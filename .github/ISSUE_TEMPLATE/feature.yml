@@ -1,0 +1,42 @@
+name: 功能建议
+description: 说说你遇到的真实场景
+labels: [idea]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        比起「想要什么功能」，「遇到了什么事」更有用：你当时以为会怎样，实际怎样，结果如何。
+  - type: textarea
+    id: story
+    attributes:
+      label: 遇到的事
+      placeholder: |
+        以为：开了自动续费，域名不用管
+        实际：付款卡被停用，自动续费没成功
+        结果：域名过期，网站打不开三天
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: 希望 Assetboard 怎么帮你
+      description: 在哪里看到什么、什么时候提醒、点一下做什么。
+  - type: dropdown
+    id: type
+    attributes:
+      label: 涉及的资产类别
+      multiple: true
+      options:
+        - 域名
+        - 服务器
+        - 代码仓库
+        - 数据库
+        - 部署服务
+        - 对象存储
+        - 订阅与工具
+        - AI 订阅
+        - 软件授权
+        - 银行卡
+        - 手机号
+        - Apple ID / Google 账号
+        - 不限

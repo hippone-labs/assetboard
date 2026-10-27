@@ -1,0 +1,145 @@
+# Only this private repository's trusted Mac runner may access the signing keychain.
+# Push an annotated vX.Y.Z tag on main, with the release notes as its message.
+name: release-app
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      notes:
+        description: Release notes (required for a manual run)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: app-production-release
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+# The signing identity and the notary keychain profile are repository variables, never written in the repository.
+env:
+  SIGNING_IDENTITY: ${{ vars.SIGNING_IDENTITY }}
+  NOTARY_PROFILE: ${{ vars.NOTARY_PROFILE }}
+
+jobs:
+  release:
+    runs-on: [self-hosted, assetboard-mini]
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Prepare release and check publishing access
+        env:
+          MANUAL_NOTES: ${{ inputs.notes }}
+          RELEASE_REF: ${{ github.ref }}
+          RELEASE_REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          test -n "$SIGNING_IDENTITY" || { echo '::error::Set the SIGNING_IDENTITY repository variable'; exit 1; }
+          test -n "$NOTARY_PROFILE" || { echo '::error::Set the NOTARY_PROFILE repository variable'; exit 1; }
+          git merge-base --is-ancestor HEAD origin/main
+          version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' desktop/Info.plist)"
+          if [[ "$RELEASE_REF" == refs/tags/* ]]; then
+            test "$RELEASE_REF_NAME" = "v$version"
+            # checkout may fetch the peeled commit into the tag ref. Restore the annotated tag object first.
+            git -c credential.helper= -c 'credential.helper=!gh auth git-credential' fetch origin "+refs/tags/$RELEASE_REF_NAME:refs/tags/$RELEASE_REF_NAME"
+            test "$(git cat-file -t "refs/tags/$RELEASE_REF_NAME")" = tag
+            test "$(git rev-parse "refs/tags/$RELEASE_REF_NAME^{commit}")" = "$(git rev-parse HEAD)"
+            git cat-file tag "refs/tags/$RELEASE_REF_NAME" | sed '1,/^$/d' > "$RUNNER_TEMP/release-notes.md"
+          else
+            test "$RELEASE_REF" = refs/heads/main
+            printf '%s\n' "$MANUAL_NOTES" > "$RUNNER_TEMP/release-notes.md"
+          fi
+          test -s "$RUNNER_TEMP/release-notes.md"
+          # Reuse the runner's existing GitHub login; never copy its personal token into repository secrets.
+          gh api repos/hippone/assetboard-site --jq '.permissions.push' | grep -qx true
+          site="$(mktemp -d "$RUNNER_TEMP/assetboard-site.XXXXXX")"
+          gh repo clone hippone/assetboard-site "$site" -- --depth=1
+          VERSION="$version" SITE_DIR="$site" python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          old = json.loads((Path(os.environ['SITE_DIR']) / 'downloads/latest.json').read_text())['version']
+          assert tuple(map(int, os.environ['VERSION'].split('.'))) > tuple(map(int, old.split('.'))), 'Bump the app version before publishing'
+          PY
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+          echo "SITE_DIR=$site" >> "$GITHUB_ENV"
+          echo "RELEASE_DIR=$RUNNER_TEMP/app-release-$GITHUB_RUN_ID" >> "$GITHUB_ENV"
+          mkdir -p "docs/releases"
+          cp "$RUNNER_TEMP/release-notes.md" "docs/releases/$version.md"
+          perl -e 'alarm 60; exec @ARGV' xcrun notarytool history --keychain-profile "$NOTARY_PROFILE" >/dev/null
+
+      - name: JavaScript tests
+        run: node --test
+
+      - name: Publishing tests
+        run: python3 -m unittest discover -s tools -p 'test_publish_site_release.py'
+
+      - name: Browser regression
+        run: |
+          export NODE_PATH="$HOME/.cache/assetboard-ci/playwright-1.64.1/node_modules"
+          node tools/browser-tests.js --port 4330
+
+      - name: Build, test, sign, notarize and package
+        run: zsh desktop/release.sh
+
+      - name: Stage site release and check links
+        run: |
+          python3 tools/publish-site-release.py --site "$SITE_DIR" \
+            --archive "$RELEASE_DIR/Assetboard-macOS-arm64-$VERSION.zip" \
+            --version "$VERSION" --notes "$RUNNER_TEMP/release-notes.md"
+          python3 "$SITE_DIR/tools/check_links.py" "$SITE_DIR"
+
+      - name: Upload signed release and notarization receipt
+        if: ${{ always() && env.RELEASE_DIR != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-${{ github.run_number }}
+          path: ${{ env.RELEASE_DIR }}
+          retention-days: 30
+          if-no-files-found: ignore
+
+      - name: Publish site commit and wait for deployment
+        run: |
+          set -euo pipefail
+          cd "$SITE_DIR"
+          git add index.html en/index.html downloads/index.html downloads/latest.json "downloads/Assetboard-macOS-arm64-$VERSION.zip"
+          git diff --cached --check
+          git -c user.name=lihaosong-code -c user.email=207678397+lihaosong-code@users.noreply.github.com commit -m "Release notarized Assetboard $VERSION"
+          site_commit="$(git rev-parse HEAD)"
+          git -c credential.helper= -c 'credential.helper=!gh auth git-credential' push origin HEAD:main
+          run_id=''
+          for attempt in {1..12}; do
+            run_id="$(gh run list --repo hippone/assetboard-site --workflow deploy-site.yml --commit "$site_commit" --json databaseId --jq '.[0].databaseId // empty')"
+            [[ -n "$run_id" ]] && break
+            sleep 5
+          done
+          test -n "$run_id"
+          gh run watch "$run_id" --repo hippone/assetboard-site --exit-status --interval 10
+
+      - name: Verify live update and archive checksum
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import { createHash } from 'node:crypto';
+          const response = await fetch(`https://assetboard.app/downloads/latest.json?release=${process.env.GITHUB_RUN_ID}`);
+          assert.equal(response.status, 200);
+          const manifest = await response.json();
+          assert.equal(manifest.version, process.env.VERSION);
+          const asset = manifest.assets.find(a => a.name === `Assetboard-macOS-arm64-${manifest.version}.zip`);
+          assert.ok(asset);
+          const zip = await fetch(asset.url);
+          assert.equal(zip.status, 200);
+          assert.equal(createHash('sha256').update(Buffer.from(await zip.arrayBuffer())).digest('hex'), asset.sha256);
+          console.log(`Published ${manifest.version}: download checksum verified`);
+          JS
+          echo "Published Assetboard $VERSION at https://assetboard.app/downloads/" >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>zh-Hans</string>
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>zh-Hans</string>
+		<string>en</string>
+	</array>
+	<key>CFBundleDisplayName</key>
+	<string>Assetboard</string>
+	<key>CFBundleDocumentTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>Assetboard 可导入的文件</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>LSHandlerRank</key>
+			<string>Alternate</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>public.comma-separated-values-text</string>
+				<string>public.tab-separated-values-text</string>
+				<string>public.json</string>
+				<string>public.email-message</string>
+				<string>com.apple.mail.email</string>
+				<string>public.png</string>
+				<string>public.jpeg</string>
+				<string>org.webmproject.webp</string>
+				<string>com.adobe.pdf</string>
+			</array>
+		</dict>
+	</array>
+	<key>CFBundleExecutable</key>
+	<string>Assetboard</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
+	<key>CFBundleIdentifier</key>
+	<string>studio.assetboard.local</string>
+	<key>CFBundleName</key>
+	<string>Assetboard</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>2026.10.6</string>
+	<key>CFBundleVersion</key>
+	<string>23</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>12.0</string>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<key>NSServices</key>
+	<array>
+		<dict>
+			<key>NSMenuItem</key>
+			<dict>
+				<key>default</key>
+				<string>添加到 Assetboard</string>
+			</dict>
+			<key>NSMessage</key>
+			<string>addText</string>
+			<key>NSPortName</key>
+			<string>Assetboard</string>
+			<key>NSSendTypes</key>
+			<array>
+				<string>NSStringPboardType</string>
+			</array>
+		</dict>
+	</array>
+	<key>NSSupportsAutomaticTermination</key>
+	<false/>
+</dict>
+</plist>

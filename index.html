@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' file:; style-src 'self' file: 'unsafe-inline'; img-src 'self' file: data: blob:; font-src 'self' file: data:; connect-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; worker-src 'none'; base-uri 'none'; form-action 'none'"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><title>Assetboard · 我的数字资产</title><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='10' fill='%2335644e'/%3E%3Ctext x='10' y='29' fill='white' font-size='30' font-family='-apple-system,Helvetica,sans-serif'%3Ea%3C/text%3E%3C/svg%3E"><link rel="stylesheet" href="styles.css"></head>
+<body>
+  <header id="topnav" class="topnav"><button class="icon-button sidebar-toggle" id="sidebar-toggle" data-action="sidebar" aria-pressed="true" aria-label="收起侧边栏" title="收起侧边栏（⌘\）"></button><div class="topnav-search"><label class="search"><span>⌕</span><input id="search" placeholder="搜索" aria-label="搜索资产"><kbd>⌘ K</kbd></label></div><div class="topnav-actions" id="topnav-actions"><button class="button icon-only" id="inbox-button" data-action="inbox" aria-label="待确认" title="待确认"></button></div></header>
+  <nav id="sidebar" class="sidebar" aria-label="视图与类别"></nav>
+  <main id="main">
+    <header id="topbar" class="appbar"><div class="view-head"><h1 id="view-title">全部资产</h1><button class="icon-button view-menu" id="view-menu" data-action="category-menu" title="类别设置" hidden>⋯</button><span id="view-meta" class="view-meta"></span></div><div class="layout-toggle privacy-wrap" id="privacy-wrap"><button class="seg-button" id="privacy-toggle" data-action="privacy" aria-pressed="false" aria-label="隐藏名称、账号和 IP" title="隐藏名称、账号和 IP"></button></div><div class="layout-toggle" id="layout-toggle" role="group" aria-label="显示方式"><button class="seg-button" data-action="layout" data-id="list" aria-pressed="true" aria-label="列表" title="列表"></button><button class="seg-button" data-action="layout" data-id="grid" aria-pressed="false" aria-label="网格" title="网格"></button></div><div class="toolbar"><div class="actions"><button class="button icon-only" id="panorama-button" data-action="panorama" aria-label="全景" title="全景（P）"></button><button class="button icon-only" id="import-button" data-action="import-hub" aria-label="导入" title="导入"></button><button class="button icon-only" id="add-block" aria-label="添加资产" title="添加资产"></button></div></div></header>
+    <div id="board" class="board" data-size="l"></div>
+    <section id="welcome" class="welcome" hidden aria-labelledby="welcome-title"><h1 id="welcome-title">从自己的资产开始</h1><div class="welcome-choices"><button class="welcome-choice primary" data-action="manual-import" title="粘贴、拖入，或直接打一行"><strong><span class="tile sm type-art" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg></span> 添加</strong></button><button class="welcome-choice" data-action="import-hub" title="拖入或粘贴 CSV、JSON、截图；无冲突直接写入，⌘Z 整批撤销"><strong><span class="tile sm type-art" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M5 20h14"/></svg></span> 导入</strong></button><button class="welcome-choice native-only" data-action="github-import" title="只读仓库元数据"><strong><span class="tile sm type-art" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 19c-4 1.5-4-2-7-2m14 5v-3.9a3.4 3.4 0 0 0-1-2.6c3.2-.3 6.5-1.5 6.5-7A5.2 5.2 0 0 0 19 4.6 4.8 4.8 0 0 0 18.9 1S17.7.7 15 2.5a10.4 10.4 0 0 0-6 0C6.3.7 5.1 1 5.1 1A4.8 4.8 0 0 0 5 4.6 5.2 5.2 0 0 0 3.5 8.5c0 5.4 3.3 6.7 6.5 7a3.4 3.4 0 0 0-1 2.6V22"/></svg></span> GitHub</strong></button><button class="welcome-choice native-only" data-action="cloudflare-import" title="只读 Zone、Pages、Workers、R2"><strong><span class="tile sm type-art" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 15.5h12a4 4 0 0 0 .4-8 6 6 0 0 0-11.5 1.8A3.5 3.5 0 0 0 3.5 15.5Z"/><path d="M15.5 15.5h5a2.5 2.5 0 0 0 0-5 3.5 3.5 0 0 0-3.3-2.4"/></svg></span> Cloudflare</strong></button></div></section>
+    <div id="empty" class="empty" hidden><span>⌕</span><h2 id="empty-title">没有结果</h2><p id="empty-note" hidden></p><button class="button" id="clear-search">清除</button></div>
+  </main>
+  <section id="panorama" class="panorama" role="dialog" aria-modal="false" aria-label="全景，登记状态，非实时" hidden></section>
+<div id="pano-live" class="sr-only" role="status" aria-live="polite"></div>
+  <aside id="detail" class="detail" hidden aria-label="资产详情"><button class="close" id="close-detail" aria-label="关闭详情">×</button><div id="detail-content"></div></aside>
+  <dialog id="modal"><div class="modal-head"><div><h2 id="modal-title"></h2></div><button class="close" id="close-modal" aria-label="关闭弹窗">×</button></div><div id="modal-content" tabindex="-1"></div></dialog>
+  <div id="menu" class="menu" role="menu" aria-label="操作" hidden></div>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <div id="keys-help" class="keys-help" role="dialog" aria-modal="true" aria-labelledby="keys-help-title" hidden></div>
+  <link rel="stylesheet" href="material.css">
+  <script src="i18n.js"></script>
+  <script src="i18n/en-shell.js"></script><script src="i18n/en-app.js"></script><script src="i18n/en-data.js"></script><script src="i18n/en-views.js"></script>
+  <!-- private:start -->
+  <script src="pro/web/en.js"></script>
+  <!-- private:end -->
+  <script src="theme.js"></script>
+  <script src="asset-data.js"></script>
+  <script src="demo-data.js"></script><script src="features.js"></script>
+  <script src="panorama.js"></script>
+  <script src="pro-slots.js"></script>
+  <script src="money-view.js"></script>
+  <!-- private:start -->
+  <script src="pro/web/money-pro.js"></script>
+  <script src="pro/web/import-pro.js"></script>
+  <script src="pro/web/probe-data.js"></script>
+  <script src="pro/web/probe-pro.js"></script>
+  <script src="pro/web/probe-ssh-data.js"></script>
+  <script src="pro/web/probe-ssh-pro.js"></script>
+  <script src="pro/web/agent-pro.js"></script>
+  <!-- private:end -->
+  <script src="app.js"></script>
+  <script src="panorama-view.js"></script>
+</body></html>

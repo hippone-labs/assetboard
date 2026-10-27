@@ -1,0 +1,104 @@
+# Signs with the Developer ID in the mini's login keychain, notarizes with the notary keychain profile (repository variables),
+# staples and uploads the zip as an artifact. It never creates a release or pushes a tag; publishing stays manual.
+name: notarize
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch, tag or commit to build
+        default: main
+        required: true
+      edition:
+        description: Which edition to sign and notarize
+        type: choice
+        options: [full, free, both]
+        default: full
+
+permissions:
+  contents: read
+
+concurrency:
+  group: notarize
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  SIGNING_IDENTITY: ${{ vars.SIGNING_IDENTITY }}
+  NOTARY_PROFILE: ${{ vars.NOTARY_PROFILE }}
+
+jobs:
+  notarize:
+    runs-on: [self-hosted, assetboard-mini]
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Signing identity is available
+        run: |
+          test -n "$SIGNING_IDENTITY" && test -n "$NOTARY_PROFILE" || { echo '::error::Set the SIGNING_IDENTITY and NOTARY_PROFILE repository variables'; exit 1; }
+          count="$(security find-identity -v -p codesigning | grep -cF "$SIGNING_IDENTITY" || true)"
+          echo "matching identities: $count"
+          [ "$count" -ge 1 ] || { echo "::error::Developer ID not found in the runner's keychain"; exit 1; }
+
+      - name: Signing key and notary profile are usable
+        run: |
+          # Signs a throwaway copy of /usr/bin/true (no timestamp) so a keychain prompt fails fast instead of hanging.
+          probe="$RUNNER_TEMP/sign-probe"; cp /usr/bin/true "$probe"
+          perl -e 'alarm 60; exec @ARGV' codesign --force --timestamp=none --sign "$SIGNING_IDENTITY" "$probe" \
+            || { echo "::error::codesign could not use the Developer ID key (locked keychain or access prompt)"; exit 1; }
+          rm -f "$probe"
+          perl -e 'alarm 60; exec @ARGV' xcrun notarytool history --keychain-profile "$NOTARY_PROFILE" >/dev/null 2>&1 \
+            || { echo "::error::notarytool cannot use the keychain profile $NOTARY_PROFILE"; exit 1; }
+          echo "codesign: ok, notary profile: ok"
+
+      - name: Build, sign, notarize, staple
+        env:
+          INPUT_REF: ${{ inputs.ref }}
+          EDITION: ${{ inputs.edition }}
+        run: |
+          set -euo pipefail
+          version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' desktop/Info.plist)"
+          short="$(git rev-parse --short HEAD)"
+          out="$RUNNER_TEMP/release"; mkdir -p "$out"
+          case "$EDITION" in full) editions=(full) ;; free) editions=(free) ;; *) editions=(full free) ;; esac
+          {
+            echo "### Notarized build of \`$INPUT_REF\` ($short), version $version"
+            echo
+            echo "| edition | zip | sha256 |"
+            echo "|---|---|---|"
+          } >> "$GITHUB_STEP_SUMMARY"
+          for edition in "${editions[@]}"; do
+            if [ "$edition" = full ]; then
+              zsh desktop/package.sh
+              app=dist/Assetboard.app; name="Assetboard-macOS-arm64-$version.zip"
+            else
+              # package.sh only knows the full edition; build.sh signs with SIGNING_IDENTITY itself.
+              ASSETBOARD_EDITION=free zsh desktop/build.sh
+              app=dist/free/Assetboard.app; name="Assetboard-Free-macOS-arm64-$version.zip"
+            fi
+            codesign --verify --deep --strict --verbose=2 "$app"
+            submit="$RUNNER_TEMP/submit-$edition.zip"
+            ditto -c -k --keepParent "$app" "$submit"
+            xcrun notarytool submit "$submit" --keychain-profile "$NOTARY_PROFILE" --wait 2>&1 | tee "$out/notary-$edition.log"
+            grep -q 'status: Accepted' "$out/notary-$edition.log" || { echo "::error::notarization of $edition not accepted"; exit 1; }
+            xcrun stapler staple "$app"
+            xcrun stapler validate "$app"
+            spctl -a -vv "$app"
+            rm -f "$submit"
+            ditto -c -k --keepParent "$app" "$out/$name"
+            sum="$(shasum -a 256 "$out/$name" | cut -d' ' -f1)"
+            echo "| $edition | $name | \`$sum\` |" >> "$GITHUB_STEP_SUMMARY"
+          done
+
+      - name: Upload notarized zips
+        uses: actions/upload-artifact@v4
+        with:
+          name: notarized-${{ inputs.edition }}-${{ github.run_number }}
+          path: ${{ runner.temp }}/release/
+          retention-days: 30
