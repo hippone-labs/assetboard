@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 安全问题（私下报告）
+    url: https://github.com/hippone/assetboard/security/advisories/new
+    about: 令牌泄露、绕过隐私模式这类问题，请私下报告，不要开公开 issue。

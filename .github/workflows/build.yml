@@ -1,0 +1,94 @@
+# Builds and tests both editions on the Mac mini (self-hosted runner "assetboard-mini", registered to this private
+# repository only). Never attach this runner to the public repository: anyone opening a PR there could run code on the mini.
+name: build
+
+on:
+  push:
+    branches: [main, 'cc/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  PLAYWRIGHT_VERSION: 1.64.1
+  PW_PORT: 4320
+  PW_PORT_FREE: 4321
+
+jobs:
+  build:
+    runs-on: [self-hosted, assetboard-mini]
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare logs
+        run: mkdir -p "$RUNNER_TEMP/logs" && node --version | tee "$RUNNER_TEMP/logs/env.log" && xcrun swiftc --version 2>&1 | tee -a "$RUNNER_TEMP/logs/env.log"
+
+      - name: node --check
+        run: git ls-files -z '*.js' | xargs -0 -n1 node --check 2>&1 | tee "$RUNNER_TEMP/logs/node-check.log"
+
+      - name: node --test
+        run: node --test 2>&1 | tee "$RUNNER_TEMP/logs/node-test.log"
+
+      - name: Set up Playwright (cached in the runner user's home)
+        run: |
+          pw_home="$HOME/.cache/assetboard-ci/playwright-$PLAYWRIGHT_VERSION"
+          if [ ! -d "$pw_home/node_modules/playwright" ]; then
+            npm install --prefix "$pw_home" --no-audit --no-fund "playwright@$PLAYWRIGHT_VERSION"
+          fi
+          "$pw_home/node_modules/.bin/playwright" install chromium
+          echo "NODE_PATH=$pw_home/node_modules" >> "$GITHUB_ENV"
+
+      - name: Playwright (full)
+        run: node tools/browser-tests.js --port "$PW_PORT" 2>&1 | tee "$RUNNER_TEMP/logs/playwright-full.log"
+
+      - name: Swift build + self-tests (full)
+        id: full
+        if: ${{ !cancelled() }}
+        run: zsh desktop/build.sh 2>&1 | tee "$RUNNER_TEMP/logs/build-full.log"
+
+      - name: Swift build + self-tests (free)
+        id: free
+        if: ${{ !cancelled() }}
+        run: ASSETBOARD_EDITION=free zsh desktop/build.sh 2>&1 | tee "$RUNNER_TEMP/logs/build-free.log"
+
+      - name: Zip apps
+        if: ${{ !cancelled() }}
+        run: |
+          short="${GITHUB_SHA::7}"
+          mkdir -p "$RUNNER_TEMP/apps"
+          [ -d dist/Assetboard.app ] && ditto -c -k --keepParent dist/Assetboard.app "$RUNNER_TEMP/apps/Assetboard-full-$short.zip"
+          [ -d dist/free/Assetboard.app ] && ditto -c -k --keepParent dist/free/Assetboard.app "$RUNNER_TEMP/apps/Assetboard-free-$short.zip"
+          ls -la "$RUNNER_TEMP/apps"
+          {
+            echo "### Build $short"
+            echo "- full: ${{ steps.full.outcome }}"
+            echo "- free: ${{ steps.free.outcome }}"
+            echo "Apps are ad-hoc signed (not notarized); use the notarize workflow for a release build."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload apps
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: apps-${{ github.sha }}
+          path: ${{ runner.temp }}/apps/*.zip
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Upload logs
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs-${{ github.sha }}
+          path: ${{ runner.temp }}/logs/
+          retention-days: 7

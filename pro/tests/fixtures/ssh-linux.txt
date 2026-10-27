@@ -1,0 +1,75 @@
+@@uname
+Linux x86_64
+@@stat1
+cpu  2411392 972 712299 47465688 473130 0 78771 168981 0 0
+@@stat2
+cpu  2411463 972 712317 47465699 473130 0 78771 168982 0 0
+@@nproc
+2
+@@meminfo
+MemTotal:        4013364 kB
+MemFree:          231072 kB
+MemAvailable:     740724 kB
+Buffers:            5840 kB
+Cached:          1922068 kB
+SwapCached:            0 kB
+Active:          1923140 kB
+Inactive:        1625800 kB
+Active(anon):    1525648 kB
+Inactive(anon):  1324536 kB
+Active(file):     397492 kB
+Inactive(file):   301264 kB
+Unevictable:           0 kB
+Mlocked:               0 kB
+SwapTotal:             0 kB
+SwapFree:              0 kB
+Dirty:               904 kB
+Writeback:             0 kB
+AnonPages:       1616832 kB
+Mapped:           413304 kB
+Shmem:           1229228 kB
+KReclaimable:      47664 kB
+Slab:             132656 kB
+SReclaimable:      47664 kB
+SUnreclaim:        84992 kB
+KernelStack:        5136 kB
+PageTables:        18036 kB
+SecPageTables:         0 kB
+NFS_Unstable:          0 kB
+Bounce:                0 kB
+WritebackTmp:          0 kB
+CommitLimit:     2006680 kB
+Committed_AS:    5444268 kB
+VmallocTotal:   34359738367 kB
+VmallocUsed:       13428 kB
+VmallocChunk:          0 kB
+Percpu:              984 kB
+HardwareCorrupted:     0 kB
+AnonHugePages:    172032 kB
+ShmemHugePages:        0 kB
+ShmemPmdMapped:        0 kB
+FileHugePages:         0 kB
+FilePmdMapped:         0 kB
+Unaccepted:            0 kB
+HugePages_Total:       0
+HugePages_Free:        0
+HugePages_Rsvd:        0
+HugePages_Surp:        0
+Hugepagesize:       2048 kB
+Hugetlb:               0 kB
+DirectMap4k:       94988 kB
+DirectMap2M:     4096000 kB
+DirectMap1G:     2097152 kB
+@@df
+Filesystem     1024-blocks    Used Available Capacity Mounted on
+/dev/sda1         10088732 7542188   2012480      79% /
+@@netdev
+Inter-|   Receive                                                |  Transmit
+ face |bytes    packets errs drop fifo frame compressed multicast|bytes    packets errs drop fifo colls carrier compressed
+    lo: 2302610032  661658    0    0    0     0          0         0 2302610032  661658    0    0    0     0       0          0
+  eth0: 17284208546 16132694    0    0    0     0          0         0 11516046893 11885114    0    0    0     0       0          0
+@@uptime
+262904.83 474656.99
+@@loadavg
+6.52 5.40 7.54 5/319 537322
+@@end

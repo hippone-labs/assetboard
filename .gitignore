@@ -1,0 +1,40 @@
+# Build output and packages
+dist/
+*.zip
+*.dmg
+*.pkg
+*.app
+
+# Logs and temporary captures
+*.log
+tmp/
+screenshots-tmp/
+.playwright-mcp/
+.workflow/
+
+# Secrets, certificates and local environment (never commit)
+.env
+.env.*
+*.p12
+*.pem
+*.cer
+*.key
+*.mobileprovision
+*.p8
+
+# Dependencies and tooling
+node_modules/
+.wrangler/
+
+# macOS metadata
+.DS_Store
+
+# Local-only notes and design docs (kept on disk, never committed)
+/ASSETBOARD-*.md
+/CLAUDE.md
+/DESIGN-PRINCIPLES.md
+/LAYOUT-VALIDATION.md
+/PROTOTYPE.md
+/THEME-DESIGN.md
+/UI-COLOR-RESEARCH.md
+/docs/

@@ -1,0 +1,38 @@
+# The site's screenshots in each language, from the demo board on the Mac mini (tools/site-screenshots.sh). Run by hand, or by
+# pushing a branch named shots/<anything> (a workflow only becomes dispatchable once it is on main); the
+# PNGs come back as an artifact and go into the site repository as WebP. Demo mode only: fictional data, nothing is saved.
+name: site-screenshots
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['shots/**']
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  screenshots:
+    runs-on: [self-hosted, assetboard-mini]
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build
+        run: zsh desktop/build.sh
+
+      - name: Screenshots
+        run: zsh tools/site-screenshots.sh "$RUNNER_TEMP/site-screenshots"
+
+      - name: Upload
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: site-screenshots-${{ github.run_number }}
+          path: ${{ runner.temp }}/site-screenshots
+          retention-days: 14
+          if-no-files-found: error

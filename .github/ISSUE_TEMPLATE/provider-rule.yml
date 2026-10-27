@@ -1,0 +1,74 @@
+name: 服务商规则
+description: 补充某个服务商过期后的处理规则、宽限期、停号规则等
+labels: [provider-rule]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Assetboard 按这些规则提醒「还剩几天能救」，规则错了用户会错过续费。请务必附**官方来源**。
+  - type: input
+    id: provider
+    attributes:
+      label: 服务商
+      placeholder: 例如 阿里云、Namecheap、giffgaff
+    validations:
+      required: true
+  - type: dropdown
+    id: type
+    attributes:
+      label: 资产类别
+      options:
+        - 域名
+        - 服务器
+        - 数据库
+        - 部署服务
+        - 对象存储
+        - 订阅与工具
+        - AI 订阅
+        - 软件授权
+        - 手机号
+        - Apple ID / Google 账号
+        - 其他
+    validations:
+      required: true
+  - type: input
+    id: scope
+    attributes:
+      label: 适用范围
+      description: 哪个产品、哪种计费方式、哪些后缀或地区。
+      placeholder: 例如 ECS 包年包月；.com/.net 等通用顶级域；英国号码
+    validations:
+      required: true
+  - type: textarea
+    id: rule
+    attributes:
+      label: 规则
+      description: 从到期日（或最后一次使用）算起，每个阶段持续几天、这段时间能做什么、之后会怎样。
+      placeholder: |
+        第 1–15 天：停机，续费后恢复，数据还在
+        第 16 天：释放实例和数据，不可恢复
+    validations:
+      required: true
+  - type: input
+    id: source
+    attributes:
+      label: 官方来源链接
+      description: 官方文档或公告。论坛帖子可以放在下面的补充里。
+    validations:
+      required: true
+  - type: textarea
+    id: quote
+    attributes:
+      label: 原文摘录
+      description: 贴出说明天数的那一两句原文，方便核对（例如「15 天内」含不含当天）。
+  - type: textarea
+    id: extra
+    attributes:
+      label: 补充
+      description: 亲身经历、论坛讨论、和官方说法不一致的地方。
+  - type: checkboxes
+    id: credit
+    attributes:
+      label: 致谢
+      options:
+        - label: 采纳后不要在发布说明里写我的名字

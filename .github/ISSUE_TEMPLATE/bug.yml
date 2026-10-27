@@ -1,0 +1,42 @@
+name: 问题反馈
+description: 哪里不对、怎么复现
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        不要贴令牌、完整卡号、完整手机号。截图请用演示模式（`--demo` 或 `?demo`）或打开隐私模式。
+  - type: textarea
+    id: what
+    attributes:
+      label: 发生了什么
+      description: 你看到的，和你期望看到的。
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 怎么复现
+      placeholder: |
+        1. 添加一个域名，到期日设为……
+        2. 点……
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: 版本
+      description: App 的版本号，或者「浏览器版」。
+      placeholder: v0.4.6
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS 版本
+      placeholder: macOS 15.4
+  - type: textarea
+    id: extra
+    attributes:
+      label: 其他信息
+      description: 截图、网络记录里相关的那几行（注意先遮住敏感信息）。
