@@ -23,10 +23,10 @@ defaults:
   run:
     shell: bash
 
-# The signing identity and the notary keychain profile are repository variables, never written in the repository.
+# The signing identity and the notary keychain profile are repository secrets (masked in the public logs), never written in the repository.
 env:
-  SIGNING_IDENTITY: ${{ vars.SIGNING_IDENTITY }}
-  NOTARY_PROFILE: ${{ vars.NOTARY_PROFILE }}
+  SIGNING_IDENTITY: ${{ secrets.SIGNING_IDENTITY }}
+  NOTARY_PROFILE: ${{ secrets.NOTARY_PROFILE }}
 
 jobs:
   release:

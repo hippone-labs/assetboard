@@ -1,4 +1,4 @@
-# Signs with the Developer ID in the mini's login keychain, notarizes with the notary keychain profile (repository variables),
+# Signs with the Developer ID in the mini's login keychain, notarizes with the notary keychain profile (repository secrets, masked in the public logs),
 # staples and uploads the zip as an artifact. It never creates a release or pushes a tag; publishing stays manual.
 name: notarize
 
@@ -27,8 +27,8 @@ defaults:
     shell: bash
 
 env:
-  SIGNING_IDENTITY: ${{ vars.SIGNING_IDENTITY }}
-  NOTARY_PROFILE: ${{ vars.NOTARY_PROFILE }}
+  SIGNING_IDENTITY: ${{ secrets.SIGNING_IDENTITY }}
+  NOTARY_PROFILE: ${{ secrets.NOTARY_PROFILE }}
 
 jobs:
   notarize:
@@ -41,7 +41,7 @@ jobs:
 
       - name: Signing identity is available
         run: |
-          test -n "$SIGNING_IDENTITY" && test -n "$NOTARY_PROFILE" || { echo '::error::Set the SIGNING_IDENTITY and NOTARY_PROFILE repository variables'; exit 1; }
+          test -n "$SIGNING_IDENTITY" && test -n "$NOTARY_PROFILE" || { echo '::error::Set the SIGNING_IDENTITY and NOTARY_PROFILE repository secrets'; exit 1; }
           count="$(security find-identity -v -p codesigning | grep -cF "$SIGNING_IDENTITY" || true)"
           echo "matching identities: $count"
           [ "$count" -ge 1 ] || { echo "::error::Developer ID not found in the runner's keychain"; exit 1; }
