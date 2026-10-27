@@ -45,8 +45,8 @@ jobs:
           RELEASE_REF_NAME: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          test -n "$SIGNING_IDENTITY" || { echo '::error::Set the SIGNING_IDENTITY repository variable'; exit 1; }
-          test -n "$NOTARY_PROFILE" || { echo '::error::Set the NOTARY_PROFILE repository variable'; exit 1; }
+          test -n "$SIGNING_IDENTITY" || { echo '::error::Set the SIGNING_IDENTITY repository secret'; exit 1; }
+          test -n "$NOTARY_PROFILE" || { echo '::error::Set the NOTARY_PROFILE repository secret'; exit 1; }
           git merge-base --is-ancestor HEAD origin/main
           version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' desktop/Info.plist)"
           if [[ "$RELEASE_REF" == refs/tags/* ]]; then
