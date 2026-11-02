@@ -15,8 +15,9 @@ version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/
 "$app/Contents/MacOS/Assetboard" --test-license
 "$app/Contents/MacOS/Assetboard" --test-update
 codesign --verify --deep --strict --verbose=2 "$app"
+notary_kc=(); [[ -n "${NOTARY_KEYCHAIN:-}" ]] && notary_kc=(--keychain "$NOTARY_KEYCHAIN")
 xcrun notarytool submit "dist/Assetboard-macOS-arm64-$version.zip" \
-  --keychain-profile "$NOTARY_PROFILE" --wait --output-format json > "$RELEASE_DIR/notary.json"
+  --keychain-profile "$NOTARY_PROFILE" "${notary_kc[@]}" --wait --output-format json > "$RELEASE_DIR/notary.json"
 /usr/bin/python3 -c 'import json,sys; assert json.load(open(sys.argv[1]))["status"] == "Accepted", "Notarization rejected"' "$RELEASE_DIR/notary.json"
 xcrun stapler staple "$app"
 xcrun stapler validate "$app"

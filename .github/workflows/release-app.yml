@@ -29,6 +29,9 @@ defaults:
 env:
   SIGNING_IDENTITY: ${{ secrets.SIGNING_IDENTITY }}
   NOTARY_PROFILE: ${{ secrets.NOTARY_PROFILE }}
+  # Optional: the password of a dedicated signing keychain (~/Library/Keychains/assetboard-signing.keychain-db) holding only the
+  # Developer ID certificate and the notary profile. Without it the runner's login keychain is used and must already be unlocked.
+  SIGNING_KEYCHAIN_PASSWORD: ${{ secrets.SIGNING_KEYCHAIN_PASSWORD }}
 
 jobs:
   release:
@@ -39,6 +42,18 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+
+      - name: Unlock the signing keychain
+        if: ${{ env.SIGNING_KEYCHAIN_PASSWORD != '' }}
+        run: |
+          set -euo pipefail
+          kc="$HOME/Library/Keychains/assetboard-signing.keychain-db"
+          test -f "$kc" || { echo "::error::$kc not found"; exit 1; }
+          security unlock-keychain -p "$SIGNING_KEYCHAIN_PASSWORD" "$kc"
+          security set-keychain-settings -lut 7200 "$kc"
+          # codesign finds the identity through the search list; notarytool is pointed at the keychain explicitly.
+          security list-keychains -d user | xargs | grep -qF "$kc" || security list-keychains -d user -s "$kc" $(security list-keychains -d user | xargs)
+          echo "NOTARY_KEYCHAIN=$kc" >> "$GITHUB_ENV"
 
       - name: Prepare release and check publishing access
         env:
@@ -78,7 +93,8 @@ jobs:
           echo "RELEASE_DIR=$RUNNER_TEMP/app-release-$GITHUB_RUN_ID" >> "$GITHUB_ENV"
           mkdir -p "docs/releases"
           cp "$RUNNER_TEMP/release-notes.md" "docs/releases/$version.md"
-          perl -e 'alarm 60; exec @ARGV' xcrun notarytool history --keychain-profile "$NOTARY_PROFILE" >/dev/null
+          notary_kc=(); [[ -n "${NOTARY_KEYCHAIN:-}" ]] && notary_kc=(--keychain "$NOTARY_KEYCHAIN")
+          perl -e 'alarm 60; exec @ARGV' xcrun notarytool history --keychain-profile "$NOTARY_PROFILE" ${notary_kc[@]+"${notary_kc[@]}"} >/dev/null
 
       - name: JavaScript tests
         run: node --test
@@ -106,6 +122,10 @@ jobs:
             --archive "$RELEASE_DIR/Assetboard-macOS-arm64-$VERSION.zip" \
             --version "$VERSION" --notes "$RUNNER_TEMP/release-notes.md"
           python3 "$SITE_DIR/tools/check_links.py" "$SITE_DIR"
+
+      - name: Lock the signing keychain
+        if: ${{ always() && env.SIGNING_KEYCHAIN_PASSWORD != '' }}
+        run: security lock-keychain "$HOME/Library/Keychains/assetboard-signing.keychain-db" || true
 
       - name: Upload signed release and notarization receipt
         if: ${{ always() && env.RELEASE_DIR != '' }}
