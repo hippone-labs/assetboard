@@ -542,10 +542,10 @@ func testProbeSources() {
     }
     precondition(ProbeSourceConfig(["id": "../x", "kind": "cfsm", "url": "https://status.example.com"]) == nil, "ids are plain")
     precondition(ProbeSourceConfig(["id": "a1", "kind": "unknown", "url": "https://status.example.com"]) == nil, "kinds are known")
-    let panel = ProbeSourceConfig.panelURL("https://status.example.com/panel")!
-    precondition(ProbeSourceConfig.sameServer(panel, ProbeSourceConfig.panelURL("https://STATUS.example.com:443/other")!), "Same scheme, host and port: the same server")
+    let panelHome = ProbeSourceConfig.panelURL("https://status.example.com/panel")!
+    precondition(ProbeSourceConfig.sameServer(panelHome, ProbeSourceConfig.panelURL("https://STATUS.example.com:443/other")!), "Same scheme, host and port: the same server")
     for moved in ["https://status.example.net", "http://status.example.com", "https://status.example.com:8443", "https://192.0.2.10"] {
-        precondition(!ProbeSourceConfig.sameServer(panel, ProbeSourceConfig.panelURL(moved)!), "Another server: \(moved)")
+        precondition(!ProbeSourceConfig.sameServer(panelHome, ProbeSourceConfig.panelURL(moved)!), "Another server: \(moved)")
     }
 
     // Sources live in their own defaults; the page gets the user name at most, never a password. Accounts round-trip as JSON; an
