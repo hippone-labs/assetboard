@@ -66,9 +66,11 @@ async (page) => {
  ({p,context,errors}=await setup());
  try {
   await p.evaluate(()=>{state={blocks:[],assets:[],deletedExternalIds:[]};history=[];future=[];render();});
-  await p.evaluate(()=>routeImportText('名称,类别\nalpha.dev,域名\nbeta.dev,域名\n'));
-  check(!(await p.evaluate(()=>document.querySelector('#modal')?.open)),'No preview when there is no conflict');
-  check(await p.evaluate(()=>state.assets.map(a=>a.name).sort().join(',')),'alpha.dev,beta.dev');
+  // A quoted note may run over several lines; it stays in its record.
+  await p.evaluate(()=>routeImportText('名称,类别,备注\nalpha.dev,域名,"two\nlines, with a comma"\nbeta.dev,域名,\n'));
+  check(!(await p.evaluate(()=>document.querySelector('#modal')?.open)),'No preview when there is no conflict and nothing was dropped');
+  check(await p.evaluate(()=>state.assets.map(a=>a.name).sort().join(',')==='alpha.dev,beta.dev'),'Two records, no broken-off line: '+await p.evaluate(()=>state.assets.map(a=>a.name).join()));
+  check(await p.evaluate(()=>state.assets.find(a=>a.name==='alpha.dev').notes==='two\nlines, with a comma'),'The note keeps both lines');
   await p.evaluate(()=>undo());
   check(await p.evaluate(()=>state.assets.length===0),'Batch undo clears both rows');
  } finally { await context.close(); }

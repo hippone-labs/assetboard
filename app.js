@@ -1000,6 +1000,7 @@ function importPreviewHtml(plan,meta={}){
   ${group('hold',tr('同名'),[...(plan.collisions||[]),...(plan.skippedSame||[])],(row,i)=>`<label class="check-label import-row"><input type="checkbox" name="import-same" value="${esc(row.assetId)}"><strong>${name(row)}</strong>${facts(row)}${type(row)}</label>`,tr('默认跳过，勾选则覆盖'))}
   ${group('hold',tr('已删除'),plan.skippedDeleted||[],row=>`<label class="check-label import-row"><input type="checkbox" name="import-restore" value="${esc(row.key)}"><strong>${name(row)}</strong>${facts(row)}${type(row)}</label>`,tr('默认跳过，勾选则恢复'))}
   ${group('quiet',tr('已隐藏'),plan.hidden||[],line,tr('更新后仍隐藏'))}
+  ${group('bad',tr('已拒收'),meta.refused||[],row=>`<div class="import-row"><strong>${esc(row.name&&!secretKinds(row.name).length?row.name:(row.found||[]).map(kind=>SECRET_KINDS[kind]).join(tr('、')))}</strong>${row.name?`<span class="chip">${esc((row.found||[]).map(kind=>SECRET_KINDS[kind]).join(tr('、')))}</span>`:''}${row.line?`<span class="chip">${tr('第 {n} 行',{n:row.line})}</span>`:''}</div>`,tr('有完整卡号、私钥、令牌或 TOTP 密钥，整行没有读入'))}
   ${group('bad',tr('没读懂'),meta.unreadable||[],row=>`<div class="import-row"><strong>${esc(row.reason||tr('无法识别'))}</strong>${row.line?`<span class="chip">${tr('第 {n} 行',{n:row.line})}</span>`:''}</div>`)}
   <div class="confirm-actions"><button class="button primary" data-action="import-apply">${tr('导入')}</button><button class="button" data-action="import-hub" title="${tr('返回导入')}" aria-label="${tr('返回导入')}">${ui('back')}</button></div>
  </div>`;
@@ -1026,8 +1027,11 @@ function runImportPlan(plan,meta={}){
  importPlan=plan;
  // A file handed over from outside the window always stops at the preview, and stays queued until it is imported.
  const from=importFrom;if(from)from.used=true;importIntakeId=from?.id||null;
- const skipped=plan.skippedSame?.length||0;const needsPreview=!!(from?.preview||plan.conflicts||(meta.unreadable||[]).length||meta.truncated||plan.mode==='replace');
- if(from&&!(plan.added||[]).length&&!(plan.updated||[]).length&&!(plan.hidden||[]).length&&!skipped&&!(plan.skippedDeleted||[]).length&&!(meta.unreadable||[]).length){from.used=false;importIntakeId=null;toast(tr('没有可导入的内容'));return;}
+ const skipped=plan.skippedSame?.length||0;
+ // Whenever anything was left out (secret columns, refused rows, fields not imported), the preview says so before anything is written.
+ const dropped=(meta.droppedSecrets||[]).length+(meta.refused||[]).length+(meta.leftOut||[]).length;
+ const needsPreview=!!(from?.preview||plan.conflicts||(meta.unreadable||[]).length||meta.truncated||dropped||plan.mode==='replace');
+ if(from&&!(plan.added||[]).length&&!(plan.updated||[]).length&&!(plan.hidden||[]).length&&!skipped&&!(plan.skippedDeleted||[]).length&&!(meta.unreadable||[]).length&&!dropped){from.used=false;importIntakeId=null;toast(tr('没有可导入的内容'));return;}
 
  if(!needsPreview){
   const empty=!(plan.added||[]).length&&!(plan.updated||[]).length&&!(plan.hidden||[]).length;
@@ -1040,19 +1044,19 @@ function runImportPlan(plan,meta={}){
 function importCsvText(text,{filename=''}={}){
  const parsed=parseDelimitedText(text);
  if(!parsed.ok){toast(parsed.error||tr('无法解析表格'));return;}
- const {items,unreadable,preset,droppedSecrets,truncated,totalRows}=rowsToImportItems(parsed,{types:Object.keys(cats)});
+ const {items,unreadable,refused,preset,droppedSecrets,truncated,totalRows}=rowsToImportItems(parsed,{types:Object.keys(cats)});
  const plan=planImport(state,items,{sameName:'skip'});
  if(unreadable.length)plan.conflicts=true;
- runImportPlan(plan,{unreadable,preset,droppedSecrets,truncated,totalRows,note:filename});
+ runImportPlan(plan,{unreadable,refused,preset,droppedSecrets,truncated,totalRows,note:filename});
 }
 // CF-Server-Monitor's 导出服务器 file: its servers land as server assets, like a table would; nothing is sent to the panel.
 function importCfsmText(text,{filename=''}={}){
  const parsed=parseCfsmBackup(text);
  if(!parsed.ok){toast(parsed.error);return;}
- const {items,unreadable,preset,droppedSecrets,leftOut,truncated,totalRows}=parsed;
+ const {items,unreadable,refused,preset,droppedSecrets,leftOut,truncated,totalRows}=parsed;
  const plan=planImport(state,items,{sameName:'skip'});
  if(unreadable.length)plan.conflicts=true;
- runImportPlan(plan,{unreadable,preset,droppedSecrets,leftOut,truncated,totalRows,note:filename});
+ runImportPlan(plan,{unreadable,refused,preset,droppedSecrets,leftOut,truncated,totalRows,note:filename});
 }
 // Agent files ({"assetboard":1,"items":[…]}), however they arrive, always stop at the preview; nothing is written until it is confirmed.
 function importAgentTexts(files){
@@ -1066,11 +1070,11 @@ function importAgentTexts(files){
  if(problems.length)toast(problems.join(tr('；')));
  if(!rows.length)return;
  const limited=rows.slice(0,IMPORT_ROW_LIMIT).map((row,index)=>({...row,_line:index+1}));
- const {items,unreadable}=rowsToImportItems({ok:true,headers:AGENT_FIELDS,rows:limited},{types:Object.keys(cats)});
+ const {items,unreadable,refused}=rowsToImportItems({ok:true,headers:AGENT_FIELDS,rows:limited},{types:Object.keys(cats)});
  const plan=planImport(state,items,{sameName:'skip'});
  plan.conflicts=true;
  importKind='csv';
- runImportPlan(plan,{unreadable,truncated:truncated||rows.length>IMPORT_ROW_LIMIT,totalRows:total,note:names.join(tr('、'))});
+ runImportPlan(plan,{unreadable,refused,truncated:truncated||rows.length>IMPORT_ROW_LIMIT,totalRows:total,note:names.join(tr('、'))});
 }
 // One queue for everything handed over: files dropped in the window, files from the Dock or "Open With", text from the
 // Services menu and files an agent leaves in the Inbox folder. The next item opens only when nothing else is on screen,
@@ -1138,7 +1142,7 @@ function openIntake(id){
   finishIntake(id);captureDialog();
   const box=$('#capture-text');box.value=item.text;box.focus();box.setSelectionRange(0,0);return;
  }
- const kind=classifyImportPayload({text:item.text,filename:item.name,mime:item.mime}).kind;
+ const kind=importGate({text:item.text,filename:item.name,mime:item.mime}).kind;
  if(['csv','json','agent','cfsm'].includes(kind)){
   const from={id,preview:item.source!=='window',used:false};importFrom=from;
   try{routeImportText(item.text,{filename:item.name,mime:item.mime});}finally{importFrom=null;if(!from.used)finishIntake(id);}
@@ -1301,6 +1305,10 @@ function agentFields(input,type,base=null){
   const value=raw===null||raw===undefined?'':typeof raw==='number'?String(raw):key==='ips'&&Array.isArray(raw)?raw.join(', '):raw;
   if(typeof value!=='string')return {error:`${key} 需要是文字`};
   const text=value.trim();
+  // The import gate's row check (`secretKinds`): no field of a record takes a full card number, a private key, a token or a TOTP secret.
+  const found=secretKinds(text);
+  if(found.includes('card'))return {error:`${key} 像是完整卡号；Assetboard 只保存卡号后 4 位（last4）`};
+  if(found.length)return {error:`${key} 里像是私钥、访问令牌或 TOTP 密钥；Assetboard 不保存密钥`};
   // 找回 and 备份 (research round 4): only for the types they apply to, places only.
   if(['mfa','mfaWhere','recoveryCodes','vault','legacy','backup','backupNote','restoreTestedOn','importance'].includes(key)){
    const types=key==='importance'?null:key==='legacy'?Object.keys(LEGACY_WORDS):['mfa','mfaWhere','recoveryCodes','vault'].includes(key)?RECOVERY_TYPES:BACKUP_TYPES;
@@ -1315,7 +1323,6 @@ function agentFields(input,type,base=null){
   if(key in AGENT_TEXT_FIELDS){
    if(text.length>AGENT_TEXT_FIELDS[key])return {error:`${key} 最多 ${AGENT_TEXT_FIELDS[key]} 字`};
    if(key==='project'){fields.project=cleanProject(text);continue;}
-   if(looksLikeCardNumber(text))return {error:`${key} 像是完整卡号；Assetboard 只保存卡号后 4 位（last4）`};
    fields[key]=text;
   }else if(key==='date'){const date=text?parseLooseDate(text):'';if(text&&!date)return {error:'date 无法识别，请用 2027-03-01'};fields.date=date;}
   else if(key==='dateKind'){if(!dateKinds[text])return {error:`dateKind 只能是 ${Object.keys(dateKinds).join('、')}`};fields.dateKind=text;}
@@ -1624,7 +1631,7 @@ window.assetboardAgent=call=>{
  catch(error){return send({ok:false,error:String(error?.message||error)});}
 };
 function importJsonText(text,{filename='',mode}={}){
- const backup=parseBoardBackup(text);
+ const {backup,refused}=screenBackup(parseBoardBackup(text));
  if(!backup.ok){toast(backup.error||tr('无法读取备份'));return;}
  const chosen=mode||'merge';
  const plan=planBoardBackup(state,backup,{mode:chosen});
@@ -1635,7 +1642,7 @@ function importJsonText(text,{filename='',mode}={}){
  importKind='json';
  const modeNote=chosen==='replace'?tr('整体替换'):tr('合并');
  const extra=chosen==='merge'?`<label class="check-label"><input type="checkbox" id="import-replace">${tr('替换整个资产板（可撤销）')}</label>`:'';
- runImportPlan(plan,{note:`${filename?filename+' · ':''}${modeNote}`,unreadable:[]});
+ runImportPlan(plan,{note:`${filename?filename+' · ':''}${modeNote}`,unreadable:[],refused});
  // If preview opened, inject replace checkbox
  if($('#import-preview')&&chosen==='merge'){
   const actions=$('#import-preview .confirm-actions');
@@ -1645,9 +1652,12 @@ function importJsonText(text,{filename='',mode}={}){
 function importEmlText(raw,{filename=''}={}){
  const parsed=parseEml(raw);
  if(!parsed.ok){toast(parsed.error||tr('无法解析邮件'));return;}
- pasteRow={id:'eml-'+Date.now(),kind:'paste',source:parsed.from||'',title:(parsed.subject||filename||tr('邮件')).slice(0,80),body:`From: ${parsed.from}\nSubject: ${parsed.subject}\nDate: ${parsed.date}\n\n${parsed.body}`,importedAt:new Date().toISOString()};
+ // The decoded mail passes the gate's text check before it becomes a review card or goes to the AI.
+ const screened=screenText(`From: ${parsed.from}\nSubject: ${parsed.subject}\nDate: ${parsed.date}\n\n${parsed.body}`);
+ if(!screened.ok){notice(importRefusal({reason:'secrets',found:screened.found,filename}));return;}
+ pasteRow={id:'eml-'+Date.now(),kind:'paste',source:parsed.from||'',title:(parsed.subject||filename||tr('邮件')).slice(0,80),body:screened.text,importedAt:new Date().toISOString()};
  pasteRecorded=new Set();candidateReview(buildPasteCandidate());aiAutoPaste();
- 
+ if(screened.cards)toast(tr('完整卡号已遮住，只留后 4 位'));
 }
 // One detection at a time, and an answer is reused for LOCAL_CLI_FRESH_MS: opening the import window again does not re-run gh.
 // The answer only redraws the gh / SSH row. (It used to redraw the whole window, which asked again: an endless loop of gh runs.)
@@ -1678,16 +1688,29 @@ window.assetboardSshResult=result=>{
  syncFollowUp('SSH',merge,[]);
 };
 
+// One line for what the import gate refused (`importGate`): nothing of it was read into records, evidence or the AI.
+function importRefusal(gate){
+ const name=gate.filename?String(gate.filename).split(/[\\/]/).pop().slice(0,100):'';
+ if(gate.reason==='passwords')return tr('这是密码管理器导出，没有读入，用完请删掉这个文件');
+ if(gate.reason==='secret')return tr('{name} 是密钥文件，没有读入',{name});
+ if(gate.reason==='other')return tr('{name}：不支持这种文件，表格请另存为 CSV',{name});
+ const found=(gate.found||[]).map(kind=>SECRET_KINDS[kind]).join(tr('、'));
+ return name?tr('{name} 里有{found}，没有读入',{name,found}):tr('这段文字里有{found}，没有读入',{found});
+}
 function routeImportText(text,{filename='',mime=''}={}){
- const classified=classifyImportPayload({text,filename,mime});
+ const classified=importGate({text,filename,mime});
+ if(classified.kind==='refused'){notice(importRefusal(classified));return;}
  if(classified.kind==='csv'){importKind='csv';importCsvText(classified.text||text,{filename});return;}
  if(classified.kind==='agent'){importAgentTexts([{name:filename||'JSON',text:classified.text||text}]);return;}
  if(classified.kind==='json'){importKind='json';importJsonText(classified.text||text,{filename});return;}
  if(classified.kind==='cfsm'){importKind='csv';importCfsmText(classified.text||text,{filename});return;}
  if(classified.kind==='eml'){importEmlText(classified.text||text,{filename});return;}
  if(classified.kind==='paste'){
-  pasteRow={id:'paste-'+Date.now(),kind:'paste',source:'',title:String(text).split('\n')[0].slice(0,60),body:String(text),importedAt:new Date().toISOString()};
-  pasteRecorded=new Set();candidateReview(buildPasteCandidate());aiAutoPaste();return;
+  const body=classified.text;
+  pasteRow={id:'paste-'+Date.now(),kind:'paste',source:'',title:body.split('\n')[0].slice(0,60),body,importedAt:new Date().toISOString()};
+  pasteRecorded=new Set();candidateReview(buildPasteCandidate());if(classified.ai)aiAutoPaste();
+  if(classified.maskedCards)toast(tr('完整卡号已遮住，只留后 4 位'));
+  return;
  }
  if(classified.kind==='empty'){toast(tr('没有可导入的内容'));return;}
  if(classified.kind==='copy'){notice(({'网页':tr('网页导不进来'),'日历':tr('这是导出的日历，只用来阅读，导不回来'),'付款账本':tr('这是导出的付款账本，只用来阅读，导不回来'),'交接清单':tr('这是导出的交接清单，只用来阅读，导不回来')}[classified.copy]||tr('这是导出的{what}，只用来阅读，导不回来',{what:classified.copy}))+tr('；要恢复资产，导入「导出 › 资产备份」的 .json'));return;}
@@ -1695,13 +1718,14 @@ function routeImportText(text,{filename='',mime=''}={}){
 }
 // Files dropped or pasted in the window. Screenshots and PDFs go to this Mac's OCR and land in 待确认; tables, backups and
 // mails join the intake queue, so several at once open one after another instead of the last one replacing the rest.
+// Secret files, spreadsheets and other binary formats are named and left unread (`importFileKind`).
 async function handleImportFiles(files){
- const list=[...files],images=[],texts=[];
+ const list=[...files],images=[],texts=[],refused=[];
  for(const file of list.slice(0,20)){
-  const kind=classifyImportPayload({filename:file.name,mime:file.type}).kind;
-  (kind==='image'||kind==='pdf'?images:texts).push(file);
+  const kind=importFileKind(file.name,file.type);
+  (kind==='image'||kind==='pdf'?images:kind==='text'?texts:refused).push(file);
  }
- const skipped=[list.length>20&&tr('另外 {n} 个文件未读取，一次最多 20 个',{n:list.length-20}),images.length>10&&nativeStore&&!demoMode&&tr('另外 {n} 张截图或 PDF 未识别，一次最多 10 个',{n:images.length-10})].filter(Boolean);
+ const skipped=[...refused.map(file=>importRefusal({reason:importFileKind(file.name,file.type),filename:file.name})),list.length>20&&tr('另外 {n} 个文件未读取，一次最多 20 个',{n:list.length-20}),images.length>10&&nativeStore&&!demoMode&&tr('另外 {n} 张截图或 PDF 未识别，一次最多 10 个',{n:images.length-10})].filter(Boolean);
  if(images.length){
   if(!nativeStore){notice(tr('截图和 PDF 只在 Mac App 里可用'));}
   else if(demoMode){notice(tr('演示模式不识别截图和 PDF；正式模式下会在本机识别'));}
@@ -1717,7 +1741,7 @@ async function handleImportFiles(files){
  const entries=[];
  for(const file of texts)entries.push({source:'window',name:file.name,mime:file.type,text:await file.text()});
  queueIntake(entries);
- if(skipped.length)toast(skipped.join(tr('；')));
+ if(skipped.length)(refused.length?notice:toast)(skipped.join(tr('；')));
 }
 function typingTarget(el){return !!el&&(el.closest?.('input,textarea,select,[contenteditable="true"]')||['INPUT','TEXTAREA','SELECT'].includes(el.tagName));}
 function installImportDropPaste(){
@@ -1825,12 +1849,14 @@ function captureGo(manual=false){
  const text=($('#capture-text')?.value||'').trim();
  const fallback=captureType||'subscription';
  if(!text){if(manual)assetForm(fallback);else $('#capture-text')?.focus();return;}
- const plain=classifyImportPayload({text}).kind==='paste';
+ const gate=importGate({text});
+ if(gate.kind==='refused'){notice(importRefusal(gate));return;}
+ const plain=gate.kind==='paste';
  const useAi=!manual&&plain&&nativeStore&&!demoMode&&aiReady();
  const line=!/\n/.test(text)&&text.length<=120&&plain?parseQuickLine(text):null;
  // A line naming a domain, IP or repository is read here by the rules, free and at once; anything less clear goes to the model.
  if(line?.name&&(!useAi||line.type)){const {type,...fill}=line;assetForm(type||fallback,null,fill);return;}
- if(useAi){captureAi(text);return;}
+ if(useAi){captureAi(gate.text);return;}
  if(manual){assetForm(fallback,null,{name:text.split('\n')[0].slice(0,100)});return;}
  routeImportText(text);
 }
@@ -2016,8 +2042,8 @@ window.assetboardAIResult=result=>{
  if(result.ok&&result.evidenceId){const row=evidenceRows.find(item=>item.id===result.evidenceId);if(row){row.payload=JSON.stringify({...evidencePayload(row),ai:result.ai});evidenceVersion++;}}
  const resolve=aiRequests.get(result.requestId);aiRequests.delete(result.requestId);resolve?.(result);
 };
-// Imported mail and text go to the configured AI as screenshots do (the AI setting 自动识别); the rules stay the fallback and the
-// first reading. Recognizing English bills is the AI's job: the rules know Chinese wording.
+// Imported mail and pasted text go to the configured AI as screenshots do (the AI setting 自动识别; a dropped text file waits for
+// a click, see `importGate`); the rules stay the fallback and the first reading. Recognizing English bills is the AI's job: the rules know Chinese wording.
 function aiAutoPaste(){if(aiReady()&&nativeStore.ai.autoImages!==false)aiRecognizeCandidate('paste');}
 async function aiRecognizeCandidate(key){
  const c=findCandidate(key);if(!c||aiBusy.has(key)||!aiReady())return;
@@ -2092,7 +2118,7 @@ function resolveCandidate(key,status,assetId,index=null){
  const decision=index!==null&&c.ai?.items.length>1&&state.evidenceDecisions[c.ai.rowId];if(decision)decision.recorded=[...new Set([...(decision.recorded||[]),index])];
  return c.pendingIds.length;
 }
-document.addEventListener('submit',e=>{if(e.target.id!=='paste-form')return;e.preventDefault();const text=$('#paste-text').value.trim();if(!text){$('#paste-text').focus();return;}pasteRow={id:'paste-'+Date.now(),kind:'paste',source:'',title:text.split('\n')[0].slice(0,60),body:text,importedAt:new Date().toISOString()};pasteRecorded=new Set();candidateReview(buildPasteCandidate());aiAutoPaste();});
+document.addEventListener('submit',e=>{if(e.target.id!=='paste-form')return;e.preventDefault();const raw=$('#paste-text').value.trim();if(!raw){$('#paste-text').focus();return;}const screened=screenText(raw);if(!screened.ok){notice(importRefusal({reason:'secrets',found:screened.found}));return;}const text=screened.text;pasteRow={id:'paste-'+Date.now(),kind:'paste',source:'',title:text.split('\n')[0].slice(0,60),body:text,importedAt:new Date().toISOString()};pasteRecorded=new Set();candidateReview(buildPasteCandidate());aiAutoPaste();if(screened.cards)toast(tr('完整卡号已遮住，只留后 4 位'));});
 function settings(id){if(!cats[id])return;const count=state.assets.filter(a=>a.type===id).length;
  modal(`${cats[id].name} · ${tr('类别')}`,`<div class="settings-actions"><button class="button" data-action="move-up" data-id="${id}">${tr('向上移动')}</button><button class="button" data-action="move-down" data-id="${id}">${tr('向下移动')}</button>${count?'':`<button class="button" data-action="remove-block" data-id="${id}">${tr('从侧边栏移除')}</button>`}</div><p class="form-note">${tr('也可以在侧边栏拖动类别，或选中后按 ⌥ + ↑ ↓。')}</p>`);}
 // 设置 (⌘, in the Mac app, the sidebar's 设置): the one place for viewer settings, optional features and connections. Each switch acts at
