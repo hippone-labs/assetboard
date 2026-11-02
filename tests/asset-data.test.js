@@ -468,21 +468,171 @@ test('enforces the 100-row import limit',()=>{
 });
 
 test('merges a JSON backup by id and can replace',()=>{
- const current={blocks:[{id:'domain',width:50}],assets:[{id:'keep',type:'domain',name:'old.com',source:'manual',notes:'local'}],deletedExternalIds:[]};
- const backup=parseBoardBackup(JSON.stringify({blocks:[{id:'domain',width:50},{id:'server',width:50}],assets:[{id:'keep',type:'domain',name:'new.com',source:'manual',notes:'from backup'},{id:'extra',type:'server',name:'box',source:'manual'}]}));
+ const current={blocks:[{id:'domain',width:50}],assets:[{id:'keep',type:'domain',name:'old.com',source:'manual',notes:'local',updatedAt:'2026-01-01T00:00:00Z'}],deletedExternalIds:[]};
+ const backup=parseBoardBackup(JSON.stringify({blocks:[{id:'domain',width:50},{id:'server',width:50}],assets:[{id:'keep',type:'domain',name:'new.com',source:'manual',notes:'from backup',updatedAt:'2026-02-01T00:00:00Z'},{id:'extra',type:'server',name:'box',source:'manual'}]}));
  const mergePlan=planBoardBackup(current,backup,{mode:'merge'});
  assert.equal(mergePlan.added.length,1);
  assert.equal(mergePlan.updated.length,1);
- assert.equal(mergePlan.conflicts,false);
+ assert.equal(mergePlan.preview,true,'a restore always opens the preview');
  const merged=applyBoardBackup(current,mergePlan);
  assert.equal(merged.assets.find(a=>a.id==='keep').name,'new.com');
  assert.equal(merged.assets.find(a=>a.id==='keep').notes,'from backup');
  assert.ok(merged.assets.some(a=>a.id==='extra'));
  const replacePlan=planBoardBackup(current,backup,{mode:'replace'});
- assert.equal(replacePlan.conflicts,true);
+ assert.equal(replacePlan.preview,true);
  const replaced=applyBoardBackup(current,replacePlan);
  assert.equal(replaced.assets.length,2);
  assert.ok(replaced.blocks.some(b=>b.id==='server'));
+});
+
+const {touchAsset,editedTime,addTombstone,cleanTombstones,TOMBSTONE_LIMIT,backupCounts,settleLinks,mergeBoardSettings}=require('../asset-data.js');
+const backupBoard=(assets,extra={})=>parseBoardBackup(JSON.stringify({blocks:[{id:'domain'}],assets,exportedAt:'2026-03-01T00:00:00Z',...extra}));
+test('backup merge keeps the newer local record and takes the newer backup one, row by row',()=>{
+ const current={blocks:[{id:'domain'}],deletedExternalIds:[],assets:[
+  {id:'mine',type:'domain',name:'new-name.example.com',date:'2028-01-01',updatedAt:'2026-10-29T00:00:00Z',payments:[{id:'p',paidOn:'2026-10-01',amount:10,currency:'USD'}]},
+  {id:'theirs',type:'domain',name:'stale.example.com',updatedAt:'2026-01-01T00:00:00Z'},
+  {id:'same',type:'domain',name:'same.example.com',updatedAt:'2026-01-01T00:00:00Z'}]};
+ const backup=backupBoard([
+  {id:'mine',type:'domain',name:'old-name.example.com',date:'2027-01-01',updatedAt:'2026-01-01T00:00:00Z'},
+  {id:'theirs',type:'domain',name:'fresh.example.com',updatedAt:'2026-02-01T00:00:00Z'},
+  {id:'same',type:'domain',name:'same.example.com',updatedAt:'2026-01-01T00:00:00Z'}]);
+ assert.equal(backup.exportedAt,'2026-03-01T00:00:00Z');
+ const plan=planBoardBackup(current,backup);
+ assert.equal(plan.exportedAt,'2026-03-01T00:00:00Z');
+ assert.deepEqual(plan.newerLocal.map(r=>r.assetId),['mine']);
+ assert.deepEqual(plan.updated.map(r=>r.assetId),['theirs']);
+ assert.deepEqual(plan.same.map(r=>r.assetId),['same']);
+ assert.equal(plan.newerLocal[0].localAt,Date.parse('2026-10-29T00:00:00Z'));
+ assert.equal(plan.newerLocal[0].backupAt,Date.parse('2026-01-01T00:00:00Z'));
+ const merged=applyBoardBackup(current,plan);
+ const mine=merged.assets.find(a=>a.id==='mine');
+ assert.equal(mine.name,'new-name.example.com','the newer local record is kept');
+ assert.equal(mine.date,'2028-01-01');
+ assert.equal(mine.payments.length,1);
+ assert.equal(merged.assets.find(a=>a.id==='theirs').name,'fresh.example.com','the newer backup record is taken');
+ assert.deepEqual(backupCounts(plan),{added:0,updated:1,restored:0,removed:0,kept:1});
+ // The person may pick per row: take the older backup copy, keep the local one.
+ const picked=applyBoardBackup(current,plan,{take:['mine']});
+ assert.equal(picked.assets.find(a=>a.id==='mine').name,'old-name.example.com');
+ assert.ok(!('payments' in picked.assets.find(a=>a.id==='mine')),'a taken copy replaces the record whole');
+ assert.equal(picked.assets.find(a=>a.id==='theirs').name,'stale.example.com');
+ assert.deepEqual(backupCounts(plan,{take:['mine']}),{added:0,updated:1,restored:0,removed:0,kept:1});
+ // Records without any time are kept local by default.
+ const bare=planBoardBackup({blocks:[],assets:[{id:'x',type:'domain',name:'a'}]},backupBoard([{id:'x',type:'domain',name:'b'}]));
+ assert.deepEqual(bare.newerLocal.map(r=>r.assetId),['x']);
+});
+test('a manual record deleted after the backup stays deleted; one deleted before it comes back',()=>{
+ const board={blocks:[],assets:[],deletedExternalIds:[]};
+ addTombstone(board,'gone','2026-10-29T00:00:00Z');
+ addTombstone(board,'old','2025-12-01T00:00:00Z');
+ assert.deepEqual(board.deletedRecords.map(t=>t.id),['old','gone']);
+ const backup=backupBoard([
+  {id:'gone',type:'domain',name:'gone.example.com',updatedAt:'2026-01-01T00:00:00Z'},
+  {id:'old',type:'domain',name:'old.example.com',updatedAt:'2026-01-01T00:00:00Z'},
+  {id:'new',type:'domain',name:'new.example.com'}]);
+ const plan=planBoardBackup(board,backup);
+ assert.deepEqual(plan.skippedDeleted.map(r=>r.key),['gone']);
+ assert.equal(plan.skippedDeleted[0].deletedAt,'2026-10-29T00:00:00Z');
+ assert.deepEqual(plan.added.map(r=>r.item.id),['old','new'],'a tombstone older than the backup copy does not hold it');
+ const merged=applyBoardBackup(board,plan);
+ assert.ok(!merged.assets.some(a=>a.id==='gone'));
+ assert.deepEqual(merged.deletedRecords.map(t=>t.id),['gone'],'tombstones of records that came back are dropped');
+ const restored=applyBoardBackup(board,plan,{restoreKeys:['gone']});
+ assert.ok(restored.assets.some(a=>a.id==='gone'));
+ assert.ok(!restored.deletedRecords);
+ assert.equal(backupCounts(plan,{restoreKeys:['gone']}).restored,1);
+ // Tombstones are deduplicated, sorted and capped; bad entries are dropped.
+ const many=Array.from({length:TOMBSTONE_LIMIT+5},(_,i)=>({id:'t'+i,at:new Date(Date.UTC(2026,0,1)+i*1000).toISOString()}));
+ const clean=cleanTombstones([...many,{id:'t0',at:'2027-01-01T00:00:00Z'},{id:'',at:'2026-01-01'},{id:'x',at:'nope'},null]);
+ assert.equal(clean.length,TOMBSTONE_LIMIT);
+ assert.equal(clean.at(-1).id,'t0','the newest stone of an id wins');
+ assert.ok(!clean.some(t=>t.id==='t1'),'the oldest go first');
+ // Tombstones travel in the backup and join the local ones.
+ const carried=planBoardBackup({blocks:[],assets:[]},backupBoard([],{deletedRecords:[{id:'far',at:'2026-02-01T00:00:00Z'}]}));
+ assert.deepEqual(applyBoardBackup({blocks:[],assets:[]},carried).deletedRecords,[{id:'far',at:'2026-02-01T00:00:00Z'}]);
+});
+test('board settings come back with a backup, so auto icons are not switched back on',()=>{
+ const backup=backupBoard([],{autoIcons:false,rdapAuto:true,iconSites:{'acme.example':'https://acme.example'},paymentsSince:'2025-05-01',agentActions:[{id:'old'}],nonsense:1});
+ assert.equal(backup.board.autoIcons,false);
+ assert.equal(backup.board.rdapAuto,true);
+ assert.ok(!('nonsense' in backup.board)&&!('agentActions' in backup.board));
+ // A new Mac: nothing set, paymentsSince is today.
+ const fresh={blocks:[],assets:[],paymentsSince:'2026-11-02',agentActions:[{id:'here'}]};
+ const plan=planBoardBackup(fresh,backup);
+ assert.deepEqual(plan.settings,{autoIcons:false,rdapAuto:true,iconSites:{'acme.example':'https://acme.example'},paymentsSince:'2025-05-01'});
+ const merged=applyBoardBackup(fresh,plan);
+ assert.equal(merged.autoIcons,false);
+ assert.equal(merged.rdapAuto,true);
+ assert.equal(merged.paymentsSince,'2025-05-01');
+ assert.deepEqual(merged.agentActions,[{id:'here'}]);
+ // What the local board set stays; icon sites combine with the local choice winning.
+ assert.deepEqual(mergeBoardSettings({rdapAuto:true,iconSites:{'acme.example':'https://mine.example','b.example':'https://b.example'},paymentsSince:'2024-01-01'},{iconSites:{'acme.example':'https://acme.example','c.example':'https://c.example'},paymentsSince:'2025-05-01'}),
+  {iconSites:{'acme.example':'https://mine.example','b.example':'https://b.example','c.example':'https://c.example'}});
+ // Invalid values are not carried.
+ assert.ok(!('autoIcons' in backupBoard([],{autoIcons:'no'}).board));
+ // Replace takes the backup's settings, keeps this Mac's pending agent requests.
+ const replaced=applyBoardBackup({...fresh,autoIcons:false,rdapAuto:true},planBoardBackup({...fresh,autoIcons:false,rdapAuto:true},backupBoard([]),{mode:'replace'}));
+ assert.ok(!('autoIcons' in replaced)&&!('rdapAuto' in replaced));
+ assert.equal(replaced.paymentsSince,'2026-11-02');
+ assert.deepEqual(replaced.agentActions,[{id:'here'}]);
+});
+test('replacing the board lists the local records it deletes and counts against the old board',()=>{
+ const current={blocks:[{id:'domain'}],assets:[{id:'a',type:'domain',name:'a.example.com'},{id:'b',type:'domain',name:'b.example.com'},{id:'c',type:'domain',name:'c.example.com',updatedAt:'2026-10-01T00:00:00Z'},{id:'d',type:'domain',name:'d.example.com'}],deletedExternalIds:[]};
+ const backup=backupBoard([{id:'a',type:'domain',name:'a.example.com'},{id:'z',type:'domain',name:'z.example.com'}],{autoIcons:false});
+ const plan=planBoardBackup(current,backup,{mode:'replace'});
+ assert.deepEqual(plan.removed.map(r=>r.name),['b.example.com','c.example.com','d.example.com']);
+ assert.equal(plan.removed[1].localAt,Date.parse('2026-10-01T00:00:00Z'));
+ assert.deepEqual(plan.added.map(r=>r.item.id),['z']);
+ assert.deepEqual(plan.updated.map(r=>r.assetId),['a']);
+ assert.deepEqual(plan.settings,{autoIcons:false});
+ assert.deepEqual(backupCounts(plan),{added:1,updated:1,restored:0,removed:3,kept:0});
+ const next=applyBoardBackup(current,plan);
+ assert.deepEqual(next.assets.map(a=>a.id),['a','z']);
+ assert.equal(next.autoIcons,false);
+});
+test('every write stamps the record; a GitHub repository keeps GitHub\'s updatedAt',()=>{
+ const D=require('../asset-data.js'),now='2026-11-02T10:00:00.000Z';
+ const a=touchAsset({id:'a'},now),g=touchAsset({id:'g',source:'github',updatedAt:'2026-01-01T00:00:00Z'},now);
+ assert.equal(a.updatedAt,now);
+ assert.equal(g.updatedAt,'2026-01-01T00:00:00Z');
+ assert.equal(g.editedAt,now);
+ assert.equal(editedTime(g),Date.parse(now));
+ assert.equal(editedTime({createdAt:'2026-01-01T00:00:00Z'}),Date.parse('2026-01-01T00:00:00Z'));
+ assert.equal(editedTime(null),0);
+ const assets=[{id:'card',type:'bankcard',name:'c'},{id:'acct',type:'subscription',name:'s'},{id:'phone',type:'phone',name:'p'}];
+ assert.ok(D.linkAssets(assets,'card','acct'));
+ assert.ok(assets[0].updatedAt&&assets[1].updatedAt,'linking stamps both ends');
+ for(const x of assets)delete x.updatedAt;
+ assert.ok(D.unlinkAssets(assets,'card','acct'));
+ assert.ok(assets[0].updatedAt&&assets[1].updatedAt,'unlinking stamps both ends');
+ for(const x of assets)delete x.updatedAt;
+ D.linkAssets(assets,'card','phone');for(const x of assets)delete x.updatedAt;
+ assert.ok(D.setCardPays(assets,'phone','card',true)&&assets[2].updatedAt,'marking a card as paying stamps the number');
+ delete assets[2].updatedAt;D.removeLinksTo(assets,'card');
+ assert.ok(assets[2].updatedAt,'a delete stamps what linked to it');
+ const paid={id:'s',type:'subscription',name:'s',cycle:'monthly',date:'2026-12-01',dateKind:'renew',cost:'$5/月'};
+ assert.ok(D.recordPayment(paid,{paidOn:'2026-11-01',amount:5,currency:'USD'})&&paid.updatedAt,'a payment stamps');
+ delete paid.updatedAt;
+ assert.ok(D.removePayment(paid,paid.payments[0].id)&&paid.updatedAt,'removing a payment stamps');
+ delete paid.updatedAt;
+ assert.ok(D.renewAsset(paid,{until:'2027-01-01'}).ok&&paid.updatedAt,'a renewal stamps');
+});
+test('after a merge a one-sided link is settled by the side changed last',()=>{
+ // The account came back from the backup holding the old card; locally the card was unlinked and a new card linked later.
+ const assets=[
+  {id:'acct',type:'subscription',name:'s',links:['card1'],updatedAt:'2026-01-01T00:00:00Z'},
+  {id:'card1',type:'bankcard',name:'c1',links:[],updatedAt:'2026-10-01T00:00:00Z'},
+  {id:'card2',type:'bankcard',name:'c2',links:['acct'],updatedAt:'2026-10-01T00:00:00Z'}];
+ settleLinks(assets,new Set(['acct']));
+ assert.deepEqual(assets[0].links,['card2'],'the old card goes, the new card is linked back');
+ // A record taken from a newer backup links to a local one: the link is completed.
+ const b=[{id:'x',type:'subscription',name:'x',links:['y'],updatedAt:'2026-10-01T00:00:00Z'},{id:'y',type:'bankcard',name:'y',updatedAt:'2026-01-01T00:00:00Z'}];
+ settleLinks(b,new Set(['x']));
+ assert.deepEqual(b[1].links,['x']);
+ // Pairs the merge did not touch are left alone.
+ const c=[{id:'x',type:'subscription',name:'x',links:['y']},{id:'y',type:'bankcard',name:'y'}];
+ settleLinks(c,new Set());
+ assert.ok(!c[1].links);
 });
 
 
