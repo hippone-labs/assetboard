@@ -1,6 +1,5 @@
 # Tests and deploys the purchase worker (pro/worker: Stripe webhook → signed licence → Resend mail → /thanks) to Cloudflare, on a
-# GitHub-hosted runner. Manual only: run it from the Actions tab of this private repository once the placeholders in
-# pro/worker/wrangler.toml (PAYMENT_LINK, PRO_PRODUCT, the KV namespace id) are filled; the job stops while any is left.
+# GitHub-hosted runner. Manual only: run it from the Actions tab. The job stops if configuration placeholders remain.
 # Repository settings it reads:
 #   secret   CLOUDFLARE_API_TOKEN   a Cloudflare API token with Workers Scripts Edit, Workers KV Storage Edit and Workers Routes Edit
 #                                   (custom domain pay.assetboard.app) on the account that holds the assetboard.app zone
