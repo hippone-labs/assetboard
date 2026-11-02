@@ -1,4 +1,4 @@
-# Signs, notarizes and publishes on the self-hosted Mac mini, the only machine with the signing keychain and the notary profile.
+# Signs, notarizes and publishes on the self-hosted Mac labelled hans-mac, which holds the signing keychain and the notary profile.
 # That runner is attached to this public repository: no workflow that runs on it has a pull_request trigger, and a pull request
 # from outside must not be approved to run workflows while it stays attached. Ordinary builds and tests run on GitHub-hosted
 # runners (build.yml). Push an annotated vX.Y.Z tag on main, with the release notes as its message.
@@ -32,7 +32,7 @@ env:
 
 jobs:
   release:
-    runs-on: [self-hosted, assetboard-mini]
+    runs-on: [self-hosted, macOS, ARM64, hans-mac]
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
@@ -88,7 +88,7 @@ jobs:
 
       - name: Browser regression
         run: |
-          # Cached in the runner user's home; build.yml no longer runs on the mini, so this step sets it up itself.
+          # Cached in the runner user's home; this step sets it up itself.
           pw_home="$HOME/.cache/assetboard-ci/playwright-1.64.1"
           if [ ! -d "$pw_home/node_modules/playwright" ]; then
             npm install --prefix "$pw_home" --no-audit --no-fund playwright@1.64.1
