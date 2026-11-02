@@ -34,12 +34,12 @@ function proLicenceSection(row){
  return [row(tr('状态'),`<span class="pro-state${licensed?' ok':''}" id="pro-state">${esc(proStateText())}</span>`),
   licensed?'':`<p class="pro-price">${tr('{price} 一次买断，终身更新；你自己的 Mac 不限台数。',{price:esc(PRO_PRICE)})}</p>`,
   licensed?'':row(tr('购买'),`<button class="button primary" data-action="pro-buy">${tr('购买 Pro（{price}）↗',{price:esc(PRO_PRICE)})}</button>`,tr('在浏览器里打开 Stripe 结账页；付完的页面和邮件给出许可证。App 不访问任何服务器')),
-  licensed?'':row(tr('输入许可证'),`<span class="pro-key-row"><input id="pro-key" class="pro-key" autocomplete="off" spellcheck="false" aria-label="${tr('输入许可证')}" placeholder="${tr('粘贴 ASB1. 开头的那段文本')}"><button id="pro-activate" class="button" data-action="pro-activate">${tr('激活')}</button></span>`),
+  licensed?'':row(tr('输入许可证'),`<span class="pro-key-row"><input id="pro-key" class="pro-key" autocomplete="off" spellcheck="false" aria-label="${tr('输入许可证')}" placeholder="${tr('以 ASB1. 开头的文本')}"><button id="pro-activate" class="button" data-action="pro-activate">${tr('激活')}</button></span>`),
   licensed?'':`<p id="pro-status" class="form-note pro-status" role="status"></p>`,
   licensed?'':row(tr('找回许可证'),`<button class="button" data-action="pro-recover">${tr('找回 ↗')}</button>`,tr('在浏览器里打开找回页，填购买时的邮箱，许可证会再发一遍')),
   licensed?row(tr('移除许可证'),`<button class="button" data-action="pro-remove">${tr('移除…')}</button>`,tr('删除本机保存的许可证，下次启动回到免费版；数据不变')):'',
   `<details class="pro-includes"><summary>${tr('Pro 包含')}</summary>${list(PRO_INCLUDES)}<p class="form-note">${tr('即将推出')}</p>${list(PRO_COMING)}</details>`,
-  `<p class="form-note platform-note">${ui('lock')}${tr('许可证在本机离线验证，不联网；没有 Pro 时 Pro 记下的数据照常显示。')}</p>`].join('');
+  `<p class="form-note platform-note">${ui('lock')}${tr('许可证在本机离线验证，不联网。')}</p>`].join('');
 }
 function proActivate(){
  const input=$('#pro-key'),text=(input?.value||'').trim(),status=$('#pro-status');
