@@ -181,7 +181,7 @@ test('handoverHtml lists live records by category, escapes everything and can ma
  assert.ok(html.indexOf('<h2>域名</h2>')<html.indexOf('<h2>银行卡</h2>'));
  assert.ok(html.includes('me@example.org')&&html.includes('Visa •••• 4242，发卡方停业'),'the card row carries its status');
  const masked=handoverHtml(board,{now:at('2026-10-21'),mask:true,types:{domain:'域名'}});
- assert.ok(!masked.includes('me@example.org')&&masked.includes('名称和账号已遮挡'));
+ assert.ok(!masked.includes('me@example.org')&&masked.includes('名称、账号、地址、备注和链接已遮挡'));
 });
 
 test('rdapFacts reads the expiry and registrar; rdapCompare checks the stored date',()=>{

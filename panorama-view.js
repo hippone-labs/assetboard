@@ -19,8 +19,8 @@ const panoSkip=()=>({skip:projectsOn()?[]:['project']});
 const panoLensDef=()=>PANORAMA_LENSES.find(l=>l.key===panoLens)||PANORAMA_LENSES[0];
 const panoHidden=()=>Array.isArray(panoHide[panoLens])?panoHide[panoLens]:[];
 const panoModel=()=>buildPanorama(state.assets,{lens:panoLens,cardOrder:state.cardOrder||{},hide:panoHidden()});
-// Presentation (v13b P6): addresses lose their middle (hover or ⌥ shows them), the bar fades after 3 s, the body scales up to 1.5× on big screens.
-const pIp=ip=>privacy||(panoShow&&!panoAlt)?maskIp(ip):ip;
+// Presentation (v13b P6): addresses lose their middle (maskAsset's present set) (hover or ⌥ shows them), the bar fades after 3 s, the body scales up to 1.5× on big screens.
+const pIp=ip=>privacy||(panoShow&&!panoAlt)?maskValue('ips',ip):ip;
 // Width of the panorama itself: the middle column beside the sidebar (the whole window when the sidebar folds into a strip).
 const panoW=()=>$('#panorama')?.clientWidth||innerWidth;
 const panoZoom=()=>panoShow&&panoW()>=1500?Math.min(1.5,panoW()/1200):1;
@@ -423,7 +423,7 @@ function panoKeys(e,key){
 document.addEventListener('keyup',e=>{if(panoOpen&&panoShow&&e.key==='Alt'&&panoAlt){panoAlt=false;panoramaRender();}},true);
 document.addEventListener('pointermove',()=>{if(panoOpen&&panoShow)panoWake();},true);
 let panoRevealed=null;
-const panoCover=()=>{if(panoRevealed?.isConnected&&!panoAlt)panoRevealed.textContent=maskIp(panoRevealed.dataset.full);panoRevealed=null;};
+const panoCover=()=>{if(panoRevealed?.isConnected&&!panoAlt)panoRevealed.textContent=maskValue('ips',panoRevealed.dataset.full);panoRevealed=null;};
 document.addEventListener('pointerover',e=>{if(!panoOpen||!panoShow||e.pointerType!=='mouse')return;const n=e.target.closest?.('#panorama .ip-text[data-full]');if(n===panoRevealed)return;panoCover();if(n){n.textContent=n.dataset.full;panoRevealed=n;}},true);
 document.addEventListener('pointerleave',()=>panoCover(),true);
 

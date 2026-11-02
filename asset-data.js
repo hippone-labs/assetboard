@@ -770,7 +770,44 @@ function maskName(value){
  const body=[...(suffix?text.slice(0,dot):text)];
  return body.length<=1?`•${suffix}`:`${body[0]}${'•'.repeat(Math.min(6,body.length-1))}${suffix}`;
 }
-function maskEmail(value){const text=String(value||'').trim(),at=text.lastIndexOf('@');if(at<1)return text;const user=text.slice(0,at);return `${user.slice(0,user.length>2?2:1)}•••${text.slice(at)}`;}
+// An address keeps the start of its user part; with domain, its domain is masked as a name too (the handover list).
+function maskEmail(value,{domain=false}={}){const text=String(value||'').trim(),at=text.lastIndexOf('@');if(at<1)return text;const user=text.slice(0,at);return `${user.slice(0,user.length>2?2:1)}•••@${domain?maskName(text.slice(at+1)):text.slice(at+1)}`;}
+// One mask for every way a record leaves the board: privacy mode (screen), presentation mode (present), the handover list, the
+// calendar file and what external tools read (agent). A set names the fields it masks, and `mail` masks every e-mail address in
+// any text of the record; the calendar set drops what it names, so only the category and the days are written. maskValue is
+// the rule for one field; a masked value always holds MASK_MARK, which is how a write of a masked value is told apart (hasMask).
+const MASK_MARK='•';
+const MASK_SETS={
+ screen:{mask:['name','account','host','ips']},
+ present:{mask:['ips']},
+ handover:{mask:['name','account','host','sshUser','ips','phone','notes','url','mail'],domain:true},
+ agent:{mask:['ips','host','sshUser','phone','mail']},
+ calendar:{drop:['name','provider','account','project','cost','notes','url','purpose','reason']}
+};
+const MAIL_PATTERN=/[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}/g;
+function maskMail(text,{domain=false}={}){return String(text).replace(MAIL_PATTERN,found=>maskEmail(found,{domain}));}
+function maskValue(key,value,{domain=false}={}){
+ if(Array.isArray(value))return value.map(item=>maskValue(key,item,{domain}));
+ const text=String(value??'').trim();if(!text)return value;
+ if(key==='ips')return maskIp(text)||`${MASK_MARK.repeat(3)}`;
+ if(key==='host')return normalizeIp(text)?maskIp(text):maskName(text);
+ if(key==='account')return text.includes('@')?maskEmail(text,{domain}):maskName(text);
+ if(key==='phone')return maskPhone(text)||MASK_MARK.repeat(3);
+ if(key==='notes')return MASK_MARK.repeat(6);
+ if(key==='url'){try{const url=new URL(text);return `${url.protocol}//${maskName(url.hostname)}${url.pathname.length>1||url.search?'/…':''}`;}catch{return maskName(text);}}
+ return maskName(text);
+}
+// A masked copy of one record under a set (a MASK_SETS name or {mask, drop, domain}); the record itself is left as it is.
+function maskAsset(asset,set){
+ const rule=typeof set==='string'?MASK_SETS[set]:set;if(!asset||!rule)return asset;
+ const out={...asset},opts={domain:!!rule.domain},mask=rule.mask||[];
+ for(const key of rule.drop||[])if(key in out)out[key]='';
+ for(const key of mask)if(key!=='mail'&&out[key]!=null&&out[key]!=='')out[key]=maskValue(key,out[key],opts);
+ if(mask.includes('mail'))for(const [key,value] of Object.entries(out))if(key!=='id'&&typeof value==='string'&&value.includes('@')&&!/^data:/.test(value))out[key]=maskMail(value,opts);
+ return out;
+}
+// Whether a value (text, or a list or object of them) holds the mask mark.
+function hasMask(value){return typeof value==='string'?value.includes(MASK_MARK):Array.isArray(value)?value.some(hasMask):!!value&&typeof value==='object'&&Object.values(value).some(hasMask);}
 
 // Card expiry is written MM/YY or MM/YYYY and stored as the last day of that month.
 function cardExpiry(value){const match=/^\s*(0?[1-9]|1[0-2])\s*\/\s*(\d{2}|\d{4})\s*$/.exec(String(value||''));if(!match)return null;const year=match[2].length===2?2000+Number(match[2]):Number(match[2]);return isoDay(Date.UTC(year,Number(match[1]),0)/DAY_MS);}
@@ -2342,7 +2379,9 @@ function reviewQueue(assets,{now=new Date(),currency='CNY',rates}={}){
 }
 
 // Calendar export (RFC 5545): one all-day event per dated record, repeating with its cycle, with alarms at 09:00 on the same
-// lead days as the app's own reminders. Text is escaped and lines are folded at 75 octets.
+// lead days as the app's own reminders. Text is escaped and lines are folded at 75 octets. With minimal (只写类别和天数) each event
+// says only its category and how many days are left: maskAsset's calendar set drops every other text, and the UID is a hash of
+// the record id (ids of synced records name the zone or the host).
 function icsText(value){return String(value??'').replace(/\\/g,'\\\\').replace(/;/g,'\\;').replace(/,/g,'\\,').replace(/\r?\n/g,'\\n');}
 function icsFold(line){
  const bytes=text=>new TextEncoder().encode(text).length;if(bytes(line)<=75)return line;
@@ -2351,18 +2390,28 @@ function icsFold(line){
  parts.push(current);return parts.join('\r\n ');
 }
 function icsDate(value){return value.replace(/-/g,'');}
-function calendarIcs(assets,{now=new Date(),name='Assetboard'}={}){
+// A repeat every `months` months from date. Past the 28th the app keeps the day where the month has it and takes the month's last
+// day otherwise (addMonths); a plain FREQ=MONTHLY would skip the months without that day (RFC 5545 §3.3.10 drops invalid dates).
+function icsRepeat(date,months){
+ const day=Number(date.slice(8,10)),base=`RRULE:FREQ=MONTHLY;INTERVAL=${months}`;
+ if(day<=28)return base;
+ if(day===31)return `${base};BYMONTHDAY=-1`;
+ return `${base};BYMONTHDAY=${Array.from({length:day-27},(_,i)=>28+i).join(',')};BYSETPOS=-1`;
+}
+function icsHash(text){let a=0x811c9dc5,b=0x01000193;for(const ch of String(text)){const c=ch.codePointAt(0);a=Math.imul(a^c,0x01000193)>>>0;b=Math.imul(b^c,0x5bd1e995)>>>0;}return a.toString(16).padStart(8,'0')+b.toString(16).padStart(8,'0');}
+function calendarIcs(assets,{now=new Date(),name='Assetboard',minimal=false,types={}}={}){
  const stamp=now.toISOString().replace(/[-:]/g,'').replace(/\.\d+Z$/,'Z'),lines=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Assetboard//Renewals//ZH','CALSCALE:GREGORIAN','METHOD:PUBLISH',`X-WR-CALNAME:${icsText(name)}`];
- for(const asset of assets||[]){
-  if(asset.hiddenAt||asset.stopped||!asset.name||dayNumber(asset.date)===null)continue;
+ for(const real of assets||[]){
+  if(real.hiddenAt||real.stopped||!real.name||dayNumber(real.date)===null)continue;
+  const asset=minimal?{...maskAsset(real,'calendar'),name:types[real.type]||real.type||'Assetboard'}:real;
   const kind=dateKinds[asset.dateKind]?asset.dateKind:'expire',months=billingCycles[asset.cycle]?.months,cost=asset.cost&&asset.cost!=='未知'?asset.cost:'';
   const details=[asset.provider&&asset.provider!=='平台待补充'?tr('平台：{value}',{value:asset.provider}):'',cost&&tr('费用：{value}',{value:cost}),asset.account&&tr('账号：{value}',{value:asset.account}),asset.project&&tr('项目：{value}',{value:asset.project})].filter(Boolean).join('\n');
-  lines.push('BEGIN:VEVENT',`UID:${icsText(asset.id)}@assetboard.local`,`DTSTAMP:${stamp}`,`DTSTART;VALUE=DATE:${icsDate(asset.date)}`,`DTEND;VALUE=DATE:${icsDate(isoDay(dayNumber(asset.date)+1))}`,`SUMMARY:${icsText(dateStatusWords[kind][4](asset.name))}`);
-  if(months)lines.push(`RRULE:FREQ=MONTHLY;INTERVAL=${months}`);
+  lines.push('BEGIN:VEVENT',`UID:${minimal?icsHash(real.id):icsText(real.id)}@assetboard.local`,`DTSTAMP:${stamp}`,`DTSTART;VALUE=DATE:${icsDate(asset.date)}`,`DTEND;VALUE=DATE:${icsDate(isoDay(dayNumber(asset.date)+1))}`,`SUMMARY:${icsText(dateStatusWords[kind][4](asset.name))}`);
+  if(months)lines.push(icsRepeat(asset.date,months));
   if(details)lines.push(`DESCRIPTION:${icsText(details)}`);
   if(/^https?:\/\//.test(asset.url||'')&&!/\/\/example\.com/.test(asset.url))lines.push(`URL:${asset.url}`);
   lines.push('TRANSP:TRANSPARENT');
-  for(const lead of reminderLeads(asset))lines.push('BEGIN:VALARM','ACTION:DISPLAY',`DESCRIPTION:${icsText(`${asset.name} ${dateWhen(kind,lead)}`)}`,`TRIGGER:-P${lead>1?lead-1+'D':''}T15H`,'END:VALARM');
+  for(const lead of reminderLeads(real))lines.push('BEGIN:VALARM','ACTION:DISPLAY',`DESCRIPTION:${icsText(`${asset.name} ${dateWhen(kind,lead)}`)}`,`TRIGGER:-P${lead>1?lead-1+'D':''}T15H`,'END:VALARM');
   lines.push('END:VEVENT');
  }
  lines.push('END:VCALENDAR');
@@ -2370,21 +2419,22 @@ function calendarIcs(assets,{now=new Date(),name='Assetboard'}={}){
 }
 
 // 交接清单: one self-contained page someone else can follow without the app — what exists, where it lives, what it costs, when it
-// is due and how it is paid. Optional masking hides names, accounts and addresses the same way privacy mode does.
+// is due and how it is paid. Masking (maskAsset's handover set) hides names, accounts with their mail domains, addresses, SSH
+// targets and users, numbers, notes and management links.
 function escHtml(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function handoverHtml(board,{now=new Date(),mask=false,types={},order=[],owner=''}={}){
- const assets=(board?.assets||[]).filter(asset=>!asset.hiddenAt),veilName=text=>mask&&text?maskName(text):text||'',veilAccount=text=>mask&&text?(String(text).includes('@')?maskEmail(text):maskName(text)):text||'';
+ const assets=(board?.assets||[]).filter(asset=>!asset.hiddenAt),veil=asset=>mask?maskAsset(asset,'handover'):asset;
  const ids=[...new Set([...order,...assets.map(asset=>asset.type)])].filter(type=>assets.some(asset=>asset.type===type));
  const day=isoDay(localDay(now)),money=new Map();
  for(const asset of assets){const m=costAmount(asset);if(m?.months&&!asset.stopped)money.set(m.currency,(money.get(m.currency)||0)+m.value/m.months);}
  const totals=[...money].map(([currency,value])=>tr('{money} / 月',{money:formatMoney(value,currency)})).join(' + ');
- const card=asset=>{
-  const status=assetDateStatus(asset,now),link=/^https?:\/\//.test(asset.url||'')&&!/\/\/example\.com/.test(asset.url)?asset.url:'';
-  const linked=linkedAssets(board.assets||[],asset).filter(other=>!other.hiddenAt).map(other=>tr('{label}：{value}',{label:escHtml(linkKind(asset,other).label),value:escHtml(veilName(other.type==='bankcard'&&other.last4?`${other.name} •••• ${other.last4}`:other.name))}));
-  const ips=assetIps(asset).map(x=>mask?maskIp(x.ip):x.ip);
+ const card=real=>{
+  const asset=veil(real),status=assetDateStatus(real,now),link=/^https?:\/\//.test(real.url||'')&&!/\/\/example\.com/.test(real.url)?asset.url:'';
+  const linked=linkedAssets(board.assets||[],real).filter(other=>!other.hiddenAt).map(other=>{const shown=veil(other).name;return tr('{label}：{value}',{label:escHtml(linkKind(real,other).label),value:escHtml(other.type==='bankcard'&&other.last4?`${shown} •••• ${other.last4}`:shown)});});
+  const ips=assetIps(real).map(x=>mask?maskValue('ips',x.ip):x.ip);
   const kindLabel=(dateKinds[asset.dateKind]||dateKinds.expire).label,when=billingCycles[asset.cycle]?tr('{a}，{b}',{a:kindLabel,b:billingCycles[asset.cycle].label}):kindLabel;
-  const rows=[[tr('平台'),asset.provider==='平台待补充'?'':asset.provider],[tr('账号'),veilAccount(asset.account)],[tr('项目'),asset.project],[tr('下一日期'),status.level==='none'?'':tr('{date}（{what}）',{date:status.date,what:when})],[tr('费用'),asset.cost&&asset.cost!=='未知'?asset.cost:''],[tr('地址'),ips.join('  ')],['SSH',asset.host?`${asset.sshUser?asset.sshUser+'@':''}${mask?maskName(asset.host):asset.host}${asset.sshPort?':'+asset.sshPort:''}`:''],[tr('卡'),[asset.last4?`${asset.network||''} •••• ${asset.last4}`.trim():'',CARD_STATUSES[asset.cardStatus]||''].filter(Boolean).join(tr('，'))],[tr('重要程度'),IMPORTANCE[asset.importance]||''],[tr('用途'),asset.purpose&&asset.purpose!==types[asset.type]?asset.purpose:''],[tr('找回'),recoveryText(asset)],[tr('备份'),backupText(asset)],[tr('保留原因'),asset.reason],[tr('状态'),asset.stopped?tr('已停用'):'']].filter(([,v])=>v);
-  return `<article><h3>${escHtml(veilName(asset.name))}</h3><dl>${rows.map(([k,v])=>`<dt>${k}</dt><dd>${escHtml(v)}</dd>`).join('')}${link?`<dt>${tr('管理')}</dt><dd><a href="${escHtml(link)}">${escHtml(link)}</a></dd>`:''}${linked.length?`<dt>${tr('关联')}</dt><dd>${linked.join('<br>')}</dd>`:''}</dl>${asset.notes?`<p class="notes">${escHtml(asset.notes)}</p>`:''}</article>`;
+  const rows=[[tr('平台'),asset.provider==='平台待补充'?'':asset.provider],[tr('账号'),asset.account],[tr('项目'),asset.project],[tr('下一日期'),status.level==='none'?'':tr('{date}（{what}）',{date:status.date,what:when})],[tr('费用'),asset.cost&&asset.cost!=='未知'?asset.cost:''],[tr('地址'),ips.join('  ')],['SSH',asset.host?`${asset.sshUser?asset.sshUser+'@':''}${asset.host}${asset.sshPort?':'+asset.sshPort:''}`:''],[tr('卡'),[asset.last4?`${asset.network||''} •••• ${asset.last4}`.trim():'',CARD_STATUSES[asset.cardStatus]||''].filter(Boolean).join(tr('，'))],[tr('重要程度'),IMPORTANCE[asset.importance]||''],[tr('用途'),asset.purpose&&asset.purpose!==types[asset.type]?asset.purpose:''],[tr('找回'),recoveryText(asset)],[tr('备份'),backupText(asset)],[tr('保留原因'),asset.reason],[tr('状态'),asset.stopped?tr('已停用'):'']].filter(([,v])=>v);
+  return `<article><h3>${escHtml(asset.name)}</h3><dl>${rows.map(([k,v])=>`<dt>${k}</dt><dd>${escHtml(v)}</dd>`).join('')}${link?`<dt>${tr('管理')}</dt><dd>${mask?escHtml(link):`<a href="${escHtml(link)}">${escHtml(link)}</a>`}</dd>`:''}${linked.length?`<dt>${tr('关联')}</dt><dd>${linked.join('<br>')}</dd>`:''}</dl>${asset.notes?`<p class="notes">${escHtml(asset.notes)}</p>`:''}</article>`;
  };
  const due=upcomingEvents(assets,now,90);
  return `<!doctype html><html lang="${trLocale()}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${tr('资产交接清单 {day}',{day})}</title><style>
@@ -2398,9 +2448,9 @@ article{padding:14px 16px;border:1px solid var(--line);border-radius:12px;margin
 dl{display:grid;grid-template-columns:88px 1fr;gap:2px 12px;margin:0}dt{color:var(--muted)}dd{margin:0;overflow-wrap:anywhere}
 .notes{white-space:pre-wrap;margin:8px 0 0;color:var(--muted)}a{color:var(--accent)}ol{padding-left:20px}li{margin:4px 0}
 .due{color:var(--muted)}@media print{body{padding:0}article{border-color:#ccc}}
-</style></head><body><h1>${tr('资产交接清单')}</h1><p class="lead">${owner?escHtml(owner)+' · ':''}${tr('由 Assetboard 生成于 {day}',{day})}${mask?' · '+tr('名称和账号已遮挡'):''}${tr('。这里只有记录，没有密码；登录方式请按各项的账号去找。')}</p>
+</style></head><body><h1>${tr('资产交接清单')}</h1><p class="lead">${owner?escHtml(owner)+' · ':''}${tr('由 Assetboard 生成于 {day}',{day})}${mask?' · '+tr('名称、账号、地址、备注和链接已遮挡'):''}${tr('。这里只有记录，没有密码；登录方式请按各项的账号去找。')}</p>
 <div class="summary"><div><b>${assets.length}</b><span>${tr('项资产')}</span></div>${totals?`<div><b>${escHtml(totals)}</b><span>${tr('周期费用')}</span></div>`:''}<div><b>${due.length}</b><span>${tr('项 90 天内到期或扣款')}</span></div></div>
-${due.length?`<h2>${tr('最先要处理的')}</h2><ol>${due.map(({asset,status})=>`<li>${escHtml(veilName(asset.name))} <span class="due">· ${escHtml(status.label)}${asset.cost&&asset.cost!=='未知'?' · '+escHtml(asset.cost):''}</span></li>`).join('')}</ol>`:''}
+${due.length?`<h2>${tr('最先要处理的')}</h2><ol>${due.map(({asset,status})=>`<li>${escHtml(veil(asset).name)} <span class="due">· ${escHtml(status.label)}${asset.cost&&asset.cost!=='未知'?' · '+escHtml(asset.cost):''}</span></li>`).join('')}</ol>`:''}
 ${ids.map(type=>`<h2>${escHtml(types[type]||type)}</h2>${assets.filter(asset=>asset.type===type).sort((left,right)=>IMPORTANCE_RANK(left)-IMPORTANCE_RANK(right)).map(card).join('')}`).join('\n')}
 </body></html>`;
 }
@@ -2484,4 +2534,4 @@ function dueLevel(asset,{now=new Date(),since=''}={}){
  return assetDateStatus(asset,now).level;
 }
 
-if(typeof module!=='undefined')module.exports={LEGACY_WORDS,LEGACY_STATES,MFA_KINDS,RECOVERY_TYPES,RECOVERY_FIELDS,BACKUP_KINDS,BACKUP_TYPES,IMPORTANCE,looksLikeSecret,recoveryText,recoveryGap,backupText,mailHost,mailDependents,selfRecovery,mailStake,PHONE_STATUSES,phoneTrouble,carrierNote,cardPaysPhone,setCardPays,CREDIT_RULES,creditRule,settleCreditExpiry,PLATFORM_SOURCES,missedReminders,reminderDays,STALE_SYNC_DAYS,staleSyncs,AUTO_RENEW_WORDS,CARD_STATUSES,cardTrouble,sourceTrouble,IMPACT_WORDS,verifyNumbers,phoneReach,phoneStake,syncedLabel,BILLING_TYPES,billingLabels,isFreeCost,billingTypeOf,validPromotion,moneyOn,settlePromotions,noteCostChange,costForecast,PAYMENT_LIMIT,CONFIRM_DAYS,paymentList,paidPayments,lastPayment,recordPayment,removePayment,occurrencesBetween,pendingCharges,pendingRenewals,confirmRenewal,cardOutlook,runsOut,needsConfirm,confirmWords,LIFECYCLE_RULES,lifecycleRule,lifecycleOf,AFTER_DUE_DAYS,monthsBetween,renewBase,canRenew,renewOptions,costFromPayment,renewAsset,confirmCharge,priceChange,paidTotals,ledgerRows,csvCell,ledgerCsv,cleanProject,projectNames,projectAssets,shutdownPlan,REVIEW_QUIET_DAYS,reviewQueue,icsFold,calendarIcs,escHtml,handoverHtml,rdapFacts,rdapCompare,rdapPhaseLabels,registryPhaseOf,RDAP_HOLDS,rdapHoldLabels,RDAP_MISSING_TLDS,rdapMissing,rdapNameservers,registryHoldOf,registryChangeOf,rdapRemember,registryAlerts,dueLevel,renewalGrace,RENEWAL_GRACE_DAYS,maskName,PROVIDER_PRESETS,providerPresets,MAIN_CURRENCIES,FALLBACK_RATES,costAmount,syncMoney,convertMoney,formatMoney,costTotals,MOUNT_TYPES,relationKind,linkAllowed,LINK_KINDS,LINK_KIND_ORDER,linkKind,linkRisks,linkImpact,serverChain,serverChainCount,linkRelation,linkMetaOf,setLinkMeta,serverTone,peekSet,dropLinkMeta,IP_LIMIT,normalizeIp,parseIps,assetIps,primaryIp,maskIp,validIpList,ACTION_FIELDS,QUICK_LIMIT,validActionField,sshCommand,cloneUrl,quickActions,recencyTime,recentFirst,arrangeAssets,touchedPrefix,bringToFront,DISPLAY_LIMITS,formatCount,ensureBlock,iconHost,iconVendor,iconVendors,vendorForHost,iconPlan,iconSiteHost,iconSiteFor,iconPlatformOf,iconRows,guessAssetType,regionList,regionName,regionFlag,phoneParts,regionFromPhone,maskPhone,maskEmail,cardExpiry,expiryText,looksLikeCardNumber,linkAssets,unlinkAssets,linkedAssets,removeLinksTo,assetFingerprint,removeUntouchedDemo,orderAssets,moveAsset,dateKinds,billingCycles,dayNumber,localDay,isoDay,addMonths,nextOccurrence,assetDateStatus,upcomingEvents,REMINDER_LIMIT,reminderLeads,reminderPlan,syncKey,assetSyncKey,isBlacklisted,findByExternal,findNameCollision,mergeCloudflare,mergeGitHub,applyCollision,parseSender,registrableDomain,cleanMerchant,findAmounts,findDates,findDomains,evidenceFacts,inferCycle,formatCost,matchAsset,buildCandidates,evidencePayload,parseAiItems,applyAiItem,IMPORT_ROW_LIMIT,parseLooseDate,shiftDate,costParts,formatCostParts,inferTypeFromName,parseQuickLine,AGENT_FIELDS,isAgentImport,parseAgentImport,parseDelimitedText,importHeaderField,rowsToImportItems,isCfsmBackup,parseCfsmBackup,classifyImportPayload,planImport,applyImport,parseBoardBackup,planBoardBackup,applyBoardBackup,demoImportSampleCsv,csvSyncKey,VENDOR_CSV_PRESETS,cloudflareTokenTemplateUrl,githubTokenTemplateUrl,CLOUDFLARE_TOKEN_PERMISSIONS,parseSshConfig,mergeSshConfig,parseEml,delimitedRecords,splitDelimitedLine,resolvePresetValue,SECRET_KINDS,secretKinds,rowSecrets,looksLikeEnv,screenText,PASSWORD_EXPORTS,passwordExportOf,importFileKind,importGate,screenBackup,AI_PLANS,AI_PLANS_CHECKED,aiPlanProviders,aiPlansFor,findAiPlan,aiPlanFields};
+if(typeof module!=='undefined')module.exports={LEGACY_WORDS,LEGACY_STATES,MFA_KINDS,RECOVERY_TYPES,RECOVERY_FIELDS,BACKUP_KINDS,BACKUP_TYPES,IMPORTANCE,looksLikeSecret,recoveryText,recoveryGap,backupText,mailHost,mailDependents,selfRecovery,mailStake,PHONE_STATUSES,phoneTrouble,carrierNote,cardPaysPhone,setCardPays,CREDIT_RULES,creditRule,settleCreditExpiry,PLATFORM_SOURCES,missedReminders,reminderDays,STALE_SYNC_DAYS,staleSyncs,AUTO_RENEW_WORDS,CARD_STATUSES,cardTrouble,sourceTrouble,IMPACT_WORDS,verifyNumbers,phoneReach,phoneStake,syncedLabel,BILLING_TYPES,billingLabels,isFreeCost,billingTypeOf,validPromotion,moneyOn,settlePromotions,noteCostChange,costForecast,PAYMENT_LIMIT,CONFIRM_DAYS,paymentList,paidPayments,lastPayment,recordPayment,removePayment,occurrencesBetween,pendingCharges,pendingRenewals,confirmRenewal,cardOutlook,runsOut,needsConfirm,confirmWords,LIFECYCLE_RULES,lifecycleRule,lifecycleOf,AFTER_DUE_DAYS,monthsBetween,renewBase,canRenew,renewOptions,costFromPayment,renewAsset,confirmCharge,priceChange,paidTotals,ledgerRows,csvCell,ledgerCsv,cleanProject,projectNames,projectAssets,shutdownPlan,REVIEW_QUIET_DAYS,reviewQueue,icsFold,icsRepeat,calendarIcs,escHtml,handoverHtml,rdapFacts,rdapCompare,rdapPhaseLabels,registryPhaseOf,RDAP_HOLDS,rdapHoldLabels,RDAP_MISSING_TLDS,rdapMissing,rdapNameservers,registryHoldOf,registryChangeOf,rdapRemember,registryAlerts,dueLevel,renewalGrace,RENEWAL_GRACE_DAYS,maskName,PROVIDER_PRESETS,providerPresets,MAIN_CURRENCIES,FALLBACK_RATES,costAmount,syncMoney,convertMoney,formatMoney,costTotals,MOUNT_TYPES,relationKind,linkAllowed,LINK_KINDS,LINK_KIND_ORDER,linkKind,linkRisks,linkImpact,serverChain,serverChainCount,linkRelation,linkMetaOf,setLinkMeta,serverTone,peekSet,dropLinkMeta,IP_LIMIT,normalizeIp,parseIps,assetIps,primaryIp,maskIp,validIpList,ACTION_FIELDS,QUICK_LIMIT,validActionField,sshCommand,cloneUrl,quickActions,recencyTime,recentFirst,arrangeAssets,touchedPrefix,bringToFront,DISPLAY_LIMITS,formatCount,ensureBlock,iconHost,iconVendor,iconVendors,vendorForHost,iconPlan,iconSiteHost,iconSiteFor,iconPlatformOf,iconRows,guessAssetType,regionList,regionName,regionFlag,phoneParts,regionFromPhone,maskPhone,maskEmail,MASK_MARK,MASK_SETS,maskValue,maskAsset,maskMail,hasMask,cardExpiry,expiryText,looksLikeCardNumber,linkAssets,unlinkAssets,linkedAssets,removeLinksTo,assetFingerprint,removeUntouchedDemo,orderAssets,moveAsset,dateKinds,billingCycles,dayNumber,localDay,isoDay,addMonths,nextOccurrence,assetDateStatus,upcomingEvents,REMINDER_LIMIT,reminderLeads,reminderPlan,syncKey,assetSyncKey,isBlacklisted,findByExternal,findNameCollision,mergeCloudflare,mergeGitHub,applyCollision,parseSender,registrableDomain,cleanMerchant,findAmounts,findDates,findDomains,evidenceFacts,inferCycle,formatCost,matchAsset,buildCandidates,evidencePayload,parseAiItems,applyAiItem,IMPORT_ROW_LIMIT,parseLooseDate,shiftDate,costParts,formatCostParts,inferTypeFromName,parseQuickLine,AGENT_FIELDS,isAgentImport,parseAgentImport,parseDelimitedText,importHeaderField,rowsToImportItems,isCfsmBackup,parseCfsmBackup,classifyImportPayload,planImport,applyImport,parseBoardBackup,planBoardBackup,applyBoardBackup,demoImportSampleCsv,csvSyncKey,VENDOR_CSV_PRESETS,cloudflareTokenTemplateUrl,githubTokenTemplateUrl,CLOUDFLARE_TOKEN_PERMISSIONS,parseSshConfig,mergeSshConfig,parseEml,delimitedRecords,splitDelimitedLine,resolvePresetValue,SECRET_KINDS,secretKinds,rowSecrets,looksLikeEnv,screenText,PASSWORD_EXPORTS,passwordExportOf,importFileKind,importGate,screenBackup,AI_PLANS,AI_PLANS_CHECKED,aiPlanProviders,aiPlansFor,findAiPlan,aiPlanFields};
