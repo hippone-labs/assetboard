@@ -1256,7 +1256,8 @@ function formatCount(value){const n=Math.max(0,Math.floor(Number(value)||0));ret
 
 // Batch import (2026-10-09): CSV/table paste, JSON backup restore. Pure; the UI decides when to preview.
 const IMPORT_ROW_LIMIT=100;
-const IMPORT_SECRET_HEADERS=/^(?:password|passwd|pwd|pass|secret|token|api[_-]?key|access[_-]?key|private[_-]?key|auth|authorization|cvv|cvc|pin|ssn|信用卡|密码|令牌|密钥)$/i;
+// A column is a secret when its whole name is one of these, or its name holds a password, a TOTP or a key (login_password, OTPAuth, 恢复码).
+const IMPORT_SECRET_HEADERS=/^(?:passwd|pwd|pass|token|auth|authorization|cvv|cvc|pin|ssn|otp|2fa|信用卡|令牌)$|password|totp|otpauth|secret|apikey|accesskey|accesstoken|privatekey|accountkey|recoverycode|backupcode|密码|密钥|口令|验证码|恢复码/i;
 const IMPORT_HEADER_ALIASES={
  name:['name','domain','domain name','hostname','host name','asset','title','名称','域名','主机','资产','项目'],
  type:['type','category','kind','类别','类型','分类'],
@@ -1285,15 +1286,16 @@ const IMPORT_TYPE_ALIASES={
  appleid:['appleid','apple id','apple'],
  google:['google','gmail','google 账号']
 };
+// A preset maps a field to a column (its header, or a function of the headers that returns one) or writes {value} itself.
 const VENDOR_CSV_PRESETS=[
- {id:'namecheap',label:'Namecheap',match:h=>h.includes('domain name')&&(h.includes('expires')||h.includes('expired date')),map:{name:'domain name',date:'expires',provider:()=>'Namecheap',type:()=>'domain'}},
- {id:'godaddy',label:'GoDaddy',match:h=>h.includes('domain name')&&(h.includes('expiration date')||h.includes('expires')),map:{name:'domain name',date:h=>h.find(x=>x.includes('expiration')||x==='expires')||'expiration date',provider:()=>'GoDaddy',type:()=>'domain'}},
- {id:'porkbun',label:'Porkbun',match:h=>h.includes('domain')&&h.includes('expire date'),map:{name:'domain',date:'expire date',provider:()=>'Porkbun',type:()=>'domain'}},
- {id:'aliyun',label:'阿里云',match:h=>(h.includes('域名')||h.includes('实例名称'))&&(h.includes('到期')||h.includes('到期日期')),map:{name:h=>h.find(x=>x.includes('域名')||x.includes('实例')||x==='名称')||'域名',date:h=>h.find(x=>x.includes('到期'))||'到期日期',provider:()=>'阿里云'}},
- {id:'tencent',label:'腾讯云',match:h=>h.includes('域名')&&h.includes('到期时间'),map:{name:'域名',date:'到期时间',provider:()=>'腾讯云',type:()=>'domain'}},
- {id:'vultr',label:'Vultr',match:h=>h.includes('label')&&(h.includes('main ip')||h.includes('ip address')),map:{name:'label',provider:()=>'Vultr',type:()=>'server',notes:h=>h.find(x=>x.includes('ip'))||'main ip'}},
- {id:'digitalocean',label:'DigitalOcean',match:h=>h.includes('name')&&h.includes('ip address')&&h.includes('region'),map:{name:'name',provider:()=>'DigitalOcean',type:()=>'server',account:'region'}},
- {id:'hetzner',label:'Hetzner',match:h=>h.includes('name')&&(h.includes('server')||h.includes('ipv4')),map:{name:'name',provider:()=>'Hetzner',type:()=>'server'}}
+ {id:'namecheap',label:'Namecheap',match:h=>h.includes('domain name')&&(h.includes('expires')||h.includes('expired date')),map:{name:'domain name',date:'expires',provider:{value:'Namecheap'},type:{value:'domain'}}},
+ {id:'godaddy',label:'GoDaddy',match:h=>h.includes('domain name')&&(h.includes('expiration date')||h.includes('expires')),map:{name:'domain name',date:h=>h.find(x=>x.includes('expiration')||x==='expires')||'expiration date',provider:{value:'GoDaddy'},type:{value:'domain'}}},
+ {id:'porkbun',label:'Porkbun',match:h=>h.includes('domain')&&h.includes('expire date'),map:{name:'domain',date:'expire date',provider:{value:'Porkbun'},type:{value:'domain'}}},
+ {id:'aliyun',label:'阿里云',match:h=>(h.includes('域名')||h.includes('实例名称'))&&(h.includes('到期')||h.includes('到期日期')),map:{name:h=>h.find(x=>x.includes('域名')||x.includes('实例')||x==='名称')||'域名',date:h=>h.find(x=>x.includes('到期'))||'到期日期',provider:{value:'阿里云'}}},
+ {id:'tencent',label:'腾讯云',match:h=>h.includes('域名')&&h.includes('到期时间'),map:{name:'域名',date:'到期时间',provider:{value:'腾讯云'},type:{value:'domain'}}},
+ {id:'vultr',label:'Vultr',match:h=>h.includes('label')&&(h.includes('main ip')||h.includes('ip address')),map:{name:'label',provider:{value:'Vultr'},type:{value:'server'},notes:h=>h.find(x=>x.includes('ip'))||'main ip'}},
+ {id:'digitalocean',label:'DigitalOcean',match:h=>h.includes('name')&&h.includes('ip address')&&h.includes('region'),map:{name:'name',provider:{value:'DigitalOcean'},type:{value:'server'},account:'region'}},
+ {id:'hetzner',label:'Hetzner',match:h=>h.includes('name')&&(h.includes('server')||h.includes('ipv4')),map:{name:'name',provider:{value:'Hetzner'},type:{value:'server'}}}
 ];
 
 function normalizeImportHeader(value){return String(value||'').trim().toLowerCase().replace(/[\s_-]+/g,' ').replace(/[^\w\u4e00-\u9fa5 ]+/g,'');}
@@ -1308,17 +1310,31 @@ function importTypeFromText(value){
  for(const [type,aliases] of Object.entries(IMPORT_TYPE_ALIASES))if(aliases.includes(key))return type;
  return null;
 }
-function splitDelimitedLine(line,delimiter){
- const cells=[];let current='',inQuotes=false;
- for(let i=0;i<line.length;i++){
-  const ch=line[i];
-  if(ch==='"'){if(inQuotes&&line[i+1]==='"'){current+='"';i++;}else inQuotes=!inQuotes;continue;}
-  if(ch===delimiter&&!inQuotes){cells.push(current);current='';continue;}
-  current+=ch;
+// Records of a table (RFC 4180): a cell that starts with a quote runs to its closing quote, newlines and delimiters included,
+// and "" inside it is one quote. Each record keeps the line it starts on; blank lines are left out.
+function delimitedRecords(text,delimiter){
+ const records=[];let cells=[],cell='',quoted=false,started=false,line=1,start=1;
+ const endCell=()=>{cells.push(cell.trim());cell='';started=false;};
+ const endRecord=()=>{endCell();if(cells.some(Boolean))records.push({line:start,cells});cells=[];};
+ for(let i=0;i<text.length;i++){
+  const ch=text[i];
+  if(quoted){
+   if(ch==='"'){if(text[i+1]==='"'){cell+='"';i++;}else quoted=false;}
+   else if(ch==='\r'&&text[i+1]==='\n')continue;
+   else{if(ch==='\n')line++;cell+=ch;}
+   continue;
+  }
+  if(ch==='"'&&!started){quoted=true;started=true;cell='';continue;}
+  if(ch===delimiter){endCell();continue;}
+  if(ch==='\r'&&text[i+1]==='\n')continue;
+  if(ch==='\n'||ch==='\r'){endRecord();line++;start=line;continue;}
+  if(ch!==' '&&ch!=='\t')started=true;
+  cell+=ch;
  }
- cells.push(current);
- return cells.map(cell=>cell.trim());
+ endRecord();
+ return records;
 }
+function splitDelimitedLine(line,delimiter){return delimitedRecords(String(line||''),delimiter)[0]?.cells||[''];}
 function detectDelimiter(sample){
  const lines=sample.split(/\r?\n/).filter(line=>line.trim()).slice(0,5);
  if(!lines.length)return ',';
@@ -1327,37 +1343,33 @@ function detectDelimiter(sample){
  return Object.entries(scores).sort((a,b)=>b[1]-a[1])[0][0];
 }
 function parseDelimitedText(text,{limit=IMPORT_ROW_LIMIT}={}){
- const raw=String(text||'').replace(/^\uFEFF/,'').trim();
+ const raw=String(text||'').replace(/^﻿/,'').trim();
  if(!raw)return {ok:false,error:tr('没有可解析的表格内容'),headers:[],rows:[],droppedSecrets:[],truncated:null};
  const delimiter=detectDelimiter(raw);
- const lines=raw.split(/\r?\n/).filter(line=>line.trim());
- if(lines.length<2)return {ok:false,error:tr('表格至少需要表头和一行数据'),headers:[],rows:[],droppedSecrets:[],delimiter};
- const headers=splitDelimitedLine(lines[0],delimiter);
+ const records=delimitedRecords(raw,delimiter);
+ if(records.length<2)return {ok:false,error:tr('表格至少需要表头和一行数据'),headers:[],rows:[],droppedSecrets:[],delimiter};
+ const headers=records[0].cells,normalized=headers.map(normalizeImportHeader);
  const droppedSecrets=[];
  const fields=headers.map(header=>{
   const field=importHeaderField(header);
-  if(field==='secret'){droppedSecrets.push(header);return null;}
+  if(field==='secret')droppedSecrets.push(header);
   return field;
  });
- if(!fields.includes('name')){
-  // Vendor presets may still map a name column by raw header.
-  const normalized=headers.map(normalizeImportHeader);
-  const preset=VENDOR_CSV_PRESETS.find(item=>item.match(normalized));
-  if(!preset)return {ok:false,error:tr('未识别到名称列。请包含「名称」或「域名」表头。'),headers,rows:[],droppedSecrets,delimiter};
- }
- const dataLines=lines.slice(1);
- const truncated=dataLines.length>limit;
- const rows=dataLines.slice(0,limit).map((line,index)=>{
-  const cells=splitDelimitedLine(line,delimiter);
-  const row={_line:index+2};
-  headers.forEach((header,i)=>{if(fields[i]&&fields[i]!=='secret')row[fields[i]]=cells[i]??'';row['raw:'+normalizeImportHeader(header)]=cells[i]??'';});
+ const preset=VENDOR_CSV_PRESETS.find(item=>item.match(normalized))||null;
+ // Vendor presets may still map a name column by raw header.
+ if(!fields.includes('name')&&!preset)return {ok:false,error:tr('未识别到名称列。请包含「名称」或「域名」表头。'),headers,rows:[],droppedSecrets,delimiter};
+ const dataRecords=records.slice(1);
+ const truncated=dataRecords.length>limit;
+ // A secret column's cells are kept nowhere, not even under their raw header.
+ const rows=dataRecords.slice(0,limit).map(({line,cells})=>{
+  const row={_line:line};
+  headers.forEach((header,i)=>{if(fields[i]==='secret')return;if(fields[i])row[fields[i]]=cells[i]??'';row['raw:'+normalized[i]]=cells[i]??'';});
   return row;
  });
- const normalized=headers.map(normalizeImportHeader);
- const preset=VENDOR_CSV_PRESETS.find(item=>item.match(normalized))||null;
- return {ok:true,headers,rows,droppedSecrets,delimiter,truncated,preset,totalRows:dataLines.length};
+ return {ok:true,headers,rows,droppedSecrets,delimiter,truncated,preset,totalRows:dataRecords.length};
 }
 function resolvePresetValue(spec,headers,row){
+ if(spec&&typeof spec==='object')return spec.value??'';
  if(typeof spec==='function'){
   const key=spec(headers.map(normalizeImportHeader));
   return typeof key==='string'?row['raw:'+normalizeImportHeader(key)]??row[key]??'':key;
@@ -1378,12 +1390,101 @@ function parseImportDate(value){
  }
  return '';
 }
+// The import gate. Every way in (files and text dropped or pasted in the window, the Dock and 打开方式, the Services menu, the
+// Inbox folder, the MCP and CLI add tools, tables, JSON, mail and pasted text) passes `importGate` or `secretKinds` before anything
+// becomes a record, a review card or an AI request. Password manager exports are refused whole; a row holding a full card number,
+// a private key, a token or a TOTP secret is left out and named in the preview; secret files (.env, keys, password databases),
+// spreadsheets and other binary formats are never read as text. Only screenshots, PDFs, mail and pasted text go to the AI on their own.
+const PRIVATE_KEY_TEXT=/-----BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY(?: BLOCK)?-----|PuTTY-User-Key-File-\d/;
+const TOTP_TEXT=/otpauth(?:-migration)?:\/\//i;
+const TOKEN_TEXT=/\b(?:ghp_|gho_|ghs_|github_pat_|glpat-|xox[abp]-|sk-(?:ant-|proj-)?|AKIA)[A-Za-z0-9_-]{16,}/;
+const SECRET_KINDS={card:tr('完整卡号'),key:tr('私钥'),token:tr('访问令牌'),totp:tr('TOTP 密钥'),env:tr('.env 密钥')};
+function secretKinds(text){const v=String(text||'');return [looksLikeCardNumber(v)&&'card',PRIVATE_KEY_TEXT.test(v)&&'key',TOKEN_TEXT.test(v)&&'token',TOTP_TEXT.test(v)&&'totp'].filter(Boolean);}
+function rowSecrets(row){return [...new Set(Object.entries(row||{}).filter(([key])=>key!=='_line').flatMap(([,v])=>typeof v==='string'?secretKinds(v):[]))];}
+// .env text: most of its lines are NAME=value.
+function looksLikeEnv(text){
+ const lines=String(text||'').split(/\r?\n/).map(line=>line.trim()).filter(line=>line&&!line.startsWith('#'));
+ const set=lines.filter(line=>/^(?:export\s+)?[A-Za-z_][A-Za-z0-9_]*=\S/.test(line)).length;
+ return set>=2&&set>=lines.length*.6;
+}
+// Pasted text and mail before they become a review card or go to the AI: refused when they hold a key, a token, a TOTP secret
+// or .env lines; a full card number is masked to its last 4 digits.
+function screenText(text){
+ const v=String(text||''),found=secretKinds(v).filter(kind=>kind!=='card');
+ if(looksLikeEnv(v))found.push('env');
+ if(found.length)return {ok:false,found};
+ let cards=0;
+ const masked=v.replace(/(?:\d[ -]?){12,18}\d/g,run=>{if(!looksLikeCardNumber(run))return run;cards++;return '•••• '+run.replace(/\D/g,'').slice(-4);});
+ return {ok:true,text:masked,cards};
+}
+// Password manager exports, told by their header row (each tool's CSV export; field names as Bitwarden's importers read them)
+// or by the shape of the file. The last entry is any table of web logins with passwords.
+const PASSWORD_EXPORTS=[
+ ['Bitwarden',h=>h.includes('loginpassword')||h.includes('loginuri')&&h.includes('loginusername')],
+ ['Firefox',h=>h.includes('password')&&(h.includes('httprealm')||h.includes('formactionorigin'))],
+ ['KeePassXC',h=>['group','title','username','password'].every(x=>h.includes(x))],
+ ['1Password',h=>h.includes('masterpassword')||h.includes('accountkey')||h.includes('password')&&h.includes('otpauth')&&['favorite','archived','tags'].some(x=>h.includes(x))],
+ ['Apple',h=>['title','url','username','password'].every(x=>h.includes(x))],
+ ['Chrome',h=>['name','url','username','password'].every(x=>h.includes(x))],
+ ['other',h=>h.some(x=>x.includes('password'))&&h.some(x=>/^(?:username|loginname|login|email|user)$/.test(x))&&h.some(x=>/^(?:url|website|weburl|site|uri|loginuri|title)$/.test(x))]
+];
+function passwordExportOf(text){
+ const raw=String(text||'').replace(/^﻿/,'').trim();
+ if(!raw)return '';
+ if(/^(?:<\?xml[^>]*>\s*)?<KeePassFile[\s>]/.test(raw))return 'KeePassXC';
+ if(raw.slice(0,4000).includes('***5642bee8-a5ff-11dc-8314-0800200c9a66***'))return '1Password';
+ if(/^[\[{]/.test(raw)){
+  let value=null;try{value=JSON.parse(raw);}catch{}
+  if(value&&typeof value==='object'&&!Array.isArray(value)&&(typeof value.encrypted==='boolean'&&(Array.isArray(value.items)||typeof value.data==='string')||Array.isArray(value.items)&&value.items.some(item=>item&&typeof item.login==='object'&&item.login)))return 'Bitwarden';
+  return '';
+ }
+ const first=raw.split(/\r?\n/,1)[0],headers=splitDelimitedLine(first,detectDelimiter(first)).map(h=>normalizeImportHeader(h).replace(/\s/g,''));
+ if(headers.length<3)return '';
+ return PASSWORD_EXPORTS.find(([,match])=>match(headers))?.[0]||'';
+}
+// What a file is, from its name and type, before it is read: only text formats are read as text.
+const SECRET_FILE_NAMES=/^(?:\.env(?:\..+)?|.+\.env|id_(?:rsa|dsa|ecdsa|ed25519)(?:_sk)?|\.netrc|\.npmrc|\.pypirc|\.pgpass|credentials|.+\.(?:pem|key|p8|p12|pfx|ppk|jks|keystore|kdbx|kdb|1pux|1pif|keychain|keychain-db|gpg|age))$/i;
+const TEXT_FILE_NAMES=/\.(?:csv|tsv|txt|text|json|eml|ics|html?)$/i;
+function importFileKind(filename='',mime=''){
+ const name=String(filename||'').split(/[\\/]/).pop().toLowerCase(),type=String(mime||'').toLowerCase();
+ if(/\.(png|jpe?g|webp)$/.test(name)||/^image\//.test(type))return 'image';
+ if(/\.pdf$/.test(name)||type==='application/pdf')return 'pdf';
+ if(SECRET_FILE_NAMES.test(name))return 'secret';
+ if(!name)return !type||/^(?:text\/|application\/json$|message\/rfc822$)/.test(type)?'text':'other';
+ return TEXT_FILE_NAMES.test(name)?'text':'other';
+}
+// The gate itself: {kind:'refused', reason:'secret'|'other'|'passwords'|'secrets', …} or classifyImportPayload's answer with `ai`,
+// whether the content may go to the AI on its own. Pasted text comes back screened (`screenText`); mail is screened once decoded.
+function importGate({text='',filename='',mime=''}={}){
+ const file=importFileKind(filename,mime);
+ if(file==='secret'||file==='other')return {kind:'refused',reason:file,filename};
+ if(file==='image'||file==='pdf')return {kind:file,filename,ai:true};
+ const vendor=passwordExportOf(text);
+ if(vendor)return {kind:'refused',reason:'passwords',vendor,filename};
+ const classified=classifyImportPayload({text,filename,mime});
+ if(classified.kind==='paste'){
+  const screened=screenText(classified.text);
+  if(!screened.ok)return {kind:'refused',reason:'secrets',found:screened.found,filename};
+  return {...classified,text:screened.text,maskedCards:screened.cards,ai:!filename};
+ }
+ return {...classified,ai:classified.kind==='eml'};
+}
+// A board backup's records pass the same row check: one holding a card number, a key, a token or a TOTP secret is not restored.
+// Ids, times and icons are left out of the check: a uuid or a data URL can hold a digit run that passes Luhn.
+const BACKUP_UNSCREENED=/^(?:id|externalId|iconData|siteIcon|.+At)$/;
+function screenBackup(backup){
+ if(!backup?.ok)return {backup,refused:[]};
+ const refused=[],assets=backup.board.assets.filter(asset=>{const found=rowSecrets(Object.fromEntries(Object.entries(asset).filter(([key])=>!BACKUP_UNSCREENED.test(key))));if(found.length)refused.push({name:asset.name,found});return !found.length;});
+ return {backup:{...backup,board:{...backup.board,assets}},refused};
+}
 function csvSyncKey(type,name){return syncKey('csv',`${type}:${String(name||'').trim().toLowerCase()}`);}
 function rowsToImportItems(parsed,{types=Object.keys(IMPORT_TYPE_ALIASES)}={}){
- if(!parsed?.ok)return {items:[],unreadable:[{reason:parsed?.error||tr('无法解析')}]};
- const items=[],unreadable=[];
- const headers=parsed.headers.map(normalizeImportHeader);
+ if(!parsed?.ok)return {items:[],unreadable:[{reason:parsed?.error||tr('无法解析')}],refused:[]};
+ const items=[],unreadable=[],refused=[];
  for(const row of parsed.rows){
+  // A full card number, a private key, a token or a TOTP secret anywhere in the row leaves the whole row out.
+  const found=rowSecrets(row);
+  if(found.length){refused.push({line:row._line,found});continue;}
   let name=String(row.name||'').trim();
   let type=importTypeFromText(row.type)||'';
   let provider=String(row.provider||'').trim();
@@ -1398,8 +1499,9 @@ function rowsToImportItems(parsed,{types=Object.keys(IMPORT_TYPE_ALIASES)}={}){
   if(parsed.preset){
    const map=parsed.preset.map;
    if(map.name)name=String(resolvePresetValue(map.name,parsed.headers,row)||name).trim();
-   if(map.type)type=importTypeFromText(resolvePresetValue(map.type,parsed.headers,row))||(typeof map.type==='function'?map.type():type);
-   if(map.provider)provider=String(resolvePresetValue(map.provider,parsed.headers,row)||provider).trim();
+   if(map.type)type=importTypeFromText(resolvePresetValue(map.type,parsed.headers,row))||type;
+   // The file's own provider column wins over the vendor the preset names.
+   if(map.provider)provider=typeof map.provider==='object'?provider||map.provider.value:String(resolvePresetValue(map.provider,parsed.headers,row)||provider).trim();
    if(map.account)account=String(resolvePresetValue(map.account,parsed.headers,row)||account).trim();
    if(map.date)date=parseImportDate(resolvePresetValue(map.date,parsed.headers,row))||date;
    if(map.notes){const extra=String(resolvePresetValue(map.notes,parsed.headers,row)||'').trim();if(extra)notes=notes?`${notes} · ${extra}`:extra;}
@@ -1413,7 +1515,7 @@ function rowsToImportItems(parsed,{types=Object.keys(IMPORT_TYPE_ALIASES)}={}){
   const externalId=`${type}:${name.toLowerCase()}`;
   items.push({name:name.slice(0,100),type,provider:provider.slice(0,80),account:account.slice(0,100),date,dateKind,cycle,cost:cost.slice(0,80),url:url.slice(0,2000),notes:notes.slice(0,2000),purpose:purpose.slice(0,100),source:'csv',externalId,vendorPreset:parsed.preset?.id||null,importedFrom:parsed.preset?.label||''});
  }
- return {items,unreadable,truncated:parsed.preset,droppedSecrets:parsed.droppedSecrets||[],truncated:parsed.truncated,totalRows:parsed.totalRows};
+ return {items,unreadable,refused,preset:parsed.preset||null,droppedSecrets:parsed.droppedSecrets||[],truncated:parsed.truncated,totalRows:parsed.totalRows};
 }
 
 // CF-Server-Monitor's server backup (后台 → 数据库 → 导出服务器, servers-backup-<date>.json): a JSON array of its servers rows.
@@ -1428,8 +1530,10 @@ function isCfsmBackup(value){
 function parseCfsmBackup(text){
  let value=null;try{value=JSON.parse(text);}catch{}
  if(!isCfsmBackup(value))return {ok:false,error:tr('不是 CF-Server-Monitor 的服务器备份')};
- const items=[],unreadable=[],clean=value=>String(value??'').trim();
+ const items=[],unreadable=[],refused=[],clean=value=>String(value??'').trim();
  value.slice(0,IMPORT_ROW_LIMIT).forEach((row,index)=>{
+  const found=rowSecrets({name:clean(row.name),group:clean(row.server_group),tags:clean(row.tags)});
+  if(found.length){refused.push({line:index+1,found});return;}
   const name=clean(row.name);
   if(!name){unreadable.push({line:index+1,reason:tr('缺少名称')});return;}
   // Its price is "12.00"; 0 and -1 mean free, blank means not set.
@@ -1442,7 +1546,7 @@ function parseCfsmBackup(text){
   items.push({name:name.slice(0,100),type:'server',provider:'',account:'',...(regionName(region)?{region}:{}),date:parseImportDate(row.expire_date),dateKind:String(row.auto_renewal)==='1'?'renew':'expire',cycle,cost:cost.slice(0,80),url:'',notes:notes.slice(0,2000),purpose:'',source:'csv',externalId:`server:${name.toLowerCase()}`,vendorPreset:'cfsm',importedFrom:'CF-Server-Monitor'});
  });
  // Its 备注 is not a secret column, so the preview says it was left out rather than dropped as a key.
- return {ok:true,items,unreadable,preset:{id:'cfsm',label:'CF-Server-Monitor'},droppedSecrets:[],leftOut:value.some(row=>clean(row.note))?[{label:tr('备注'),why:tr('CF-Server-Monitor 的备注常记着密码，没有导入')}]:[],truncated:value.length>IMPORT_ROW_LIMIT,totalRows:value.length};
+ return {ok:true,items,unreadable,refused,preset:{id:'cfsm',label:'CF-Server-Monitor'},droppedSecrets:[],leftOut:value.some(row=>clean(row.note))?[{label:tr('备注'),why:tr('CF-Server-Monitor 的备注常记着密码，没有导入')}]:[],truncated:value.length>IMPORT_ROW_LIMIT,totalRows:value.length};
 }
 
 // Cloudflare user-token template URL (permission keys verified against Cloudflare template docs 2026).
@@ -2263,4 +2367,4 @@ function rdapCompare(asset,facts,now=new Date()){
  return stored===facts.expires?{state:'same',registry:facts.expires}:{state:'differs',registry:facts.expires,stored};
 }
 
-if(typeof module!=='undefined')module.exports={LEGACY_WORDS,LEGACY_STATES,MFA_KINDS,RECOVERY_TYPES,RECOVERY_FIELDS,BACKUP_KINDS,BACKUP_TYPES,IMPORTANCE,looksLikeSecret,recoveryText,recoveryGap,backupText,mailHost,mailDependents,selfRecovery,mailStake,PHONE_STATUSES,phoneTrouble,carrierNote,cardPaysPhone,setCardPays,CREDIT_RULES,creditRule,settleCreditExpiry,PLATFORM_SOURCES,missedReminders,reminderDays,STALE_SYNC_DAYS,staleSyncs,AUTO_RENEW_WORDS,CARD_STATUSES,cardTrouble,sourceTrouble,IMPACT_WORDS,verifyNumbers,phoneReach,phoneStake,syncedLabel,BILLING_TYPES,billingLabels,isFreeCost,billingTypeOf,validPromotion,moneyOn,settlePromotions,noteCostChange,costForecast,PAYMENT_LIMIT,CONFIRM_DAYS,paymentList,paidPayments,lastPayment,recordPayment,removePayment,occurrencesBetween,pendingCharges,pendingRenewals,confirmRenewal,cardOutlook,runsOut,needsConfirm,confirmWords,LIFECYCLE_RULES,lifecycleRule,lifecycleOf,AFTER_DUE_DAYS,monthsBetween,renewBase,canRenew,renewOptions,costFromPayment,renewAsset,confirmCharge,priceChange,paidTotals,ledgerRows,csvCell,ledgerCsv,cleanProject,projectNames,projectAssets,shutdownPlan,REVIEW_QUIET_DAYS,reviewQueue,icsFold,calendarIcs,escHtml,handoverHtml,rdapFacts,rdapCompare,rdapPhaseLabels,registryPhaseOf,maskName,PROVIDER_PRESETS,providerPresets,MAIN_CURRENCIES,FALLBACK_RATES,costAmount,syncMoney,convertMoney,formatMoney,costTotals,MOUNT_TYPES,relationKind,linkAllowed,LINK_KINDS,LINK_KIND_ORDER,linkKind,linkRisks,linkImpact,serverChain,serverChainCount,linkRelation,linkMetaOf,setLinkMeta,serverTone,peekSet,dropLinkMeta,IP_LIMIT,normalizeIp,parseIps,assetIps,primaryIp,maskIp,validIpList,ACTION_FIELDS,QUICK_LIMIT,validActionField,sshCommand,cloneUrl,quickActions,recencyTime,recentFirst,arrangeAssets,touchedPrefix,bringToFront,DISPLAY_LIMITS,formatCount,ensureBlock,iconHost,iconVendor,iconVendors,vendorForHost,iconPlan,iconSiteHost,iconSiteFor,iconPlatformOf,iconRows,guessAssetType,regionList,regionName,regionFlag,phoneParts,regionFromPhone,maskPhone,maskEmail,cardExpiry,expiryText,looksLikeCardNumber,linkAssets,unlinkAssets,linkedAssets,removeLinksTo,assetFingerprint,removeUntouchedDemo,orderAssets,moveAsset,dateKinds,billingCycles,dayNumber,localDay,isoDay,addMonths,nextOccurrence,assetDateStatus,upcomingEvents,REMINDER_LIMIT,reminderLeads,reminderPlan,syncKey,assetSyncKey,isBlacklisted,findByExternal,findNameCollision,mergeCloudflare,mergeGitHub,applyCollision,parseSender,registrableDomain,cleanMerchant,findAmounts,findDates,findDomains,evidenceFacts,inferCycle,formatCost,matchAsset,buildCandidates,evidencePayload,parseAiItems,applyAiItem,IMPORT_ROW_LIMIT,parseLooseDate,shiftDate,costParts,formatCostParts,inferTypeFromName,parseQuickLine,AGENT_FIELDS,isAgentImport,parseAgentImport,parseDelimitedText,importHeaderField,rowsToImportItems,isCfsmBackup,parseCfsmBackup,classifyImportPayload,planImport,applyImport,parseBoardBackup,planBoardBackup,applyBoardBackup,demoImportSampleCsv,csvSyncKey,VENDOR_CSV_PRESETS,cloudflareTokenTemplateUrl,githubTokenTemplateUrl,CLOUDFLARE_TOKEN_PERMISSIONS,parseSshConfig,mergeSshConfig,parseEml};
+if(typeof module!=='undefined')module.exports={LEGACY_WORDS,LEGACY_STATES,MFA_KINDS,RECOVERY_TYPES,RECOVERY_FIELDS,BACKUP_KINDS,BACKUP_TYPES,IMPORTANCE,looksLikeSecret,recoveryText,recoveryGap,backupText,mailHost,mailDependents,selfRecovery,mailStake,PHONE_STATUSES,phoneTrouble,carrierNote,cardPaysPhone,setCardPays,CREDIT_RULES,creditRule,settleCreditExpiry,PLATFORM_SOURCES,missedReminders,reminderDays,STALE_SYNC_DAYS,staleSyncs,AUTO_RENEW_WORDS,CARD_STATUSES,cardTrouble,sourceTrouble,IMPACT_WORDS,verifyNumbers,phoneReach,phoneStake,syncedLabel,BILLING_TYPES,billingLabels,isFreeCost,billingTypeOf,validPromotion,moneyOn,settlePromotions,noteCostChange,costForecast,PAYMENT_LIMIT,CONFIRM_DAYS,paymentList,paidPayments,lastPayment,recordPayment,removePayment,occurrencesBetween,pendingCharges,pendingRenewals,confirmRenewal,cardOutlook,runsOut,needsConfirm,confirmWords,LIFECYCLE_RULES,lifecycleRule,lifecycleOf,AFTER_DUE_DAYS,monthsBetween,renewBase,canRenew,renewOptions,costFromPayment,renewAsset,confirmCharge,priceChange,paidTotals,ledgerRows,csvCell,ledgerCsv,cleanProject,projectNames,projectAssets,shutdownPlan,REVIEW_QUIET_DAYS,reviewQueue,icsFold,calendarIcs,escHtml,handoverHtml,rdapFacts,rdapCompare,rdapPhaseLabels,registryPhaseOf,maskName,PROVIDER_PRESETS,providerPresets,MAIN_CURRENCIES,FALLBACK_RATES,costAmount,syncMoney,convertMoney,formatMoney,costTotals,MOUNT_TYPES,relationKind,linkAllowed,LINK_KINDS,LINK_KIND_ORDER,linkKind,linkRisks,linkImpact,serverChain,serverChainCount,linkRelation,linkMetaOf,setLinkMeta,serverTone,peekSet,dropLinkMeta,IP_LIMIT,normalizeIp,parseIps,assetIps,primaryIp,maskIp,validIpList,ACTION_FIELDS,QUICK_LIMIT,validActionField,sshCommand,cloneUrl,quickActions,recencyTime,recentFirst,arrangeAssets,touchedPrefix,bringToFront,DISPLAY_LIMITS,formatCount,ensureBlock,iconHost,iconVendor,iconVendors,vendorForHost,iconPlan,iconSiteHost,iconSiteFor,iconPlatformOf,iconRows,guessAssetType,regionList,regionName,regionFlag,phoneParts,regionFromPhone,maskPhone,maskEmail,cardExpiry,expiryText,looksLikeCardNumber,linkAssets,unlinkAssets,linkedAssets,removeLinksTo,assetFingerprint,removeUntouchedDemo,orderAssets,moveAsset,dateKinds,billingCycles,dayNumber,localDay,isoDay,addMonths,nextOccurrence,assetDateStatus,upcomingEvents,REMINDER_LIMIT,reminderLeads,reminderPlan,syncKey,assetSyncKey,isBlacklisted,findByExternal,findNameCollision,mergeCloudflare,mergeGitHub,applyCollision,parseSender,registrableDomain,cleanMerchant,findAmounts,findDates,findDomains,evidenceFacts,inferCycle,formatCost,matchAsset,buildCandidates,evidencePayload,parseAiItems,applyAiItem,IMPORT_ROW_LIMIT,parseLooseDate,shiftDate,costParts,formatCostParts,inferTypeFromName,parseQuickLine,AGENT_FIELDS,isAgentImport,parseAgentImport,parseDelimitedText,importHeaderField,rowsToImportItems,isCfsmBackup,parseCfsmBackup,classifyImportPayload,planImport,applyImport,parseBoardBackup,planBoardBackup,applyBoardBackup,demoImportSampleCsv,csvSyncKey,VENDOR_CSV_PRESETS,cloudflareTokenTemplateUrl,githubTokenTemplateUrl,CLOUDFLARE_TOKEN_PERMISSIONS,parseSshConfig,mergeSshConfig,parseEml,delimitedRecords,splitDelimitedLine,resolvePresetValue,SECRET_KINDS,secretKinds,rowSecrets,looksLikeEnv,screenText,PASSWORD_EXPORTS,passwordExportOf,importFileKind,importGate,screenBackup};

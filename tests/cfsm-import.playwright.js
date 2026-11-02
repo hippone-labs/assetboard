@@ -1,6 +1,6 @@
-// CF-Server-Monitor's 导出服务器 file, in the free edition: dropped in the window it writes server assets at once (⌘Z undoes it);
-// opened from outside (Dock / 打开方式) it stops at the preview, which names the source, says the 备注 column was left out and
-// shows each server's date and cost. On the board a server shows its region, and the detail says where it came from.
+// CF-Server-Monitor's 导出服务器 file, in the free edition: its 备注 column is left out, so dropped in the window it stops at the
+// preview too and writes server assets on Import (⌘Z undoes it); opened from outside (Dock / 打开方式) the preview names the
+// source, says the 备注 column was left out and shows each server's date and cost. On the board a server shows its region, and the detail says where it came from.
 // The page makes no request for it.
 async (page) => {
  const check=(ok,message)=>{if(!ok)throw new Error(message);};
@@ -16,6 +16,9 @@ async (page) => {
   const hint=await p.evaluate(()=>{save=()=>{};state={...state,assets:[],deletedExternalIds:[]};render();importHub();return document.querySelector('#import-drop').title;});
   check(hint.includes('CF-Server-Monitor'),'the import window does not mention CF-Server-Monitor backups: '+hint);
   await p.evaluate(text=>handleImportFiles([new File([text],'servers-backup-2026-10-22.json',{type:'application/json'})]),backup);
+  await until(p,()=>!!document.querySelector('#import-preview'));
+  check(!await p.evaluate(()=>state.assets.length),'a dropped file with a left-out column wrote before the preview');
+  await p.click('[data-action="import-apply"]');
   const added=await until(p,()=>state.assets.length===2&&state.assets.map(a=>({name:a.name,type:a.type,cost:a.cost,date:a.date,dateKind:a.dateKind,notes:a.notes})));
   const hk=added.find(a=>a.name==='HK-01'),jp=added.find(a=>a.name==='JP-02');
   check(hk&&hk.type==='server'&&hk.cost==='$12.00 / 月'&&hk.date==='2027-03-01'&&hk.dateKind==='renew','HK-01 came in wrong: '+JSON.stringify(hk));

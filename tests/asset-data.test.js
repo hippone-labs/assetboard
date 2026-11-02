@@ -415,7 +415,7 @@ const {
 }=require('../asset-data.js');
 
 test('parses CSV with header aliases and drops secret columns',()=>{
- const parsed=parseDelimitedText('Domain Name,Registrar,Expires,Password\nexample.com,Namecheap,2027-03-01,s3cret\n');
+ const parsed=parseDelimitedText('Domain Name,Expires,Password\nexample.com,2027-03-01,s3cret\n');
  assert.equal(parsed.ok,true);
  assert.deepEqual(parsed.droppedSecrets,['Password']);
  assert.equal(parsed.preset?.id,'namecheap');
