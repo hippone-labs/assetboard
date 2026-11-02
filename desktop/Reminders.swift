@@ -93,11 +93,8 @@ final class ReminderScheduler: NSObject, UNUserNotificationCenterDelegate {
         }
     }
 
-    /// The Notifications pane of System Settings (System Preferences on macOS 12); the person picks Assetboard there.
-    static var settingsURL: URL {
-        if #available(macOS 13, *) { return URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension")! }
-        return URL(string: "x-apple.systempreferences:com.apple.preference.notifications")!
-    }
+    /// The Notifications pane of System Settings; the person picks Assetboard there.
+    static let settingsURL = URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension")!
 
     func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
         completionHandler([.banner, .list, .sound])

@@ -510,7 +510,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
                 window.center()
             }
             createMenu()
-            if !demoMode { updater.window = window; updater.startAutomaticChecks() }
+            if !demoMode { updater.window = window; updater.reportRollback(); updater.startAutomaticChecks() }
             webView.loadFileURL(root.appendingPathComponent("index.html"), allowingReadAccessTo: root)
             window.makeKeyAndOrderFront(nil)
             placeTrafficLights()
@@ -2102,7 +2102,9 @@ func testWebView() {
 
 @main struct AssetboardMain {
 static func main() {
-if CommandLine.arguments.contains("--test-store") {
+if CommandLine.arguments.contains(Updater.launchCheckFlag) {
+    selfCheckLaunch()
+} else if CommandLine.arguments.contains("--test-store") {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: root) }
     do {
