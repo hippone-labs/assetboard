@@ -71,6 +71,7 @@ codesign --verify --deep --strict "$app_dir"
 "$app_dir/Contents/MacOS/Assetboard" --test-ai
 "$app_dir/Contents/MacOS/Assetboard" --test-network-log
 "$app_dir/Contents/MacOS/Assetboard" --test-fx
+"$app_dir/Contents/MacOS/Assetboard" --test-rdap
 "$app_dir/Contents/MacOS/Assetboard" --test-agent-socket
 "$app_dir/Contents/MacOS/Assetboard" --test-update
 (( free )) || "$app_dir/Contents/MacOS/assetboard-cli" --self-test

@@ -1528,6 +1528,28 @@ func testExchangeRates() {
     print("PASS: Frankfurter in USD, kept copy the same day, refresh and next day fetch, failure falls back to kept rates, incomplete or implausible rates refused")
 }
 
+func testRegistryFacts() {
+    let vcard: [Any] = ["vcard", [["fn", [String: Any](), "text", "Example Registrar"] as [Any]] as [Any]]
+    let registrar: [String: Any] = ["roles": ["registrar"], "vcardArray": vcard, "handle": "1"]
+    let registrant: [String: Any] = ["roles": ["registrant"], "vcardArray": vcard]
+    let event: [String: Any] = ["eventAction": "expiration", "eventDate": "2027-03-01T00:00:00Z", "eventActor": "registry"]
+    var servers: [[String: Any]] = (1...20).map { index -> [String: Any] in ["objectClassName": "nameserver", "ldhName": "NS\(index).EXAMPLE.NET", "ipAddresses": ["v4": ["192.0.2.\(index)"]] as [String: Any]] }
+    servers.append(["ldhName": ""])
+    let reply: [String: Any] = ["objectClassName": "domain", "ldhName": "shop.example", "events": [event], "status": ["client hold", "server transfer prohibited"],
+                                "entities": [registrar, registrant], "nameservers": servers, "remarks": [["description": ["dropped"]]] as [Any]]
+    let facts = RegistryLookup.pageFacts(reply)
+    precondition(Set(facts.keys) == ["events", "status", "entities", "nameservers"], "Only what the page reads goes back: \(facts.keys)")
+    let nameservers = facts["nameservers"] as? [[String: String]] ?? []
+    precondition(nameservers.count == 13 && nameservers.first == ["ldhName": "NS1.EXAMPLE.NET"], "Nameservers go back by name, at most 13: \(nameservers)")
+    precondition((facts["status"] as? [String]) == ["client hold", "server transfer prohibited"], "The status goes back as it is")
+    let entities = facts["entities"] as? [[String: Any]] ?? []
+    precondition(entities.count == 1 && Set(entities[0].keys) == ["roles", "vcardArray"], "Only the registrar entity, without its other fields")
+    precondition((facts["events"] as? [[String: Any]])?.first?["eventActor"] == nil, "Events keep only their action and date")
+    precondition((RegistryLookup.pageFacts([:])["nameservers"] as? [Any])?.isEmpty == true, "A reply without nameservers sends an empty list")
+    guard JSONSerialization.isValidJSONObject(facts) else { fatalError("The facts are not JSON") }
+    print("PASS: RDAP reply trimmed to events, status, registrar and at most 13 nameserver names")
+}
+
 func testNetworkLog() {
     let manager = FileManager.default
     let root = manager.temporaryDirectory.appendingPathComponent("assetboard-net-" + UUID().uuidString)
@@ -2172,6 +2194,8 @@ if CommandLine.arguments.contains("--test-store") {
     testAgentInbox()
 } else if CommandLine.arguments.contains("--test-fx") {
     testExchangeRates()
+} else if CommandLine.arguments.contains("--test-rdap") {
+    testRegistryFacts()
 } else if CommandLine.arguments.contains("--test-network-log") {
     testNetworkLog()
 } else if CommandLine.arguments.contains("--test-agent-socket") {

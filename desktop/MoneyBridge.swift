@@ -3,7 +3,8 @@ import WebKit
 import UniformTypeIdentifiers
 
 /// The native half of renewals and exports: saving the files the page builds (calendar, ledger, handover list), asking a
-/// domain's registry for its expiry and lifecycle status over RDAP (only when the person clicks, recorded in 网络记录), the menu bar summary,
+/// domain's registry for its expiry, status, registrar and nameservers over RDAP (when the person clicks, or the weekly check they turned
+/// on; recorded in 网络记录), the menu bar summary,
 /// and a Dock bounce when an agent asks for something that needs the person.
 var statusMenu: StatusMenu?
 
@@ -74,11 +75,7 @@ extension AppDelegate {
                     reply(["ok": false, "error": status == 404 ? L("注册局查不到这个域名") : L("注册局返回 {status}", ["status": status])])
                     return
                 }
-                // Only what the page reads goes back: the events, the lifecycle status and the registrar's name.
-                let events = (json["events"] as? [[String: Any]] ?? []).map { event -> [String: Any] in ["eventAction": event["eventAction"] ?? "", "eventDate": event["eventDate"] ?? ""] }
-                let states = Array((json["status"] as? [Any] ?? []).compactMap { $0 as? String }.prefix(20))
-                let entities = (json["entities"] as? [[String: Any]] ?? []).filter { ($0["roles"] as? [String] ?? []).contains("registrar") }.map { entity -> [String: Any] in ["roles": entity["roles"] ?? [Any](), "vcardArray": entity["vcardArray"] ?? [Any]()] }
-                reply(["ok": true, "json": ["events": events, "status": states, "entities": entities]])
+                reply(["ok": true, "json": RegistryLookup.pageFacts(json)])
             }.resume()
         }
         RegistryLookup.server(for: host) { result in
@@ -129,6 +126,16 @@ enum RegistryLookup {
     private static let queue = DispatchQueue(label: "assetboard.rdap-bootstrap")
     private static var services: [String: URL] = [:]
     private static var fetchedAt: Date?
+
+    /// Only what the page reads goes back: the events, the status (lifecycle phases and holds), the registrar entity and the
+    /// nameservers' names (at most 13, each a hostname of at most 253 characters).
+    static func pageFacts(_ json: [String: Any]) -> [String: Any] {
+        let events = (json["events"] as? [[String: Any]] ?? []).map { event -> [String: Any] in ["eventAction": event["eventAction"] ?? "", "eventDate": event["eventDate"] ?? ""] }
+        let states = Array((json["status"] as? [Any] ?? []).compactMap { $0 as? String }.prefix(20))
+        let entities = (json["entities"] as? [[String: Any]] ?? []).filter { ($0["roles"] as? [String] ?? []).contains("registrar") }.map { entity -> [String: Any] in ["roles": entity["roles"] ?? [Any](), "vcardArray": entity["vcardArray"] ?? [Any]()] }
+        let nameservers = (json["nameservers"] as? [[String: Any]] ?? []).compactMap { $0["ldhName"] as? String }.filter { !$0.isEmpty && $0.count <= 253 }.prefix(13).map { ["ldhName": $0] }
+        return ["events": events, "status": states, "entities": entities, "nameservers": Array(nameservers)]
+    }
 
     /// The RDAP base URL for a host (longest matching suffix), nil when its registry publishes none. Completes on a background queue.
     static func server(for host: String, completion: @escaping (Result<URL?, Error>) -> Void) {
