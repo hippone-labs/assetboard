@@ -71,6 +71,10 @@ async (page) => {
 
   // Agent: relations with their words and risks; links added and removed under the same rules.
   const call=(method,params)=>p.evaluate(([method,params])=>assetboardAgent({requestId:'t',method,params}),[method,params]);
+  // By default the card and the number are withheld: the relation and the risk name only their kind (pro/tests/agent-mask).
+  const hidden=(await call('get',{id:'ai'})).result;
+  check(hidden.relations.some(r=>r.withheld&&r.label==='付款卡'&&!('id' in r))&&!JSON.stringify(hidden).includes('4821'),'Withheld by default: '+JSON.stringify(hidden.relations));
+  await p.evaluate(()=>setFeature('agentCards',true));
   const sub=(await call('get',{id:'ai'})).result;
   check(sub.relations.map(r=>r.label).sort().join()==='付款卡,登录账号'&&!('links' in sub)&&sub.risks.some(r=>r.startsWith('付款卡 •••• 4821'))&&sub.risks.some(r=>r.startsWith('验证手机号 giffgaff（登录账号 美区主号）')),'get returns relations with their words and the risks: '+JSON.stringify([sub.relations,sub.risks]));
   const linked=await call('update',{id:'dep',fields:{linkTo:['card']}});
