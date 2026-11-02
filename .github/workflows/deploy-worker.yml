@@ -1,0 +1,47 @@
+# Tests and deploys the purchase worker (pro/worker: Stripe webhook → signed licence → Resend mail → /thanks) to Cloudflare, on a
+# GitHub-hosted runner. Manual only: run it from the Actions tab of this private repository once the placeholders in
+# pro/worker/wrangler.toml (PAYMENT_LINK, PRO_PRODUCT, the KV namespace id) are filled; the job stops while any is left.
+# Repository settings it reads:
+#   secret   CLOUDFLARE_API_TOKEN   a Cloudflare API token with Workers Scripts Edit, Workers KV Storage Edit and Workers Routes Edit
+#                                   (custom domain pay.assetboard.app) on the account that holds the assetboard.app zone
+#   variable CLOUDFLARE_ACCOUNT_ID  that account's id
+# The worker's own secrets (STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, LICENSE_PRIVATE_KEY, MAIL_API_KEY) live in Cloudflare, set once
+# with `wrangler secret put` (see wrangler.toml); they never pass through GitHub.
+name: deploy-worker
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-worker-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Test Worker
+        run: node --test pro/tests/worker.test.mjs
+      - name: Check the configuration
+        run: |
+          if grep -n 'PLACEHOLDER' pro/worker/wrangler.toml; then echo '::error::Fill the placeholders in pro/worker/wrangler.toml first'; exit 1; fi
+      - name: Deploy production Worker
+        working-directory: pro/worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN" || { echo '::error::Set the CLOUDFLARE_API_TOKEN repository secret'; exit 1; }
+          test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo '::error::Set the CLOUDFLARE_ACCOUNT_ID repository variable'; exit 1; }
+          npx --yes wrangler@4.152.0 deploy
+      - name: Check recovery page
+        run: curl --fail --silent --show-error --retry 3 https://pay.assetboard.app/recover -o /dev/null
