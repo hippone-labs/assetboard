@@ -14,11 +14,14 @@ function board(){
   {id:'db',type:'database',name:'pg',updatedAt:ago(3)},{id:'li',type:'license',name:'lic',updatedAt:ago(4)},
   {id:'lone',type:'domain',name:'parked.test',updatedAt:ago(1)},{id:'lonerepo',type:'repository',name:'idea',updatedAt:ago(2)},{id:'hid',type:'domain',name:'hidden.test',hiddenAt:'2026-01-01'}
  ];
+ const times=new Map(a.map(x=>[x.id,x.updatedAt]));
  const link=(x,y)=>D.linkRelation(a,x,y).ok||assert.fail(x+y);
  link('s1','u1');link('s4','u1');link('s2','u2');
  for(let i=0;i<6;i++)link('d'+i,'s1');
  for(let i=0;i<4;i++)link('r'+i,'s1');link('db','s1');link('li','s1');link('hid','s1');
  link('d0','s2');link('r0','s2');D.setLinkMeta(a,'d0','s2',{standby:true});D.setLinkMeta(a,'d1','s1',{proxied:true});
+ // Linking stamps updatedAt; the fixture keeps its own times so recency stays the one written above.
+ for(const x of a){if(times.get(x.id))x.updatedAt=times.get(x.id);else delete x.updatedAt;}
  return a;
 }
 const build=(a,extra)=>P.buildPanorama(a,extra);

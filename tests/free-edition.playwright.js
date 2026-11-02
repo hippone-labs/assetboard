@@ -60,7 +60,7 @@ async (page) => {
    const plan=planImport(state,[{name:'box-one',type:'server',provider:'Hosting',account:'',date:'2027-01-01',dateKind:'expire',cycle:'',cost:'',url:'',notes:'',purpose:'',source:'csv',externalId:'server:box-one'}]);
    const imported=applyImport(state,plan,{applySame:plan.skippedSame.map(r=>r.assetId)}).assets.find(a=>a.id==='pr2');
    const backup=parseBoardBackup(JSON.stringify({blocks:[],assets:[{...afterEdit,purpose:'restored'}]}));
-   const restored=applyBoardBackup(state,planBoardBackup(state,backup,{mode:'merge'})).assets.find(a=>a.id==='pr1');
+   const restored=applyBoardBackup(state,planBoardBackup(state,backup,{mode:'merge'}),{take:['pr1']}).assets.find(a=>a.id==='pr1');
    const handover=handoverHtml(state,{types:Object.fromEntries(Object.entries(cats).map(([id,c])=>[id,c.name])),order:categoryIds()});
    panoramaOpen(true);const lenses=[...document.querySelectorAll('.pano-lens .seg')].map(b=>b.dataset.lens);panoramaOpen(false);
    return {on:projectsOn(),edited:afterEdit.project+'|'+afterEdit.purpose,imported:imported.project+'|'+imported.date,restored:restored.project+'|'+restored.purpose,

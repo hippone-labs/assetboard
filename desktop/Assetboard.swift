@@ -1384,11 +1384,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
     @objc func exportBoard() {
         if demoMode { demoBlocked(); return }
         let panel = NSSavePanel()
-        panel.nameFieldStringValue = "Assetboard-backup.json"
+        let day = DateFormatter()
+        day.locale = Locale(identifier: "en_US_POSIX")
+        day.dateFormat = "yyyy-MM-dd"
+        panel.nameFieldStringValue = "Assetboard-backup-\(day.string(from: Date())).json"
         panel.beginSheetModal(for: window) { response in
             guard response == .OK, let destination = panel.url else { return }
             do {
-                guard let board = try self.store.load() else { return }
+                guard var board = try self.store.load() else { return }
+                // A restore compares each record with the local copy and shows when the backup was made.
+                board["exportedAt"] = ISO8601DateFormatter().string(from: Date())
                 let data = try JSONSerialization.data(withJSONObject: board, options: [.prettyPrinted, .sortedKeys])
                 try data.write(to: destination, options: .atomic)
                 // The page keeps the day of the last export to say when a copy is a month old (research Q6).

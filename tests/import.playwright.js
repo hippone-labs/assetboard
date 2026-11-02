@@ -90,7 +90,11 @@ async (page) => {
   await p.evaluate(()=>{state={blocks:[{id:'domain',width:50}],assets:[{id:'keep',type:'domain',name:'old.com',source:'manual',art:'generic',notes:'local'}],deletedExternalIds:[]};history=[];future=[];render();});
   const backup=JSON.stringify({blocks:[{id:'domain',width:50},{id:'server',width:50}],assets:[{id:'keep',type:'domain',name:'new.com',source:'manual',notes:'backup'},{id:'extra',type:'server',name:'box-1',source:'manual',art:'generic'}]});
   await p.evaluate(text=>routeImportText(text,{filename:'Assetboard-backup.json'}),backup);
-  check(await p.evaluate(()=>state.assets.find(a=>a.id==='keep').name==='new.com'&&state.assets.some(a=>a.id==='extra')),'JSON merge updates by id and adds new');
+  check(await p.locator('#modal[data-view="import-preview"] .import-mode').count()===1,'A backup always opens the preview, with the restore choice');
+  check(await p.locator('#import-preview input[name="import-take"][value="keep"]:not(:checked)').count()===1,'A local record no older than the backup copy is kept by default');
+  await p.locator('#import-preview input[name="import-take"][value="keep"]').check();
+  await p.click('#import-preview [data-action="import-apply"]');
+  check(await p.evaluate(()=>state.assets.find(a=>a.id==='keep').name==='new.com'&&state.assets.some(a=>a.id==='extra')),'JSON merge takes a ticked backup copy and adds new');
  } finally { await context.close(); }
 
  // Demo sample: in-memory only, no saves.
@@ -107,5 +111,5 @@ async (page) => {
   check(!errors.length,'Page errors: '+errors.join(' | '));
  } finally { await context.close(); }
 
- return 'PASS: import hub, welcome wording, CSV paste with preview groups, blacklist restore, direct write, batch undo, 100-row cap, JSON merge, demo sample without save';
+ return 'PASS: import hub, welcome wording, CSV paste with preview groups, blacklist restore, direct write, batch undo, 100-row cap, JSON merge through the preview, demo sample without save';
 }
