@@ -18,13 +18,7 @@ codesign --verify --deep --strict --verbose=2 "$app"
 xcrun notarytool submit "dist/Assetboard-macOS-arm64-$version.zip" \
   --keychain-profile "$NOTARY_PROFILE" --wait --output-format json > "$RELEASE_DIR/notary.json"
 /usr/bin/python3 -c 'import json,sys; assert json.load(open(sys.argv[1]))["status"] == "Accepted", "Notarization rejected"' "$RELEASE_DIR/notary.json"
-# stapler can fail with ENOENT while removing a missing ticket (Error 73).
-# Prepare only the unsealed ticket path; never overwrite a file or symlink.
-ticket="$app/Contents/CodeResources"
-if [[ ! -e "$ticket" && ! -L "$ticket" ]]; then
-  : > "$ticket"
-fi
-xcrun stapler staple -v "$app"
+xcrun stapler staple "$app"
 xcrun stapler validate "$app"
 spctl -a -vv "$app"
 archive="$RELEASE_DIR/Assetboard-macOS-arm64-$version.zip"
