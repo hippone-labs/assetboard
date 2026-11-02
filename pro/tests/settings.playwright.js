@@ -86,7 +86,8 @@ async (page) => {
   const backup=JSON.stringify({blocks:[{id:'domain',width:50,folded:false}],assets:[{id:'r1',type:'domain',name:'restored.example',provider:'R',source:'manual',art:'generic'}]});
   await p.setInputFiles('#backup-file',{name:'Assetboard-backup.json',mimeType:'application/json',buffer:Buffer.from(backup)});
   for(let i=0;i<50&&!await p.evaluate(()=>state.assets.some(a=>a.id==='r1')||$('#modal').dataset.view==='import-preview');i++)await p.waitForTimeout(40);
-  if(await p.evaluate(()=>$('#modal').dataset.view==='import-preview'))await p.click('#modal [data-action="import-apply"]');
+  check(await p.evaluate(()=>$('#modal').dataset.view==='import-preview'),'从备份恢复 always opens the preview');
+  await p.click('#modal [data-action="import-apply"]');
   check(await p.evaluate(()=>state.assets.some(a=>a.id==='r1')),'从备份恢复 brings the record back');
   // A read-only copy is named instead of becoming records.
   const count=await p.evaluate(()=>state.assets.length);

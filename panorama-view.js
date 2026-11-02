@@ -373,7 +373,7 @@ function panoDragEnd(abort,e){
 function panoRelink(id,{from,to,keep}){
  checkpoint();const r=moveMount(state.assets,id,{from,to,keep,lens:panoLens});
  if(!r.ok){history.pop();panoSay(tr('没有变化'));return r;}
- save();render();
+ touchAsset(state.assets.find(a=>a.id===id));save();render();
  const w=panoWords(),text=r.kind==='detach'?w.detach:r.kind==='also'?w.also(r.server.name):w.move(r.server.name);
  toast(text,true);panoSay(text);
  const keepFocus=document.querySelector(`#panorama [data-chip="${CSS.escape(id)}"]`)||document.querySelector(`#panorama [data-lane-head="${CSS.escape(to||'')}"],#panorama [data-pick="${CSS.escape(to||'')}"]`)||document.querySelector('#panorama [data-nav]');

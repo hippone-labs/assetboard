@@ -51,7 +51,7 @@ document.addEventListener('submit',e=>{
  const months=billingCycles[a.cycle]?.months||costAmount(a)?.months||null;
  recordPayment(a,{paidOn,amount,currency,months,covers:due,via:due?'confirm':'manual',note:form.elements.note.value.trim()});
  if(form.elements.updateCost?.checked){const cost=costFromPayment(a,{amount,currency,months});if(cost)a.cost=cost;}
- a.updatedAt=new Date().toISOString();costSource='payment';$('#modal').close();
+ touchAsset(a);costSource='payment';$('#modal').close();
  afterMoneyChange(a.id,tr('已记下 {amount}',{amount:formatMoney(amount,currency)}));
 });
 // The detail's payment section: what is waiting, the latest payments and this year's total.
@@ -143,7 +143,7 @@ document.addEventListener('submit',e=>{
  const ids=[...e.target.querySelectorAll('input[name="done"]:checked:not(:disabled)')].map(input=>input.value);
  if(!ids.length){$('#modal').close();return;}
  checkpoint();const now=new Date().toISOString();let stopped=0,hidden=0;
- for(const id of ids){const a=state.assets.find(x=>x.id===id);if(!a)continue;if(STOPPABLE.includes(a.type)){a.stopped=true;stopped++;}else{a.hiddenAt=now;hidden++;}a.updatedAt=now;}
+ for(const id of ids){const a=state.assets.find(x=>x.id===id);if(!a)continue;if(STOPPABLE.includes(a.type)){a.stopped=true;stopped++;}else{a.hiddenAt=now;hidden++;}touchAsset(a,now);}
  $('#modal').close();afterMoneyChange(null,[stopped&&tr('{n} 项标为停用',{n:stopped}),hidden&&tr('{n} 项已隐藏',{n:hidden})].filter(Boolean).join(tr('，')));
 });
 
@@ -170,7 +170,7 @@ function reviewStep(){
 function reviewAnswer(kind){
  const run=reviewRun;if(!run)return;
  const a=state.assets.find(x=>x.id===run.ids[run.index]);
- if(a&&kind!=='skip'){checkpoint();const now=new Date().toISOString();a.reviewedAt=now;if(kind==='stop'){a.stopped=true;run.stopped++;}else if(kind==='hide'){a.hiddenAt=now;run.hidden++;}else run.kept++;save();render();}
+ if(a&&kind!=='skip'){checkpoint();const now=new Date().toISOString();a.reviewedAt=now;if(kind==='stop'){a.stopped=true;run.stopped++;}else if(kind==='hide'){a.hiddenAt=now;run.hidden++;}else run.kept++;if(kind!=='keep')touchAsset(a,now);save();render();}
  run.index++;reviewStep();
 }
 document.addEventListener('keydown',e=>{

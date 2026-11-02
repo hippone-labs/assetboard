@@ -25,6 +25,10 @@ function removeUntouchedDemo(board){
 // Display order (2026-10-09): what shows first is the person's own order (cardOrder), then the most recently updated.
 // The board never guesses importance; urgency only colours dates, the agenda and block summaries.
 // Recency: updatedAt (platform or last local edit), else createdAt (added or first imported); records with neither keep their stored order after dated ones.
+// Every local write stamps the record through touchAsset: updatedAt, or editedAt for a GitHub repository, whose updatedAt is GitHub's own.
+// editedTime is the record's last change either way; restoring a backup compares it to keep the newer copy.
+function touchAsset(asset,now=new Date()){if(!asset)return asset;const at=typeof now==='string'?now:now.toISOString();if(asset.source==='github')asset.editedAt=at;else asset.updatedAt=at;return asset;}
+function editedTime(asset){return Math.max(0,...[asset?.editedAt,asset?.updatedAt,asset?.createdAt].map(value=>Date.parse(value||'')).filter(Number.isFinite));}
 function recencyTime(asset){return Date.parse(asset?.updatedAt)||Date.parse(asset?.createdAt)||0;}
 function recentFirst(assets){return assets.map((asset,index)=>({asset,index,time:recencyTime(asset)})).sort((left,right)=>(right.time-left.time)||(left.index-right.index)).map(item=>item.asset);}
 function arrangeAssets(assets,ids){
@@ -794,16 +798,18 @@ function linkAssets(assets,leftId,rightId){
  if(!left||!right||left===right)return false;
  let changed=false;
  for(const [from,to] of [[left,right],[right,left]]){const links=Array.isArray(from.links)?from.links:[];if(!links.includes(to.id)){from.links=[...links,to.id];changed=true;}}
+ if(changed){touchAsset(left);touchAsset(right);}
  return changed;
 }
 function dropLinkMeta(asset,id){if(asset?.linkMeta&&id in asset.linkMeta){delete asset.linkMeta[id];if(!Object.keys(asset.linkMeta).length)delete asset.linkMeta;}}
 function unlinkAssets(assets,leftId,rightId){
  let changed=false;
  for(const [from,to] of [[leftId,rightId],[rightId,leftId]]){const asset=assets.find(item=>item.id===from);if(Array.isArray(asset?.links)&&asset.links.includes(to)){asset.links=asset.links.filter(id=>id!==to);changed=true;}dropLinkMeta(asset,to);}
+ if(changed)for(const id of [leftId,rightId])touchAsset(assets.find(item=>item.id===id));
  return changed;
 }
 function linkedAssets(assets,asset){const ids=new Set(Array.isArray(asset?.links)?asset.links:[]);return assets.filter(item=>item.id!==asset?.id&&(ids.has(item.id)||Array.isArray(item.links)&&item.links.includes(asset?.id)));}
-function removeLinksTo(assets,id){for(const asset of assets){if(Array.isArray(asset.links)&&asset.links.includes(id))asset.links=asset.links.filter(item=>item!==id);dropLinkMeta(asset,id);}}
+function removeLinksTo(assets,id){for(const asset of assets){if(Array.isArray(asset.links)&&asset.links.includes(id)){asset.links=asset.links.filter(item=>item!==id);touchAsset(asset);}dropLinkMeta(asset,id);}}
 
 // Server-centred relations (v13 B). The server is the hub: things are mounted on it (domain, repository, database, licence) and it belongs to
 // an account (a subscription). Direction is never stored; it follows from the pair of types, so `links` stays one symmetric array.
@@ -856,7 +862,7 @@ function setLinkMeta(assets,childId,serverId,{standby,proxied}={}){
  child.linkMeta={...(child.linkMeta||{})};
  if(Object.keys(meta).length)child.linkMeta[serverId]=meta;else delete child.linkMeta[serverId];
  if(!Object.keys(child.linkMeta).length)delete child.linkMeta;
- return true;
+ touchAsset(child);return true;
 }
 // Colour a mounted card's marker takes from its servers: the worst visible primary server, standbys only when nothing else is left. Colour only, never order.
 function serverTone(assets,child,now=new Date()){
@@ -921,7 +927,7 @@ function setCardPays(assets,phoneId,cardId,on){
  phone.linkMeta={...(phone.linkMeta||{})};
  if(Object.keys(meta).length)phone.linkMeta[cardId]=meta;else delete phone.linkMeta[cardId];
  if(!Object.keys(phone.linkMeta).length)delete phone.linkMeta;
- return true;
+ touchAsset(phone);return true;
 }
 // A number marked stopped while accounts still take their codes on it: carriers recycle numbers to new owners, so it is as bad as a
 // lapsed one until those accounts move to another number (research M4). A source's trouble beyond its date: the card's or this.
@@ -2050,6 +2056,38 @@ function cryptoRandomId(){
  if(typeof crypto!=='undefined'&&crypto.randomUUID)return crypto.randomUUID();
  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=Math.random()*16|0;return (c==='x'?r:(r&0x3|0x8)).toString(16);});
 }
+// A deleted manual record leaves a tombstone {id, at} (synced ones are remembered in deletedExternalIds), so restoring an older backup
+// keeps it deleted. The newest TOMBSTONE_LIMIT are kept.
+const TOMBSTONE_LIMIT=500;
+function cleanTombstones(list){
+ const newest=new Map();
+ for(const t of Array.isArray(list)?list:[]){const time=Date.parse(t?.at||'');if(typeof t?.id!=='string'||!t.id||!Number.isFinite(time))continue;if(!newest.has(t.id)||Date.parse(newest.get(t.id).at)<time)newest.set(t.id,{id:t.id,at:t.at});}
+ return [...newest.values()].sort((left,right)=>Date.parse(left.at)-Date.parse(right.at)).slice(-TOMBSTONE_LIMIT);
+}
+function addTombstone(board,id,at=new Date().toISOString()){if(!board||!id)return;board.deletedRecords=cleanTombstones([...(board.deletedRecords||[]).filter(t=>t?.id!==id),{id,at}]);}
+// Board settings travel with the backup: what each may hold, and how a merge combines the local value with the backup's. A merge fills
+// what the local board leaves unset (a new Mac) and keeps what it has set; the day pending charges are asked from keeps the earlier one,
+// and icon sites are combined with the local choice winning.
+const BOARD_SETTINGS={
+ autoIcons:{valid:v=>v===false},
+ rdapAuto:{valid:v=>v===true},
+ rdapAsked:{valid:v=>v===true},
+ iconSites:{valid:v=>!!v&&typeof v==='object'&&!Array.isArray(v)&&Object.values(v).every(x=>typeof x==='string'),merge:(local,backup)=>({...backup,...local})},
+ paymentsSince:{valid:v=>typeof v==='string'&&dayNumber(v)!==null,merge:(local,backup)=>dayNumber(backup)<dayNumber(local)?backup:local}
+};
+function backupSettings(value){const out={};for(const [key,rule] of Object.entries(BOARD_SETTINGS))if(value&&rule.valid(value[key]))out[key]=value[key];return out;}
+function stableValue(value){return Array.isArray(value)?value.map(stableValue):value&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().filter(key=>value[key]!==undefined).map(key=>[key,stableValue(value[key])])):value;}
+function sameValue(left,right){return JSON.stringify(stableValue(left))===JSON.stringify(stableValue(right));}
+// The settings a merge changes: {key: new value}.
+function mergeBoardSettings(current,board){
+ const out={};
+ for(const [key,rule] of Object.entries(BOARD_SETTINGS)){
+  if(!(key in board))continue;
+  const local=current?.[key],value=local===undefined?board[key]:rule.merge?rule.merge(local,board[key]):local;
+  if(!sameValue(value,local))out[key]=value;
+ }
+ return out;
+}
 function parseBoardBackup(text){
  let value;
  try{value=typeof text==='string'?JSON.parse(text):text;}catch{return {ok:false,error:tr('不是有效的 JSON')};}
@@ -2057,55 +2095,87 @@ function parseBoardBackup(text){
  if(!Array.isArray(value.assets)||!Array.isArray(value.blocks))return {ok:false,error:tr('备份缺少 assets 或 blocks')};
  if(value.blocks.some(block=>!block||typeof block.id!=='string'))return {ok:false,error:tr('区块格式无效')};
  if(value.assets.some(asset=>!asset||typeof asset.id!=='string'||typeof asset.name!=='string'||typeof asset.type!=='string'))return {ok:false,error:tr('资产格式无效')};
- return {ok:true,board:{blocks:value.blocks.map(block=>({id:block.id,folded:!!block.folded})),assets:value.assets,deletedExternalIds:Array.isArray(value.deletedExternalIds)?value.deletedExternalIds:[],evidenceDecisions:value.evidenceDecisions&&typeof value.evidenceDecisions==='object'?value.evidenceDecisions:{},cardOrder:value.cardOrder&&typeof value.cardOrder==='object'?value.cardOrder:{},theme:value.theme}};
+ const exportedAt=typeof value.exportedAt==='string'&&Number.isFinite(Date.parse(value.exportedAt))?value.exportedAt:'';
+ return {ok:true,exportedAt,board:{blocks:value.blocks.map(block=>({id:block.id,folded:!!block.folded})),assets:value.assets,deletedExternalIds:Array.isArray(value.deletedExternalIds)?value.deletedExternalIds:[],deletedRecords:cleanTombstones(value.deletedRecords),evidenceDecisions:value.evidenceDecisions&&typeof value.evidenceDecisions==='object'?value.evidenceDecisions:{},cardOrder:value.cardOrder&&typeof value.cardOrder==='object'?value.cardOrder:{},theme:value.theme,...backupSettings(value)}};
 }
+// Restoring a backup always goes through the preview. Merge compares each record with the local one by editedTime: the backup's copy
+// is taken by default only when it is newer (`updated`); a newer or equally old local copy stays (`newerLocal`); identical ones are
+// `same`. A record missing locally comes back (`added`) unless it was deleted after the backup's copy (a tombstone newer than it) or is
+// a deleted synced record (`skippedDeleted`, restorable). Replace makes the board the backup's and lists the local records it drops (`removed`).
 function planBoardBackup(current,backup,{mode='merge'}={}){
  if(!backup?.ok)return {ok:false,error:backup?.error||tr('无效备份'),conflicts:true};
- if(mode==='replace')return {ok:true,mode:'replace',added:backup.board.assets.map(asset=>({item:asset})),updated:[],collisions:[],skippedDeleted:[],hidden:[],skippedSame:[],conflicts:true,board:backup.board};
- const added=[],updated=[],skippedDeleted=[];
- const currentIds=new Set(current.assets.map(a=>a.id));
- const deleted=new Set(current.deletedExternalIds||[]);
- for(const asset of backup.board.assets){
-  if(deleted.has(asset.id)||(assetSyncKey(asset)&&deleted.has(assetSyncKey(asset)))){skippedDeleted.push({item:asset,key:assetSyncKey(asset)||asset.id});continue;}
-  if(currentIds.has(asset.id))updated.push({item:asset,assetId:asset.id,name:asset.name,hidden:!!current.assets.find(a=>a.id===asset.id)?.hiddenAt});
-  else added.push({item:asset});
+ const local=new Map(current.assets.map(a=>[a.id,a])),exportedAt=backup.exportedAt||'';
+ const base={ok:true,mode,preview:true,conflicts:true,collisions:[],hidden:[],skippedSame:[],board:backup.board,exportedAt};
+ const row=(asset,mine)=>({item:asset,assetId:asset.id,name:asset.name,hidden:!!mine?.hiddenAt,localAt:editedTime(mine),backupAt:editedTime(asset)});
+ if(mode==='replace'){
+  const ids=new Set(backup.board.assets.map(a=>a.id)),settings={};
+  for(const key of Object.keys(BOARD_SETTINGS))if(!sameValue(backup.board[key],current[key])&&!(key==='paymentsSince'&&backup.board[key]===undefined))settings[key]=backup.board[key];
+  return {...base,added:backup.board.assets.filter(a=>!local.has(a.id)).map(asset=>({item:asset})),updated:backup.board.assets.filter(a=>local.has(a.id)).map(a=>row(a,local.get(a.id))),newerLocal:[],same:[],skippedDeleted:[],
+   removed:current.assets.filter(a=>!ids.has(a.id)).map(a=>({assetId:a.id,name:a.name,type:a.type,localAt:editedTime(a)})),settings};
  }
- const hidden=updated.filter(row=>row.hidden);
- const plainUpdated=updated.filter(row=>!row.hidden);
- return {ok:true,mode:'merge',added,updated:plainUpdated,collisions:[],skippedDeleted,hidden,skippedSame:[],conflicts:skippedDeleted.length+hidden.length>0,board:backup.board};
+ const added=[],updated=[],newerLocal=[],same=[],skippedDeleted=[];
+ const deleted=new Set(current.deletedExternalIds||[]),stones=new Map(cleanTombstones(current.deletedRecords).map(t=>[t.id,t.at]));
+ for(const asset of backup.board.assets){
+  const key=assetSyncKey(asset),mine=local.get(asset.id);
+  if(!mine&&(deleted.has(asset.id)||(key&&deleted.has(key)))){skippedDeleted.push({item:asset,key:key||asset.id});continue;}
+  if(!mine){const gone=stones.get(asset.id);if(gone&&Date.parse(gone)>editedTime(asset))skippedDeleted.push({item:asset,key:asset.id,deletedAt:gone,backupAt:editedTime(asset)});else added.push({item:asset});continue;}
+  const entry=row(asset,mine);
+  if(sameValue(asset,mine))same.push(entry);else if(entry.backupAt>entry.localAt)updated.push(entry);else newerLocal.push(entry);
+ }
+ return {...base,added,updated,newerLocal,same,skippedDeleted,removed:[],settings:mergeBoardSettings(current,backup.board)};
 }
-function applyBoardBackup(current,plan,{restoreKeys=[]}={}){
+// After a merge a link can be held by one side only (one copy came from the backup, the other is local): the side changed last decides,
+// since linking and unlinking stamp both. Only pairs that touch a record the merge wrote are settled.
+function settleLinks(assets,changed){
+ const byId=new Map(assets.map(a=>[a.id,a])),add=[],drop=[];
+ for(const a of assets)for(const id of Array.isArray(a.links)?a.links:[]){
+  const b=byId.get(id);if(!b||(Array.isArray(b.links)&&b.links.includes(a.id))||!(changed.has(a.id)||changed.has(b.id)))continue;
+  if(editedTime(b)>editedTime(a))drop.push([a,id]);else add.push([b,a.id]);
+ }
+ for(const [a,id] of drop){a.links=a.links.filter(x=>x!==id);dropLinkMeta(a,id);}
+ for(const [b,id] of add)b.links=[...(Array.isArray(b.links)?b.links:[]),id];
+}
+// `take`: ids whose backup copy replaces the local one (default: the rows where the backup is newer). `restoreKeys`: skipped deleted rows to bring back.
+function applyBoardBackup(current,plan,{restoreKeys=[],take}={}){
  if(plan.mode==='replace'){
   const next=structuredClone(plan.board);
   if(!Array.isArray(next.deletedExternalIds))next.deletedExternalIds=[];
+  if(!next.deletedRecords?.length)delete next.deletedRecords;
+  if(next.paymentsSince===undefined&&current.paymentsSince)next.paymentsSince=current.paymentsSince;
+  // Pending requests from external tools belong to this Mac, not to the backup.
+  if(current.agentActions)next.agentActions=structuredClone(current.agentActions);
   return next;
  }
  const next=structuredClone(current);
  if(!Array.isArray(next.deletedExternalIds))next.deletedExternalIds=[];
- const restore=new Set(restoreKeys);
+ const restore=new Set(restoreKeys),taken=new Set(take||(plan.updated||[]).map(row=>row.assetId)),changed=new Set();
  if(restore.size)next.deletedExternalIds=next.deletedExternalIds.filter(key=>!restore.has(key));
- const byId=new Map(next.assets.map(asset=>[asset.id,asset]));
- for(const entry of [...plan.updated,...plan.hidden]){
-  const local=byId.get(entry.assetId);if(!local)continue;
-  const incoming=entry.item;
-  Object.assign(local,{...incoming,hiddenAt:local.hiddenAt,iconData:local.iconData||incoming.iconData,siteIcon:local.siteIcon||incoming.siteIcon,siteIconHost:local.siteIconHost||incoming.siteIconHost,notes:incoming.notes||local.notes});
-  ensureBlock(next,local.type);
+ const index=new Map(next.assets.map((asset,i)=>[asset.id,i]));
+ for(const entry of [...(plan.updated||[]),...(plan.newerLocal||[])]){
+  if(!taken.has(entry.assetId)||!index.has(entry.assetId))continue;
+  const i=index.get(entry.assetId),mine=next.assets[i],copy=structuredClone(entry.item);
+  for(const key of ['iconData','siteIcon','siteIconHost'])if(!copy[key]&&mine[key])copy[key]=mine[key];
+  next.assets[i]=copy;changed.add(copy.id);ensureBlock(next,copy.type);
  }
- for(const entry of plan.added){
-  if(byId.has(entry.item.id))continue;
-  next.assets.push(structuredClone(entry.item));
-  ensureBlock(next,entry.item.type);
- }
- for(const entry of plan.skippedDeleted){
-  if(!restore.has(entry.key))continue;
-  if(byId.has(entry.item.id))continue;
-  next.assets.push(structuredClone(entry.item));
-  ensureBlock(next,entry.item.type);
- }
+ const push=item=>{if(index.has(item.id))return;next.assets.push(structuredClone(item));index.set(item.id,next.assets.length-1);changed.add(item.id);ensureBlock(next,item.type);};
+ for(const entry of plan.added||[])push(entry.item);
+ for(const entry of plan.skippedDeleted||[])if(restore.has(entry.key))push(entry.item);
+ for(const [key,value] of Object.entries(plan.settings||{}))next[key]=value;
+ const present=new Set(next.assets.map(a=>a.id));
+ next.deletedRecords=cleanTombstones([...(next.deletedRecords||[]),...(plan.board.deletedRecords||[])].filter(t=>!present.has(t?.id)));
+ if(!next.deletedRecords.length)delete next.deletedRecords;
+ settleLinks(next.assets,changed);
  if(plan.board.evidenceDecisions)next.evidenceDecisions={...(next.evidenceDecisions||{}),...plan.board.evidenceDecisions};
  if(plan.board.cardOrder)next.cardOrder={...(next.cardOrder||{}),...plan.board.cardOrder};
  for(const key of plan.board.deletedExternalIds||[])if(!restore.has(key)&&!next.deletedExternalIds.includes(key))next.deletedExternalIds.push(key);
  return next;
+}
+// What a restore wrote, for its toast; replace counts against the board it replaced.
+function backupCounts(plan,{restoreKeys=[],take}={}){
+ if(plan.mode==='replace')return {added:(plan.added||[]).length,updated:(plan.updated||[]).length,restored:0,removed:(plan.removed||[]).length,kept:0};
+ const taken=new Set(take||(plan.updated||[]).map(row=>row.assetId)),restore=new Set(restoreKeys),rows=[...(plan.updated||[]),...(plan.newerLocal||[])];
+ const updated=rows.filter(row=>taken.has(row.assetId)).length;
+ return {added:(plan.added||[]).length,updated,restored:(plan.skippedDeleted||[]).filter(row=>restore.has(row.key)).length,removed:0,kept:rows.length-updated};
 }
 function demoImportSampleCsv(){
  return ['名称,类别,平台,到期日,费用,备注','sample-studio.com,域名,Namecheap,2026-10-21,$10.98 / 年,演示用域名','demo-box-tokyo,服务器,Example VPS,2026-11-04,$6.00 / 月,演示用服务器','Example Notes Pro,订阅与工具,Example Notes,2026-11-06,$8.00 / 月,演示用订阅'].join('\n');
@@ -2131,10 +2201,10 @@ function recordPayment(asset,{paidOn,amount=0,currency='',months=null,covers='',
  const list=paymentList(asset).filter(p=>!(payment.covers&&p.covers===payment.covers));
  list.push(payment);
  list.sort((left,right)=>dayNumber(left.paidOn)-dayNumber(right.paidOn)||String(left.covers).localeCompare(String(right.covers)));
- asset.payments=list.slice(-PAYMENT_LIMIT);settleCreditExpiry(asset);
+ asset.payments=list.slice(-PAYMENT_LIMIT);settleCreditExpiry(asset);touchAsset(asset);
  return payment;
 }
-function removePayment(asset,id){const before=paymentList(asset).length;asset.payments=paymentList(asset).filter(p=>p.id!==id);if(!asset.payments.length)delete asset.payments;settleCreditExpiry(asset);return before!==(asset.payments?.length||0);}
+function removePayment(asset,id){const before=paymentList(asset).length;asset.payments=paymentList(asset).filter(p=>p.id!==id);if(!asset.payments.length)delete asset.payments;settleCreditExpiry(asset);const changed=before!==(asset.payments?.length||0);if(changed)touchAsset(asset);return changed;}
 // Prepaid API credit runs out a year after it was bought and cannot be extended (research A1, A4: OpenAI and Anthropic say so in their
 // terms, OpenRouter may expire it after 365 days). A prepaid (not recurring) AI record of one of these keeps its date at the newest
 // purchase + 365 days, as an expiry, while that date is one this rule set (creditExpiry); a date someone typed is left alone. For
@@ -2197,10 +2267,10 @@ function confirmRenewal(asset,due,{renewed=true,now=new Date()}={}){
  if(!months||dayNumber(due)===null)return null;
  if(renewed){
   const payment=moneyOn(asset,dayNumber(due))?.value>0?confirmCharge(asset,due,{now}):null;
-  asset.date=addMonths(due,months);asset.updatedAt=now.toISOString();delete asset.registryPhase;
+  asset.date=addMonths(due,months);touchAsset(asset,now);delete asset.registryPhase;
   return {renewed:true,date:asset.date,payment};
  }
- asset.date=due;asset.cycle='';asset.updatedAt=now.toISOString();
+ asset.date=due;asset.cycle='';touchAsset(asset,now);
  return {renewed:false,date:due,payment:null};
 }
 // A card's next month and recent trouble: the automatic charges due on what it pays for within `days`, and the charges marked as not
@@ -2254,7 +2324,7 @@ function renewAsset(asset,{until,paidOn,amount=0,currency='',updateCost=false,vi
  asset.event=`${until} ${dateKinds[asset.dateKind].future}`;
  let costChanged=false;
  if(updateCost&&payment){const cost=costFromPayment(asset,payment),own=costAmount(asset);if(cost&&!(own&&own.value===payment.amount&&own.currency===payment.currency&&own.months===payment.months)){asset.cost=cost;costChanged=true;}}
- asset.updatedAt=now.toISOString();delete asset.warn;
+ touchAsset(asset,now);delete asset.warn;
  return {ok:true,payment,base,months,costChanged};
 }
 // One automatic charge confirmed as paid (amount defaults to the record's cost) or as not taken.
@@ -2262,7 +2332,7 @@ function confirmCharge(asset,due,{amount,currency,paidOn,missed=false,now=new Da
  if(missed)return recordPayment(asset,{paidOn:paidOn||isoDay(localDay(now)),covers:due,via:'confirm',status:'missed'});
  const own=moneyOn(asset,dayNumber(due)??localDay(now)),value=amount??own?.value,code=currency||own?.currency;
  const payment=recordPayment(asset,{paidOn:paidOn||due,amount:value,currency:code,months:billingCycles[asset.cycle]?.months||own?.months||null,covers:due,via:'confirm'});
- if(payment)asset.updatedAt=now.toISOString();
+ if(payment)touchAsset(asset,now);
  return payment;
 }
 // The price moved: today's cost against the last payment, or (when the cost was already updated) the last payment against the one
@@ -2484,4 +2554,4 @@ function dueLevel(asset,{now=new Date(),since=''}={}){
  return assetDateStatus(asset,now).level;
 }
 
-if(typeof module!=='undefined')module.exports={LEGACY_WORDS,LEGACY_STATES,MFA_KINDS,RECOVERY_TYPES,RECOVERY_FIELDS,BACKUP_KINDS,BACKUP_TYPES,IMPORTANCE,looksLikeSecret,recoveryText,recoveryGap,backupText,mailHost,mailDependents,selfRecovery,mailStake,PHONE_STATUSES,phoneTrouble,carrierNote,cardPaysPhone,setCardPays,CREDIT_RULES,creditRule,settleCreditExpiry,PLATFORM_SOURCES,missedReminders,reminderDays,STALE_SYNC_DAYS,staleSyncs,AUTO_RENEW_WORDS,CARD_STATUSES,cardTrouble,sourceTrouble,IMPACT_WORDS,verifyNumbers,phoneReach,phoneStake,syncedLabel,BILLING_TYPES,billingLabels,isFreeCost,billingTypeOf,validPromotion,moneyOn,settlePromotions,noteCostChange,costForecast,PAYMENT_LIMIT,CONFIRM_DAYS,paymentList,paidPayments,lastPayment,recordPayment,removePayment,occurrencesBetween,pendingCharges,pendingRenewals,confirmRenewal,cardOutlook,runsOut,needsConfirm,confirmWords,LIFECYCLE_RULES,lifecycleRule,lifecycleOf,AFTER_DUE_DAYS,monthsBetween,renewBase,canRenew,renewOptions,costFromPayment,renewAsset,confirmCharge,priceChange,paidTotals,ledgerRows,csvCell,ledgerCsv,cleanProject,projectNames,projectAssets,shutdownPlan,REVIEW_QUIET_DAYS,reviewQueue,icsFold,calendarIcs,escHtml,handoverHtml,rdapFacts,rdapCompare,rdapPhaseLabels,registryPhaseOf,RDAP_HOLDS,rdapHoldLabels,RDAP_MISSING_TLDS,rdapMissing,rdapNameservers,registryHoldOf,registryChangeOf,rdapRemember,registryAlerts,dueLevel,renewalGrace,RENEWAL_GRACE_DAYS,maskName,PROVIDER_PRESETS,providerPresets,MAIN_CURRENCIES,FALLBACK_RATES,costAmount,syncMoney,convertMoney,formatMoney,costTotals,MOUNT_TYPES,relationKind,linkAllowed,LINK_KINDS,LINK_KIND_ORDER,linkKind,linkRisks,linkImpact,serverChain,serverChainCount,linkRelation,linkMetaOf,setLinkMeta,serverTone,peekSet,dropLinkMeta,IP_LIMIT,normalizeIp,parseIps,assetIps,primaryIp,maskIp,validIpList,ACTION_FIELDS,QUICK_LIMIT,validActionField,sshCommand,cloneUrl,quickActions,recencyTime,recentFirst,arrangeAssets,touchedPrefix,bringToFront,DISPLAY_LIMITS,formatCount,ensureBlock,iconHost,iconVendor,iconVendors,vendorForHost,iconPlan,iconSiteHost,iconSiteFor,iconPlatformOf,iconRows,guessAssetType,regionList,regionName,regionFlag,phoneParts,regionFromPhone,maskPhone,maskEmail,cardExpiry,expiryText,looksLikeCardNumber,linkAssets,unlinkAssets,linkedAssets,removeLinksTo,assetFingerprint,removeUntouchedDemo,orderAssets,moveAsset,dateKinds,billingCycles,dayNumber,localDay,isoDay,addMonths,nextOccurrence,assetDateStatus,upcomingEvents,REMINDER_LIMIT,reminderLeads,reminderPlan,syncKey,assetSyncKey,isBlacklisted,findByExternal,findNameCollision,mergeCloudflare,mergeGitHub,applyCollision,parseSender,registrableDomain,cleanMerchant,findAmounts,findDates,findDomains,evidenceFacts,inferCycle,formatCost,matchAsset,buildCandidates,evidencePayload,parseAiItems,applyAiItem,IMPORT_ROW_LIMIT,parseLooseDate,shiftDate,costParts,formatCostParts,inferTypeFromName,parseQuickLine,AGENT_FIELDS,isAgentImport,parseAgentImport,parseDelimitedText,importHeaderField,rowsToImportItems,isCfsmBackup,parseCfsmBackup,classifyImportPayload,planImport,applyImport,parseBoardBackup,planBoardBackup,applyBoardBackup,demoImportSampleCsv,csvSyncKey,VENDOR_CSV_PRESETS,cloudflareTokenTemplateUrl,githubTokenTemplateUrl,CLOUDFLARE_TOKEN_PERMISSIONS,parseSshConfig,mergeSshConfig,parseEml,delimitedRecords,splitDelimitedLine,resolvePresetValue,SECRET_KINDS,secretKinds,rowSecrets,looksLikeEnv,screenText,PASSWORD_EXPORTS,passwordExportOf,importFileKind,importGate,screenBackup,AI_PLANS,AI_PLANS_CHECKED,aiPlanProviders,aiPlansFor,findAiPlan,aiPlanFields};
+if(typeof module!=='undefined')module.exports={touchAsset,editedTime,TOMBSTONE_LIMIT,addTombstone,cleanTombstones,BOARD_SETTINGS,backupSettings,mergeBoardSettings,settleLinks,backupCounts,LEGACY_WORDS,LEGACY_STATES,MFA_KINDS,RECOVERY_TYPES,RECOVERY_FIELDS,BACKUP_KINDS,BACKUP_TYPES,IMPORTANCE,looksLikeSecret,recoveryText,recoveryGap,backupText,mailHost,mailDependents,selfRecovery,mailStake,PHONE_STATUSES,phoneTrouble,carrierNote,cardPaysPhone,setCardPays,CREDIT_RULES,creditRule,settleCreditExpiry,PLATFORM_SOURCES,missedReminders,reminderDays,STALE_SYNC_DAYS,staleSyncs,AUTO_RENEW_WORDS,CARD_STATUSES,cardTrouble,sourceTrouble,IMPACT_WORDS,verifyNumbers,phoneReach,phoneStake,syncedLabel,BILLING_TYPES,billingLabels,isFreeCost,billingTypeOf,validPromotion,moneyOn,settlePromotions,noteCostChange,costForecast,PAYMENT_LIMIT,CONFIRM_DAYS,paymentList,paidPayments,lastPayment,recordPayment,removePayment,occurrencesBetween,pendingCharges,pendingRenewals,confirmRenewal,cardOutlook,runsOut,needsConfirm,confirmWords,LIFECYCLE_RULES,lifecycleRule,lifecycleOf,AFTER_DUE_DAYS,monthsBetween,renewBase,canRenew,renewOptions,costFromPayment,renewAsset,confirmCharge,priceChange,paidTotals,ledgerRows,csvCell,ledgerCsv,cleanProject,projectNames,projectAssets,shutdownPlan,REVIEW_QUIET_DAYS,reviewQueue,icsFold,calendarIcs,escHtml,handoverHtml,rdapFacts,rdapCompare,rdapPhaseLabels,registryPhaseOf,RDAP_HOLDS,rdapHoldLabels,RDAP_MISSING_TLDS,rdapMissing,rdapNameservers,registryHoldOf,registryChangeOf,rdapRemember,registryAlerts,dueLevel,renewalGrace,RENEWAL_GRACE_DAYS,maskName,PROVIDER_PRESETS,providerPresets,MAIN_CURRENCIES,FALLBACK_RATES,costAmount,syncMoney,convertMoney,formatMoney,costTotals,MOUNT_TYPES,relationKind,linkAllowed,LINK_KINDS,LINK_KIND_ORDER,linkKind,linkRisks,linkImpact,serverChain,serverChainCount,linkRelation,linkMetaOf,setLinkMeta,serverTone,peekSet,dropLinkMeta,IP_LIMIT,normalizeIp,parseIps,assetIps,primaryIp,maskIp,validIpList,ACTION_FIELDS,QUICK_LIMIT,validActionField,sshCommand,cloneUrl,quickActions,recencyTime,recentFirst,arrangeAssets,touchedPrefix,bringToFront,DISPLAY_LIMITS,formatCount,ensureBlock,iconHost,iconVendor,iconVendors,vendorForHost,iconPlan,iconSiteHost,iconSiteFor,iconPlatformOf,iconRows,guessAssetType,regionList,regionName,regionFlag,phoneParts,regionFromPhone,maskPhone,maskEmail,cardExpiry,expiryText,looksLikeCardNumber,linkAssets,unlinkAssets,linkedAssets,removeLinksTo,assetFingerprint,removeUntouchedDemo,orderAssets,moveAsset,dateKinds,billingCycles,dayNumber,localDay,isoDay,addMonths,nextOccurrence,assetDateStatus,upcomingEvents,REMINDER_LIMIT,reminderLeads,reminderPlan,syncKey,assetSyncKey,isBlacklisted,findByExternal,findNameCollision,mergeCloudflare,mergeGitHub,applyCollision,parseSender,registrableDomain,cleanMerchant,findAmounts,findDates,findDomains,evidenceFacts,inferCycle,formatCost,matchAsset,buildCandidates,evidencePayload,parseAiItems,applyAiItem,IMPORT_ROW_LIMIT,parseLooseDate,shiftDate,costParts,formatCostParts,inferTypeFromName,parseQuickLine,AGENT_FIELDS,isAgentImport,parseAgentImport,parseDelimitedText,importHeaderField,rowsToImportItems,isCfsmBackup,parseCfsmBackup,classifyImportPayload,planImport,applyImport,parseBoardBackup,planBoardBackup,applyBoardBackup,demoImportSampleCsv,csvSyncKey,VENDOR_CSV_PRESETS,cloudflareTokenTemplateUrl,githubTokenTemplateUrl,CLOUDFLARE_TOKEN_PERMISSIONS,parseSshConfig,mergeSshConfig,parseEml,delimitedRecords,splitDelimitedLine,resolvePresetValue,SECRET_KINDS,secretKinds,rowSecrets,looksLikeEnv,screenText,PASSWORD_EXPORTS,passwordExportOf,importFileKind,importGate,screenBackup,AI_PLANS,AI_PLANS_CHECKED,aiPlanProviders,aiPlansFor,findAiPlan,aiPlanFields};

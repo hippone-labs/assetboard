@@ -203,7 +203,7 @@ proRegister(()=>{
    const raw=params.mode==='none'||params.mode==='auto'?params.mode:{source:params.source,serverId:params.serverId};
    if(raw.source===undefined&&raw.serverId===undefined&&typeof raw==='object')throw new Error(tr('需要 source + serverId，或 mode 为 none / auto'));
    const value=agentProbeLinkValue(raw,a);
-   checkpoint();if(value)a.probeLink=value;else delete a.probeLink;a.updatedAt=new Date().toISOString();
+   checkpoint();if(value)a.probeLink=value;else delete a.probeLink;touchAsset(a);
    save();agentProbeLinked(a);render();if(activeAsset===a.id)showDetail(a.id,{focus:false});if(typeof panoOpen!=='undefined'&&panoOpen)panoramaRender();
    toast(value?.none?tr('外部工具取消了「{name}」的探针关联',{name:a.name}):value?tr('外部工具为「{name}」关联了探针',{name:a.name}):tr('外部工具让「{name}」恢复自动匹配探针',{name:a.name}),true);
    return agentServerMetrics(a);

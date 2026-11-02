@@ -180,7 +180,7 @@ function exportDialog(){
 }
 function exportRun(kind){
  const day=todayIso();
- if(kind==='backup'){saveFile(`Assetboard-backup-${day}.json`,JSON.stringify(state,null,1),'application/json');if(!nativeStore)window.assetboardExported();return;}
+ if(kind==='backup'){saveFile(`Assetboard-backup-${day}.json`,JSON.stringify({...state,exportedAt:new Date().toISOString()},null,1),'application/json');if(!nativeStore)window.assetboardExported();return;}
  if(kind==='ics'){saveFile(`Assetboard-${day}.ics`,calendarIcs(state.assets,{name:tr('Assetboard 到期与扣款')}),'text/calendar');return;}
  if(kind==='handover'){const mask=!!$('#handover-mask')?.checked;try{localStorage.setItem(HANDOVER_KEY,new Date().toISOString());}catch{}saveFile(tr('Assetboard-交接清单-{day}.html',{day}),handoverHtml(state,{mask,types:Object.fromEntries(Object.entries(cats).map(([id,c])=>[id,c.name])),order:categoryIds()}),'text/html');}
 }
@@ -231,7 +231,7 @@ window.assetboardRdap=async result=>{
  rdapApply(a,cmp.registry);
 };
 function rdapApply(a,date){
- checkpoint();a.date=date;a.dateKind=a.dateKind==='renew'?'renew':'expire';a.event=`${a.date} ${dateKinds[a.dateKind].future}`;a.registryCheckedAt=a.updatedAt=new Date().toISOString();delete a.registryPhase;delete a.registryExpires;
+ checkpoint();a.date=date;a.dateKind=a.dateKind==='renew'?'renew':'expire';a.event=`${a.date} ${dateKinds[a.dateKind].future}`;a.registryCheckedAt=new Date().toISOString();touchAsset(a,a.registryCheckedAt);delete a.registryPhase;delete a.registryExpires;
  afterMoneyChange(a.id,tr('到期日改为 {date}',{date}));
 }
 // ---- 每周核对注册局 (research #3, U5): off until turned on in the domain category's settings (state.rdapAuto), because it reaches
