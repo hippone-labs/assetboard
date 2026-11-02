@@ -1978,3 +1978,17 @@ body::before,.native-app body::before{background:radial-gradient(70vw 65vh at 0%
 .fact .fact-warn{color:var(--warning)}
 #toast.ask .toast-ask{display:flex;flex-direction:column;gap:2px;min-width:0}
 #toast.ask .toast-ask small{font-size:11px}
+/* AI plans (2026-11-02): plan chips under the AI vendor in the form, and the 从常见 AI 套餐添加 list. The price is the quieter
+   second part of a chip; on the picked chip it takes the chip's own text colour. */
+:root #modal .form .plan-picks{display:grid;gap:6px;margin-top:-6px}
+:root #modal .form .plan-picks:empty{display:none}
+.choice .plan-price{margin-left:6px;color:var(--muted);font-variant-numeric:tabular-nums}
+.choice[aria-pressed="true"] .plan-price,.choice[aria-checked="true"] .plan-price{color:inherit}
+:root #modal .ai-plans{gap:18px}
+.ai-plans .plan-group{display:grid;gap:2px;margin:0;padding:0;border:0;min-width:0}
+.ai-plans .plan-group legend{padding:0;margin-bottom:4px;font-size:12px;color:var(--muted)}
+.ai-plans .plan-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:4px 10px;min-height:32px}
+.ai-plans .plan-row .check-label{flex:1 1 auto;min-width:0;font-size:13px;color:var(--ink)}
+.ai-plans .plan-row .chip-group{flex:none}
+.ai-plans .plan-row>.plan-price{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.ai-plans .plan-have{font-size:11px;color:var(--muted)}
