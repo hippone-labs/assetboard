@@ -1,0 +1,5 @@
+{
+  "note": "A throwaway Ed25519 key pair for tests only (pro/tests, pro/desktop/License.swift's --test-license). Never the production key: that one is made by pro/worker/keygen.mjs and lives only in the worker's secret and License.swift.",
+  "privateKeyPkcs8": "MC4CAQAwBQYDK2VwBCIEIAuObkTHM4CrtkGAYnBf0X4M4FzSwdc1UuPES7ITjjok",
+  "publicKeyRaw": "VvZRbb0zp8qzeuJCvVl_2uR6OstgCy8k_DP36Gh70EE"
+}

@@ -1,0 +1,33 @@
+# Assetboard Pro's purchase worker (pro/worker/worker.mjs). Deploy with `npx wrangler deploy` from this directory after
+# `wrangler kv namespace create LICENSES` (paste its id below) and the four secrets:
+#   wrangler secret put STRIPE_SECRET_KEY        rk_live_… (restricted key: Checkout Sessions read, PaymentIntents write, Customers write)
+#   wrangler secret put STRIPE_WEBHOOK_SECRET    whsec_… from the endpoint https://<host>/stripe/webhook
+#                                                (events: checkout.session.completed, checkout.session.async_payment_succeeded, charge.refunded)
+#   wrangler secret put LICENSE_PRIVATE_KEY      the PKCS#8 line from `node pro/worker/keygen.mjs`; its public key goes into License.swift
+#   wrangler secret put MAIL_API_KEY             Resend API key (the sending domain must be verified there)
+# Nothing here is a secret. The app opens the Payment Link itself (pro/web/license-pro.js, PRO_BUY_URL); /buy here is for the site.
+# The worker answers on its own host, pay.assetboard.app (a Workers custom domain on the assetboard.app zone); the static site
+# (~/projects/assetboard-site) stays as it is. The Payment Link's "after payment" setting must point at SITE/thanks?session_id={CHECKOUT_SESSION_ID}.
+name = "assetboard-pro"
+main = "worker.mjs"
+compatibility_date = "2026-10-01"
+
+[[routes]]
+pattern = "pay.assetboard.app"
+custom_domain = true
+
+[vars]
+SITE = "https://pay.assetboard.app"
+DOWNLOAD = "https://assetboard.app/"
+MAIL_FROM = "Assetboard <licenses@assetboard.app>"   # the domain must be verified at Resend first
+MAIL_REPLY_TO = "assetboard@163.com"                 # where "reply to this email" (refunds, questions) lands
+# Pro is US$10, one purchase, lifetime updates; the webhook issues a licence only for 1000 USD cents of PRO_PRODUCT (worker.mjs, PRO_PRICE).
+# Placeholders until the owner creates the US$10 Payment Link in Stripe: its https://buy.stripe.com/… address (the same as PRO_BUY_URL in
+# pro/web/license-pro.js) and the product id it sells.
+PAYMENT_LINK = "https://buy.stripe.com/PAYMENT_LINK_PLACEHOLDER"
+PRO_PRODUCT = "prod_PRODUCT_PLACEHOLDER"
+
+# Placeholder: `wrangler kv namespace create LICENSES` prints the id to put here.
+[[kv_namespaces]]
+binding = "LICENSES"
+id = "KV_NAMESPACE_ID_PLACEHOLDER"
