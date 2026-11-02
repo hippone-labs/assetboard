@@ -2070,3 +2070,6 @@ body::before,.native-app body::before{background:radial-gradient(70vw 65vh at 0%
 /* 设置 at a narrow width: a switch stays at the end of its row and a long label wraps beside it. */
 :root #modal .prefs-row:has(>input.prefs-switch){flex-wrap:nowrap}
 :root #modal .prefs-row:has(>input.prefs-switch) .prefs-label{flex:1 1 0;min-width:0}
+/* The privacy line under 添加资产: its lock keeps a gap from the words. */
+.capture-note{display:flex;align-items:flex-start;gap:6px}
+.capture-note .ui-icon{width:13px;height:13px;margin-top:2px;flex:none}
