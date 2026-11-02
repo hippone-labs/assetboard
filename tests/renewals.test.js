@@ -186,8 +186,8 @@ test('handoverHtml lists live records by category, escapes everything and can ma
 
 test('rdapFacts reads the expiry and registrar; rdapCompare checks the stored date',()=>{
  const json={events:[{eventAction:'registration',eventDate:'2020-03-01T10:00:00Z'},{eventAction:'expiration',eventDate:'2027-03-01T23:59:59Z'}],entities:[{roles:['registrar'],vcardArray:['vcard',[['version',{},'text','4.0'],['fn',{},'text','NameCheap, Inc.']]]}]};
- assert.deepEqual(rdapFacts(json),{expires:'2027-03-01',registrar:'NameCheap, Inc.',phase:''});
- assert.deepEqual(rdapFacts(null),{expires:'',registrar:'',phase:''});
+ assert.deepEqual(rdapFacts(json),{expires:'2027-03-01',registrar:'NameCheap, Inc.',phase:'',hold:'',ns:[]});
+ assert.deepEqual(rdapFacts(null),{expires:'',registrar:'',phase:'',hold:'',ns:[]});
  assert.equal(rdapCompare({date:'2027-03-01'},{expires:'2027-03-01'}).state,'same');
  assert.equal(rdapCompare({date:'2026-03-01',cycle:'yearly'},{expires:'2027-03-01'},at('2026-10-21')).state,'same');
  assert.deepEqual(rdapCompare({date:'2026-12-01'},{expires:'2027-03-01'}),{state:'differs',registry:'2027-03-01',stored:'2026-12-01'});
@@ -296,11 +296,14 @@ test('rdapFacts reads the lifecycle phase; past expiry the registry date is not 
 });
 
 test('pendingRenewals asks about an auto-renewing expiry from the day after; the answer rolls it on or lets it expire',()=>{
- const domain=()=>({id:'d',name:'auto.dev',date:'2025-10-05',dateKind:'expire',cycle:'yearly',cost:'$10 / 年',createdAt:'2025-01-01T00:00:00Z'});
+ const domain=()=>({id:'d',name:'auto.dev',date:'2025-10-05',dateKind:'expire',cycle:'yearly',cost:'$10 / 年',createdAt:'2026-01-01T00:00:00Z'});
  assert.deepEqual(pendingRenewals([domain()],{now:at('2026-10-05')}),[],'not on the day itself');
  const [c]=pendingRenewals([domain()],{now:at('2026-10-07')});
  assert.equal(c.due,'2026-10-05');assert.equal(c.days,2);
- assert.deepEqual(pendingRenewals([domain()],{now:at('2026-12-01')}),[],'outside the confirm window');
+ const late=pendingRenewals([domain()],{now:at('2026-12-01')});
+ assert.equal(late.length,1,'still asked after 45 days: it stays until answered');assert.equal(late[0].due,'2026-10-05');
+ assert.equal(c.overdue,false);assert.equal(c.grace,45,'no published rule: the 45-day auto-renew grace');assert.equal(late[0].overdue,true,'past the grace it counts as expired');
+ assert.deepEqual(pendingRenewals([domain()],{now:at('2026-12-01'),since:'2026-11-01'}),[],'never about a date before payments were kept');
  assert.deepEqual(pendingRenewals([{...domain(),dateKind:'renew'}],{now:at('2026-10-07')}),[],'charges are pendingCharges');
  assert.deepEqual(pendingRenewals([{...domain(),cycle:''}],{now:at('2026-10-07')}),[],'a one-off expiry just expires');
  assert.deepEqual(pendingRenewals([{...domain(),stopped:true}],{now:at('2026-10-07')}),[]);

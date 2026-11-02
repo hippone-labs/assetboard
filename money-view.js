@@ -57,10 +57,10 @@ function chargeRow(c,{named=false}={}){
  return `<div class="charge-row" data-asset="${esc(a.id)}">${named?tile(a,'sm'):''}<span class="charge-main">${named?`<span class="charge-name">${esc(displayName(a))}</span>`:''}<span class="charge-sub">${tr('{date} 扣款',{date:esc(c.due)})} · ${esc(amount)} · ${c.days?tr('{n} 天前',{n:c.days}):tr('今天')}</span></span><span class="charge-actions"><button class="button primary" data-action="charge-paid" data-id="${esc(a.id)}" data-due="${esc(c.due)}"${c.money?.value>0?'':' disabled'}>${tr('已扣款')}</button>${proAction('charge-edit')?`<button class="button" data-action="charge-edit" data-id="${esc(a.id)}" data-due="${esc(c.due)}">${tr('金额不同')}</button>`:''}<button class="button quiet" data-action="charge-missed" data-id="${esc(a.id)}" data-due="${esc(c.due)}" title="${tr('这次没有扣款（取消了或扣款失败）')}">${tr('没扣')}</button></span></div>`;
 }
 // Auto-renewals and repeating keep-alives that came due: either can fail silently, so the date waits for a yes before it rolls on, and
-// a no makes it an expiry.
+// a no makes it an expiry. The question stays until answered; past the registrar's grace it says the record may have expired.
 function renewalRow(c,{named=false}={}){
  const a=c.asset;
- return `<div class="charge-row renewal-row" data-asset="${esc(a.id)}">${named?tile(a,'sm'):''}<span class="charge-main">${named?`<span class="charge-name">${esc(displayName(a))}</span>`:''}<span class="charge-sub">${esc(c.due)} ${confirmWords[c.kind].due} · ${c.days===1?tr('昨天'):tr('{n} 天前',{n:c.days})} · ${confirmWords[c.kind].ask}</span></span><span class="charge-actions"><button class="button primary" data-action="renewal-yes" data-id="${esc(a.id)}" data-due="${esc(c.due)}">${confirmWords[c.kind].yes}</button><button class="button quiet" data-action="renewal-no" data-id="${esc(a.id)}" data-due="${esc(c.due)}">${confirmWords[c.kind].no}</button></span></div>`;
+ return `<div class="charge-row renewal-row" data-asset="${esc(a.id)}">${named?tile(a,'sm'):''}<span class="charge-main">${named?`<span class="charge-name">${esc(displayName(a))}</span>`:''}<span class="charge-sub">${esc(c.due)} ${confirmWords[c.kind].due} · ${c.days===1?tr('昨天'):tr('{n} 天前',{n:c.days})} · ${c.overdue?`<span class="due-bad">${tr('可能已过期')}</span> · `:''}${confirmWords[c.kind].ask}</span></span><span class="charge-actions"><button class="button primary" data-action="renewal-yes" data-id="${esc(a.id)}" data-due="${esc(c.due)}">${confirmWords[c.kind].yes}</button><button class="button quiet" data-action="renewal-no" data-id="${esc(a.id)}" data-due="${esc(c.due)}">${confirmWords[c.kind].no}</button></span></div>`;
 }
 function renewalsBandHtml(){
  const list=pendingRenewals(state.assets,{since:state.paymentsSince});if(!list.length)return '';
@@ -110,11 +110,17 @@ function extraFacts(a){
   const steps=life.stages.map((st,i)=>`<span class="life-step${now?.stage===st?' now':''}" title="${esc(now?.stage===st?st.can+' · '+tr('还剩 {n} 天',{n:now.daysLeft+1}):st.can)}">${esc(st.label.replace(/期$/,''))} ${tr('{from}–{to} 天',{from:from(i),to:st.to})}</span>`).join(arrow);
   const said=life.stages.map((st,i)=>tr('{stage}第 {from} 到 {to} 天，{can}',{stage:st.label,from:from(i),to:st.to,can:st.can})).join(tr('；'))+tr('；之后{end}',{end:life.end});
   out.push(`<div class="fact fact-block"><span>${tr('过期后')}</span><span class="life-steps" role="img" aria-label="${esc(said)}">${steps}${arrow}<span class="life-step" title="${esc(life.end)}">${tr('释放')}</span></span></div>`);}
+ // A hold comes first and in red: the domain does not resolve, and only the side that set it can lift it.
+ const hold=registryHoldOf(a),checked=a.registryCheckedAt?' · '+tr('{date} 查询',{date:esc(String(a.registryCheckedAt).slice(0,10))}):'';
+ if(hold)out.push(row(tr('注册局'),`<strong class="fact-bad">${tr('冻结')}</strong> · ${esc(rdapHoldLabels[hold])}${checked}`));
+ const change=registryChangeOf(a);
+ if(change){const was=[change.registrar&&tr('原注册商 {name}',{name:change.registrar}),change.ns&&tr('原 NS {list}',{list:change.ns.join(', ')})].filter(Boolean).join(tr('；')),now=[a.registryRegistrar,(a.registryNS||[]).join(', ')].filter(Boolean).join(' · ');
+  out.push(row(tr('注册局'),`<span class="fact-warn" title="${esc(was+(now?' → '+now:''))}">${tr('注册商或 NS 变了')}</span> · ${esc(String(change.at).slice(0,10))} <button class="text-button" data-action="rdap-seen" data-id="${esc(a.id)}">${tr('知道了')}</button>`));}
  const phase=registryPhaseOf(a);if(phase)out.push(row(tr('注册局'),`<strong>${esc(rdapPhaseLabels[phase])}</strong>${a.registryCheckedAt?' · '+tr('{date} 查询',{date:esc(String(a.registryCheckedAt).slice(0,10))}):''}`));
  // A date the registry gave that differs from the stored one waits here until taken; once the stored date matches, it is gone.
  else if(a.registryExpires&&['differs','missing'].includes(rdapCompare(a,{expires:a.registryExpires}).state))out.push(row(tr('注册局'),`${tr('{date} 到期',{date:esc(a.registryExpires)})}${a.registryCheckedAt?' · '+tr('{date} 查询',{date:esc(String(a.registryCheckedAt).slice(0,10))}):''} <button class="text-button" data-action="rdap-apply" data-id="${esc(a.id)}">${tr('改成这个')}</button>`));
  // A check that agreed leaves only its date (research D4); after 30 days it is said as an age, quietly, so a new check looks due.
- else if(a.type==='domain'&&Date.parse(a.registryCheckedAt||'')){const days=Math.floor((Date.now()-Date.parse(a.registryCheckedAt))/86400000);out.push(row(tr('注册局'),days>30?`<span class="quiet-fact">${tr('{n} 天前核对',{n:days})}</span>`:`${tr('核对一致')} · ${esc(String(a.registryCheckedAt).slice(0,10))}`));}
+ else if(a.type==='domain'&&!hold&&Date.parse(a.registryCheckedAt||'')){const days=Math.floor((Date.now()-Date.parse(a.registryCheckedAt))/86400000);out.push(row(tr('注册局'),days>30?`<span class="quiet-fact">${tr('{n} 天前核对',{n:days})}</span>`:`${tr('核对一致')} · ${esc(String(a.registryCheckedAt).slice(0,10))}`));}
  return out.join('')+slotHtml('facts',a,row);
 }
 function paymentsSection(a){
@@ -199,20 +205,28 @@ window.assetboardRdap=async result=>{
  const id=ask.id,a=state.assets.find(x=>x.id===id);if(!a){if(ask.auto)rdapAutoNext();return;}
  if(ask.auto){rdapAutoAnswer(a,result);rdapAutoNext();return;}
  if(!result.ok){toast(tr('没有查到：{error}',{error:String(result.error||tr('注册局不支持')).slice(0,100)}));return;}
- const facts=rdapFacts(result.json),cmp=rdapCompare(a,facts);
+ const facts=rdapFacts(result.json),cmp=rdapCompare(a,facts),change=cmp.state==='unknown'?null:rdapRemember(a,facts),moved=change?tr('；')+tr('注册商或 NS 变了'):'';
+ if(cmp.state!=='unknown')save();
+ if(cmp.state==='hold'){
+  a.registryCheckedAt=new Date().toISOString();delete a.registryPhase;
+  if(['differs','missing'].includes(cmp.dates))a.registryExpires=cmp.registry;else delete a.registryExpires;
+  save();render();if(activeAsset===id)showDetail(id,{focus:false});
+  await confirmDialog(tr('{name}：冻结',{name:a.name}),rdapHoldLabels[cmp.hold]+tr('。')+(cmp.hold==='client'?tr('多半是欠费、没完成邮箱验证或被投诉，去注册商后台看原因。'):tr('注册局冻结通常和投诉或法律程序有关，去注册商那里问原因。'))+moved,tr('知道了'));
+  return;
+ }
  if(cmp.state==='phase'){
-  a.registryCheckedAt=new Date().toISOString();a.registryPhase=cmp.phase;save();if(activeAsset===id)showDetail(id,{focus:false});
+  a.registryCheckedAt=new Date().toISOString();a.registryPhase=cmp.phase;save();render();if(activeAsset===id)showDetail(id,{focus:false});
   const what={autoRenew:cmp.registry?tr('注册局已经按惯例先延了一年（到 {date}），这不代表续费成功：注册商没收到钱的话，会在 45 天宽限期内删除。去注册商后台确认是否续上。',{date:cmp.registry}):tr('注册局已经按惯例先延了一年，这不代表续费成功：注册商没收到钱的话，会在 45 天宽限期内删除。去注册商后台确认是否续上。'),
    redemption:tr('域名已过期，正处在赎回期：还能赎回，但通常要另付一笔赎回费，期满后进入待删除，然后任何人都能注册。'),
    pendingRestore:tr('注册商已经提交赎回，注册局正在处理。'),
    pendingDelete:tr('域名即将被注册局删除，已经不能赎回；删除后任何人都能注册。')}[cmp.phase];
-  await confirmDialog(tr('{name}：{phase}',{name:a.name,phase:rdapPhaseLabels[cmp.phase]}),what,tr('知道了'));
+  await confirmDialog(tr('{name}：{phase}',{name:a.name,phase:rdapPhaseLabels[cmp.phase]}),what+moved,tr('知道了'));
   return;
  }
  if(cmp.state==='unknown'){toast(tr('注册局没有给出到期日'));return;}
- if(cmp.state==='same'){a.registryCheckedAt=new Date().toISOString();delete a.registryPhase;delete a.registryExpires;save();toast(tr('注册局到期日 {date}，和记录一致',{date:cmp.registry})+(facts.registrar?` · ${facts.registrar}`:''));if(activeAsset===id)showDetail(id,{focus:false});return;}
+ if(cmp.state==='same'){a.registryCheckedAt=new Date().toISOString();delete a.registryPhase;delete a.registryExpires;save();render();toast(tr('注册局到期日 {date}，和记录一致',{date:cmp.registry})+(facts.registrar?` · ${facts.registrar}`:'')+moved);if(activeAsset===id)showDetail(id,{focus:false});return;}
  const said=tr('注册局记录「{name}」{date} 到期',{name:a.name,date:cmp.registry})+(facts.registrar?tr('（{registrar}）',{registrar:facts.registrar}):'');
- const ok=await confirmDialog(cmp.state==='missing'?tr('填上到期日 {date}？',{date:cmp.registry}):tr('改成注册局的 {date}？',{date:cmp.registry}),cmp.state==='missing'?said+tr('，这里还没有日期。'):said+tr('，这里记的是 {date}。\n注册局的日期晚，多半是已经自动续费了；早，说明自动续费可能没开。',{date:cmp.stored}),tr('改日期'));
+ const ok=await confirmDialog(cmp.state==='missing'?tr('填上到期日 {date}？',{date:cmp.registry}):tr('改成注册局的 {date}？',{date:cmp.registry}),(cmp.state==='missing'?said+tr('，这里还没有日期。'):said+tr('，这里记的是 {date}。\n注册局的日期晚，多半是已经自动续费了；早，说明自动续费可能没开。',{date:cmp.stored}))+moved,tr('改日期'));
  if(!ok)return;
  rdapApply(a,cmp.registry);
 };
@@ -224,13 +238,14 @@ function rdapApply(a,date){
 // public registries. Then every domain is checked once every RDAP_REFRESH_DAYS, one at a time, rdapGapMs apart, on opening and every
 // 6 hours. The answer never overwrites a date: the same date or a lifecycle phase is just recorded (the phase shows on the row), and a
 // different date waits in the detail as 注册局记的是… for the person to take (registryExpires). A failed lookup waits a week too
-// (registryTriedAt), so a TLD without RDAP is not asked again every 6 hours.
+// (registryTriedAt), so a TLD without RDAP is not asked again every 6 hours; a TLD known to have none (rdapMissing) is not asked at all.
+// Each answer also stores the hold, the registrar and the nameservers (rdapRemember), so the next check can say they changed.
 const RDAP_REFRESH_DAYS=7;
 let rdapQueue=[],rdapBusy=false,rdapGapMs=4000;
 function rdapAutoOn(){return !!state.rdapAuto&&!!nativeStore&&!demoMode;}
 function rdapAutoDue(now=new Date()){
  const last=a=>Math.max(Date.parse(a.registryCheckedAt)||0,Date.parse(a.registryTriedAt)||0);
- return state.assets.filter(a=>a.type==='domain'&&!a.hiddenAt&&!a.stopped&&rdapDomain(a)&&now-last(a)>=RDAP_REFRESH_DAYS*86400000).sort((x,y)=>last(x)-last(y)).map(a=>a.id);
+ return state.assets.filter(a=>a.type==='domain'&&!a.hiddenAt&&!a.stopped&&rdapDomain(a)&&!rdapMissing(rdapDomain(a))&&now-last(a)>=RDAP_REFRESH_DAYS*86400000).sort((x,y)=>last(x)-last(y)).map(a=>a.id);
 }
 function rdapAutoRun(){if(!rdapAutoOn()||rdapBusy)return;rdapQueue=rdapAutoDue();rdapAutoNext();}
 function rdapAutoNext(){
@@ -246,21 +261,24 @@ function rdapAutoNext(){
 function rdapAutoAnswer(a,result){
  const now=new Date().toISOString(),facts=result.ok?rdapFacts(result.json):null,cmp=facts?rdapCompare(a,facts):{state:'unknown'};
  if(cmp.state==='unknown'){a.registryTriedAt=now;save();return;}
- a.registryCheckedAt=now;delete a.registryTriedAt;
+ a.registryCheckedAt=now;delete a.registryTriedAt;rdapRemember(a,facts,new Date(now));
  if(cmp.state==='phase')a.registryPhase=cmp.phase;else delete a.registryPhase;
- if(cmp.state==='differs'||cmp.state==='missing')a.registryExpires=cmp.registry;else delete a.registryExpires;
+ if(['differs','missing'].includes(cmp.dates||cmp.state))a.registryExpires=cmp.registry;else delete a.registryExpires;
  save();render();if(activeAsset===a.id&&!$('#detail').hidden)showDetail(a.id,{focus:false});
 }
 
-// ---- Menu bar: the next few dates and charges waiting, sent to the Mac app whenever they change.
+// ---- Menu bar: frozen domains, renewals waiting for an answer, the next few dates and charges waiting, sent to the Mac app whenever
+// they change. The badge counts the frozen domains, the unanswered renewals, the dates within 7 days and the charges waiting.
 // The Chinese title adds the kind to the short date ("12 天到期"); other languages take the status label, which already says both.
 let statusSent='';
 function syncStatusItem(){
  if(!nativeStore||demoMode)return;
  try{
-  const events=upcomingEvents(state.assets,new Date(),30),charges=pendingChargesAsked(state.assets),cur=totalCurrency(),t=costTotals(liveAssets(),{currency:cur,rates:fx.rates});
-  const urgent=events.filter(e=>e.status.days<=7).length;
-  const summary={badge:urgent+charges.length,monthly:t.items.length?tr('{amount} / 月',{amount:formatMoney(t.monthly,cur)}):'',charges:charges.length,items:events.slice(0,8).map(({asset,status})=>({id:asset.id,title:`${veil(asset.name)}  ·  ${appLang==='zh'?agendaWhen(status)+(status.days>=0?(dateKinds[status.kind]||dateKinds.expire).future:''):status.label}`.slice(0,80),level:status.level}))};
+  const frozen=registryAlerts(state.assets).frozen,renewals=pendingRenewals(state.assets,{since:state.paymentsSince}),named=new Set([...frozen,...renewals.map(c=>c.asset)].map(a=>a.id));
+  const events=upcomingEvents(state.assets,new Date(),30).filter(e=>!named.has(e.asset.id)),charges=pendingChargesAsked(state.assets),cur=totalCurrency(),t=costTotals(liveAssets(),{currency:cur,rates:fx.rates});
+  const urgent=events.filter(e=>e.status.days<=7).length,line=(a,text)=>`${veil(a.name)}  ·  ${text}`.slice(0,80);
+  const first=[...frozen.map(a=>({id:a.id,title:line(a,tr('冻结')),level:'overdue'})),...renewals.filter(c=>!registryHoldOf(c.asset)).map(c=>({id:c.asset.id,title:line(c.asset,c.overdue?tr('可能已过期 · {ask}？',{ask:confirmWords[c.kind].ask}):tr('{ask}？',{ask:confirmWords[c.kind].ask})),level:c.overdue?'overdue':'soon'}))];
+  const summary={badge:named.size+urgent+charges.length,monthly:t.items.length?tr('{amount} / 月',{amount:formatMoney(t.monthly,cur)}):'',charges:charges.length,items:[...first,...events.map(({asset,status})=>({id:asset.id,title:line(asset,appLang==='zh'?agendaWhen(status)+(status.days>=0?(dateKinds[status.kind]||dateKinds.expire).future:''):status.label),level:status.level}))].slice(0,8)};
   const json=JSON.stringify(summary);if(json===statusSent)return;statusSent=json;
   window.webkit.messageHandlers.assetboard.postMessage({action:'statusSummary',summary});
  }catch{}
@@ -277,6 +295,9 @@ document.addEventListener('click',e=>{
   'export':()=>exportDialog(),
   'export-ics':()=>exportRun('ics'),'restore-backup':()=>$('#backup-file')?.click(),'export-handover':()=>exportRun('handover'),
   'rdap':()=>rdapCheck(id),
+  'rdap-none':()=>toast(tr('这个后缀的注册局没有提供 RDAP，到期日只能在注册商后台看')),
+  'rdap-seen':()=>{const a=state.assets.find(x=>x.id===id);if(!a?.registryChange)return;delete a.registryChange;save();render();if(activeAsset===id)showDetail(id,{focus:false});},
+  'rdap-ask-on':()=>{hideToast();state.rdapAuto=true;save();toast(tr('已打开：每周向注册局核对'));rdapAutoRun();},
   'renewal-yes':()=>renewalAnswer(action,id,el.dataset.due),'renewal-no':()=>renewalAnswer(action,id,el.dataset.due)
  };
  const pro=Object.hasOwn(handlers,action)?null:proAction(action);

@@ -1968,3 +1968,13 @@ body::before,.native-app body::before{background:radial-gradient(70vw 65vh at 0%
 @media(prefers-reduced-motion:reduce){:root #modal input.prefs-switch,:root #modal input.prefs-switch::after{transition:none}}
 .topnav-slot{display:contents}
 .prefs-version{display:inline-flex;align-items:center;gap:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+
+/* Registry check: a frozen domain in red, a changed registrar or NS in amber, the weekly-check question after a domain import */
+.registry-note{display:flex;align-items:center;gap:10px;margin:8px 0 12px;padding:9px 10px 9px 12px;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--surface-card);color:var(--ink);font-size:12px}
+.registry-note>.ui-icon{width:14px;height:14px;flex:none;color:var(--warning)}
+.registry-note>span{flex:1;min-width:0;overflow-wrap:anywhere}
+.registry-note>.button{flex:none;min-height:0;padding:4px 10px;font-size:11px}
+.fact .fact-bad,.charge-sub .due-bad{color:var(--danger);font-weight:600}
+.fact .fact-warn{color:var(--warning)}
+#toast.ask .toast-ask{display:flex;flex-direction:column;gap:2px;min-width:0}
+#toast.ask .toast-ask small{font-size:11px}
