@@ -1957,6 +1957,7 @@ body::before,.native-app body::before{background:radial-gradient(70vw 65vh at 0%
 :root #modal .prefs-row{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:8px;min-height:36px;padding:4px 0;border-bottom:1px solid var(--border)}
 :root #modal .prefs-group .prefs-row:last-child{border-bottom:0}
 :root #modal .prefs-label{flex:1 1 auto;min-width:8em;font-size:13px;color:var(--ink)}
+:root #modal .prefs-row.prefs-sub .prefs-label{padding-inline-start:16px}
 :root #modal .prefs-row .chip-group{margin:0}
 :root #modal .prefs-row .chip{margin:0}
 :root #modal .prefs-row .button{min-height:28px;padding:0 10px;font-size:12px}

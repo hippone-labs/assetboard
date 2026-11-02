@@ -223,9 +223,11 @@ addEventListener('scroll',()=>hideRailTip(),{passive:true,capture:true});
 function syncSidebar(){document.body.classList.toggle('sidebar-rail',sidebarRail);const words=sidebarRail?tr('展开侧边栏（⌘\\）'):tr('收起侧边栏（⌘\\）');setIconButton($('#sidebar-toggle'),'sidebar',words);$('#sidebar-toggle').setAttribute('aria-pressed',String(!sidebarRail));railTips();postWindowChrome();}
 let sidebarMoving=0,chromeFrame=0,chromeSent='';
 function toggleSidebar(expand=sidebarRail){if(expand!==sidebarRail)return;sidebarRail=!expand;railForced=false;writeViewPrefs();document.body.classList.add('sidebar-moving');clearTimeout(sidebarMoving);sidebarMoving=setTimeout(()=>document.body.classList.remove('sidebar-moving'),MOTION_MS+80);renderSidebar();syncSidebar();}
-function veil(text){return privacy&&text?maskName(text):text;}
-function veilAccount(text){return privacy&&text?(String(text).includes('@')?maskEmail(text):maskName(text)):text;}
-function veilIp(ip){return privacy&&ip?maskIp(ip):ip;}
+// Privacy mode draws each field through maskValue, the rule maskAsset's screen set uses (asset-data.js).
+function veil(text){return privacy&&text?maskValue('name',text):text;}
+function veilAccount(text){return privacy&&text?maskValue('account',text):text;}
+function veilHost(text){return privacy&&text?maskValue('host',text):text;}
+function veilIp(ip){return privacy&&ip?maskValue('ips',ip):ip;}
 function setPrivacy(on){privacy=on;writeViewPrefs();render();if(activeAsset&&!$('#detail').hidden)showDetail(activeAsset,{focus:false});if(typeof panoOpen!=='undefined'&&panoOpen)panoramaRender();toast(on?tr('已隐藏名称、账号和 IP'):tr('已显示全部信息'));}
 // 费用: totals in one currency the viewer picks (remembered per viewer); records keep their own. Rates come from the Mac app once a
 // day (ECB via Frankfurter, recorded in 网络记录), and only when something needs converting; until then, or offline, the built-in or
@@ -568,7 +570,7 @@ const DATE_FACTS=['下一日期','下次扣款','保号','有效期'].map(k=>tr(
 function detailFacts(a,lastSync){
  // A date row stays on one line; when the inspector is too narrow its end is cut and the whole text is the tip.
  const row=([k,html])=>DATE_FACTS.includes(k)?`<div class="fact fact-date"><span>${k}</span><span title="${esc(html.replace(/<[^>]*>/g,''))}">${html}</span></div>`:`<div class="fact"><span>${k}</span><span>${html}</span></div>`,text=value=>esc(value||'');
- if(!assetProfiles[a.type]){const list=assetIps(a),net=list.length?`<div class="fact"><span>${tr('网络')}</span><span class="ip-pills">${list.map(x=>`<button class="ip-pill" data-action="copy-ip" data-ip="${esc(x.ip)}" title="${tr('复制 IP')}" aria-label="${tr('复制 IP {ip}',{ip:esc(veilIp(x.ip))})}">${x.inner?`<em>${tr('内')}</em>`:''}${esc(veilIp(x.ip))}</button>`).join('')}</span></div>`:'';return [[tr('保留原因'),a.reason],[tr('费用'),costText(a)],[tr('下一日期'),a.date?dateText(a):''],[tr('自动续费'),AUTO_RENEW_WORDS[a.autoRenew]&&a.source!=='manual'?AUTO_RENEW_WORDS[a.autoRenew]:''],['SSH',a.type==='server'&&a.host?`${a.sshUser?a.sshUser+'@':''}${veil(a.host)}${a.sshPort?':'+a.sshPort:''}`:''],[tr('本机目录'),a.type==='repository'?a.localPath:''],[tr('DNS 托管'),a.type==='domain'?a.dnsHost:''],[tr('备案'),a.type==='domain'&&a.icp?a.icp+(a.stopped||a.hiddenAt||['overdue'].includes(assetDateStatus(a).level)?' · '+tr('不用了先注销备案'):''):''],[tr('来源'),shownSource(a)],...(lastSync?[[syncedLabel(a),lastSync]]:[])].filter(([,v])=>v).map(([k,v])=>row([k,esc(v)])).join('')+net;}
+ if(!assetProfiles[a.type]){const list=assetIps(a),net=list.length?`<div class="fact"><span>${tr('网络')}</span><span class="ip-pills">${list.map(x=>`<button class="ip-pill" data-action="copy-ip" data-ip="${esc(x.ip)}" title="${tr('复制 IP')}" aria-label="${tr('复制 IP {ip}',{ip:esc(veilIp(x.ip))})}">${x.inner?`<em>${tr('内')}</em>`:''}${esc(veilIp(x.ip))}</button>`).join('')}</span></div>`:'';return [[tr('保留原因'),a.reason],[tr('费用'),costText(a)],[tr('下一日期'),a.date?dateText(a):''],[tr('自动续费'),AUTO_RENEW_WORDS[a.autoRenew]&&a.source!=='manual'?AUTO_RENEW_WORDS[a.autoRenew]:''],['SSH',a.type==='server'&&a.host?`${a.sshUser?a.sshUser+'@':''}${veilHost(a.host)}${a.sshPort?':'+a.sshPort:''}`:''],[tr('本机目录'),a.type==='repository'?a.localPath:''],[tr('DNS 托管'),a.type==='domain'?a.dnsHost:''],[tr('备案'),a.type==='domain'&&a.icp?a.icp+(a.stopped||a.hiddenAt||['overdue'].includes(assetDateStatus(a).level)?' · '+tr('不用了先注销备案'):''):''],[tr('来源'),shownSource(a)],...(lastSync?[[syncedLabel(a),lastSync]]:[])].filter(([,v])=>v).map(([k,v])=>row([k,esc(v)])).join('')+net;}
  const region=a.region?`${regionFlag(a.region)} ${regionName(a.region)}`:'',when=a.date?dateText(a):'',count=['appleid','google'].includes(a.type)?verifyNumbers(state.assets,a).length:0,numbers=count===1?tr('1 个（唯一）'):count?tr('{n} 个',{n:count}):'';
  const rows={
   bankcard:[[tr('地区'),text(region)],[tr('状态'),text(CARD_STATUSES[a.cardStatus])],[tr('费用'),text(costText(a))],[tr('有效期'),a.date?esc(`${expiryText(a.date)} · ${assetDateStatus(a).label}`):text('')],[tr('发卡行'),text(a.provider)],[tr('账户备注'),text(veilAccount(a.account))]],
@@ -899,6 +901,7 @@ function agentSetupDialog(){
  const tabs=AGENT_TOOLS.map(([id,label])=>`<button type="button" class="choice" role="radio" aria-checked="${id===agentTool}" data-action="agent-tab" data-id="${id}">${esc(label)}</button>`).join('');
  modal(tr('MCP 接入'),`<div class="form agent-setup">
   <p class="form-note">${tr('让 Claude、ChatGPT（Codex）、Cursor 等 AI 工具或你的脚本查询、添加、修改资产：新增和修改立即生效，可用 ⌘Z 撤销；删除会先到「待确认」，你确认才删。通道在本机，但你的 AI 工具会把读到的内容发给它的模型服务商；每次调用都记在「网络记录」里。')}</p>
+  <p class="form-note">${tr('它读到的 IP、SSH 主机和用户、手机号和邮箱是遮住的，银行卡和手机号两类记录不给它；要改，在「设置 › 功能」里。')}<button class="text-button" data-action="prefs" data-id="features">${tr('打开设置')}</button></p>
   <div class="chip-group agent-tabs" role="radiogroup" aria-label="${tr('选择工具')}">${tabs}</div>
   <section class="agent-tool">${agentToolHtml(agentTool,cli)}</section>
   <p class="form-note platform-note">${ui('info')}${tr('也可以把 JSON 文件放进 ~/Library/Application Support/Assetboard/Inbox/，格式见 README；这种方式每次都要你在导入预览里确认。')}</p>
@@ -1276,17 +1279,28 @@ document.addEventListener('submit',e=>{
 function intakeLabel(item){return (item.source==='service'?item.text.trim().split('\n')[0]:item.name).slice(0,100);}
 function intakeRow(item){return `<article class="candidate"><div class="candidate-main"><strong>${esc(intakeLabel(item))}</strong><span class="candidate-meta">${esc(intakeSources[item.source])}${item.source==='inbox'?' · '+tr('导入或丢弃后移出文件夹'):''}</span></div><div class="candidate-actions"><button class="button" data-action="intake-open" data-id="${esc(item.id)}">${tr('打开')}</button><button class="text-button" data-action="intake-discard" data-id="${esc(item.id)}">${tr('丢弃')}</button></div></article>`;}
 // The local agent interface (assetboard-cli and its MCP server): the app hands each call to assetboardAgent and sends the
-// reply back. Reads return whole records; adds and edits apply at once and undo with ⌘Z; a delete only asks, through
-// 待确认, and happens once confirmed here.
+// reply back. Reads return whole records with addresses and contact details masked; adds and edits apply at once and undo with
+// ⌘Z; a delete only asks, through 待确认, and happens once confirmed here.
 const AGENT_LIMIT=100;
+// What agents are given (设置 › 功能 › 外部工具接入): IPs, SSH hosts and users, phone numbers and mail addresses masked
+// (maskAsset's agent set) unless agentAddresses is on; bank cards and phone numbers left out unless agentCards is on. Search
+// still matches the real values, and a masked value is never written back (agentFields).
+const AGENT_WITHHELD=['bankcard','phone'];
+function agentSees(a){return !!a&&(featureOn('agentCards')||!AGENT_WITHHELD.includes(a.type));}
+// An SSH user also stands in account when imported from ~/.ssh/config, so it is masked there too.
+function agentMask(a){const out=maskAsset(a,'agent');if(a?.sshUser&&a.account===a.sshUser&&out.account===a.account)out.account=out.sshUser;return out;}
+function agentShown(a){return featureOn('agentAddresses')?a:agentMask(a);}
+function agentWithheldCount(list){return featureOn('agentCards')?0:list.filter(a=>!agentSees(a)).length;}
+function agentRiskText(r){return agentSees(r.source)&&(!r.via||agentSees(r.via))?riskText(r):`${r.source.type==='bankcard'?tr('付款卡',null,'risk'):tr('验证手机号')} ${r.label}`;}
 const AGENT_TEXT_FIELDS={name:100,provider:80,account:100,purpose:100,reason:120,cost:80,notes:2000,project:40};
 // Records as agents see them: no image data (it can run to tens of KB per record), only whether there is an icon and where it came from.
 // Links come with their meaning from this record's side, and payment or verification at risk is spelled out.
 function agentAsset(a){
- const {iconData,siteIcon,links,linkMeta,...rest}=a,status=agentIconStatus.get(a.id),risks=linkRisks(state.assets,a);
- const relations=linkedAssets(state.assets,a).map(x=>{const k=linkKind(a,x),meta=k.kind==='mount'?(x.type==='server'?linkMetaOf(a,x.id):linkMetaOf(x,a.id)):null;return {id:x.id,name:x.name,type:x.type,relation:k.kind,label:k.label,...(meta?.standby?{standby:true}:{}),...(meta?.proxied?{proxied:true}:{})};});
+ const {iconData,siteIcon,links,linkMeta,...rest}=agentShown(a),status=agentIconStatus.get(a.id),risks=linkRisks(state.assets,a);
+ const masked=Object.keys(rest).filter(key=>JSON.stringify(rest[key])!==JSON.stringify(a[key]));
+ const relations=linkedAssets(state.assets,a).map(x=>{const k=linkKind(a,x),meta=k.kind==='mount'?(x.type==='server'?linkMetaOf(a,x.id):linkMetaOf(x,a.id)):null;return {...(agentSees(x)?{id:x.id,name:agentShown(x).name}:{withheld:true}),type:x.type,relation:k.kind,label:k.label,...(meta?.standby?{standby:true}:{}),...(meta?.proxied?{proxied:true}:{})};});
  const money=moneyOn(a,localDay()),change=priceChange(a),charges=pendingChargesAsked([a]);
- return {...rest,typeName:cats[a.type]?.name||a.type,billingType:billingTypeOf(a),billingTypeSet:BILLING_TYPES.includes(a.billingType),...(money?{currentPrice:{amount:money.value,currency:money.currency,months:money.months,basis:money.basis}}:{}),...(change?{priceChange:change}:{}),...(charges.length?{unconfirmedCharges:charges.map(c=>c.due)}:{}),hidden:isHidden(a),hasCustomIcon:!!customIconSrc(a),hasSiteIcon:!!siteIconSrc(a),relations,...(risks.length?{risks:risks.map(riskText)}:{}),...(status?{iconStatus:status}:{})};
+ return {...rest,typeName:cats[a.type]?.name||a.type,billingType:billingTypeOf(a),billingTypeSet:BILLING_TYPES.includes(a.billingType),...(money?{currentPrice:{amount:money.value,currency:money.currency,months:money.months,basis:money.basis}}:{}),...(change?{priceChange:change}:{}),...(charges.length?{unconfirmedCharges:charges.map(c=>c.due)}:{}),hidden:isHidden(a),hasCustomIcon:!!customIconSrc(a),hasSiteIcon:!!siteIconSrc(a),relations,...(risks.length?{risks:risks.map(agentRiskText)}:{}),...(masked.length?{masked}:{}),...(status?{iconStatus:status}:{})};
 }
 // linkTo / unlinkFrom: ids of records to link or unlink, under the same rules as the picker (legal pairs, one account per server).
 function agentLinkIds(input,key){
@@ -1297,7 +1311,7 @@ function agentLinkIds(input,key){
 }
 function agentLinkProblem(a,id,linking){
  const x=state.assets.find(item=>item.id===id);
- if(!x)return `找不到要${linking?'关联':'解除'}的资产 ${id.slice(0,100)}`;
+ if(!agentSees(x))return `找不到要${linking?'关联':'解除'}的资产 ${id.slice(0,100)}`;
  const linked=linkedAssets(state.assets,a).some(item=>item.id===id);
  if(linking&&!linked&&!linkAllowed(a,x))return `${cats[a.type].name}「${a.name}」不能关联${cats[x.type].name}「${x.name}」`;
  if(!linking&&!linked)return `「${a.name}」和「${x.name}」没有关联`;
@@ -1349,6 +1363,9 @@ function agentFields(input,type,base=null){
  if(!input||typeof input!=='object'||Array.isArray(input))return {error:'字段需要是对象'};
  const fields={},ignored=[],after=[],actions=ACTION_FIELDS[type]||[];
  for(const [key,raw] of Object.entries(input)){
+  // A masked value (as reads return addresses and contact details, maskAsset's agent set) is never written back: sent back as it
+  // was read it leaves the field as it is, any other value holding the mask mark is refused.
+  if(hasMask(raw)){if(base&&JSON.stringify(raw)===JSON.stringify(agentMask(base)[key]))continue;return {error:`${key} 里有遮蔽符号 ${MASK_MARK}，是读取时遮住的值，不能写回；不改就不要传这个字段，要改请给出完整的值`};}
   if(['type','id','icon','iconHost','linkTo','unlinkFrom','amount','currency','promotion'].includes(key))continue;
   // Updates only: hidden and stopped (true or false, like 隐藏 and 已停用), and fields a Pro script adds (probeLink).
   if(key==='hidden'||key==='stopped'||Object.hasOwn(proSlots.agentFields,key)){
@@ -1425,15 +1442,16 @@ function agentFields(input,type,base=null){
  }
  return {fields,ignored,after};
 }
-function agentFind(id){const a=state.assets.find(x=>x.id===id);if(!a)throw new Error(`找不到资产 ${String(id).slice(0,100)}`);return a;}
+function agentFind(id){const a=state.assets.find(x=>x.id===id);if(!a)throw new Error(`找不到资产 ${String(id).slice(0,100)}`);if(!agentSees(a))throw new Error(`资产 ${String(id).slice(0,100)} 是银行卡或手机号，不交给外部工具；要交给它们，在 Assetboard 的 设置 › 功能 里打开「把银行卡和手机号交给 AI 工具」`);return a;}
 const agentMethods={
  types:()=>Object.entries(cats).map(([id,c])=>({id,name:c.name,hint:c.hint,...(assetProfiles[id]?.fixedProvider?{provider:assetProfiles[id].fixedProvider}:{providers:providerPresets(id)}),...(id==='ai'?{plans:AI_PLANS.map(p=>({name:p.name,provider:p.provider,cost:aiPlanFields(p).cost,...(p.yearly?{yearlyCost:aiPlanFields(p,'yearly').cost}:{}),checked:p.checked}))}:{})})),
  list:({type='',query:text='',includeHidden=false,limit=100,offset=0,project='',billingType=''})=>{
   if(billingType&&!BILLING_TYPES.includes(billingType))throw new Error(`billingType 只能是 ${BILLING_TYPES.join('、')}`);
   const needle=String(text||'').trim().toLowerCase();
-  const hits=agentScope({type,project,includeHidden}).filter(a=>(!billingType||billingTypeOf(a)===billingType)&&(!needle||`${searchText(a)} ${String(a.notes||'').toLowerCase()}`.includes(needle)));
+  const scope=agentScope({type,project,includeHidden}),withheld=agentWithheldCount(agentScope({type,project,includeHidden},true));
+  const hits=scope.filter(a=>(!billingType||billingTypeOf(a)===billingType)&&(!needle||`${searchText(a)} ${[a.notes,a.host,a.sshUser].filter(Boolean).join(' ').toLowerCase()}`.includes(needle)));
   const start=Math.max(Number(offset)||0,0),count=Math.min(Math.max(Number(limit)||100,1),500);
-  return {total:hits.length,offset:start,assets:hits.slice(start,start+count).map(agentAsset)};
+  return {total:hits.length,offset:start,assets:hits.slice(start,start+count).map(agentAsset),...(withheld?{withheld}:{})};
  },
  get:({id})=>agentAsset(agentFind(id)),
  // Recurring cost in one currency (records keep their own), by category and largest first, with what could not be counted.
@@ -1446,7 +1464,7 @@ const agentMethods={
    byType:t.byType.map(([id,m])=>({type:id,typeName:cats[id]?.name||id,monthly:round(m)})),
    items:t.items.map(({asset,monthly})=>({id:asset.id,name:asset.name,cost:asset.cost,monthly:round(monthly)})),
    oneOffTotal:round(t.oneOffTotal),...(groups?{groups}:{}),
-   notCounted:{free:t.free.map(a=>a.id),oneOff:t.oneOff.map(a=>a.id),noCycle:t.noCycle.map(a=>a.id),unreadable:t.unreadable.map(a=>a.id),noRate:t.noRate.map(a=>a.id)}};
+   notCounted:{free:t.free.map(a=>a.id),oneOff:t.oneOff.map(a=>a.id),noCycle:t.noCycle.map(a=>a.id),unreadable:t.unreadable.map(a=>a.id),noRate:t.noRate.map(a=>a.id)},...(agentWithheldCount(agentScope({type,project},true))?{withheld:agentWithheldCount(agentScope({type,project},true))}:{})};
  },
  add:({items})=>{
   const list=Array.isArray(items)?items:items&&typeof items==='object'?[items]:null;
@@ -1467,7 +1485,7 @@ const agentMethods={
    if(checked.error||icon.error){errors.push({index,error:checked.error||icon.error});return;}
    let linkTo;try{linkTo=agentLinkIds(item,'linkTo');}catch(error){errors.push({index,error:error.message});return;}
    const same=[...state.assets,...planned].find(a=>a.type===type&&String(a.name).trim().toLowerCase()===name.toLowerCase());
-   if(same){skipped.push({index,id:same.id,name:same.name,reason:'同类别已有同名资产，要修改请用 update'});return;}
+   if(same){skipped.push({index,...(agentSees(same)?{id:same.id}:{}),name:same.name,reason:agentSees(same)?'同类别已有同名资产，要修改请用 update':'同类别已有同名资产'});return;}
    const profile=assetProfiles[type]||{};
    const fields={provider:'',account:'',purpose:'',reason:'',date:'',dateKind:profile.dateKind||'expire',cycle:'',cost:'未知',notes:'',url:'',...checked.fields};
    if(profile.fixedProvider)fields.provider=profile.fixedProvider;
@@ -1535,7 +1553,7 @@ const agentMethods={
   return {payment,asset:agentAsset(a)};
  },
  // 待确认扣款 is Pro: the free edition answers with an empty list.
- charges:()=>({charges:pendingChargesAsked(state.assets).map(c=>({id:c.asset.id,name:c.asset.name,due:c.due,daysAgo:c.days,...(c.money?{amount:c.money.value,currency:c.money.currency}:{})}))}),
+ charges:()=>({charges:pendingChargesAsked(state.assets.filter(agentSees)).map(c=>({id:c.asset.id,name:c.asset.name,due:c.due,daysAgo:c.days,...(c.money?{amount:c.money.value,currency:c.money.currency}:{})}))}),
  renew:({id,until,amount,currency='',paidOn='',updateCost=true})=>{
   const a=agentFind(id),date=until?parseLooseDate(String(until)):'';if(!date)throw new Error('until 需要是新的到期或扣款日期，例如 2027-03-01');
   if(!canRenew(a))throw new Error('这项资产没有可续费的日期（需要到期、扣款或保号日期）');
@@ -1555,21 +1573,21 @@ const agentMethods={
  },
  costHistory:({id='',from='',limit=200})=>{
   const lo=from?Date.parse(String(from)):-Infinity,rows=[];
-  for(const a of id?[agentFind(id)]:state.assets)for(const h of Array.isArray(a.costHistory)?a.costHistory:[])if(Date.parse(h.at)>=lo)rows.push({id:a.id,name:a.name,...h});
+  for(const a of id?[agentFind(id)]:state.assets.filter(agentSees))for(const h of Array.isArray(a.costHistory)?a.costHistory:[])if(Date.parse(h.at)>=lo)rows.push({id:a.id,name:a.name,...h});
   rows.sort((x,y)=>Date.parse(y.at)-Date.parse(x.at));
   return {total:rows.length,history:rows.slice(0,Math.min(Math.max(Number(limit)||200,1),1000)),...(id?{payments:paymentList(agentFind(id))}:{})};
  },
  projects:()=>{
   const cur=totalCurrency(),round=n=>Math.round(n*100)/100;
-  return {currency:cur,projects:projectsOn()?projectNames(state.assets).map(({name,count})=>{const t=costTotals(projectAssets(state.assets,name),{currency:cur,rates:fx.rates});return {name,count,monthly:round(t.monthly),yearly:round(t.yearly)};}):[]};
+  return {currency:cur,projects:projectsOn()?projectNames(state.assets.filter(agentSees)).map(({name,count})=>{const t=costTotals(projectAssets(state.assets.filter(agentSees),name),{currency:cur,rates:fx.rates});return {name,count,monthly:round(t.monthly),yearly:round(t.yearly)};}):[]};
  }
 };
 function agentCurrency(currency){const cur=currency?String(currency).toUpperCase():totalCurrency();if(!(cur in FALLBACK_RATES.rates))throw new Error(`currency 需要是 ${Object.keys(FALLBACK_RATES.rates).join('、')} 之一`);return cur;}
-// Live records narrowed by category or project (both optional).
-function agentScope({type='',project='',includeHidden=false}={}){
+// Live records agents are given (with all: every record), narrowed by category or project (both optional).
+function agentScope({type='',project='',includeHidden=false}={},all=false){
  if(type&&!cats[type])throw new Error(`未知类别 ${type}`);
  const want=cleanProject(project);
- return state.assets.filter(a=>(includeHidden||!isHidden(a))&&(!type||a.type===type)&&(!want||cleanProject(a.project)===want));
+ return state.assets.filter(a=>(all||agentSees(a))&&(includeHidden||!isHidden(a))&&(!type||a.type===type)&&(!want||cleanProject(a.project)===want));
 }
 // Checks one update completely before anything changes; apply() then writes it (the caller takes the undo checkpoint and saves).
 function agentPrepareUpdate(id,input){
@@ -1602,7 +1620,7 @@ const AGENT_ACTION_LIMIT=200;
 function agentActionList(){if(!Array.isArray(state.agentActions))state.agentActions=[];return state.agentActions;}
 function agentRequestDelete(ids,reason){
  const assets=[],missing=[];
- for(const id of [...new Set(ids.map(String))]){const a=state.assets.find(x=>x.id===id);if(a)assets.push(a);else missing.push(id);}
+ for(const id of [...new Set(ids.map(String))]){const a=state.assets.find(x=>x.id===id);if(agentSees(a))assets.push(a);else missing.push(id);}
  if(!assets.length)throw new Error(`找不到资产 ${missing.slice(0,5).join('、').slice(0,200)}`);
  const waiting=new Map(intake.filter(item=>item.deleteId).map(item=>[item.deleteId,item.actionId]));
  const fresh=assets.filter(a=>!waiting.has(a.id)),list=agentActionList();
@@ -2227,7 +2245,7 @@ function prefsDialog(section){
   mac?row(tr('在菜单栏显示'),toggle('prefs-native',nativeStore.statusItem!==false,tr('在菜单栏显示'),' data-id="statusItem"'),tr('菜单栏的小日历：7 天内到期和待确认扣款的数量')):'',
   mac?row(tr('系统通知'),`<span class="chip ${notify[0]}">${notify[1]}</span><button class="button" data-action="notification-settings">${tr('通知设置…')}</button>`,tr('到期前的提醒用 macOS 通知发出')):''].join('');
  const usable=f=>(!f.mac||nativeStore||demoMode)&&(!f.pro||proLoaded());
- const features=[...Object.entries(FEATURES).filter(([,f])=>usable(f)).map(([key,f])=>row(f.name,toggle('prefs-feature',featureOn(key),f.name,` data-id="${key}"`),f.note)),
+ const features=[...Object.entries(FEATURES).filter(([,f])=>usable(f)&&(!f.under||featureOn(f.under))).map(([key,f])=>{const html=row(f.name,toggle('prefs-feature',featureOn(key),f.name,` data-id="${key}"`),f.note);return f.under?html.replace('class="prefs-row"','class="prefs-row prefs-sub"'):html;}),
   mac?row(tr('自动获取网站图标'),toggle('auto-icons',state.autoIcons!==false,tr('自动获取网站图标')),tr('新添加的资产认出是已知平台时，从它的官网取图标；每次请求都记在网络记录里')):'',
   mac?row(tr('每周核对域名到期日'),toggle('rdap-auto',!!state.rdapAuto,tr('每周向注册局核对域名到期日')),tr('每周把每个域名发给它的注册局（公开 RDAP）查一次；日期不同只提示，不改')):''].join('');
  const link=(name,on,action,title)=>row(name,`${on===null?'':`<span class="chip ${on?'ok':''}">${on?tr('已连接'):tr('未连接')}</span>`}<button class="button" data-action="${action}">${tr('设置…')}</button>`,title);

@@ -73,6 +73,15 @@ async (page) => {
   check(!!accountId&&/停用/.test((await call('update',{id:accountId,fields:{stopped:true}})).error),'An account cannot be marked stopped');
   await p.evaluate(()=>{undo();undo();});
   check(await p.evaluate(()=>!state.assets.find(a=>a.id==='d1').hiddenAt&&!state.assets.find(a=>a.id==='d1').stopped),'Each undoes on its own');
+  // A masked value is never written back: the same value as read leaves the field, any other value holding • is refused.
+  const srv=(await call('add',{items:[{name:'mask-box',type:'server',ips:['203.0.113.10'],host:'vps-a.example.com',sshUser:'deploy'}]})).result.added[0].id;
+  check(/遮蔽符号/.test((await call('update',{id:srv,fields:{ips:['203.0.•••.•••','198.51.100.7']}})).error),'A masked IP list with a new address is refused');
+  check(/遮蔽符号/.test((await call('update',{id:srv,fields:{host:'x••••.com'}})).error)&&/遮蔽符号/.test((await call('add',{items:[{name:'n•ame',type:'domain'}]})).result.errors[0].error),'Any value holding the mark is refused, on add too');
+  const same=await call('update',{id:srv,fields:{ips:['203.0.•••.•••'],host:'v••••••.com',sshUser:'d•••••',notes:'kept'}});
+  check(same.ok&&await p.evaluate(id=>{const a=state.assets.find(x=>x.id===id);return a.ips[0]==='203.0.113.10'&&a.host==='vps-a.example.com'&&a.sshUser==='deploy'&&a.notes==='kept';},srv),'Masked values sent back as read leave the fields as they are: '+JSON.stringify(same.error||''));
+  check((await call('list',{query:'203.0.113.10'})).result.total===1&&(await call('list',{query:'vps-a.example'})).result.total===1&&(await call('list',{query:'deploy'})).result.total===1,'Search matches the real address, host and user');
+  await p.evaluate(()=>{undo();undo();});
+  check(await p.evaluate(id=>!state.assets.some(a=>a.id===id),srv),'Both undo');
 
   // Deletes only ask: the record stays until confirmed here.
   const asked=await call('delete',{id:'d1',reason:'域名已转出'});
@@ -141,7 +150,7 @@ async (page) => {
    const post=window.webkit.messageHandlers.assetboard.postMessage;window.webkit.messageHandlers.assetboard.postMessage=x=>{post(x);
     if(x.action==='iconFetch')setTimeout(()=>assetboardIconResult(x.host==='bad.example'?{requestId:x.requestId,ok:false,error:'这个网站没有图标'}:{requestId:x.requestId,ok:true,host:x.host,dataUrl:window.__icon}),20);};},png);
   const mcall=(method,params)=>m.evaluate(([method,params])=>assetboardAgent({requestId:'m',method,params}),[method,params]);
-  const withIcon=await mcall('add',{items:[{name:'Wise',type:'bankcard',iconHost:'wise.com'},{name:'Bad',type:'subscription',iconHost:'bad.example'},{name:'Own',type:'subscription',icon:png}]});
+  const withIcon=await mcall('add',{items:[{name:'Wise',type:'subscription',iconHost:'wise.com'},{name:'Bad',type:'subscription',iconHost:'bad.example'},{name:'Own',type:'subscription',icon:png}]});
   check(withIcon.result.added.length===3&&withIcon.result.added[0].iconStatus==='fetching'&&!('iconStatus' in withIcon.result.added[2]),'iconHost starts a fetch; an icon given directly needs none');
   const [wise,bad,own]=withIcon.result.added.map(x=>x.id);
   await until(m,id=>!!state.assets.find(a=>a.id===id)?.siteIcon,wise);
@@ -160,5 +169,5 @@ async (page) => {
   check((await mcall('update',{id:wise,fields:{iconHost:'wise.com'}})).result.asset.iconStatus==='fetching','update can fetch again');
   await mac.close();
  } finally { await context.close(); }
- return 'PASS: types, list by type/query/hidden, get, unknown method/type/id, add with checks, skipped same names, ignored fields, toast, one undo per batch, update with event and synced guard, unsafe url, hidden and stopped, delete only after confirming, queued while a form is open, deletes confirmed together in one list, five tool tabs with separate copy blocks and a remembered choice, icons by host or data with status and no image data in replies';
+ return 'PASS: types, list by type/query/hidden, get, unknown method/type/id, add with checks, skipped same names, ignored fields, toast, one undo per batch, update with event and synced guard, unsafe url, hidden and stopped, masked values never written back and search on real values, delete only after confirming, queued while a form is open, deletes confirmed together in one list, five tool tabs with separate copy blocks and a remembered choice, icons by host or data with status and no image data in replies';
 }
