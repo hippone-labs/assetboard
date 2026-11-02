@@ -10,8 +10,8 @@ async (page) => {
   const line=await p.evaluate(()=>{const sub=document.querySelector('#board [data-asset="demo-s1"] .ip-sub'),r=sub.getBoundingClientRect();return {text:sub.textContent.trim(),h:r.height,more:sub.querySelector('.ip-more')?.textContent,prov:sub.querySelector('.ip-prov')?.textContent,tabular:getComputedStyle(sub).fontVariantNumeric};});
   check(/^203\.0\.113\.10\s*\+v6\s*·\s*Vultr$/.test(line.text.replace(/\s+/g,' ')),'Public v4 first, +v6 marker, provider last: '+line.text);
   check(line.h<18,'The address line never wraps: '+line.h);check(/tabular/.test(line.tabular),'Digits are tabular');
-  const nas=await p.evaluate(()=>{const sub=document.querySelector('#board [data-asset="demo-s3"] .ip-sub');return {text:sub.textContent.trim(),inner:!!sub.querySelector('.ip-inner'),title:sub.querySelector('.ip-inner')?.title};});
-  check(nas.inner&&/192\.168\.1\.20/.test(nas.text)&&nas.title==='内网地址','Inner addresses carry a named 内 mark: '+JSON.stringify(nas));
+  const nas=await p.evaluate(()=>{state.assets.find(a=>a.id==='demo-s3').ips=['10.0.0.20'];render();const sub=document.querySelector('#board [data-asset="demo-s3"] .ip-sub');return {text:sub.textContent.trim(),inner:!!sub.querySelector('.ip-inner'),title:sub.querySelector('.ip-inner')?.title};});
+  check(nas.inner&&/10\.0\.0\.20/.test(nas.text)&&nas.title==='内网地址','Inner addresses carry a named 内 mark: '+JSON.stringify(nas));
   // No address, no line: a server without any keeps the provider text.
   await p.evaluate(()=>{state.assets.push({id:'bare',type:'server',name:'bare-vps',provider:'Linode',updatedAt:new Date().toISOString(),source:'manual'});render();});
   check(await p.evaluate(()=>!document.querySelector('#board [data-asset="bare"] .ip-sub')&&/Linode/.test(document.querySelector('#board [data-asset="bare"] .r-sub')?.textContent||'')),'Server without an address keeps the provider line');

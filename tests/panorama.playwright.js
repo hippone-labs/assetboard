@@ -64,7 +64,7 @@ async (page) => {
   for(const k of ['h','e','f','x','n','i','o'])await p.keyboard.press(k);await p.waitForTimeout(150);
   check(await p.evaluate(()=>JSON.stringify(state.assets.map(a=>[a.id,a.hiddenAt,a.name])))===before&&!(await p.evaluate(()=>$('#modal').open)),'Board letter keys are inert in the read-only overview');
   await p.keyboard.press('Enter');await p.waitForSelector('#detail:not([hidden])');
-  check(await p.evaluate(()=>document.querySelector('#detail h2').textContent)==='notes-lab.dev','Enter opens the thing\'s detail');
+  check(await p.evaluate(()=>document.querySelector('#detail h2').textContent)==='notes.example.org','Enter opens the thing\'s detail');
   check(await p.evaluate(()=>{const r=document.querySelector('#detail').getBoundingClientRect(),el=document.elementFromPoint(r.left+r.width/2,r.top+40);return !!el?.closest('#detail');}),'The detail sits above the overview');
   await p.keyboard.press('Escape');await p.waitForTimeout(150);
   check(await open()&&await p.evaluate(()=>document.activeElement.dataset.chip)==='demo-d2'&&await p.evaluate(()=>document.querySelector('#detail').hidden),'Esc closes the detail first and returns to the same chip');

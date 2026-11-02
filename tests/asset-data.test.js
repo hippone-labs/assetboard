@@ -532,7 +532,7 @@ test('server addresses: literals only, normalised, capped, masked',()=>{
  assert.equal(normalizeIp('2001:DB8:0:0:0:0:0:10').ip,'2001:db8::10');
  assert.equal(normalizeIp('[2001:db8::1]').ip,'2001:db8::1');
  assert.equal(normalizeIp('2001:db8:0:0:1:0:0:1').ip,'2001:db8::1:0:0:1','the longest zero run is the one compressed');
- for(const text of ['10.0.0.5','172.16.0.1','192.168.1.20','100.64.0.9','fd00::1'])assert.equal(normalizeIp(text).inner,true,text);
+ for(const text of ['10.0.0.5','172.16.0.1','192.168.0.1','100.64.0.9','fd00::1'])assert.equal(normalizeIp(text).inner,true,text);
  for(const text of ['198.51.100.88','203.0.113.10','2001:db8::1'])assert.equal(normalizeIp(text).inner,false,text);
  for(const text of ['','127.0.0.1','0.0.0.0','::1','::','fe80::1','224.0.0.1','169.254.1.1','256.1.1.1','203.0.113.04','203.0.113','example.org','2001:db8::1::2','::ffff:203.0.113.4','203.0.113.4/24'])assert.equal(normalizeIp(text),null,'refused: '+text);
  const parsed=parseIps('203.0.113.10, 2001:db8::10;203.0.113.10 10.0.0.1 192.168.1.2 198.51.100.88 bad');
@@ -548,7 +548,7 @@ test('server addresses: literals only, normalised, capped, masked',()=>{
  // Card pick: public v4, else public v6, else inner; both public families mark +v6.
  assert.deepEqual(primaryIp({ips:['10.0.0.2','2001:db8::10','203.0.113.10']}),{ip:'203.0.113.10',inner:false,version:4,more:'v6',count:3});
  assert.equal(primaryIp({ips:['2001:db8::10']}).ip,'2001:db8::10');
- assert.deepEqual([primaryIp({ips:['192.168.1.20']}).inner,primaryIp({ips:['192.168.1.20']}).more],[true,'']);
+ assert.deepEqual([primaryIp({ips:['10.0.0.20']}).inner,primaryIp({ips:['10.0.0.20']}).more],[true,'']);
  assert.equal(primaryIp({name:'x'}),null);
  assert.equal(maskIp('203.0.113.10'),'203.0.•••.•••');assert.equal(maskIp('2001:db8::10'),'2001:db8:••••');assert.equal(maskIp('nope'),'');
  // Quick action copies the address when one is known, the host name otherwise.
