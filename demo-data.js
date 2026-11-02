@@ -50,15 +50,15 @@ window.assetboardDemoBoard=function(){
  const repoRecord=(name,i)=>free?{...base,id:'demo-r'+i,type:'repository',name,provider:'GitHub',purpose:t('代码仓库'),updatedAt:new Date(Date.now()-i*86400000*3).toISOString(),pushedAt:new Date(Date.now()-i*86400000*3).toISOString()}
   :{...base,id:'demo-r'+i,type:'repository',name:'acme-labs/'+name,provider:'GitHub',account:'acme-labs',purpose:t('代码仓库'),source:'github',externalId:'demo-'+i,syncStatus:i%3?'私有仓库':'公开仓库',event:i%3?'私有仓库':'公开仓库',updatedAt:new Date(Date.now()-i*86400000*3).toISOString(),pushedAt:new Date(Date.now()-i*86400000*5).toISOString()};
  const assets=[
-  {...base,id:'demo-d1',updatedAt:ago(3),type:'domain',name:'example-studio.com',provider:'Namecheap',purpose:t('工作室主站'),date:day(12),dateKind:'expire',cycle:'yearly'},
-  {...base,id:'demo-d2',updatedAt:ago(1),type:'domain',name:'notes-lab.dev',provider:'Namecheap',purpose:t('笔记站点'),date:day(160),dateKind:'expire',cycle:'yearly'},
-  {...base,id:'demo-d3',createdAt:ago(200),updatedAt:ago(20),type:'domain',name:'sample-shop.cn',provider:'Cloudflare',purpose:t('电商试验'),date:day(-2),dateKind:'expire'},
-  {...base,id:'demo-d4',updatedAt:ago(40),type:'domain',name:'old-landing.io',provider:'Namecheap',purpose:t('旧落地页'),hiddenAt:'2026-01-01T00:00:00Z'},
+  {...base,id:'demo-d1',updatedAt:ago(3),type:'domain',name:'studio.example.com',provider:'Namecheap',purpose:t('工作室主站'),date:day(12),dateKind:'expire',cycle:'yearly'},
+  {...base,id:'demo-d2',updatedAt:ago(1),type:'domain',name:'notes.example.org',provider:'Namecheap',purpose:t('笔记站点'),date:day(160),dateKind:'expire',cycle:'yearly'},
+  {...base,id:'demo-d3',createdAt:ago(200),updatedAt:ago(20),type:'domain',name:'shop.example.net',provider:'Cloudflare',purpose:t('电商试验'),date:day(-2),dateKind:'expire'},
+  {...base,id:'demo-d4',updatedAt:ago(40),type:'domain',name:'old-landing.example.com',provider:'Namecheap',purpose:t('旧落地页'),hiddenAt:'2026-01-01T00:00:00Z'},
   {...base,id:'demo-s1',updatedAt:ago(2),type:'server',name:'tokyo-vps',provider:'Vultr',purpose:t('API 服务'),host:'203.0.113.10',ips:['203.0.113.10','2001:db8::10'],sshUser:'deploy',date:day(26),dateKind:'renew',cycle:'monthly',cost:t('$6/月')},
   // The full edition reads this one over SSH 直读 (made-up output, never ssh), linked by hand: a hand link wins over the demo panel.
   {...base,id:'demo-s2',createdAt:ago(200),updatedAt:ago(9),type:'server',name:'frankfurt-vps',provider:'Hetzner',purpose:t('备份节点'),host:'198.51.100.24',ips:['198.51.100.24'],sshPort:'2222',date:day(90),dateKind:'renew',cycle:'yearly',...(free?{}:{probeLink:{source:'ssh',id:'frankfurt-vps'}})},
   // The full edition's demo probe calls it nas-home, so it is linked by hand (probe-data.js probeDemoAnswer).
-  {...base,id:'demo-s3',updatedAt:ago(30),type:'server',name:'home-nas',provider:t('自建'),purpose:t('照片备份'),ips:['192.168.1.20'],...(free?{}:{probeLink:{source:'demo-probe',id:'cf3'}})},
+  {...base,id:'demo-s3',updatedAt:ago(30),type:'server',name:'home-nas',provider:t('自建'),purpose:t('照片备份'),ips:['192.0.2.20'],...(free?{}:{probeLink:{source:'demo-probe',id:'cf3'}})},
   {...base,id:'demo-u1',createdAt:ago(200),updatedAt:ago(6),type:'subscription',name:'Notes Pro',provider:'Acme',purpose:t('写作'),date:day(-25),dateKind:'renew',cycle:'monthly',cost:t('$8/月')},
   {...base,id:'demo-u2',updatedAt:ago(15),type:'subscription',name:'Design Studio',provider:'Acme',purpose:t('界面设计'),date:day(48),dateKind:'renew',cycle:'yearly'},
   {...base,id:'demo-u3',updatedAt:ago(7),type:'subscription',name:'Acme Cloud',provider:'Acme',purpose:t('云账号'),date:day(70),dateKind:'renew',cycle:'monthly',cost:t('$12/月')},
