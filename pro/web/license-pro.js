@@ -12,7 +12,7 @@ const PRO_PRICE='US$10';
 // The Stripe Payment Link for Pro. Placeholder until the owner creates the US$10 link: replace it with https://buy.stripe.com/…
 // (the same link goes into pro/worker/wrangler.toml as PAYMENT_LINK). Its "after payment" page must be the worker's
 // /thanks?session_id={CHECKOUT_SESSION_ID}.
-const PRO_BUY_URL='https://buy.stripe.com/PAYMENT_LINK_PLACEHOLDER';
+const PRO_BUY_URL='https://buy.stripe.com/8x23cx2uJ1iO4YUeuadMI02';
 // The purchase worker (pro/worker): /recover mails a lost licence again.
 const PRO_PAY_URL='https://pay.assetboard.app';
 // What Pro adds, and what is still to come (the slots in pro-slots.js), for the section's list.

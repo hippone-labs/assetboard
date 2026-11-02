@@ -24,7 +24,7 @@ MAIL_REPLY_TO = "assetboard@163.com"                 # where "reply to this emai
 # Pro is US$10, one purchase, lifetime updates; the webhook issues a licence only for 1000 USD cents of PRO_PRODUCT (worker.mjs, PRO_PRICE).
 # Placeholders until the owner creates the US$10 Payment Link in Stripe: its https://buy.stripe.com/… address (the same as PRO_BUY_URL in
 # pro/web/license-pro.js) and the product id it sells.
-PAYMENT_LINK = "https://buy.stripe.com/PAYMENT_LINK_PLACEHOLDER"
+PAYMENT_LINK = "https://buy.stripe.com/8x23cx2uJ1iO4YUeuadMI02"
 PRO_PRODUCT = "prod_PRODUCT_PLACEHOLDER"
 
 # Placeholder: `wrangler kv namespace create LICENSES` prints the id to put here.

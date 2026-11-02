@@ -8,10 +8,9 @@ import CryptoKit
 /// The app only checks it with the public key below: nothing is sent anywhere, no activation, no device count, no report. Every licence
 /// carries lifetime updates (the worker writes upd 9999-12-31), so `upd` is checked as a day and otherwise not used.
 enum ProLicense {
-    /// The production worker's public key, raw 32 bytes, base64. PLACEHOLDER: replace it at deploy time with the `publicKey (License.swift)`
-    /// line that `node pro/worker/keygen.mjs` prints (its private key goes into the worker's LICENSE_PRIVATE_KEY secret). While the
-    /// placeholder is here no licence verifies, and desktop/package.sh refuses to package.
-    static let publicKeyBase64 = "PRODUCTION_PUBLIC_KEY_PLACEHOLDER"
+    /// The production worker's public key, raw 32 bytes, base64, from `node pro/worker/keygen.mjs`; its private key is only the
+    /// worker's LICENSE_PRIVATE_KEY secret. A new pair means every earlier licence stops verifying.
+    static let publicKeyBase64 = "Y+alMXL+GwenCOXyOmUoha8FFG7TjXbcm8cRsR6copg="
     static var publicKey: Data { Data(base64Encoded: publicKeyBase64) ?? Data() }
 
     struct Payload: Equatable {
