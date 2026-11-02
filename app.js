@@ -1303,6 +1303,9 @@ function agentFields(input,type,base=null){
  if(!input||typeof input!=='object'||Array.isArray(input))return {error:'字段需要是对象'};
  const fields={},ignored=[],after=[],actions=ACTION_FIELDS[type]||[];
  for(const [key,raw] of Object.entries(input)){
+  // A masked value (as reads return addresses and contact details, maskAsset's agent set) is never written back: sent back as it
+  // was read it leaves the field as it is, any other value holding the mask mark is refused.
+  if(hasMask(raw)){if(base&&JSON.stringify(raw)===JSON.stringify(maskAsset(base,'agent')[key]))continue;return {error:`${key} 里有遮蔽符号 ${MASK_MARK}，是读取时遮住的值，不能写回；不改就不要传这个字段，要改请给出完整的值`};}
   if(['type','id','icon','iconHost','linkTo','unlinkFrom','amount','currency','promotion'].includes(key))continue;
   // Updates only: hidden and stopped (true or false, like 隐藏 and 已停用), and fields a Pro script adds (probeLink).
   if(key==='hidden'||key==='stopped'||Object.hasOwn(proSlots.agentFields,key)){
@@ -1385,7 +1388,7 @@ const agentMethods={
  list:({type='',query:text='',includeHidden=false,limit=100,offset=0,project='',billingType=''})=>{
   if(billingType&&!BILLING_TYPES.includes(billingType))throw new Error(`billingType 只能是 ${BILLING_TYPES.join('、')}`);
   const needle=String(text||'').trim().toLowerCase();
-  const hits=agentScope({type,project,includeHidden}).filter(a=>(!billingType||billingTypeOf(a)===billingType)&&(!needle||`${searchText(a)} ${String(a.notes||'').toLowerCase()}`.includes(needle)));
+  const hits=agentScope({type,project,includeHidden}).filter(a=>(!billingType||billingTypeOf(a)===billingType)&&(!needle||`${searchText(a)} ${[a.notes,a.host,a.sshUser].filter(Boolean).join(' ').toLowerCase()}`.includes(needle)));
   const start=Math.max(Number(offset)||0,0),count=Math.min(Math.max(Number(limit)||100,1),500);
   return {total:hits.length,offset:start,assets:hits.slice(start,start+count).map(agentAsset)};
  },
