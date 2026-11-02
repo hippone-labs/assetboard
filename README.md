@@ -55,7 +55,7 @@ open Assetboard.app --args --demo   # 在解压后的目录里执行
 | Cloudflare | 只读 API 令牌，读取授权范围内的 Zone、Pages、Workers 和 R2 列表；权限不够的类别跳过 | App |
 | `~/.ssh/config` | 只读 Host、HostName、User、Port，生成服务器 | App |
 | 服务菜单、Dock | 在任何软件里选中文字，右键 → 服务 →「添加到 Assetboard」，文字会填进添加面板，点「识别」才处理。把邮件、截图、PDF、CSV、JSON 拖到 Dock 图标上，或用“打开方式”选 Assetboard：表格和 JSON 一律先进导入预览，截图和 PDF 在本机识别后进待确认。正在编辑或核对时不会打断，收到的内容在「待确认」里排队，可打开或丢弃。首次安装后若菜单里没有，注销再登录一次 | App |
-| MCP 接入 / 命令行 | App 内置 `assetboard-cli`：Claude Code、Claude Desktop 等 MCP 客户端或脚本可以查询、添加、修改资产，新增和修改立即生效（`⌘Z` 撤销），删除要你在 App 里确认。通道在本机，但你的 AI 工具会把读到的内容发给它的模型服务商。菜单「文件 → MCP 接入…」里有可复制的配置。见下 | App |
+| MCP 接入 / 命令行 | App 内置 `assetboard-cli`：Claude Code、Claude Desktop 等 MCP 客户端或脚本可以查询、添加、修改资产，新增和修改立即生效（`⌘Z` 撤销），删除要你在 App 里确认。通道在本机，但你的 AI 工具会把读到的内容发给它的模型服务商；地址和联系方式默认遮住，银行卡和手机号默认不给。菜单「文件 → MCP 接入…」里有可复制的配置。见下 | App |
 | Inbox 文件夹 | 把 JSON 文件放进 `~/Library/Application Support/Assetboard/Inbox/`，App 打开或回到前台时读取，一律先进导入预览，确认才写入；导入或丢弃后原文件才移到 `Inbox/handled/`（保留 30 天），取消预览或退出 App 时文件留在原处。这个格式拖进窗口或 Dock 也能识别。格式见下 | App |
 | AI 识别（可选） | 接入你自己的模型（Claude、OpenAI 兼容接口或本机 Ollama），配置后，导入的截图、PDF、邮件和粘贴的文字会自动发给它识别（AI 识别设置里可关掉，关掉后只在你点“用 AI 识别”时发送）。本地规则只认中文账单和通知，英文的靠 AI。尚未用真实 API key 验证 | App |
 
@@ -122,7 +122,7 @@ Mac App 在菜单栏有一个小日历图标：显示 7 天内到期和待确认
 菜单“Assetboard → 设置…”（`⌘,`）或侧边栏底部“设置”，一处管所有开关。左边是分区，右边是选中分区的设置：
 
 - **通用：** 语言（简体中文或 English，默认跟随系统；切换后当场生效，菜单也一起换）、计价币种、隐私模式、在菜单栏显示、系统通知状态。
-- **功能：** 全景、探针与 SSH 直读（默认关闭）、外部工具接入（MCP，关掉后一律拒绝调用）、自动获取网站图标、每周核对域名到期日。功能开关按此设备记住，不进资产数据，不随备份走。
+- **功能：** 全景、探针与 SSH 直读（默认关闭）、外部工具接入（MCP，关掉后一律拒绝调用；下面两个开关默认关：把地址和联系方式交给 AI 工具、把银行卡和手机号交给 AI 工具）、自动获取网站图标、每周核对域名到期日。功能开关按此设备记住，不进资产数据，不随备份走。
 - **连接：** Cloudflare、GitHub、AI 识别、MCP 接入、探针数据源，各自显示是否已连接，点“设置…”打开对应面板。
 - **关于：** 当前版本、检查更新、自动检查更新。
 
@@ -165,12 +165,15 @@ assetboard-cli totals --currency CNY                   # 周期费用合计；�
 
 MCP 工具：`list_asset_types`、`list_assets`、`get_asset`、`get_cost_totals`、`get_cost_forecast`、`get_cost_history`、`list_projects`、`add_assets`、`update_asset`、`update_assets`、`renew_asset`、`record_payment`、`list_unconfirmed_charges`、`delete_asset`、`request_delete_assets`、`list_pending_actions`、`get_action_status`。
 
-探针、SSH 直读、图标与同步的 MCP 工具：`list_probe_sources`、`add_probe_source`、`update_probe_source`、`remove_probe_source`、`refresh_probe_sources`、`list_probe_servers`、`get_server_metrics`、`set_probe_link`、`list_ssh_hosts`、`set_ssh_host`、`set_ssh_interval`、`refresh_ssh`、`list_icon_platforms`、`set_icon_site`、`fetch_icons`、`get_cloudflare_sync_status`、`sync_cloudflare`、`list_sync_blocklist`、`unblock_sync_item`。
+探针、SSH 直读、图标与同步的 MCP 工具：`list_probe_sources`、`refresh_probe_sources`、`list_probe_servers`、`get_server_metrics`、`set_probe_link`、`list_ssh_hosts`、`refresh_ssh`、`list_icon_platforms`、`set_icon_site`、`fetch_icons`、`get_cloudflare_sync_status`、`sync_cloudflare`、`list_sync_blocklist`、`unblock_sync_item`。
 
-- **凭据不经过 MCP：** 这些工具不接收、也不返回用户名、密码、令牌或会话；面板不公开时 `add_probe_source` 返回 `needsLogin`，账号只能在 App 的「探针数据源」里填，Cloudflare 令牌只能在「同步 Cloudflare…」里填。SSH 主机只按别名列出，不返回 HostName、IP、用户名、端口、IdentityFile 或 ssh config 原文；读取失败只给原因代码和固定说明。
-- **先返回、再查询：** 读面板、SSH 读取、获取图标和 Cloudflare 同步会立即返回 `checking` / `refreshing` / `fetching` / `syncing`，结果用 `list_probe_sources`、`list_ssh_hosts`、`get_server_metrics`、`list_icon_platforms`（`lastFetch`）、`get_cloudflare_sync_status` 查看。
-- **要你确认的：** `remove_probe_source`、`set_ssh_host` 开启（相当于让外部工具借用你的 SSH 密钥连服务器）和 `unblock_sync_item` 都返回 `pending` 和 `actionId`，在 App 里勾选允许才生效；关闭 SSH 直读立即生效，并记为手动关闭。
-- **撤销：** 看板上的改动（`set_probe_link`、`set_icon_site`、获取到的图标、允许后的解除跳过）可以 `⌘Z`；存在本机设置里的探针数据源、SSH 直读开关和读取间隔不进撤销。`update_asset` / `update_assets` 另外接受 `hidden`、`stopped`（true / false）和服务器的 `probeLink`（`{source, serverId}`、`"none"` 或 `"auto"`）。
+- **默认遮住、默认不给：** 外部工具读到的 IP、SSH 主机和用户、手机号和邮箱是遮住的（带 `•`，字段名列在 `masked` 里），银行卡和手机号两类记录读不到也改不了（`list_assets` 只给数量 `withheld`）；在「设置 › 功能 › 外部工具接入」里有两个开关可以改。搜索仍按真实值匹配。写回时，原样传回的遮住值保持不变，其他带 `•` 的值一律拒收。
+- **探针和 SSH 直读只读：** 外部工具只能读取和刷新；添加、修改、删除探针数据源，开关 SSH 直读和改读取间隔，都只能在 App 里做。探针数据源换了地址（协议、主机或端口）时，App 会丢掉已存的面板账号，要重新填写。
+- **凭据不经过 MCP：** 这些工具不接收、也不返回用户名、密码、令牌或会话；面板不公开时状态为 `needsLogin`，账号只能在 App 的「探针数据源」里填，Cloudflare 令牌只能在「同步 Cloudflare…」里填。SSH 主机只按别名列出，不返回 HostName、IP、用户名、端口、IdentityFile 或 ssh config 原文；读取失败只给原因代码和固定说明。
+- **先返回、再查询：** 读面板、SSH 读取、获取图标和 Cloudflare 同步会立即返回 `refreshing` / `fetching` / `syncing`，结果用 `list_probe_sources`、`list_ssh_hosts`、`get_server_metrics`、`list_icon_platforms`（`lastFetch`）、`get_cloudflare_sync_status` 查看。
+- **要你确认的：** 删除资产和 `unblock_sync_item` 都返回 `pending` 和 `actionId`，在 App 里勾选允许才生效。
+- **工具标注：** 会覆盖或删除已有内容的写工具标 `destructiveHint: true`；会让 App 联网的工具（取图标、读面板、SSH 读取、Cloudflare 同步，以及新增、修改资产和关联探针：认出平台时自动取图标，关联后读面板历史）标 `openWorldHint: true`，其余只动这台 Mac 上的数据，标 `false`。
+- **撤销：** 看板上的改动（`set_probe_link`、`set_icon_site`、获取到的图标、允许后的解除跳过）可以 `⌘Z`。`update_asset` / `update_assets` 另外接受 `hidden`、`stopped`（true / false）和服务器的 `probeLink`（`{source, serverId}`、`"none"` 或 `"auto"`）。
 
 - **计费：** `billingType` 为 `recurring` / `one_off` / `free` / `unknown`（留空自动判断），`amount: 0` 即免费；`promotion` 为 `{start, end, amount, regularAmount, currency}`，`null` 删除。查询结果带 `billingType`、`currentPrice`（含 `basis`：promotion / regular / free / cost）、`priceChange`、`unconfirmedCharges`、`payments`、`costHistory`。
 - **项目：** `project`（也接受 `projectId`）；`list_assets`、`get_cost_totals` 和 `get_cost_forecast` 可按项目筛选，`get_cost_totals` 的 `groupBy` 可按项目或类别拆分。
@@ -241,7 +244,7 @@ App 自己会连的：
 
 - 不探活。App 不访问你的域名或 IP。全景里的状态是登记状态（到期情况加手动标记的“已停用”），不是实时状态；只有打开探针或 SSH 直读后，服务器才有实时读数，读数只留在内存，不进数据和导出。
 - 令牌只读，存在 macOS 钥匙串；用本机 `gh` 时不另存令牌。AI 的 API key、探针面板的账号同样存钥匙串。
-- MCP 接入的通道在本机（`agent.sock`），但你的 AI 工具会把读到的内容发给它的模型服务商；不想让它读到，就在“设置 › 功能”关掉外部工具接入。
+- MCP 接入的通道在本机（`agent.sock`），但你的 AI 工具会把读到的内容发给它的模型服务商。它默认读到的 IP、SSH 主机和用户、手机号和邮箱是遮住的，银行卡和手机号两类记录不给它；不想让它读到任何内容，就在“设置 › 功能”关掉外部工具接入。
 - 全屏展示全景时，IP 默认遮住中间部分，悬停或按住 ⌥ 才显示。
 - 提醒是 macOS 本地通知，由本机排定，不经过任何服务器。
 - 演示模式用虚构数据，不读写你的数据，也不联网。

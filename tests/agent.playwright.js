@@ -150,7 +150,7 @@ async (page) => {
    const post=window.webkit.messageHandlers.assetboard.postMessage;window.webkit.messageHandlers.assetboard.postMessage=x=>{post(x);
     if(x.action==='iconFetch')setTimeout(()=>assetboardIconResult(x.host==='bad.example'?{requestId:x.requestId,ok:false,error:'这个网站没有图标'}:{requestId:x.requestId,ok:true,host:x.host,dataUrl:window.__icon}),20);};},png);
   const mcall=(method,params)=>m.evaluate(([method,params])=>assetboardAgent({requestId:'m',method,params}),[method,params]);
-  const withIcon=await mcall('add',{items:[{name:'Wise',type:'bankcard',iconHost:'wise.com'},{name:'Bad',type:'subscription',iconHost:'bad.example'},{name:'Own',type:'subscription',icon:png}]});
+  const withIcon=await mcall('add',{items:[{name:'Wise',type:'subscription',iconHost:'wise.com'},{name:'Bad',type:'subscription',iconHost:'bad.example'},{name:'Own',type:'subscription',icon:png}]});
   check(withIcon.result.added.length===3&&withIcon.result.added[0].iconStatus==='fetching'&&!('iconStatus' in withIcon.result.added[2]),'iconHost starts a fetch; an icon given directly needs none');
   const [wise,bad,own]=withIcon.result.added.map(x=>x.id);
   await until(m,id=>!!state.assets.find(a=>a.id===id)?.siteIcon,wise);

@@ -195,6 +195,13 @@ async (page) => {
   await p.click('[data-action="probe-save"]');
   const kept2=await p.evaluate(()=>window.__msgs.at(-1));
   check(kept2.action==='probeSave'&&kept2.id==='src2'&&kept2.name==='私有面板'&&!('password' in kept2)&&!('username' in kept2)&&!kept2.clearLogin,'an empty password keeps the kept account: '+JSON.stringify(kept2));
+  // A new address never takes the kept account along: the form asks for it again and sends nothing.
+  await p.waitForTimeout(200);
+  await p.evaluate(()=>document.querySelector('[data-action="probe-edit"][data-id="src2"]').click());
+  await p.fill('#probe-url','https://other.example.net');
+  before=await p.evaluate(()=>window.__msgs.length);
+  await p.click('[data-action="probe-save"]');
+  check(await p.evaluate(b=>window.__msgs.length===b&&/换了地址/.test(document.querySelector('#probe-status').textContent),before),'a moved panel asks for its account again: '+await p.evaluate(()=>document.querySelector('#probe-status').textContent));
   await p.evaluate(()=>document.querySelector('#modal').close());
   // Every message the probe sent was one of the allowed ones, and none names a path, a method or a token.
   const msgs=await p.evaluate(()=>window.__msgs);

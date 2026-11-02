@@ -1,8 +1,10 @@
 // Run with the browser tool's filename option. The Pro agent methods behind the MCP tools for probe sources, SSH 直读, site icons and
 // the Cloudflare sync (pro/web/agent-pro.js), against a stubbed Mac app: every method answers at once, slow work is looked up later,
-// removing a source, turning SSH 直读 on and unblocking a sync item wait for the person in the app (allowed or declined there), board
-// changes undo with ⌘Z, and no reply carries an account, a password, a token, an ssh HostName, an address, a user or a key file, even
-// when the app's own errors name them. The demo refuses the calls. All names, addresses and keys here are made up.
+// probe sources and SSH 直读 are read and refreshed only (no method adds, changes or removes a source or switches a host), unblocking
+// a sync item waits for the person in the app (allowed or declined there), board changes undo with ⌘Z, and no reply carries an
+// account, a password, a token, an ssh HostName, an address, a user or a key file, even when the app's own errors name them. Bank
+// cards are given to agents here (agentCards) so the icon and link rules can use them. The demo refuses the calls. All names,
+// addresses and keys here are made up.
 async (page) => {
  const check=(ok,message)=>{if(!ok)throw new Error(message);};
  const wait=ms=>new Promise(r=>setTimeout(r,ms));
@@ -47,10 +49,10 @@ async (page) => {
    server('s1','tokyo-vps',{ips:['203.0.113.10']}),server('s2','backup-box'),server('s3','paris-vps'),server('s4','spare'),
    {id:'w1',type:'bankcard',name:'Wise 卡',provider:'Wise',source:'manual',art:'generic',last4:'1234'},{id:'w2',type:'bankcard',name:'Wise 备用',provider:'Wise',source:'manual',art:'generic',last4:'5678'}],
    deletedExternalIds:['cloudflare:zone:z9','cloudflare-zone-z9','github:4242','asset-abc']},
-   probeSources:[{id:'src1',kind:'cfsm',name:'我的探针',url:'https://status.example.com',hasLogin:true,username:'admin-fake-user'}],
+   probeSources:[{id:'src1',kind:'cfsm',name:'我的探针',url:'https://status.example.com',hasLogin:true,username:'admin-fake-user'},{id:'src2',kind:'cfsm',name:'私有面板',url:'https://private.example.net',hasLogin:false,username:''}],
    sshProbe:{enabled:[],interval:60},cloudflareConnected:true,githubConnected:false,gmailConfigured:false};
  };
- await p.addInitScript(()=>{try{localStorage.setItem('assetboard-features-v1','{"probe":true}');}catch{}});
+ await p.addInitScript(()=>{try{localStorage.setItem('assetboard-features-v1','{"probe":true,"agentCards":true}');}catch{}});
  await p.addInitScript(stub,null);
  const replies=[];
  const call=async(method,params={})=>{const r=await p.evaluate(([method,params])=>assetboardAgent({requestId:'t',method,params}),[method,params]);replies.push(JSON.stringify(r));return r;};
@@ -59,25 +61,18 @@ async (page) => {
   await p.goto('http://127.0.0.1:4317/');
   await until(p,()=>typeof assetboardAgent==='function'&&probe.state.get('src1')?.servers?.length===3&&sshProbe.listed);
 
-  // 探针数据源: listed without the account; adding asks for the address only and never takes a password.
+  // 探针数据源: listed without the account and with the address masked; added, changed and removed in the app only.
   let r=await call('probeSources');
-  check(r.ok&&r.result.sources.length===1&&r.result.sources[0].status==='ok'&&r.result.sources[0].hasLogin===true&&r.result.sources[0].servers===3,'list_probe_sources: '+JSON.stringify(r));
-  check(/只能在 Assetboard 里填写/.test((await call('probeSourceAdd',{url:'status.example.org',password:'pw-fake-1'})).error),'add_probe_source refuses a password');
-  check(/只能在 Assetboard 里填写/.test((await call('probeSourceAdd',{url:'status.example.org',username:'admin-fake-user'})).error),'add_probe_source refuses a user name');
-  check(/url/.test((await call('probeSourceAdd',{url:'ftp://status.example.org'})).error),'add_probe_source refuses another scheme');
-  r=await call('probeSourceAdd',{url:'private.example.net/admin#/login',name:'私有面板'});
-  check(r.ok&&r.result.status==='checking'&&r.result.url==='https://private.example.net'&&/^[0-9a-f-]{36}$/.test(r.result.id),'add_probe_source normalizes like the form and answers at once: '+JSON.stringify(r));
-  const added=r.result.id;
-  const save=(await sent('probeSave')).pop();
-  check(save.id===added&&save.url==='https://private.example.net'&&save.name==='私有面板'&&save.kind==='cfsm'&&!('username' in save)&&!('password' in save),'The app is asked to save the address and name only: '+JSON.stringify(save));
-  await until(p,id=>assetboardAgent({requestId:'x',method:'probeSources',params:{}}).result.sources.find(s=>s.id===id)?.status==='needsLogin',added);
-  r=await call('probeSources');const priv=r.result.sources.find(s=>s.id===added);
+  check(r.ok&&r.result.sources.length===2&&r.result.sources[0].status==='ok'&&r.result.sources[0].hasLogin===true&&r.result.sources[0].servers===3,'list_probe_sources: '+JSON.stringify(r));
+  check(r.result.sources[0].url==='https://s••••••.com'&&!JSON.stringify(r.result).includes('example.'),'Panel addresses are masked like a host: '+JSON.stringify(r.result.sources.map(s=>s.url)));
+  await until(p,()=>assetboardAgent({requestId:'x',method:'probeSources',params:{}}).result.sources.find(s=>s.id==='src2')?.status==='needsLogin');
+  r=await call('probeSources');const priv=r.result.sources.find(s=>s.id==='src2');
   check(priv.status==='needsLogin'&&/Assetboard/.test(priv.message)&&!/session|401 from/.test(JSON.stringify(priv)),'A private panel answers needsLogin with fixed words: '+JSON.stringify(priv));
-  check((await call('probeSourceAdd',{url:'https://private.example.net'})).result.alreadyAdded===true,'Adding the same address again returns the source');
-  r=await call('probeSourceUpdate',{id:added,name:'改名的面板'});
-  check(r.ok&&r.result.status==='checking'&&(await sent('probeSave')).pop().name==='改名的面板'&&!('password' in (await sent('probeSave')).pop()),'update_probe_source renames, account kept: '+JSON.stringify(r));
-  await until(p,id=>probe.sources.find(s=>s.id===id)?.name==='改名的面板',added);
-  check(/没有要修改/.test((await call('probeSourceUpdate',{id:added,name:'改名的面板'})).error)&&/找不到/.test((await call('probeSourceUpdate',{id:'nope',name:'x'})).error),'update_probe_source refuses nothing to do and unknown ids');
+  for(const method of ['probeSourceAdd','probeSourceUpdate','probeSourceRemove','sshSet','sshInterval']){
+   const gone=await call(method,{id:'src1',url:'https://elsewhere.example.org',alias:'lab-box',enabled:true,seconds:120});
+   check(!gone.ok&&/未知方法/.test(gone.error)&&!/probeSource(Add|Update|Remove)|sshSet|sshInterval/.test(gone.error.split('可用：')[1]),`${method} is not an agent method: `+JSON.stringify(gone));
+  }
+  check(!(await sent('probeSave')).length&&!(await sent('probeRemove')).length&&!(await sent('sshProbeSet')).length&&!(await sent('sshProbeInterval')).length,'No probe or SSH setting was sent to the app');
   r=await call('probeRefresh',{});
   check(r.ok&&r.result.status==='refreshing'&&r.result.sources.length===2&&(await sent('probeRefresh')).pop().manual===true,'refresh_probe_sources answers refreshing');
 
@@ -114,35 +109,10 @@ async (page) => {
   check(r.result.history?.cpu?.max===49&&r.result.history.span==='24h','get_server_metrics summarizes the history: '+JSON.stringify(r.result.history));
   check((await call('serverMetrics',{assetId:'s3'})).result.linked===false&&/只有服务器/.test((await call('serverMetrics',{assetId:'w1'})).error),'An unlinked card says so; a bank card has no readings');
 
-  // Removing a source waits for the person: nothing is removed until allowed here.
-  r=await call('probeSourceRemove',{id:added,reason:'不用了'});
-  check(r.ok&&r.result.status==='pending'&&/^act-/.test(r.result.actionId),'remove_probe_source is pending: '+JSON.stringify(r));
-  const removeAction=r.result.actionId;
-  check(await p.evaluate(()=>$('#modal').open&&$('#modal').dataset.view==='agent-confirm'&&$('#modal-title').textContent==='删除探针数据源？'&&/改名的面板/.test($('#modal-content').textContent)&&/不用了/.test($('#modal-content').textContent)),'The app lists the request with its reason');
-  check(!(await sent('probeRemove')).length,'Nothing is removed before the person allows it');
-  check((await call('probeSourceRemove',{id:added})).result.alreadyPending?.[0]?.actionId===removeAction,'Asking again is folded into the waiting request');
-  check((await call('action',{id:removeAction})).result.status==='pending','get_action_status: pending');
-  await p.click('#agent-confirm-yes');
-  check((await sent('probeRemove')).length===1&&(await sent('probeRemove'))[0].id===added,'Allowed: the app removes the source');
-  r=await call('action',{id:removeAction});
-  check(r.result.status==='done'&&r.result.items[0].status==='applied','get_action_status: done, applied: '+JSON.stringify(r.result));
-  await until(p,()=>probe.sources.length===1);
-  r=await call('probeSourceRemove',{id:'src1'});
-  await p.click('#agent-confirm-no');
-  check((await call('action',{id:r.result.actionId})).result.status==='cancelled'&&!(await sent('probeRemove')).some(m=>m.id==='src1'),'全部拒绝: cancelled, nothing removed');
-
-  // SSH 直读: aliases only; turning one on waits for the person, turning one off is at once and remembered.
+  // SSH 直读: aliases only, switched on and off in the app; agents read and refresh.
   r=await call('sshHosts');
   check(r.ok&&r.result.listed&&r.result.hosts.map(h=>h.alias).join()==='tokyo-vps,lab-box'&&r.result.interval===60&&r.result.hosts.every(h=>!h.enabled),'list_ssh_hosts: '+JSON.stringify(r.result));
-  check(/别名/.test((await call('sshSet',{alias:'ghost',enabled:true})).error)&&/true 或 false/.test((await call('sshSet',{alias:'lab-box',enabled:'yes'})).error),'Unknown aliases and non-boolean switches are refused');
-  r=await call('sshSet',{alias:'lab-box',enabled:true,reason:'看看负载'});
-  check(r.ok&&r.result.status==='pending','set_ssh_host on is pending: '+JSON.stringify(r));
-  const sshAction=r.result.actionId;
-  check(await p.evaluate(()=>$('#modal').dataset.view==='agent-confirm'&&/钥匙/.test($('#modal-content').textContent)&&/lab-box/.test($('#modal-content').textContent)),'The confirmation says it lends the keys');
-  check(!(await sent('sshProbeSet')).some(m=>m.on),'Nothing is turned on before the person allows it');
-  check(await p.evaluate(()=>!!$('#action-banner'))===false,'No banner over an open confirmation');
-  await p.click('#agent-confirm-yes');
-  check((await sent('sshProbeSet')).some(m=>m.alias==='lab-box'&&m.on===true)&&(await call('action',{id:sshAction})).result.status==='done','Allowed: SSH 直读 turned on');
+  await p.evaluate(()=>sshToggle('lab-box',true));
   await until(p,()=>sshSession('lab-box').reason==='down');
   r=await call('sshHosts');const lab=r.result.hosts.find(h=>h.alias==='lab-box');
   check(lab.enabled&&lab.status==='error'&&lab.problem==='down'&&lab.message==='连不上','A failed read is a code and fixed words: '+JSON.stringify(lab));
@@ -150,12 +120,11 @@ async (page) => {
   check(r.result.servers.length===1&&r.result.servers[0].serverId==='lab-box'&&!r.result.servers[0].linkedAssetId,'list_probe_servers includes SSH 直读 hosts: '+JSON.stringify(r.result));
   r=await call('sshRefresh',{alias:'lab-box'});
   check(r.ok&&r.result.status==='refreshing'&&r.result.aliases[0]==='lab-box','refresh_ssh one host');
-  check((await call('sshInterval',{seconds:45})).ok===false&&(await call('sshInterval',{seconds:120})).result.interval===120&&(await sent('sshProbeInterval')).pop().seconds===120,'set_ssh_interval takes only the listed values');
-  r=await call('sshSet',{alias:'lab-box',enabled:false});
-  check(r.ok&&r.result.status==='off'&&r.result.manuallyOff===true&&(await sent('sshProbeSet')).pop().on===false,'set_ssh_host off is at once');
+  check(/别名/.test((await call('sshRefresh',{alias:'ghost'})).error),'refresh_ssh of an unknown alias is refused');
+  await p.evaluate(()=>sshToggle('lab-box',false));
   await until(p,()=>!sshEnabled('lab-box'));
   r=await call('sshHosts');
-  check(r.result.hosts.find(h=>h.alias==='lab-box').manuallyOff===true&&r.result.interval===120,'Switched off by hand is remembered: '+JSON.stringify(r.result.hosts));
+  check(r.result.hosts.find(h=>h.alias==='lab-box').manuallyOff===true,'Switched off by hand in the app: '+JSON.stringify(r.result.hosts));
   check(/没有开启/.test((await call('sshRefresh',{alias:'lab-box'})).error),'refresh_ssh of a host that is off is refused');
 
   // Site icons: a platform's site (board data, undoable), and a fetch that answers fetching and applies in one undo step.
@@ -215,17 +184,17 @@ async (page) => {
   check(kept.agentActions.some(a=>a.id===r.result.actionId&&a.status==='pending'),'The waiting request is saved with the board');
   const again=await browser.newContext(),q=await again.newPage();
   try{
-   await q.addInitScript(()=>{try{localStorage.setItem('assetboard-features-v1','{"probe":true}');}catch{}});await q.addInitScript(stub,kept);await q.goto('http://127.0.0.1:4317/');
+   await q.addInitScript(()=>{try{localStorage.setItem('assetboard-features-v1','{"probe":true,"agentCards":true}');}catch{}});await q.addInitScript(stub,kept);await q.goto('http://127.0.0.1:4317/');
    await until(q,()=>typeof assetboardAgent==='function'&&$('#modal').open&&$('#modal').dataset.view==='agent-confirm');
    check(await q.evaluate(()=>/github:4242/.test($('#modal-content').textContent)&&intake.filter(i=>i.confirmKind).length===1),'After a restart the request is listed again');
   }finally{await again.close();}
   await p.evaluate(()=>$('#modal').close());await until(p,()=>!agentConfirmOpen);
   check((await call('actions',{status:'pending'})).result.total===0&&(await call('action',{id:r.result.actionId})).result.items[0].status==='declined','Closing the list declines what it held');
-  check((await call('actions',{})).result.actions.some(a=>a.kind==='sshEnable')&&(await call('actions',{})).result.actions.some(a=>a.kind==='probeRemove'),'list_pending_actions shows the settings requests too');
+  check((await call('actions',{})).result.actions.some(a=>a.kind==='syncUnblock'),'list_pending_actions shows the settings requests too');
 
   // Nothing secret came back, and the settings the app keeps went out without credentials.
   for(const secret of SECRETS)check(!replies.some(x=>x.includes(secret)),`A reply carries ${secret}`);
-  check(!(await sent('probeSave')).some(m=>'username' in m||'password' in m),'probeSave never carried an account');
+  check(!(await sent('probeSave')).length,'No agent call saved a probe source');
   check(!errors.length,'page errors: '+errors.join(' | '));
  } finally { await context.close(); }
 
@@ -234,8 +203,8 @@ async (page) => {
  try{
   await d.addInitScript(()=>{window.webkit={messageHandlers:{assetboard:{postMessage(){}}}};window.__ASSETBOARD_NATIVE__={data:null,demo:true,probeSources:[],cloudflareConnected:false,githubConnected:false,gmailConfigured:false};});
   await d.goto('http://127.0.0.1:4317/');await until(d,()=>typeof assetboardAgent==='function');
-  const refused=await d.evaluate(()=>['probeSources','sshSet','iconFetch','cloudflareSync','syncUnblock'].map(method=>assetboardAgent({requestId:'d',method,params:{}})));
+  const refused=await d.evaluate(()=>['probeSources','sshHosts','iconFetch','cloudflareSync','syncUnblock'].map(method=>assetboardAgent({requestId:'d',method,params:{}})));
   check(refused.every(r=>!r.ok&&/演示模式/.test(r.error)),'The demo refuses: '+JSON.stringify(refused));
  }finally{await demo.close();}
- return 'PASS: probe sources listed without accounts, added by address only (needsLogin, fixed words), renamed, refreshed, removed after confirming; probe servers, hand links (undo, none, auto, refused pairs), probeLink in update_asset(s), server metrics with history; SSH hosts by alias only, on after confirming, off at once and remembered, interval, refresh, errors as codes; icon sites (undo), icon fetch answered later in one undo; Cloudflare sync triggered without a token and looked up, key-like text cleaned; sync blocklist unblocked after confirming (undo); no secret in any reply; demo refuses';
+ return 'PASS: probe sources listed without accounts and with masked addresses (needsLogin, fixed words), refreshed, no method to add, change or remove one or to switch SSH; probe servers, hand links (undo, none, auto, refused pairs), probeLink in update_asset(s), server metrics with history; SSH hosts by alias only, refresh, errors as codes; icon sites (undo), icon fetch answered later in one undo; Cloudflare sync triggered without a token and looked up, key-like text cleaned; sync blocklist unblocked after confirming (undo); no secret in any reply; demo refuses';
 }
