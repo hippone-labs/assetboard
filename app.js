@@ -79,7 +79,7 @@ function redo(){if(!future.length){toast(tr('没有可重做的'));return;}histo
 function confirmDialog(title,message,confirmLabel,danger=false){return new Promise(resolve=>{modal(title,`<p class="form-note confirm-message">${esc(message).replaceAll('\n','<br>')}</p><div class="confirm-actions"><button class="button ${danger?'danger':'primary'}" id="confirm-yes">${esc(confirmLabel)}</button><button class="button" id="confirm-no">${tr('取消')}</button></div>`,'confirm');const dialog=$('#modal');let settled=false;const finish=value=>{if(settled)return;settled=true;dialog.removeEventListener('close',cancel);resolve(value);},cancel=()=>{if(!dialog.open)finish(false);};dialog.addEventListener('close',cancel);$('#confirm-yes').onclick=()=>{finish(true);dialog.close();};$('#confirm-no').onclick=()=>dialog.close();$('#confirm-no').focus();});}
 
 function isHidden(a){return !!(a&&a.hiddenAt);}
-function rememberDeleted(a){const key=assetSyncKey(a);if(!key)return;if(!Array.isArray(state.deletedExternalIds))state.deletedExternalIds=[];if(!state.deletedExternalIds.includes(key))state.deletedExternalIds.push(key);if(a.id&&!state.deletedExternalIds.includes(a.id))state.deletedExternalIds.push(a.id);}
+function rememberDeleted(a){if(!a)return;const key=assetSyncKey(a);if(!key){addTombstone(state,a.id);return;}if(!Array.isArray(state.deletedExternalIds))state.deletedExternalIds=[];if(!state.deletedExternalIds.includes(key))state.deletedExternalIds.push(key);if(a.id&&!state.deletedExternalIds.includes(a.id))state.deletedExternalIds.push(a.id);}
 function icon(type){return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[type]||icons.storage}</svg>`;}
 // Small UI glyphs for buttons and chips; every icon-only button must carry title and aria-label.
 const uiGlyphs={pulse:'<path d="M3 12h4l2.5-6 5 12 2.5-6h4"/>',download:'<path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19.5h14"/>',file:'<path d="M7 3.5h6.5L18 8v12.5H7z"/><path d="M13.5 3.5V8H18"/>',plus:'<path d="M12 5v14M5 12h14"/>',mail:'<path d="M4 6h16v12H4zM4 6l8 7 8-7"/>',image:'<rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.5"/><path d="m5 17 4.5-4.5L13 16l2.5-2.5L19 17"/>',terminal:'<rect x="3.5" y="5" width="17" height="14" rx="2"/><path d="m7.5 10 3 2.5-3 2.5M13 15h3.5"/>',refresh:'<path d="M19.5 9.5A8 8 0 0 0 5.2 7.8M4.5 14.5a8 8 0 0 0 14.3 1.7"/><path d="M5 4v4h4M19 20v-4h-4"/>',cloud:'<path d="M3.5 15.5h12a4 4 0 0 0 .4-8 6 6 0 0 0-11.5 1.8A3.5 3.5 0 0 0 3.5 15.5Z"/>',github:'<path d="M9 19c-4 1.5-4-2-7-2m14 5v-3.9a3.4 3.4 0 0 0-1-2.6c3.2-.3 6.5-1.5 6.5-7A5.2 5.2 0 0 0 19 4.6 4.8 4.8 0 0 0 18.9 1S17.7.7 15 2.5a10.4 10.4 0 0 0-6 0C6.3.7 5.1 1 5.1 1A4.8 4.8 0 0 0 5 4.6 5.2 5.2 0 0 0 3.5 8.5c0 5.4 3.3 6.7 6.5 7a3.4 3.4 0 0 0-1 2.6V22"/>',back:'<path d="M10 6 4 12l6 6M4 12h16"/>',info:'<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5M12 8h.01"/>',lock:'<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8.5 11V8a3.5 3.5 0 0 1 7 0v3"/>',warn:'<path d="M12 4 3 19.5h18z"/><path d="M12 10v4.5M12 17h.01"/>',check:'<path d="m5 12.5 4.5 4.5L19 7.5"/>',gear:'<circle cx="12" cy="12" r="3"/><path d="M12 3.5v2M12 18.5v2M3.5 12h2M18.5 12h2M6 6l1.4 1.4M16.6 16.6 18 18M18 6l-1.4 1.4M7.4 16.6 6 18"/>',tray:'<path d="M4 13.5 6.5 5.5h11L20 13.5V18a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18Z"/><path d="M4 13.5h4.5a1 1 0 0 1 1 1 2.5 2.5 0 0 0 5 0 1 1 0 0 1 1-1H20"/>',palette:'<path d="M12 3.5a8.5 8.5 0 1 0 0 17c1.2 0 1.8-.8 1.8-1.7 0-1.3-1-1.6-1-2.7 0-.9.7-1.6 1.7-1.6h2.2a3.3 3.3 0 0 0 3.3-3.3C20 6.9 16.5 3.5 12 3.5Z"/><circle cx="7.8" cy="11" r=".7"/><circle cx="10.5" cy="7.5" r=".7"/><circle cx="15" cy="8" r=".7"/>',clock:'<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',sidebar:'<rect x="3.5" y="5" width="17" height="14" rx="2.5"/><path d="M9.5 5v14"/>',eye:'<path d="M3.5 12s3.2-5.5 8.5-5.5S20.5 12 20.5 12s-3.2 5.5-8.5 5.5S3.5 12 3.5 12Z"/><circle cx="12" cy="12" r="2.5"/>',eyeoff:'<path d="M3.5 12s3.2-5.5 8.5-5.5S20.5 12 20.5 12s-3.2 5.5-8.5 5.5S3.5 12 3.5 12Z"/><circle cx="12" cy="12" r="2.5"/><path d="M4.5 4.5l15 15"/>',spark:'<path d="M11 4c.6 3.9 2.6 5.9 6.5 6.5-3.9.6-5.9 2.6-6.5 6.5-.6-3.9-2.6-5.9-6.5-6.5C8.4 9.9 10.4 7.9 11 4Z"/>'};
@@ -142,7 +142,7 @@ const STOPPABLE=['server','domain','repository','database','license','subscripti
 const stopRing=a=>a.stopped?`<i class="stop-ring" role="img" aria-label="${tr('已停用')}" title="${tr('已停用')}"></i>`:'';
 function toggleStopped(id){
  const a=state.assets.find(x=>x.id===id);if(!a||!STOPPABLE.includes(a.type))return false;
- checkpoint();if(a.stopped)delete a.stopped;else a.stopped=true;save();render();if(activeAsset===id&&!$('#detail').hidden)showDetail(id);
+ checkpoint();if(a.stopped)delete a.stopped;else a.stopped=true;touchAsset(a);save();render();if(activeAsset===id&&!$('#detail').hidden)showDetail(id);
  toast(a.stopped?tr('已标为停用')+icpNote(a):tr('已恢复启用'),true);return true;
 }
 // Category quick actions (DESIGN-PRINCIPLES §5): at most QUICK_LIMIT icon buttons on a row, the full list in the inspector.
@@ -877,7 +877,7 @@ $('#modal-content').addEventListener('toggle',modalScrollState,true);
 addEventListener('resize',()=>{if($('#modal').open)modalScrollState();});
 // The + adds an asset: straight into the category on screen, otherwise through the category chooser.
 function addAsset(){const v=currentView();captureDialog(cats[v]&&!query?v:'');}
-let importPlan=null,importKind=null;
+let importPlan=null,importKind=null,importBackup=null;
 // Where agents and scripts connect: the MCP server inside the app, set up per tool (one tab each), plus the command line.
 // The chosen tab is remembered per viewer.
 const AGENT_TOOLS=[['claude-code','Claude Code'],['claude-desktop','Claude Desktop'],['codex','ChatGPT / Codex'],['cursor','Cursor'],['other',tr('其他工具 / 命令行')]];
@@ -981,10 +981,14 @@ function importHub(){
  $('#import-drop')?.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();$('#import-file')?.click();}});
  $('#import-file')?.addEventListener('change',e=>{const files=[...e.target.files||[]];e.target.value='';if(files.length)handleImportFiles(files);});
 }
+function importGroup(tone,title,rows,render,hint=''){return rows.length?`<section class="import-group ${tone}"><h3><i class="dot" aria-hidden="true"></i>${title}<b class="count">${rows.length}</b>${hint?`<span class="hint">${hint}</span>`:''}</h3><div class="import-rows">${rows.map(render).join('')}</div></section>`:'';}
+function importRowName(row){return esc(row.item?.name||row.name||tr('未命名'));}
+function importRowType(row){return `<span class="chip">${esc(cats[row.item?.type||row.type]?.name||row.item?.type||row.type||'')}</span>`;}
+function refusedRow(row){return `<div class="import-row"><strong>${esc(row.name&&!secretKinds(row.name).length?row.name:(row.found||[]).map(kind=>SECRET_KINDS[kind]).join(tr('、')))}</strong>${row.name?`<span class="chip">${esc((row.found||[]).map(kind=>SECRET_KINDS[kind]).join(tr('、')))}</span>`:''}${row.line?`<span class="chip">${tr('第 {n} 行',{n:row.line})}</span>`:''}</div>`;}
+const REFUSED_HINT=()=>tr('有完整卡号、私钥、令牌或 TOTP 密钥，整行没有读入');
 function importPreviewHtml(plan,meta={}){
- const group=(tone,title,rows,render,hint='')=>rows.length?`<section class="import-group ${tone}"><h3><i class="dot" aria-hidden="true"></i>${title}<b class="count">${rows.length}</b>${hint?`<span class="hint">${hint}</span>`:''}</h3><div class="import-rows">${rows.map(render).join('')}</div></section>`:'';
- const name=row=>esc(row.item?.name||row.name||tr('未命名'));
- const type=row=>`<span class="chip">${esc(cats[row.item?.type||row.type]?.name||row.item?.type||'')}</span>`;
+ if(plan.preview)return backupPreviewHtml(plan,meta);
+ const group=importGroup,name=importRowName,type=importRowType;
  // What will be written, the way the board shows it: the next date and the cost, so a source's mapping can be checked here.
  const facts=row=>{const it=row.item||{},when=it.date?`${it.date} ${dateKinds[it.dateKind]?.future||dateKinds.expire.future}`:'',cost=it.cost&&it.cost!=='未知'?it.cost:'';
   return when||cost?`<span class="import-facts">${esc([when,cost].filter(Boolean).join(' · '))}</span>`:'';};
@@ -1004,25 +1008,69 @@ function importPreviewHtml(plan,meta={}){
   ${group('hold',tr('同名'),[...(plan.collisions||[]),...(plan.skippedSame||[])],(row,i)=>`<label class="check-label import-row"><input type="checkbox" name="import-same" value="${esc(row.assetId)}"><strong>${name(row)}</strong>${facts(row)}${type(row)}</label>`,tr('默认跳过，勾选则覆盖'))}
   ${group('hold',tr('已删除'),plan.skippedDeleted||[],row=>`<label class="check-label import-row"><input type="checkbox" name="import-restore" value="${esc(row.key)}"><strong>${name(row)}</strong>${facts(row)}${type(row)}</label>`,tr('默认跳过，勾选则恢复'))}
   ${group('quiet',tr('已隐藏'),plan.hidden||[],line,tr('更新后仍隐藏'))}
-  ${group('bad',tr('已拒收'),meta.refused||[],row=>`<div class="import-row"><strong>${esc(row.name&&!secretKinds(row.name).length?row.name:(row.found||[]).map(kind=>SECRET_KINDS[kind]).join(tr('、')))}</strong>${row.name?`<span class="chip">${esc((row.found||[]).map(kind=>SECRET_KINDS[kind]).join(tr('、')))}</span>`:''}${row.line?`<span class="chip">${tr('第 {n} 行',{n:row.line})}</span>`:''}</div>`,tr('有完整卡号、私钥、令牌或 TOTP 密钥，整行没有读入'))}
+  ${group('bad',tr('已拒收'),meta.refused||[],refusedRow,REFUSED_HINT())}
   ${group('bad',tr('没读懂'),meta.unreadable||[],row=>`<div class="import-row"><strong>${esc(row.reason||tr('无法识别'))}</strong>${row.line?`<span class="chip">${tr('第 {n} 行',{n:row.line})}</span>`:''}</div>`)}
   <div class="confirm-actions"><button class="button primary" data-action="import-apply">${tr('导入')}</button><button class="button" data-action="import-hub" title="${tr('返回导入')}" aria-label="${tr('返回导入')}">${ui('back')}</button></div>
  </div>`;
 }
+// 从备份恢复: the preview always opens. Merge shows each record's local and backup time and keeps the newer copy by default (one box per
+// row); 整体替换 lists the local records it deletes. Board settings in the backup are listed and restored.
+function backupWhen(time){if(!time)return tr('没有时间');const d=new Date(time);return `${isoDay(localDay(d))} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;}
+function backupSettingText(key,value){
+ if(key==='autoIcons')return `${tr('自动获取网站图标')}${tr('：')}${value===false?tr('关'):tr('开')}`;
+ if(key==='rdapAuto')return `${tr('每周核对域名到期日')}${tr('：')}${value?tr('开'):tr('关')}`;
+ if(key==='iconSites')return tr('自定义图标站点 {n} 个',{n:Object.keys(value||{}).length});
+ if(key==='paymentsSince')return value?tr('待确认扣款从 {day} 算起',{day:value}):'';
+ return '';
+}
+function backupPreviewHtml(plan,meta={}){
+ const replace=plan.mode==='replace',group=importGroup,name=importRowName,type=importRowType;
+ const times=row=>`<span class="import-facts">${esc(tr('本地 {local} · 备份 {backup}',{local:backupWhen(row.localAt),backup:backupWhen(row.backupAt)}))}</span>`;
+ const pick=(row,on)=>`<label class="check-label import-row"><input type="checkbox" name="import-take" value="${esc(row.assetId)}"${on?' checked':''}><strong>${name(row)}</strong>${times(row)}${row.hidden?`<span class="chip">${tr('已隐藏')}</span>`:''}${type(row)}</label>`;
+ const line=row=>`<div class="import-row"><strong>${name(row)}</strong>${type(row)}</div>`;
+ const settings=Object.entries(plan.settings||{}).map(([key,value])=>backupSettingText(key,value)).filter(Boolean);
+ const notes=[meta.note&&`<span class="chip">${ui('file')}${esc(meta.note)}</span>`,`<span class="chip">${ui('clock')}${plan.exportedAt?esc(tr('备份于 {when}',{when:backupWhen(Date.parse(plan.exportedAt))})):tr('备份时间未知')}</span>`,(plan.same||[]).length&&`<span class="chip">${tr('相同 {n} 项',{n:formatCount(plan.same.length)})}</span>`].filter(Boolean).join('');
+ const mode=(id,label)=>`<button type="button" class="choice" role="radio" aria-checked="${(plan.mode===id)}" data-action="import-mode" data-id="${id}">${label}</button>`;
+ const body=replace?`<p class="form-note">${tr('资产板会变得和备份完全一样：备份里没有的本地记录会被删除。⌘Z 可撤销。')}</p>
+  ${group('bad',tr('将删除'),plan.removed||[],row=>`<div class="import-row"><strong>${name(row)}</strong><span class="import-facts">${esc(tr('本地 {local}',{local:backupWhen(row.localAt)}))}</span>${type(row)}</div>`,tr('本地有、备份里没有'))}
+  ${group('add',tr('新增'),plan.added||[],line)}
+  ${group('update',tr('以备份为准'),plan.updated||[],row=>`<div class="import-row"><strong>${name(row)}</strong>${times(row)}${type(row)}</div>`)}`
+  :`${group('add',tr('新增'),plan.added||[],line)}
+  ${group('update',tr('备份较新'),plan.updated||[],row=>pick(row,true),tr('默认用备份，取消勾选保留本地'))}
+  ${group('hold',tr('本地较新'),plan.newerLocal||[],row=>pick(row,false),tr('默认保留本地，勾选改用备份'))}
+  ${group('hold',tr('已删除'),plan.skippedDeleted||[],row=>`<label class="check-label import-row"><input type="checkbox" name="import-restore" value="${esc(row.key)}"><strong>${name(row)}</strong>${row.deletedAt?`<span class="import-facts">${esc(tr('删除于 {when}',{when:backupWhen(Date.parse(row.deletedAt))}))}</span>`:''}${type(row)}</label>`,tr('默认跳过，勾选则恢复'))}
+  ${(plan.added||[]).length+(plan.updated||[]).length+(plan.newerLocal||[]).length+(plan.skippedDeleted||[]).length+settings.length?'':`<p class="form-note">${tr('备份里的记录和本地一样，没有要写入的。')}</p>`}`;
+ return `<div class="form import-preview backup-preview" id="import-preview">
+  <div class="chips import-notes">${notes}</div>
+  <div class="chip-group import-mode" role="radiogroup" aria-label="${tr('恢复方式')}">${mode('merge',tr('合并'))}${mode('replace',tr('整体替换'))}</div>
+  ${body}
+  ${group('quiet',tr('看板设置'),settings,text=>`<div class="import-row"><strong>${esc(text)}</strong></div>`,tr('随备份恢复'))}
+  ${group('bad',tr('已拒收'),meta.refused||[],refusedRow,REFUSED_HINT())}
+  <div class="confirm-actions"><button class="button ${replace?'danger':'primary'}" data-action="import-apply">${replace?tr('整体替换'):tr('导入')}</button><button class="button" data-action="import-hub" title="${tr('返回导入')}" aria-label="${tr('返回导入')}">${ui('back')}</button></div>
+ </div>`;
+}
+// Switching between 合并 and 整体替换 plans the same backup again against the board as it is now.
+function backupMode(mode){
+ if(importKind!=='json'||!importBackup||!['merge','replace'].includes(mode))return;
+ importPlan=planBoardBackup(state,importBackup.backup,{mode});
+ modal(tr('导入预览'),importPreviewHtml(importPlan,importBackup.meta),'import-preview');
+ $(`#import-preview [data-action="import-mode"][data-id="${mode}"]`)?.focus();
+}
 function commitImportPlan(plan,meta={},opts={}){
- const restoreKeys=opts.restoreKeys||[];
+ const restoreKeys=opts.restoreKeys||[],backupRun=importKind==='json';
  const applySame=opts.applySame||[];
  const applyCollisions=opts.applyCollisions||[];
  const beforeCount=state.assets.length,beforeIds=new Set(state.assets.map(a=>a.id));
  checkpoint();
- if(importKind==='json')state=applyBoardBackup(state,plan,{restoreKeys});
+ if(backupRun)state=applyBoardBackup(state,plan,{restoreKeys,take:opts.take});
  else state=applyImport(state,plan,{restoreKeys,applySame,applyCollisions});
  if(!Array.isArray(state.deletedExternalIds))state.deletedExternalIds=[];
  const askRdap=rdapAskDue(state.assets.filter(a=>!beforeIds.has(a.id)));if(askRdap)state.rdapAsked=true;
  save();render();
  const added=state.assets.length-beforeCount;
  const updated=(plan.updated||[]).length+(plan.hidden||[]).length+applySame.length+applyCollisions.length;
- const skipped=(plan.skippedSame||[]).length;const parts=[added?tr('新增 {n}',{n:added}):'',updated?tr('更新 {n}',{n:updated}):'',restoreKeys.length?tr('恢复 {n}',{n:restoreKeys.length}):'',skipped?tr('跳过 {n}',{n:skipped}):''].filter(Boolean);
+ const skipped=(plan.skippedSame||[]).length;let parts=[added?tr('新增 {n}',{n:added}):'',updated?tr('更新 {n}',{n:updated}):'',restoreKeys.length?tr('恢复 {n}',{n:restoreKeys.length}):'',skipped?tr('跳过 {n}',{n:skipped}):''].filter(Boolean);
+ if(backupRun){const c=backupCounts(plan,{restoreKeys,take:opts.take}),settings=Object.keys(plan.settings||{}).length;parts=[plan.mode==='replace'?tr('已整体替换'):'',c.added?tr('新增 {n}',{n:c.added}):'',c.updated?tr('更新 {n}',{n:c.updated}):'',c.restored?tr('恢复 {n}',{n:c.restored}):'',c.removed?tr('删除 {n}',{n:c.removed}):'',c.kept?tr('保留本地 {n}',{n:c.kept}):'',settings?tr('看板设置 {n} 项',{n:settings}):''].filter(Boolean);importBackup=null;}
  $('#modal').close();
  if(askRdap)rdapAskToast(parts.join(' · '));else toast(parts.length?parts.join(' · '):tr('没有写入新内容'),true);
  importPlan=null;importKind=null;
@@ -1039,8 +1087,8 @@ function runImportPlan(plan,meta={}){
  const skipped=plan.skippedSame?.length||0;
  // Whenever anything was left out (secret columns, refused rows, fields not imported), the preview says so before anything is written.
  const dropped=(meta.droppedSecrets||[]).length+(meta.refused||[]).length+(meta.leftOut||[]).length;
- const needsPreview=!!(from?.preview||plan.conflicts||(meta.unreadable||[]).length||meta.truncated||dropped||plan.mode==='replace');
- if(from&&!(plan.added||[]).length&&!(plan.updated||[]).length&&!(plan.hidden||[]).length&&!skipped&&!(plan.skippedDeleted||[]).length&&!(meta.unreadable||[]).length&&!dropped){from.used=false;importIntakeId=null;toast(tr('没有可导入的内容'));return;}
+ const needsPreview=!!(plan.preview||from?.preview||plan.conflicts||(meta.unreadable||[]).length||meta.truncated||dropped||plan.mode==='replace');
+ if(from&&!plan.preview&&!(plan.added||[]).length&&!(plan.updated||[]).length&&!(plan.hidden||[]).length&&!skipped&&!(plan.skippedDeleted||[]).length&&!(meta.unreadable||[]).length&&!dropped){from.used=false;importIntakeId=null;toast(tr('没有可导入的内容'));return;}
 
  if(!needsPreview){
   const empty=!(plan.added||[]).length&&!(plan.updated||[]).length&&!(plan.hidden||[]).length;
@@ -1482,7 +1530,7 @@ const agentMethods={
   checkpoint();
   const payment=recordPayment(a,{paidOn:day,amount:value,currency:code,months:months||billingCycles[a.cycle]?.months||own?.months||null,covers:coverDay,via:'agent',status:missed?'missed':'paid',note});
   if(!payment){history.pop();throw new Error('付款记录无效');}
-  a.updatedAt=new Date().toISOString();save();render();if(activeAsset===a.id)showDetail(a.id,{focus:false});
+  touchAsset(a);save();render();if(activeAsset===a.id)showDetail(a.id,{focus:false});
   toast(missed?tr('外部工具记下了「{name}」的未扣款',{name:a.name}):tr('外部工具记下了「{name}」的付款',{name:a.name}),true);
   return {payment,asset:agentAsset(a)};
  },
@@ -1541,7 +1589,7 @@ function agentPrepareUpdate(id,input){
   for(const id of unlinkFrom)unlinkAssets(state.assets,a.id,id);
   const replaced=linkTo.flatMap(id=>linkRelation(state.assets,a.id,id).replaced);
   if('date' in checked.fields||'dateKind' in checked.fields)a.event=agentEvent(a);
-  a.updatedAt=new Date().toISOString();delete a.warn;
+  touchAsset(a);delete a.warn;
   if(icon.iconHost)agentIconFetch(a.id,icon.iconHost);
   return {asset:agentAsset(a),ignored:checked.ignored,...(replaced.length?{replacedAccounts:replaced}:{})};
  }};
@@ -1644,24 +1692,13 @@ window.assetboardAgent=call=>{
  try{return send({ok:true,result:handler(call.params&&typeof call.params==='object'&&!Array.isArray(call.params)?call.params:{})});}
  catch(error){return send({ok:false,error:String(error?.message||error)});}
 };
-function importJsonText(text,{filename='',mode}={}){
+function importJsonText(text,{filename='',mode='merge'}={}){
  const {backup,refused}=screenBackup(parseBoardBackup(text));
  if(!backup.ok){toast(backup.error||tr('无法读取备份'));return;}
- const chosen=mode||'merge';
- const plan=planBoardBackup(state,backup,{mode:chosen});
+ const plan=planBoardBackup(state,backup,{mode});
  if(!plan.ok){toast(plan.error||tr('无法合并备份'));return;}
- if(chosen==='merge'&&!plan.conflicts&&!(plan.added||[]).length&&!(plan.updated||[]).length&&!(plan.hidden||[]).length){
-  // Offer replace when merge would change nothing meaningful but user dropped a backup — still show preview with mode choice.
- }
- importKind='json';
- const modeNote=chosen==='replace'?tr('整体替换'):tr('合并');
- const extra=chosen==='merge'?`<label class="check-label"><input type="checkbox" id="import-replace">${tr('替换整个资产板（可撤销）')}</label>`:'';
- runImportPlan(plan,{note:`${filename?filename+' · ':''}${modeNote}`,unreadable:[],refused});
- // If preview opened, inject replace checkbox
- if($('#import-preview')&&chosen==='merge'){
-  const actions=$('#import-preview .confirm-actions');
-  if(actions&&!$('#import-replace'))actions.insertAdjacentHTML('beforebegin',extra);
- }
+ importKind='json';importBackup={backup,meta:{note:filename,unreadable:[],refused}};
+ runImportPlan(plan,importBackup.meta);
 }
 function importEmlText(raw,{filename=''}={}){
  const parsed=parseEml(raw);
@@ -2320,15 +2357,14 @@ document.addEventListener('click',e=>{const button=e.target.closest('[data-actio
  else if(action==='import-demo-sample'){if(!demoMode)return;importKind='csv';importCsvText(demoImportSampleCsv(),{filename:'demo-sample.csv'});}
  else if(action==='import-apply'){
   if(!importPlan)return;
-  if(importKind==='json'&&$('#import-replace')?.checked){
-   const backup={ok:true,board:importPlan.board};importPlan=planBoardBackup(state,backup,{mode:'replace'});
-  }
   const restoreKeys=[...document.querySelectorAll('input[name="import-restore"]:checked')].map(input=>input.value);
   const applySame=[...document.querySelectorAll('input[name="import-same"]:checked')].map(input=>input.value);
   const fromIntake=importIntakeId;
-  commitImportPlan(importPlan,{},{restoreKeys,applySame,applyCollisions:applySame});
+  const take=importKind==='json'&&importPlan.mode==='merge'?[...document.querySelectorAll('input[name="import-take"]:checked')].map(input=>input.value):undefined;
+  commitImportPlan(importPlan,{},{restoreKeys,applySame,applyCollisions:applySame,take});
   if(fromIntake)drainIntake();
  }
+ else if(action==='import-mode')backupMode(id);
  else if(action==='manual-import')captureDialog();
  else if(action==='capture-go')captureGo();
  else if(action==='capture-manual')captureGo(true);
@@ -2359,13 +2395,13 @@ document.addEventListener('click',e=>{const button=e.target.closest('[data-actio
  else if(action==='settings')settings(id);
  else if(action==='toggle-hidden')setView('hidden');
  else if(action==='toggle-stopped')toggleStopped(id);
- else if(action==='hide-asset'){const a=state.assets.find(a=>a.id===id);if(!a||a.hiddenAt)return;checkpoint();a.hiddenAt=new Date().toISOString();save();if(activeAsset===id)closeDetail();render();const impact=linkImpact(state.assets,a),links=linkedAssets(state.assets,a).filter(x=>!x.hiddenAt).length;toast((impact.length?tr('已隐藏，它仍是 {n} 项的{role}',{n:formatCount(impact.length),role:IMPACT_WORDS[a.type].role}):links?tr('已隐藏，{n} 项关联保留',{n:formatCount(links)}):tr('已隐藏'))+icpNote(a),true);}
- else if(action==='restore-asset'){const a=state.assets.find(a=>a.id===id),fromBoard=!!button.closest('#board');if(!a)return;checkpoint();delete a.hiddenAt;save();if(activeAsset===id)showDetail(id);render();if(fromBoard)(document.querySelector(`#board [data-asset="${CSS.escape(id)}"] .item-open`)||document.querySelector('#board [data-action="restore-asset"]')||$('#sidebar .nav-item.active'))?.focus();toast(tr('已恢复显示'),true);}
+ else if(action==='hide-asset'){const a=state.assets.find(a=>a.id===id);if(!a||a.hiddenAt)return;checkpoint();a.hiddenAt=new Date().toISOString();touchAsset(a);save();if(activeAsset===id)closeDetail();render();const impact=linkImpact(state.assets,a),links=linkedAssets(state.assets,a).filter(x=>!x.hiddenAt).length;toast((impact.length?tr('已隐藏，它仍是 {n} 项的{role}',{n:formatCount(impact.length),role:IMPACT_WORDS[a.type].role}):links?tr('已隐藏，{n} 项关联保留',{n:formatCount(links)}):tr('已隐藏'))+icpNote(a),true);}
+ else if(action==='restore-asset'){const a=state.assets.find(a=>a.id===id),fromBoard=!!button.closest('#board');if(!a)return;checkpoint();delete a.hiddenAt;touchAsset(a);save();if(activeAsset===id)showDetail(id);render();if(fromBoard)(document.querySelector(`#board [data-asset="${CSS.escape(id)}"] .item-open`)||document.querySelector('#board [data-action="restore-asset"]')||$('#sidebar .nav-item.active'))?.focus();toast(tr('已恢复显示'),true);}
  else if(action==='delete-asset')confirmDeleteAsset(id);
  else if(action==='remove-block'){if(state.assets.some(a=>a.type===id))return;checkpoint();state.blocks=state.blocks.filter(b=>b.id!==id);save();$('#modal').close();render();toast(tr('已从侧边栏移除'),true);}
  else if(action==='move-up'||action==='move-down'){moveBlock(id,action==='move-up'?-1:1);$('#modal').close();}
 });
-document.addEventListener('submit',async e=>{if(e.target.id!=='asset-form')return;e.preventDefault();const form=e.target,data=new FormData(form),name=String(data.get('name')).trim(),url=String(data.get('url')).trim(),file=form.elements.icon.files[0];if(!name)return;const leaked=['name','provider','account','purpose','reason','cost','notes'].find(key=>looksLikeCardNumber(data.get(key)));if(leaked){const input=form.elements[leaked];input.setCustomValidity(tr('这里像是完整卡号。Assetboard 只保存卡号后 4 位，请删掉后再保存。'));input.reportValidity();input.addEventListener('input',()=>input.setCustomValidity(''),{once:true});return;}if(url&&!safeManagementUrl(url)){form.elements.url.setCustomValidity(tr('请输入不含账号密码的 http 或 https 链接'));form.elements.url.reportValidity();return;}form.elements.url.setCustomValidity('');const entryChecks=[['amount',text=>{const t=text.trim().replace(/,/g,'');return !t||/^\d+(\.\d{1,2})?$/.test(t);},tr('请填写数字金额，例如 89 或 10.98')],['date',text=>!text.trim()||!!parseLooseDate(text),tr('日期无法识别，例如 2027-03-01 或 3/1')],['regionText',text=>!text.trim()||!!form.elements.region.value,tr('请从列表里选择国家或地区')]];for(const [field,ok,message] of entryChecks){const input=form.elements[field];if(!input||input.type==='hidden')continue;input.setCustomValidity(ok(input.value)?'':message);if(!input.checkValidity()){input.reportValidity();input.addEventListener('input',()=>input.setCustomValidity(''),{once:true});return;}}const actionHints={host:tr('请填写主机名或 IP，例如 203.0.113.10'),ips:tr('最多 4 个有效 IP，用逗号或空格分隔'),sshUser:tr('SSH 用户只能包含字母、数字和 _ . -'),sshPort:tr('端口是 1 到 65535 之间的数字'),localPath:tr('请填写以 / 或 ~/ 开头的本机目录'),dnsHost:tr('只写服务商名字，最多 60 字'),icp:tr('备案号要带 ICP，例如 京ICP备00000000号')};for(const key of Object.keys(actionHints)){const input=form.elements[key];if(!input)continue;input.setCustomValidity(validActionField(key,input.value)?'':actionHints[key]);if(!input.checkValidity()){input.reportValidity();input.addEventListener('input',()=>input.setCustomValidity(''),{once:true});return;}}if(file&&(!['image/png','image/jpeg','image/webp'].includes(file.type)||file.size>256*1024)){toast(tr('图标需为 PNG、JPEG 或 WebP，且不超过 256 KB'));return;}const submit=form.querySelector('[type="submit"]');submit.disabled=true;try{const iconData=file?await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=reject;reader.readAsDataURL(file);}):null;const id=form.dataset.id,chosen=String(data.get('type')||''),type=cats[chosen]?chosen:form.dataset.type,candidateKey=form.dataset.candidate,candidateItem=form.dataset.item===''||form.dataset.item===undefined?null:Number(form.dataset.item),profile=assetProfiles[type]||{},date=data.has('expiry')?cardExpiry(data.get('expiry'))||'':parseLooseDate(data.get('date')??''),dateKind=data.has('expiry')?'expire':dateKinds[data.get('dateKind')]?String(data.get('dateKind')):'expire',cycle=billingCycles[data.get('cycle')]?String(data.get('cycle')):'',extras=Object.fromEntries((profile.extra||[]).map(key=>[key,String(data.get(key)??'').trim()])),fields={name,provider:profile.fixedProvider||String(data.get('provider')??'').trim()||(assetProfiles[type]?'':'平台待补充'),account:String(data.get('account')).trim(),purpose:String(data.get('purpose')).trim(),reason:String(data.get('reason')||'').trim(),date,dateKind,cycle,cost:costFromForm(data,cycle),notes:String(data.get('notes')).trim(),url:url?safeManagementUrl(url):''},event=date?`${date} ${dateKinds[dateKind].future}`:'日期待补充';if(extras.region&&!regionName(extras.region))extras.region='';if(extras.last4&&!/^\d{4}$/.test(extras.last4))extras.last4='';if(extras.network&&!cardNetworks.includes(extras.network))extras.network='';if(extras.cardStatus&&!CARD_STATUSES[extras.cardStatus])extras.cardStatus='';if(extras.phoneStatus&&!PHONE_STATUSES[extras.phoneStatus])extras.phoneStatus='';if(extras.phone)extras.phone=extras.phone.slice(0,30);Object.assign(fields,extras);const money=moneyFromForm(form,data,id?state.assets.find(x=>x.id===id):null);if(!money)return;Object.assign(fields,money);for(const [key] of ACTION_FIELDS[type]||[])if(data.has(key))fields[key]=key==='ips'?parseIps(data.get(key)).ips.map(x=>x.ip):String(data.get(key)).trim();const keep=keepFromForm(form,data,type);if(!keep)return;Object.assign(fields,keep);checkpoint();let assetId=id;if(id){const a=state.assets.find(a=>a.id===id);const synced=PLATFORM_SOURCES.includes(a.source);if(a.source==='cloudflare'&&a.syncName==null)a.syncName=a.name;Object.assign(a,fields);clearEmptyFields(a);for(const key of ['region','last4','network','cardStatus','phone','phoneStatus'])if(!(key in extras))delete a[key];if(file)a.iconData=iconData;else if(data.has('removeIcon'))delete a.iconData;if(!synced){a.source='manual';a.type=type;a.event=event;a.updatedAt=new Date().toISOString();}delete a.warn;ensureBlock(state,a.type);}else{assetId='asset-'+crypto.randomUUID();state.assets.push(clearEmptyFields({id:assetId,type,...fields,iconData,source:'manual',event,art:'generic',createdAt:new Date().toISOString()}));if(state.cardOrder?.[type]?.length)state.cardOrder[type].unshift(assetId);ensureBlock(state,type);}const resolved=candidateKey?resolveCandidate(candidateKey,id?'linked':'created',assetId,candidateItem):0;assetFormSnapshot=null;save();render();if(id&&activeAsset===id)showDetail(id);const source=candidateKey&&findCandidate(candidateKey),items=source?.ai?.items||[],recorded=items.length>1?recordedItems(source):[],next=items.length>1?items.findIndex((_,index)=>!recorded.includes(index)):-1;if(next>=0){candidateReview(source,next);toast(tr('已记录，这份资料里还有 {n} 项',{n:items.length-recorded.length}),true);}else if(candidateKey&&nativeStore&&pendingCount()){inboxDialog(false);toast(resolved?tr('已记录，继续核对下一组'):tr('已记录'),true);}else{$('#modal').close();toast(id?tr('资料已更新'):tr('资产已添加'),true);}}catch{toast(tr('读取图标失败，请重试'));}finally{submit.disabled=false;}});
+document.addEventListener('submit',async e=>{if(e.target.id!=='asset-form')return;e.preventDefault();const form=e.target,data=new FormData(form),name=String(data.get('name')).trim(),url=String(data.get('url')).trim(),file=form.elements.icon.files[0];if(!name)return;const leaked=['name','provider','account','purpose','reason','cost','notes'].find(key=>looksLikeCardNumber(data.get(key)));if(leaked){const input=form.elements[leaked];input.setCustomValidity(tr('这里像是完整卡号。Assetboard 只保存卡号后 4 位，请删掉后再保存。'));input.reportValidity();input.addEventListener('input',()=>input.setCustomValidity(''),{once:true});return;}if(url&&!safeManagementUrl(url)){form.elements.url.setCustomValidity(tr('请输入不含账号密码的 http 或 https 链接'));form.elements.url.reportValidity();return;}form.elements.url.setCustomValidity('');const entryChecks=[['amount',text=>{const t=text.trim().replace(/,/g,'');return !t||/^\d+(\.\d{1,2})?$/.test(t);},tr('请填写数字金额，例如 89 或 10.98')],['date',text=>!text.trim()||!!parseLooseDate(text),tr('日期无法识别，例如 2027-03-01 或 3/1')],['regionText',text=>!text.trim()||!!form.elements.region.value,tr('请从列表里选择国家或地区')]];for(const [field,ok,message] of entryChecks){const input=form.elements[field];if(!input||input.type==='hidden')continue;input.setCustomValidity(ok(input.value)?'':message);if(!input.checkValidity()){input.reportValidity();input.addEventListener('input',()=>input.setCustomValidity(''),{once:true});return;}}const actionHints={host:tr('请填写主机名或 IP，例如 203.0.113.10'),ips:tr('最多 4 个有效 IP，用逗号或空格分隔'),sshUser:tr('SSH 用户只能包含字母、数字和 _ . -'),sshPort:tr('端口是 1 到 65535 之间的数字'),localPath:tr('请填写以 / 或 ~/ 开头的本机目录'),dnsHost:tr('只写服务商名字，最多 60 字'),icp:tr('备案号要带 ICP，例如 京ICP备00000000号')};for(const key of Object.keys(actionHints)){const input=form.elements[key];if(!input)continue;input.setCustomValidity(validActionField(key,input.value)?'':actionHints[key]);if(!input.checkValidity()){input.reportValidity();input.addEventListener('input',()=>input.setCustomValidity(''),{once:true});return;}}if(file&&(!['image/png','image/jpeg','image/webp'].includes(file.type)||file.size>256*1024)){toast(tr('图标需为 PNG、JPEG 或 WebP，且不超过 256 KB'));return;}const submit=form.querySelector('[type="submit"]');submit.disabled=true;try{const iconData=file?await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=reject;reader.readAsDataURL(file);}):null;const id=form.dataset.id,chosen=String(data.get('type')||''),type=cats[chosen]?chosen:form.dataset.type,candidateKey=form.dataset.candidate,candidateItem=form.dataset.item===''||form.dataset.item===undefined?null:Number(form.dataset.item),profile=assetProfiles[type]||{},date=data.has('expiry')?cardExpiry(data.get('expiry'))||'':parseLooseDate(data.get('date')??''),dateKind=data.has('expiry')?'expire':dateKinds[data.get('dateKind')]?String(data.get('dateKind')):'expire',cycle=billingCycles[data.get('cycle')]?String(data.get('cycle')):'',extras=Object.fromEntries((profile.extra||[]).map(key=>[key,String(data.get(key)??'').trim()])),fields={name,provider:profile.fixedProvider||String(data.get('provider')??'').trim()||(assetProfiles[type]?'':'平台待补充'),account:String(data.get('account')).trim(),purpose:String(data.get('purpose')).trim(),reason:String(data.get('reason')||'').trim(),date,dateKind,cycle,cost:costFromForm(data,cycle),notes:String(data.get('notes')).trim(),url:url?safeManagementUrl(url):''},event=date?`${date} ${dateKinds[dateKind].future}`:'日期待补充';if(extras.region&&!regionName(extras.region))extras.region='';if(extras.last4&&!/^\d{4}$/.test(extras.last4))extras.last4='';if(extras.network&&!cardNetworks.includes(extras.network))extras.network='';if(extras.cardStatus&&!CARD_STATUSES[extras.cardStatus])extras.cardStatus='';if(extras.phoneStatus&&!PHONE_STATUSES[extras.phoneStatus])extras.phoneStatus='';if(extras.phone)extras.phone=extras.phone.slice(0,30);Object.assign(fields,extras);const money=moneyFromForm(form,data,id?state.assets.find(x=>x.id===id):null);if(!money)return;Object.assign(fields,money);for(const [key] of ACTION_FIELDS[type]||[])if(data.has(key))fields[key]=key==='ips'?parseIps(data.get(key)).ips.map(x=>x.ip):String(data.get(key)).trim();const keep=keepFromForm(form,data,type);if(!keep)return;Object.assign(fields,keep);checkpoint();let assetId=id;if(id){const a=state.assets.find(a=>a.id===id);const synced=PLATFORM_SOURCES.includes(a.source);if(a.source==='cloudflare'&&a.syncName==null)a.syncName=a.name;Object.assign(a,fields);clearEmptyFields(a);for(const key of ['region','last4','network','cardStatus','phone','phoneStatus'])if(!(key in extras))delete a[key];if(file)a.iconData=iconData;else if(data.has('removeIcon'))delete a.iconData;if(!synced){a.source='manual';a.type=type;a.event=event;}touchAsset(a);delete a.warn;ensureBlock(state,a.type);}else{assetId='asset-'+crypto.randomUUID();state.assets.push(clearEmptyFields({id:assetId,type,...fields,iconData,source:'manual',event,art:'generic',createdAt:new Date().toISOString()}));if(state.cardOrder?.[type]?.length)state.cardOrder[type].unshift(assetId);ensureBlock(state,type);}const resolved=candidateKey?resolveCandidate(candidateKey,id?'linked':'created',assetId,candidateItem):0;assetFormSnapshot=null;save();render();if(id&&activeAsset===id)showDetail(id);const source=candidateKey&&findCandidate(candidateKey),items=source?.ai?.items||[],recorded=items.length>1?recordedItems(source):[],next=items.length>1?items.findIndex((_,index)=>!recorded.includes(index)):-1;if(next>=0){candidateReview(source,next);toast(tr('已记录，这份资料里还有 {n} 项',{n:items.length-recorded.length}),true);}else if(candidateKey&&nativeStore&&pendingCount()){inboxDialog(false);toast(resolved?tr('已记录，继续核对下一组'):tr('已记录'),true);}else{$('#modal').close();toast(id?tr('资料已更新'):tr('资产已添加'),true);}}catch{toast(tr('读取图标失败，请重试'));}finally{submit.disabled=false;}});
 setIconButton($('#add-block'),'plus',tr('添加资产'));document.querySelectorAll('#layout-toggle [data-action="layout"]').forEach(b=>b.innerHTML=ui(b.dataset.id==='grid'?'tiles':'list'));$('#view-menu').innerHTML=ui('more');setIconButton($('#import-button'),'download',tr('导入'));$('#add-block').onclick=addAsset;$('#close-modal').onclick=()=>requestCloseModal();$('#close-detail').onclick=closeDetail;$('#modal').addEventListener('cancel',e=>{if(isAssetFormDirty()){e.preventDefault();requestCloseModal();}else assetFormSnapshot=null;});
 $('#search').oninput=e=>{query=e.target.value;render();};$('#clear-search').onclick=()=>{if(query){$('#search').value='';query='';render();}else addAsset();};
 // Keyboard map (DESIGN-PRINCIPLES §4 rule 4). Letter keys never act while typing, with a dialog open, or with ⌘/⌃/⌥ held.
@@ -2566,7 +2602,7 @@ function finishCross(g,type){
  const a=g.asset;
  cleanupDrag(g);
  if(!a||!cats[type]){render();return;}
- checkpoint();a.type=type;ensureBlock(state,type);
+ checkpoint();a.type=type;touchAsset(a);ensureBlock(state,type);
  if(state.cardOrder){for(const key of Object.keys(state.cardOrder))state.cardOrder[key]=(state.cardOrder[key]||[]).filter(id=>id!==a.id);if(state.cardOrder[type]?.length)state.cardOrder[type].push(a.id);}
  save();render();
  const target=document.querySelector(`#sidebar .nav-item[data-block="${CSS.escape(type)}"]`);
