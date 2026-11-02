@@ -22,12 +22,11 @@ DOWNLOAD = "https://assetboard.app/"
 MAIL_FROM = "Assetboard <licenses@assetboard.app>"   # the domain must be verified at Resend first
 MAIL_REPLY_TO = "assetboard@163.com"                 # where "reply to this email" (refunds, questions) lands
 # Pro is US$10, one purchase, lifetime updates; the webhook issues a licence only for 1000 USD cents of PRO_PRODUCT (worker.mjs, PRO_PRICE).
-# Placeholders until the owner creates the US$10 Payment Link in Stripe: its https://buy.stripe.com/… address (the same as PRO_BUY_URL in
-# pro/web/license-pro.js) and the product id it sells.
+# The Payment Link must match PRO_BUY_URL in pro/web/license-pro.js and sell the product below.
 PAYMENT_LINK = "https://buy.stripe.com/8x23cx2uJ1iO4YUeuadMI02"
-PRO_PRODUCT = "prod_PRODUCT_PLACEHOLDER"
+PRO_PRODUCT = "prod_VV5C5gjBbt3sqZ"
 
-# Placeholder: `wrangler kv namespace create LICENSES` prints the id to put here.
+# Production licence store in the assetboard.app Cloudflare account.
 [[kv_namespaces]]
 binding = "LICENSES"
-id = "KV_NAMESPACE_ID_PLACEHOLDER"
+id = "6c0669ced62d4c7089f70db04c1971f9"
