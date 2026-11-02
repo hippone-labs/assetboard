@@ -10,15 +10,27 @@ free=0
 swift_flags=()
 (( free )) && swift_flags=(-D ASSETBOARD_FREE)
 app_dir="$out_dir/Assetboard.app"
+# The oldest macOS the app runs on comes from LSMinimumSystemVersion. Without -target, swiftc builds for the macOS of the build
+# machine, and dyld then stops the app at launch on every older system.
+min_macos="$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "$project_dir/desktop/Info.plist")"
+target=(-target "arm64-apple-macos$min_macos")
 # Start from an empty bundle: files left by an older build (or the other edition) must not ship.
 rm -rf "$app_dir"
 mkdir -p "$app_dir/Contents/MacOS" "$app_dir/Contents/Resources/Board"
-xcrun swiftc "$project_dir/desktop/Assetboard.swift" "$project_dir/desktop/Localization.swift" "$project_dir/desktop/LocalizationEN.swift" "$project_dir/desktop/CloudflareInventory.swift" "$project_dir/desktop/ProbeSource.swift" "$project_dir/desktop/SSHProbe.swift" "$project_dir/desktop/LocalDatabase.swift" "$project_dir/desktop/OCRImporter.swift" "$project_dir/desktop/AIRecognizer.swift" "$project_dir/desktop/IconFetcher.swift" "$project_dir/desktop/LocalCLI.swift" "$project_dir/desktop/AgentInbox.swift" "$project_dir/desktop/AgentSocket.swift" "$project_dir/desktop/NetworkLog.swift" "$project_dir/desktop/ExchangeRates.swift" "$project_dir/desktop/Reminders.swift" "$project_dir/desktop/MoneyBridge.swift" "$project_dir/desktop/Updater.swift" "$project_dir/desktop/WindowChrome.swift" "${swift_flags[@]}" -o "$app_dir/Contents/MacOS/Assetboard" -framework Cocoa -framework WebKit -framework UserNotifications -framework PDFKit -framework Vision -lsqlite3 -O
+xcrun swiftc "${target[@]}" "$project_dir/desktop/Assetboard.swift" "$project_dir/desktop/Localization.swift" "$project_dir/desktop/LocalizationEN.swift" "$project_dir/desktop/CloudflareInventory.swift" "$project_dir/desktop/ProbeSource.swift" "$project_dir/desktop/SSHProbe.swift" "$project_dir/desktop/LocalDatabase.swift" "$project_dir/desktop/OCRImporter.swift" "$project_dir/desktop/AIRecognizer.swift" "$project_dir/desktop/IconFetcher.swift" "$project_dir/desktop/LocalCLI.swift" "$project_dir/desktop/AgentInbox.swift" "$project_dir/desktop/AgentSocket.swift" "$project_dir/desktop/NetworkLog.swift" "$project_dir/desktop/ExchangeRates.swift" "$project_dir/desktop/Reminders.swift" "$project_dir/desktop/MoneyBridge.swift" "$project_dir/desktop/Updater.swift" "$project_dir/desktop/WindowChrome.swift" "${swift_flags[@]}" -o "$app_dir/Contents/MacOS/Assetboard" -framework Cocoa -framework WebKit -framework UserNotifications -framework PDFKit -framework Vision -lsqlite3 -O
 # The command line and MCP server for agents; it only talks to the running app over its local socket.
 if (( ! free )); then
-  xcrun swiftc -parse-as-library "$project_dir/desktop/AssetboardCLI.swift" "$project_dir/desktop/Localization.swift" "$project_dir/desktop/LocalizationEN.swift" "$project_dir/desktop/AgentSocket.swift" -o "$app_dir/Contents/MacOS/assetboard-cli" -O
+  xcrun swiftc "${target[@]}" -parse-as-library "$project_dir/desktop/AssetboardCLI.swift" "$project_dir/desktop/Localization.swift" "$project_dir/desktop/LocalizationEN.swift" "$project_dir/desktop/AgentSocket.swift" -o "$app_dir/Contents/MacOS/assetboard-cli" -O
 fi
 cp "$project_dir/desktop/Info.plist" "$app_dir/Contents/Info.plist"
+# Every binary must be built for exactly that system (15.0 and 15 are the same).
+version_core() { local v="$1"; while [[ "$v" == *.0 ]]; do v="${v%.0}"; done; print -r -- "$v"; }
+for bin in "$app_dir"/Contents/MacOS/*; do
+  minos="$(xcrun vtool -show-build "$bin" | awk '$1 == "minos" { print $2; exit }')"
+  if [[ "$(version_core "$minos")" != "$(version_core "$min_macos")" ]]; then
+    print -u2 "${bin:t} is built for macOS ${minos:-unknown}, but LSMinimumSystemVersion is $min_macos"; exit 1
+  fi
+done
 # The localizations macOS reads itself: Info.plist text (document type, Services menu); the rest is Localization.swift.
 cp -R "$project_dir/desktop/en.lproj" "$project_dir/desktop/zh-Hans.lproj" "$app_dir/Contents/Resources/"
 cp "$project_dir/index.html" "$project_dir/styles.css" "$project_dir/material.css" "$project_dir/app.js" "$project_dir/money-view.js" "$app_dir/Contents/Resources/Board/"
