@@ -1,6 +1,7 @@
-# Tests every push and pull request on GitHub-hosted runners only: the web tests on Ubuntu, then the Swift build and self-tests
-# of both editions on macOS 15, the oldest system the app supports (LSMinimumSystemVersion), so the WebKit and system libraries
-# under test are the ones a user at the minimum has. No job here runs on the self-hosted Mac mini that holds the signing keychain.
+# Tests every push and pull request: the web tests on a GitHub-hosted Ubuntu runner, and the Swift build and self-tests of both
+# editions on the self-hosted Mac labelled hans-mac (it holds no signing keychain; signing and releases stay on assetboard-mini).
+# Before a release, run it by hand with "Minimum system" ticked: the Swift job then runs on GitHub-hosted macOS 15, the oldest
+# system the app supports (LSMinimumSystemVersion), so the WebKit and system libraries under test are the ones a user at the minimum has.
 name: build
 
 on:
@@ -8,6 +9,11 @@ on:
     branches: [main, 'cc/**']
   pull_request:
   workflow_dispatch:
+    inputs:
+      min_os:
+        description: Minimum system (run the Swift job on GitHub-hosted macOS 15)
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -69,7 +75,7 @@ jobs:
           retention-days: 7
 
   mac:
-    runs-on: macos-15
+    runs-on: ${{ inputs.min_os && 'macos-15' || fromJSON('["self-hosted","macOS","ARM64","hans-mac"]') }}
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
