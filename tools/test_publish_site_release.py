@@ -1,8 +1,10 @@
 import hashlib
 import importlib.util
 import json
+import plistlib
 import tempfile
 import unittest
+import zipfile
 from pathlib import Path
 
 spec = importlib.util.spec_from_file_location('publish_site_release', Path(__file__).with_name('publish-site-release.py'))
@@ -24,13 +26,20 @@ class ReleaseTests(unittest.TestCase):
         (self.site / 'downloads/index.html').write_text('<ul><li>Previous release</li></ul>')
         (self.site / 'downloads/latest.json').write_text(json.dumps({'version': '0.6.2'}))
         self.archive = root / 'Assetboard-macOS-arm64-0.6.3.zip'
-        self.archive.write_bytes(b'final stapled archive')
+        self.pack({'CFBundleShortVersionString': '0.6.3', 'LSMinimumSystemVersion': '15.0'})
+
+    def pack(self, info):
+        with zipfile.ZipFile(self.archive, 'w') as bundle:
+            if info is not None:
+                bundle.writestr('Assetboard.app/Contents/Info.plist', plistlib.dumps(info))
+            bundle.writestr('Assetboard.app/Contents/MacOS/Assetboard', b'final stapled archive')
 
     def test_stages_final_hash_notes_and_both_pages(self):
         publisher.stage(self.site, self.archive, '0.6.3', 'Release notes')
         manifest = json.loads((self.site / 'downloads/latest.json').read_text())
         self.assertEqual(manifest['version'], '0.6.3')
         self.assertEqual(manifest['notes'], 'Release notes')
+        self.assertEqual(manifest['minimumSystemVersion'], '15.0')
         self.assertEqual(manifest['assets'][0]['sha256'], hashlib.sha256(self.archive.read_bytes()).hexdigest())
         self.assertEqual((self.site / 'downloads' / self.archive.name).read_bytes(), self.archive.read_bytes())
         for path in ['index.html', 'en/index.html']:
@@ -54,6 +63,18 @@ class ReleaseTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'layout'):
             publisher.stage(self.site, self.archive, '0.6.3', 'Notes')
         self.assertFalse(destination.exists())
+
+    def test_minimum_system_comes_from_the_app_in_the_archive(self):
+        for info, message in [(None, 'Info.plist'), ({'CFBundleShortVersionString': '0.6.2', 'LSMinimumSystemVersion': '15.0'}, 'CFBundleShortVersionString'),
+                              ({'CFBundleShortVersionString': '0.6.3'}, 'LSMinimumSystemVersion'),
+                              ({'CFBundleShortVersionString': '0.6.3', 'LSMinimumSystemVersion': 'fifteen'}, 'LSMinimumSystemVersion')]:
+            self.pack(info)
+            with self.assertRaisesRegex(ValueError, message):
+                publisher.stage(self.site, self.archive, '0.6.3', 'Notes')
+            self.assertFalse((self.site / 'downloads' / self.archive.name).exists())
+        self.archive.write_bytes(b'not a zip')
+        with self.assertRaisesRegex(ValueError, 'Info.plist'):
+            publisher.stage(self.site, self.archive, '0.6.3', 'Notes')
 
     def test_rejects_invalid_version_and_missing_archive(self):
         with self.assertRaisesRegex(ValueError, 'stable'):
