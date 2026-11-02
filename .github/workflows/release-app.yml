@@ -66,7 +66,7 @@ jobs:
           # Reuse the runner's existing GitHub login; never copy its personal token into repository secrets.
           gh api repos/hippone/assetboard-site --jq '.permissions.push' | grep -qx true
           site="$(mktemp -d "$RUNNER_TEMP/assetboard-site.XXXXXX")"
-          gh repo clone hippone/assetboard-site "$site" -- --depth=1
+          git -c credential.helper= -c 'credential.helper=!gh auth git-credential' clone --depth=1 https://github.com/hippone/assetboard-site.git "$site"
           VERSION="$version" SITE_DIR="$site" python3 - <<'PY'
           import json, os
           from pathlib import Path
