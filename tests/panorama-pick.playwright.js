@@ -14,7 +14,7 @@ async (page) => {
   const pick=await p.evaluate(()=>({open:$('#modal').open,title:$('#modal-title').textContent,groups:[...document.querySelectorAll('#pano-pick .link-group-title')].map(n=>n.textContent),rows:document.querySelectorAll('#pano-pick .pano-pick-row').length,checked:document.querySelectorAll('#pano-pick :checked').length,focus:document.activeElement?.id}));
   check(pick.open&&pick.title==='挂到「home-nas」'&&pick.groups.join()==='域名,仓库,数据库'&&pick.rows>4&&pick.checked===0&&pick.focus==='pano-pick-search','The picker lists what may hang on the server, grouped, nothing ticked, search focused: '+JSON.stringify(pick));
   // Search narrows the list; ticking shows the running change.
-  await p.fill('#pano-pick-search','sample-shop');await p.waitForTimeout(80);
+  await p.fill('#pano-pick-search','shop.example');await p.waitForTimeout(80);
   check(await p.evaluate(()=>[...document.querySelectorAll('#pano-pick .pano-pick-row:not([hidden])')].map(r=>r.querySelector('input').value).join())==='demo-d3','Search narrows to the one domain');
   await p.check('#pano-pick input[value="demo-d3"]');await p.fill('#pano-pick-search','');await p.dispatchEvent('#pano-pick-search','input');
   await p.check('#pano-pick input[value="demo-db1"]');

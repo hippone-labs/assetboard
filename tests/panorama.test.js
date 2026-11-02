@@ -6,7 +6,7 @@ function board(){
  const a=[
   {id:'s1',type:'server',name:'tokyo',updatedAt:ago(2),ips:['203.0.113.10','2001:db8::10'],date:day(10),dateKind:'renew'},
   {id:'s2',type:'server',name:'osaka',updatedAt:ago(9),ips:['198.51.100.24'],date:day(-1),dateKind:'renew'},
-  {id:'s3',type:'server',name:'nas',updatedAt:ago(30),ips:['192.168.1.20']},
+  {id:'s3',type:'server',name:'nas',updatedAt:ago(30),ips:['10.0.0.20']},
   {id:'s4',type:'server',name:'frankfurt',updatedAt:ago(5),ips:['198.51.100.9'],date:day(200),dateKind:'renew'},
   {id:'u1',type:'subscription',name:'Vultr',updatedAt:ago(1),date:day(5),dateKind:'renew'},{id:'u2',type:'subscription',name:'Hetzner',updatedAt:ago(1)},
   ...Array.from({length:6},(_,i)=>({id:'d'+i,type:'domain',name:'d'+i+'.test',updatedAt:ago(i+1)})),
