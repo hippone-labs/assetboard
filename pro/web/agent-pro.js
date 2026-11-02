@@ -1,11 +1,12 @@
 // Pro: the agent interface (assetboard-cli / MCP) for the probe sources, SSH 直读, site icons and the Cloudflare sync. The methods join
 // app.js's agentMethods through proSlots.agentMethods and answer at once; what takes time (reading a panel, an ssh run, fetching
-// icons, a sync) answers checking / refreshing / fetching / syncing and is looked up afterwards with the list and status methods.
-// Credentials never pass here: no method takes a user name, password, token or session, none returns one, and errors are fixed words
-// rather than what a panel or ssh said (an ssh error line can name the host, the address or the user). Asking to remove a probe
-// source, to turn on SSH 直读 for a host (the app then connects with the person's own keys) or to let a sync add back what was deleted
-// waits for the person (agentRequestConfirm in app.js). Settings kept on the Mac (probe sources, SSH 直读 switches and interval) are
-// outside undo; what is board data (hand links to probes, a platform's icon site, icons, the sync blocklist) undoes with ⌘Z.
+// icons, a sync) answers refreshing / fetching / syncing and is looked up afterwards with the list and status methods.
+// Probe sources and SSH 直读 are read and refreshed only: adding, changing or removing a source, switching a host and setting the
+// interval are done in the app, so no call can point the app at a new address or lend it the person's keys. Credentials never pass
+// here: no method takes a user name, password, token or session, none returns one, and errors are fixed words rather than what a
+// panel or ssh said (an ssh error line can name the host, the address or the user). A panel's address is masked like a record's
+// host (agentShown in app.js). Letting a sync add back what was deleted waits for the person (agentRequestConfirm in app.js).
+// What is board data (hand links to probes, a platform's icon site, icons, the sync blocklist) undoes with ⌘Z.
 // Loaded after probe-ssh-pro.js and before app.js; with ?free it registers nothing.
 
 const AGENT_SECRET_KEYS=['username','user','password','pass','token','apiToken','jwt','session','cookie','login','credential','credentials','secret','key'];
@@ -36,15 +37,11 @@ function agentProbeSourceState(s){
 }
 function agentProbeSource(s){
  const st=probe.state.get(s.id)||{},linked=[...probe.links.values()].filter(x=>x.source===s.id).length;
- return {id:s.id,name:s.name,kind:s.kind,kindName:probeData.PROBE_KINDS[s.kind]?.name||s.kind,url:s.url,hasLogin:!!s.hasLogin,...agentProbeSourceState(s),
+ const open=featureOn('agentAddresses'),host=(()=>{try{return new URL(s.url).host;}catch{return '';}})();
+ return {id:s.id,name:open||s.name!==host?s.name:maskValue('host',s.name),kind:s.kind,kindName:probeData.PROBE_KINDS[s.kind]?.name||s.kind,url:open?s.url:maskValue('url',s.url),hasLogin:!!s.hasLogin,...agentProbeSourceState(s),
   servers:st.servers?.length||0,linked,updatedAt:agentIso(st.at),live:probe.live.get(s.id)?.state==='open'};
 }
 function agentProbeFind(id){const s=probe.sources.find(x=>x.id===id);if(!s)throw new Error(tr('找不到探针数据源 {id}',{id:String(id).slice(0,64)}));return s;}
-function agentProbeName(raw){
- if(raw===undefined||raw===null)return '';
- if(typeof raw!=='string'||raw.trim().length>60)throw new Error(tr('name 需要是文字，最多 60 字'));
- return raw.trim();
-}
 // Every server the sources read (panels first, then SSH 直读), with the card it shows on.
 function agentProbeServers(){
  const byKey=new Map([...probe.links].map(([assetId,x])=>[x.key,{assetId,how:x.how}]));
@@ -151,12 +148,6 @@ proRegister(()=>{
   probeLink:(raw,a)=>{try{return {value:agentProbeLinkValue(raw,a),after:agentProbeLinked};}catch(error){return {error:error.message};}}
  });
  Object.assign(proSlots.agentConfirms,{
-  probeRemove:{title:n=>n===1?tr('删除探针数据源？'):tr('删除 {n} 个探针数据源？',{n:formatCount(n)}),label:t=>tr('删除探针数据源「{name}」',{name:t.name}),
-   note:tr('只删除 Assetboard 里的设置和钥匙串里的面板账号，不动面板；手动关联会保留。'),
-   apply:t=>{if(!probe.sources.some(s=>s.id===t.id))return tr('数据源已不存在');probeSend({action:'probeRemove',id:t.id});return '';}},
-  sshEnable:{title:n=>n===1?tr('开启 SSH 直读？'):tr('开启 {n} 台主机的 SSH 直读？',{n:formatCount(n)}),label:t=>tr('开启 SSH 直读：{alias}',{alias:t.name}),
-   note:tr('开启后，Assetboard 用你的 ~/.ssh/config 和密钥连接这台主机，运行一条固定的只读命令。这相当于让外部工具借用你的钥匙连服务器：只在你信任这个请求时允许。'),
-   apply:t=>{if(!sshOn())return tr('SSH 直读不可用');if(!sshProbe.hosts.some(h=>sshIs(h.name,t.id)))return tr('~/.ssh/config 里已没有这个别名');sshToggle(t.id,true);return '';}},
   syncUnblock:{title:n=>n===1?tr('允许同步加回这一项？'):tr('允许同步加回 {n} 项？',{n:formatCount(n)}),label:t=>tr('同步时加回 {name}',{name:t.name}),
    note:tr('这些是你删除过的同步项，现在同步会跳过它们。允许后，下次同步会把它们加回来（可用 ⌘Z 撤销这次允许）。'),
    apply:t=>{const list=state.deletedExternalIds||[];if(!list.includes(t.id))return tr('已不在跳过列表里');const row=agentSyncRowId(agentSyncItem(t.id));
@@ -165,27 +156,6 @@ proRegister(()=>{
  Object.assign(proSlots.agentMethods,{
   // 探针数据源
   probeSources:()=>{agentNeedsProbe();return {sources:probe.sources.map(agentProbeSource),sshHosts:sshOn()?sshProbe.enabled.length:0};},
-  probeSourceAdd:(params)=>{
-   agentNoSecrets(params);agentNeedsProbe();
-   const url=probeData.probeNormalizeUrl(params.url);if(!url)throw new Error(tr('url 需要是面板地址，例如 status.example.com（http 或 https，不含账号密码）'));
-   const name=agentProbeName(params.name),same=probe.sources.find(s=>s.url===url);
-   if(same)return {...agentProbeSource(same),alreadyAdded:true};
-   if(probe.sources.length>=8)throw new Error(tr('最多 8 个探针数据源'));
-   const id=crypto.randomUUID();
-   probeSend({action:'probeSave',id,kind:probeData.PROBE_KIND_DEFAULT,name,url});
-   return {id,url,...(name?{name}:{}),status:'checking',message:tr('正在读取面板；用 list_probe_sources 查看结果。面板不公开时状态为 needsLogin，账号只能在 Assetboard 里填写')};
-  },
-  probeSourceUpdate:(params)=>{
-   agentNoSecrets(params);agentNeedsProbe();
-   const s=agentProbeFind(params.id);
-   const url=params.url===undefined?s.url:probeData.probeNormalizeUrl(params.url);if(!url)throw new Error(tr('url 需要是面板地址，例如 status.example.com'));
-   if(probe.sources.some(x=>x.id!==s.id&&x.url===url))throw new Error(tr('已有这个地址的数据源'));
-   const name=params.name===undefined?s.name:agentProbeName(params.name);
-   if(url===s.url&&name===s.name)throw new Error(tr('没有要修改的内容'));
-   probeSend({action:'probeSave',id:s.id,kind:s.kind,name,url});
-   return {id:s.id,url,name:name||new URL(url).host,status:'checking'};
-  },
-  probeSourceRemove:({id,reason=''})=>{agentNeedsProbe();const s=agentProbeFind(id);return agentRequestConfirm('probeRemove',[{id:s.id,name:s.name}],reason);},
   probeRefresh:({id=''}={})=>{
    agentNeedsProbe();if(id)agentProbeFind(id);
    probeRefresh(id||null,{manual:true});
@@ -214,23 +184,6 @@ proRegister(()=>{
    if(!sshProbe.listed){sshPost({action:'sshProbeList'});return {listed:false,hosts:[],interval:sshProbe.interval,message:tr('正在读取 ~/.ssh/config，稍后再查')};}
    return {listed:true,interval:sshProbe.interval,intervals:probeSshData.SSH_INTERVALS,hosts:agentSshAliases().map(agentSshHost),...(sshProbe.configError?{error:tr('无法读取 ~/.ssh/config')}:{})};
   },
-  sshSet:({alias,enabled,reason=''})=>{
-   agentNeedsSsh();if(typeof enabled!=='boolean')throw new Error(tr('enabled 需要是 true 或 false'));
-   const found=agentSshAlias(alias);
-   if(enabled){
-    if(sshEnabled(found))return {...agentSshHost(found),status:'unchanged'};
-    if(!sshProbe.hosts.some(h=>sshIs(h.name,found)))throw new Error(tr('~/.ssh/config 里已没有这个别名'));
-    return agentRequestConfirm('sshEnable',[{id:found,name:found}],reason);
-   }
-   sshToggle(found,false);
-   return {alias:found,enabled:false,manuallyOff:true,status:'off',message:tr('已关闭，并记为手动关闭：自动匹配不会再开启它')};
-  },
-  sshInterval:({seconds})=>{
-   agentNeedsSsh();const s=Number(seconds);
-   if(!probeSshData.SSH_INTERVALS.includes(s))throw new Error(tr('seconds 只能是 {list}',{list:probeSshData.SSH_INTERVALS.join(tr('、'))}));
-   sshPost({action:'sshProbeInterval',seconds:s});
-   return {interval:s,status:'set'};
-  },
   sshRefresh:({alias=''}={})=>{
    agentNeedsSsh();
    if(!alias){if(!sshProbe.enabled.length)throw new Error(tr('还没有开启 SSH 直读的主机'));sshPoll(true);return {status:'refreshing',aliases:[...sshProbe.enabled]};}
@@ -240,7 +193,7 @@ proRegister(()=>{
   },
   // 网站图标
   iconPlatforms:()=>{
-   const rows=iconRows(state.assets,{sites:iconSites()}),busy=new Set([...agentIconJob?.pending.values()||[]].map(p=>p.host));
+   const rows=iconRows(state.assets.filter(agentSees),{sites:iconSites()}),busy=new Set([...agentIconJob?.pending.values()||[]].map(p=>p.host));
    return {autoIcons:state.autoIcons!==false,platforms:rows.map(r=>({platform:r.host,site:r.site,customSite:!!r.custom,assets:r.ids.length,assetIds:r.ids,withIcon:r.have.length,
     ...(busy.has(r.host)?{fetching:true}:{}),...(iconFailures.get(r.host)?{lastError:iconFailures.get(r.host)}:{})})),lastFetch:agentIconJobSummary()};
   },
@@ -259,7 +212,7 @@ proRegister(()=>{
    if(agentIconJob?.status==='fetching')return {...agentIconJobSummary(),message:tr('上一次获取还在进行')};
    if(iconBatch||iconRowRequests.size)throw new Error(tr('「获取网站图标」窗口正在获取，稍后再试'));
    if(assetIds!=null&&(!Array.isArray(assetIds)||!assetIds.length||assetIds.length>AGENT_LIMIT||assetIds.some(id=>typeof id!=='string')))throw new Error(tr('assetIds 需要是资产 id 数组（最多 {n} 个）',{n:AGENT_LIMIT}));
-   const rows=iconRows(state.assets,{sites:iconSites()}),want=assetIds&&new Set(assetIds),host=String(platform||'').trim().toLowerCase();
+   const rows=iconRows(state.assets.filter(agentSees),{sites:iconSites()}),want=assetIds&&new Set(assetIds),host=String(platform||'').trim().toLowerCase();
    if(host&&!rows.some(r=>r.host===host))throw new Error(tr('没有这个平台；用 list_icon_platforms 查看'));
    const notRecognized=want?assetIds.filter(id=>!rows.some(r=>r.ids.includes(id))):[];
    const cache=overwrite?new Map():knownSiteIcons(),platforms=new Map();

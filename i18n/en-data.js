@@ -350,7 +350,7 @@ Object.assign(I18N.en,{
  '资产交接清单 {day}':'Asset handover sheet {day}',
  '资产交接清单':'Asset handover sheet',
  '由 Assetboard 生成于 {day}':'Made by Assetboard on {day}',
- '名称和账号已遮挡':'names and accounts masked',
+ '名称、账号、地址、备注和链接已遮挡':'names, accounts, addresses, notes and links masked',
  '。这里只有记录，没有密码；登录方式请按各项的账号去找。':'. Records only, no passwords; find each sign-in through its account.',
  '项资产':'assets',
  '周期费用':'recurring cost',

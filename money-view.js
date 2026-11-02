@@ -172,17 +172,18 @@ function exportDialog(){
  const readOnly=`<span class="fmt" title="${tr('只用来阅读，导不回来；恢复用资产备份')}">${tr('只读')}</span>`;
  modal(tr('导出'),`<div class="export-list">
   <section class="export-card"><div><h3>${ui('stack')}${tr('资产备份')}</h3><p class="form-note">${tr('全部资料、关联和付款记录，换机器或出了问题时从这里恢复。导入时可以合并，也可以整体替换，⌘Z 可撤销。')}</p></div><div class="export-buttons"><button class="button primary" data-action="export-board">${tr('导出 .json')}</button><button class="button" data-action="restore-backup">${tr('从备份恢复…')}</button><input type="file" id="backup-file" accept=".json,application/json" hidden></div></section>
-  <section class="export-card"><div><h3>${ui('clock')}${tr('日历')}${readOnly}</h3><p class="form-note">${tr('{n} 个到期和扣款日，按周期重复，提前提醒和 App 一样。导入“日历”或任何日历软件；日期变了要重新导出。',{n:formatCount(dated)})}</p></div><button class="button" data-action="export-ics">${tr('导出 .ics')}</button></section>
+  <section class="export-card"><div><h3>${ui('clock')}${tr('日历')}${readOnly}</h3><p class="form-note">${tr('{n} 个到期和扣款日，按周期重复，提前提醒和 App 一样。导入“日历”或任何日历软件；日期变了要重新导出。',{n:formatCount(dated)})}</p><p class="form-note">${tr('iCloud 日历不做端到端加密。')}</p><label class="check-label"><input type="checkbox" id="ics-minimal"${privacy?' checked':''}>${tr('只写类别和天数')}</label></div><button class="button" data-action="export-ics">${tr('导出 .ics')}</button></section>
   ${slotHtml('exportCards')}
-  <section class="export-card"><div><h3>${ui('mail')}${tr('交接清单')}${readOnly}</h3><p class="form-note">${tr('一页能离开 App 独立阅读的清单：有什么、在哪个账号、多少钱、什么时候到期、谁付款。给家人、合伙人或接手的人。不含密码。')}</p><label class="check-label"><input type="checkbox" id="handover-mask"${privacy?' checked':''}>${tr('遮住名称、账号和 IP')}</label></div><button class="button" data-action="export-handover">${tr('导出 .html')}</button></section>
+  <section class="export-card"><div><h3>${ui('mail')}${tr('交接清单')}${readOnly}</h3><p class="form-note">${tr('一页能离开 App 独立阅读的清单：有什么、在哪个账号、多少钱、什么时候到期、谁付款。给家人、合伙人或接手的人。不含密码。')}</p><label class="check-label"><input type="checkbox" id="handover-mask"${privacy?' checked':''}>${tr('遮住名称、账号、地址、备注和链接')}</label></div><button class="button" data-action="export-handover">${tr('导出 .html')}</button></section>
  </div>`,'export');
  $('#backup-file').addEventListener('change',async e=>{const file=e.target.files?.[0];e.target.value='';if(!file)return;$('#modal').close();routeImportText(await file.text(),{filename:file.name,mime:file.type});});
 }
 function exportRun(kind){
  const day=todayIso();
  if(kind==='backup'){saveFile(`Assetboard-backup-${day}.json`,JSON.stringify({...state,exportedAt:new Date().toISOString()},null,1),'application/json');if(!nativeStore)window.assetboardExported();return;}
- if(kind==='ics'){saveFile(`Assetboard-${day}.ics`,calendarIcs(state.assets,{name:tr('Assetboard 到期与扣款')}),'text/calendar');return;}
- if(kind==='handover'){const mask=!!$('#handover-mask')?.checked;try{localStorage.setItem(HANDOVER_KEY,new Date().toISOString());}catch{}saveFile(tr('Assetboard-交接清单-{day}.html',{day}),handoverHtml(state,{mask,types:Object.fromEntries(Object.entries(cats).map(([id,c])=>[id,c.name])),order:categoryIds()}),'text/html');}
+ const types=Object.fromEntries(Object.entries(cats).map(([id,c])=>[id,c.name]));
+ if(kind==='ics'){saveFile(`Assetboard-${day}.ics`,calendarIcs(state.assets,{name:tr('Assetboard 到期与扣款'),minimal:!!$('#ics-minimal')?.checked,types}),'text/calendar');return;}
+ if(kind==='handover'){const mask=!!$('#handover-mask')?.checked;try{localStorage.setItem(HANDOVER_KEY,new Date().toISOString());}catch{}saveFile(tr('Assetboard-交接清单-{day}.html',{day}),handoverHtml(state,{mask,types,order:categoryIds()}),'text/html');}
 }
 
 // ---- Cost panel extras: Pro adds paid this year, the next 12 months, and splits by project and owner.

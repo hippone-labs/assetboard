@@ -352,10 +352,12 @@ proRegister(()=>{
    $('#probe-url').value=url;
    const id=$('#probe-id').value||probe.sources.find(s=>s.url===url)?.id||'';
    const asked=!$('#probe-account').hidden,clearLogin=!!$('#probe-public')?.checked;
-   // Both filled: saved to the Keychain. Both empty when editing: what is kept stays. 公开面板: the kept account goes.
-   const username=asked?$('#probe-username').value.trim():'',password=asked?$('#probe-password').value:'';
-   const keep=!!id&&!password&&!clearLogin&&(!username||probe.sources.find(x=>x.id===id)?.username===username);
-   if(asked&&!clearLogin&&!keep&&(!username||!password)){status.textContent=tr('用户名和密码都要填');return;}
+   // Both filled: saved to the Keychain. Both empty when editing the same panel: what is kept stays. 公开面板: the kept account goes.
+   // A new address (scheme, host or port) never takes the kept account along: the app drops it, so it is asked for again.
+   const username=asked?$('#probe-username').value.trim():'',password=asked?$('#probe-password').value:'',was=probe.sources.find(x=>x.id===id);
+   const moved=!!was&&new URL(was.url).origin!==new URL(url).origin;
+   const keep=!!id&&!moved&&!password&&!clearLogin&&(!username||was?.username===username);
+   if(asked&&!clearLogin&&!keep&&(!username||!password)){status.textContent=moved&&was?.hasLogin?tr('换了地址，面板账号要重新填写'):tr('用户名和密码都要填');return;}
    $('#probe-password').value='';status.textContent=asked&&username?tr('登录中…'):tr('读取中…');
    probe.pending={url,id};
    const name=$('#probe-name-row').hidden?'':$('#probe-name').value.trim();
