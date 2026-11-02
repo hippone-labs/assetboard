@@ -737,14 +737,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
             guard probes.all.contains(where: { $0.id == id }) || probes.all.count < ProbeSources.limit else {
                 probeResult(["error": L("最多 {n} 个探针数据源", ["n": ProbeSources.limit])]); return
             }
-            // The panel account: both filled saves it, both empty keeps what is kept, clearLogin removes it (a public panel).
+            // The panel account: both filled saves it, clearLogin removes it (a public panel), both empty keeps what is kept while the
+            // address stays on the same server. A new scheme, host or port drops it: the account is never sent to another server.
             let username = (body["username"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             let password = body["password"] as? String ?? ""
+            let moved = probes.all.first(where: { $0.id == id }).map { !ProbeSourceConfig.sameServer($0.url, source.url) } ?? false
             if body["clearLogin"] as? Bool == true {
                 guard probes.setLogin(nil, for: id) else { probeResult(["error": L("无法更改 macOS 钥匙串里的面板账号")]); return }
             } else if !username.isEmpty || !password.isEmpty {
                 guard let login = ProbeLogin(username: username, password: password) else { probeResult(["error": L("用户名和密码都要填")]); return }
                 guard probes.setLogin(login, for: id) else { probeResult(["error": L("无法把面板账号存进 macOS 钥匙串")]); return }
+            } else if moved && probes.login(id) != nil {
+                guard probes.setLogin(nil, for: id) else { probeResult(["error": L("无法更改 macOS 钥匙串里的面板账号")]); return }
             }
             probeClient.forget(id)
             probes.save(source)

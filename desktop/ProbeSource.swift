@@ -102,6 +102,12 @@ struct ProbeSourceConfig {
         return parts.url
     }
 
+    /// Whether two panel addresses reach the same server (scheme, host and port). A kept panel account belongs to one of them only.
+    static func sameServer(_ a: URL, _ b: URL) -> Bool {
+        func port(_ url: URL) -> Int { url.port ?? (url.scheme?.lowercased() == "http" ? 80 : 443) }
+        return a.scheme?.lowercased() == b.scheme?.lowercased() && a.host?.lowercased() == b.host?.lowercased() && port(a) == port(b)
+    }
+
     init?(_ value: [String: Any]) {
         guard let id = value["id"] as? String, id.range(of: "^[A-Za-z0-9-]{1,64}$", options: .regularExpression) != nil,
               let kind = (value["kind"] as? String).flatMap(ProbeKind.init(rawValue:)),
@@ -536,6 +542,11 @@ func testProbeSources() {
     }
     precondition(ProbeSourceConfig(["id": "../x", "kind": "cfsm", "url": "https://status.example.com"]) == nil, "ids are plain")
     precondition(ProbeSourceConfig(["id": "a1", "kind": "unknown", "url": "https://status.example.com"]) == nil, "kinds are known")
+    let panel = ProbeSourceConfig.panelURL("https://status.example.com/panel")!
+    precondition(ProbeSourceConfig.sameServer(panel, ProbeSourceConfig.panelURL("https://STATUS.example.com:443/other")!), "Same scheme, host and port: the same server")
+    for moved in ["https://status.example.net", "http://status.example.com", "https://status.example.com:8443", "https://192.0.2.10"] {
+        precondition(!ProbeSourceConfig.sameServer(panel, ProbeSourceConfig.panelURL(moved)!), "Another server: \(moved)")
+    }
 
     // Sources live in their own defaults; the page gets the user name at most, never a password. Accounts round-trip as JSON; an
     // old token reads as no account.
