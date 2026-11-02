@@ -19,9 +19,15 @@ xcrun notarytool submit "dist/Assetboard-macOS-arm64-$version.zip" \
   --keychain-profile "$NOTARY_PROFILE" --wait --output-format json > "$RELEASE_DIR/notary.json"
 /usr/bin/python3 -c 'import json,sys; assert json.load(open(sys.argv[1]))["status"] == "Accepted", "Notarization rejected"' "$RELEASE_DIR/notary.json"
 # The ticket can take a few minutes to reach Apple's ticket service after notarization is accepted (stapler error 73 meanwhile).
+curl -sS -o /dev/null -w 'api.apple-cloudkit.com: HTTP %{http_code} via %{remote_ip}\n' https://api.apple-cloudkit.com/ || true
 for attempt in {1..10}; do
   xcrun stapler staple "$app" && break
-  (( attempt < 10 )) || exit 1
+  if (( attempt == 10 )); then
+    # Error 73 also means the ticket service is unreachable: show where its host resolves (a 198.18.x address is a local proxy's fake IP).
+    xcrun stapler staple -v "$app" 2>&1 | tail -40 || true
+    curl -sS -o /dev/null -w 'api.apple-cloudkit.com: HTTP %{http_code} via %{remote_ip}\n' https://api.apple-cloudkit.com/ || true
+    exit 1
+  fi
   sleep 30
 done
 xcrun stapler validate "$app"
