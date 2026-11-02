@@ -179,8 +179,9 @@ import Foundation
     struct AppError: Error { let text: String }
 
     /// Calls the app and returns its `result`; starts the app once when it is not running, then waits for it to load.
-    static func invoke(_ method: String, _ params: [String: Any]) throws -> Any {
-        let request: [String: Any] = ["method": method, "params": params]
+    /// `via` tells the app which client calls: "mcp" from the MCP server below, "cli" from the command line.
+    static func invoke(_ method: String, _ params: [String: Any], via: String = "cli") throws -> Any {
+        let request: [String: Any] = ["method": method, "params": params, "via": via]
         var launched = false
         let deadline = Date().addingTimeInterval(25)
         while true {
@@ -478,7 +479,7 @@ enum MCPServer {
             }
             let arguments = params["arguments"] as? [String: Any] ?? [:]
             do {
-                let result = try AssetboardCLI.invoke(target, arguments)
+                let result = try AssetboardCLI.invoke(target, arguments, via: "mcp")
                 reply["result"] = ["content": [["type": "text", "text": AssetboardCLI.pretty(result)]], "isError": false]
             } catch {
                 reply["result"] = ["content": [["type": "text", "text": AssetboardCLI.message(error)]], "isError": true]

@@ -12,6 +12,7 @@ unset SITE_DIR
 app=dist/Assetboard.app
 version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist")"
 "$app/Contents/MacOS/Assetboard" --test-store
+"$app/Contents/MacOS/Assetboard" --test-license
 "$app/Contents/MacOS/Assetboard" --test-update
 codesign --verify --deep --strict --verbose=2 "$app"
 xcrun notarytool submit "dist/Assetboard-macOS-arm64-$version.zip" \
