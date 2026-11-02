@@ -20,10 +20,12 @@ class ReleaseTests(unittest.TestCase):
         self.site = root / 'site'
         (self.site / 'downloads').mkdir(parents=True)
         (self.site / 'en').mkdir()
-        page = '<a href="/downloads/Assetboard-macOS-arm64-0.6.2.zip">Download</a>' * 2 + 'v0.6.2 · macOS <a href="https://buy.stripe.com/example">Buy</a>'
+        page = '<a href="/downloads/Assetboard-macOS-arm64-0.6.2.zip">Download</a>' * 2 + 'v0.6.2 · macOS 27 或更高 <a href="https://buy.stripe.com/example">Buy</a>'
         for path in ['index.html', 'en/index.html']:
             (self.site / path).write_text(page)
-        (self.site / 'downloads/index.html').write_text('<ul><li>Previous release</li></ul>')
+        (self.site / 'en/downloads').mkdir()
+        for path, words in [('downloads/index.html', 'macOS 27 或更高'), ('en/downloads/index.html', 'macOS 27 or later')]:
+            (self.site / path).write_text(f'<p>{words}</p><ul class="versions">\n  <li>Previous release</li></ul>')
         (self.site / 'downloads/latest.json').write_text(json.dumps({'version': '0.6.2'}))
         self.archive = root / 'Assetboard-macOS-arm64-0.6.3.zip'
         self.pack({'CFBundleShortVersionString': '0.6.3', 'LSMinimumSystemVersion': '15.0'})
@@ -45,9 +47,14 @@ class ReleaseTests(unittest.TestCase):
         for path in ['index.html', 'en/index.html']:
             text = (self.site / path).read_text()
             self.assertEqual(text.count(self.archive.name), 2)
-            self.assertIn('v0.6.3 · macOS', text)
+            self.assertIn('v0.6.3 · macOS 15 或更高', text)
             self.assertIn('https://buy.stripe.com/example', text)
-        self.assertIn('Previous release', (self.site / 'downloads/index.html').read_text())
+        digest = hashlib.sha256(self.archive.read_bytes()).hexdigest()
+        for path, words in [('downloads/index.html', 'macOS 15 或更高'), ('en/downloads/index.html', 'macOS 15 or later')]:
+            text = (self.site / path).read_text()
+            self.assertIn(words, text)
+            self.assertLess(text.index('Assetboard 0.6.3'), text.index('Previous release'))
+            self.assertIn(f'<code title="{digest}">{digest[:8]}…{digest[-8:]}</code>', text)
         with self.assertRaisesRegex(ValueError, 'newer'):
             publisher.stage(self.site, self.archive, '0.6.3', 'Repeat')
 

@@ -51,14 +51,23 @@ def stage(site, archive, version, notes):
         if links != 2 or labels != 1:
             raise ValueError(f"Unexpected download layout: {path.name}")
         pages[path] = text
-    history = site / "downloads/index.html"
-    text = history.read_text()
-    if text.count('<ul>') != 1:
-        raise ValueError("Unexpected downloads history layout")
     digest = hashlib.sha256(archive.read_bytes()).hexdigest()
     today = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).date()
-    row = f'\n  <li><a href="/downloads/{name}" download>Assetboard {html.escape(version)}</a> · {today} · SHA-256 <code>{digest[:8]}…{digest[-8:]}</code></li>'
-    pages[history] = text.replace('<ul>', '<ul>' + row, 1)
+    row = (f'\n  <li><a href="/downloads/{name}" download>Assetboard {html.escape(version)}</a><span class="v-meta">{today} · SHA-256 '
+           f'<code title="{digest}">{digest[:8]}…{digest[-8:]}</code></span></li>')
+    for history in [site / "downloads/index.html", site / "en/downloads/index.html"]:
+        text = pages.get(history, history.read_text())
+        if text.count('<ul class="versions">') != 1:
+            raise ValueError(f"Unexpected downloads history layout: {history.relative_to(site)}")
+        pages[history] = text.replace('<ul class="versions">', '<ul class="versions">' + row, 1)
+    # Every page names the release's minimum macOS (major version only), in either language.
+    major = minimum.split('.')[0]
+    for path in [site / "index.html", site / "en/index.html", site / "downloads/index.html", site / "en/downloads/index.html"]:
+        text = pages.get(path, path.read_text())
+        text, count = re.subn(r"macOS \d+(?= 或更高| or later)", f"macOS {major}", text)
+        if not count:
+            raise ValueError(f"No minimum macOS on {path.relative_to(site)}")
+        pages[path] = text
     shutil.copyfile(archive, destination)
     for path, text in pages.items():
         path.write_text(text)

@@ -120,7 +120,7 @@ jobs:
         run: |
           set -euo pipefail
           cd "$SITE_DIR"
-          git add index.html en/index.html downloads/index.html downloads/latest.json "downloads/Assetboard-macOS-arm64-$VERSION.zip"
+          git add index.html en/index.html downloads/index.html en/downloads/index.html downloads/latest.json "downloads/Assetboard-macOS-arm64-$VERSION.zip"
           git diff --cached --check
           git -c user.name=lihaosong-code -c user.email=207678397+lihaosong-code@users.noreply.github.com commit -m "Release notarized Assetboard $VERSION"
           site_commit="$(git rev-parse HEAD)"
