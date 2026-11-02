@@ -894,7 +894,7 @@ function agentSetupDialog(){
  const cli=nativeStore.cliPath||'/Applications/Assetboard.app/Contents/MacOS/assetboard-cli';
  const tabs=AGENT_TOOLS.map(([id,label])=>`<button type="button" class="choice" role="radio" aria-checked="${id===agentTool}" data-action="agent-tab" data-id="${id}">${esc(label)}</button>`).join('');
  modal(tr('MCP 接入'),`<div class="form agent-setup">
-  <p class="form-note">${tr('让 Claude、ChatGPT（Codex）、Cursor 等 AI 工具或你的脚本查询、添加、修改资产：新增和修改立即生效，可用 ⌘Z 撤销；删除会先到「待确认」，你确认才删。只在本机，通过 App 的本地通道，不经网络；每次调用都记在「网络记录」里。')}</p>
+  <p class="form-note">${tr('让 Claude、ChatGPT（Codex）、Cursor 等 AI 工具或你的脚本查询、添加、修改资产：新增和修改立即生效，可用 ⌘Z 撤销；删除会先到「待确认」，你确认才删。通道在本机，但你的 AI 工具会把读到的内容发给它的模型服务商；每次调用都记在「网络记录」里。')}</p>
   <div class="chip-group agent-tabs" role="radiogroup" aria-label="${tr('选择工具')}">${tabs}</div>
   <section class="agent-tool">${agentToolHtml(agentTool,cli)}</section>
   <p class="form-note platform-note">${ui('info')}${tr('也可以把 JSON 文件放进 ~/Library/Application Support/Assetboard/Inbox/，格式见 README；这种方式每次都要你在导入预览里确认。')}</p>

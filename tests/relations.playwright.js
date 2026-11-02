@@ -38,7 +38,7 @@ async (page) => {
   await p.evaluate(()=>showDetail('demo-s1'));
   const sd=await p.evaluate(()=>[...document.querySelectorAll('#detail .link-group')].map(g=>g.getAttribute('aria-label')));
   check(sd.join()==='所属账号，1 项,域名，3 项,代码仓库，2 项,数据库，1 项','Server detail groups: '+sd.join());
-  check(await p.evaluate(()=>[...document.querySelectorAll('#detail .link-row')].find(r=>/example-studio/.test(r.textContent)).querySelector('.link-tag.on')?.textContent==='代理'),'Server detail shows the child\'s proxy mark read-only');
+  check(await p.evaluate(()=>[...document.querySelectorAll('#detail .link-row')].find(r=>/studio\.example/.test(r.textContent)).querySelector('.link-tag.on')?.textContent==='代理'),'Server detail shows the child\'s proxy mark read-only');
   check(await p.evaluate(()=>[...document.querySelectorAll('#detail .link-row.is-hidden')].length===1),'Hidden child stays listed, toned down');
   // More than four in a group: the rest sits behind +N.
   await p.evaluate(()=>{for(let i=0;i<5;i++){state.assets.push({id:'x'+i,type:'domain',name:'extra'+i+'.test',provider:'Namecheap',updatedAt:new Date().toISOString(),links:['demo-s1'],source:'manual'});state.assets.find(a=>a.id==='demo-s1').links.push('x'+i);}showDetail('demo-s1');});

@@ -22,12 +22,12 @@ async (page) => {
    for(const type of ['pointerdown','pointerup','click'])document.addEventListener(type,e=>{if(e.target.closest?.('#panorama,#detail'))log.push({t:now(),[type]:say(e.target),at:Math.round(e.timeStamp)});},true);
   });
   const step=name=>p.evaluate(([name])=>window.__log.push({t:Math.round(performance.now()),step:name}),[name]);
-  check(await servers('demo-d2')==='demo-s1','Start: notes-lab.dev sits on tokyo-vps');
+  check(await servers('demo-d2')==='demo-s1','Start: notes.example.org sits on tokyo-vps');
   await step('wobble click');
   // A press with a small wobble is still a click: it opens the detail and nothing moves.
   let c=await center('.pano-chip[data-chip="demo-d2"][data-lane="demo-s1"]');
   await p.mouse.move(c.x,c.y);await p.mouse.down();await p.mouse.move(c.x+2,c.y+1);await p.mouse.up();await p.waitForTimeout(150);
-  check(await p.evaluate(()=>!document.querySelector('#detail').hidden&&document.querySelector('#detail h2').textContent==='notes-lab.dev'),'Under 4px is a click, not a drag');
+  check(await p.evaluate(()=>!document.querySelector('#detail').hidden&&document.querySelector('#detail h2').textContent==='notes.example.org'),'Under 4px is a click, not a drag');
   await p.keyboard.press('Escape');await p.waitForTimeout(150);
   await step('drag to frankfurt');
   // Drag to frankfurt-vps: lifted ghost, dashed hole, legal lanes bright and the rest at 55%, a slot in the target, then the drop moves it.
