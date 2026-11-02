@@ -1,5 +1,6 @@
 # Signs with the Developer ID in the mini's login keychain, notarizes with the notary keychain profile (repository secrets, masked in the public logs),
 # staples and uploads the zip as an artifact. It never creates a release or pushes a tag; publishing stays manual.
+# The mini's runner is attached to this public repository, so this workflow is manual only (see release-app.yml).
 name: notarize
 
 on:

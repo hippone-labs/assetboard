@@ -1,5 +1,7 @@
-# Only this private repository's trusted Mac runner may access the signing keychain.
-# Push an annotated vX.Y.Z tag on main, with the release notes as its message.
+# Signs, notarizes and publishes on the self-hosted Mac mini, the only machine with the signing keychain and the notary profile.
+# That runner is attached to this public repository: no workflow that runs on it has a pull_request trigger, and a pull request
+# from outside must not be approved to run workflows while it stays attached. Ordinary builds and tests run on GitHub-hosted
+# runners (build.yml). Push an annotated vX.Y.Z tag on main, with the release notes as its message.
 name: release-app
 
 on:
@@ -86,7 +88,13 @@ jobs:
 
       - name: Browser regression
         run: |
-          export NODE_PATH="$HOME/.cache/assetboard-ci/playwright-1.64.1/node_modules"
+          # Cached in the runner user's home; build.yml no longer runs on the mini, so this step sets it up itself.
+          pw_home="$HOME/.cache/assetboard-ci/playwright-1.64.1"
+          if [ ! -d "$pw_home/node_modules/playwright" ]; then
+            npm install --prefix "$pw_home" --no-audit --no-fund playwright@1.64.1
+          fi
+          "$pw_home/node_modules/.bin/playwright" install chromium
+          export NODE_PATH="$pw_home/node_modules"
           node tools/browser-tests.js --port 4330
 
       - name: Build, test, sign, notarize and package
@@ -135,6 +143,7 @@ jobs:
           assert.equal(response.status, 200);
           const manifest = await response.json();
           assert.equal(manifest.version, process.env.VERSION);
+          assert.match(manifest.minimumSystemVersion, /^\d+(\.\d+){0,2}$/);
           const asset = manifest.assets.find(a => a.name === `Assetboard-macOS-arm64-${manifest.version}.zip`);
           assert.ok(asset);
           const zip = await fetch(asset.url);
