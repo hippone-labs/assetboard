@@ -11,7 +11,7 @@ async (page) => {
  await p.addInitScript(soon=>{
   window.__sent=[];
   window.webkit={messageHandlers:{assetboard:{postMessage(msg){window.__sent.push(JSON.parse(JSON.stringify(msg)));if(msg.action==='save')setTimeout(()=>window.assetboardSaved?.(msg.sequence,true),5);if(msg.action==='evidenceList')setTimeout(()=>window.assetboardEvidenceList?.([]),5);}}}};
-  window.__ASSETBOARD_NATIVE__={data:{blocks:[{id:'server'},{id:'subscription'},{id:'bankcard'},{id:'phone'}],assets:[
+  window.__ASSETBOARD_NATIVE__={pro:{on:true,kind:'licensed',id:'K3Q7NVHM'},data:{blocks:[{id:'server'},{id:'subscription'},{id:'bankcard'},{id:'phone'}],assets:[
    {id:'s1',type:'server',name:'tokyo-vps',provider:'Vultr',source:'manual',art:'generic',account:'ops@example.org',ips:['203.0.113.10','2001:db8::10'],host:'vps-a.example.com',sshUser:'deploy',sshPort:'2222',notes:'invoices to finance@example.net'},
    {id:'x1',type:'subscription',name:'Editor Pro',provider:'Editor',source:'manual',art:'generic',account:'me@example.com',cost:'$10 / 月',cycle:'monthly',dateKind:'renew',date:'2099-01-05',links:['c1']},
    {id:'c1',type:'bankcard',name:'Visa 主卡',provider:'Example Bank',source:'manual',art:'generic',last4:'4242',network:'Visa',date:soon,dateKind:'expire',links:['x1']},

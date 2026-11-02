@@ -5,6 +5,8 @@ async (page) => {
  const p=await page.context().newPage();
  try {
   await p.goto('http://127.0.0.1:4317/');
+  // The browser holds no licence: turn Pro on in place, as an activation does.
+  await p.evaluate(()=>{proEnable();render();});
   const seen=await p.evaluate(()=>{
    save=()=>{};
    state={...state,assets:[{id:'u1',type:'subscription',name:'Notes Pro',provider:'Notes',account:'',purpose:'',date:isoDay(localDay()-5),dateKind:'renew',cycle:'monthly',cost:'$8 / 月',art:'generic',source:'manual',createdAt:'2025-01-01T00:00:00Z'}],paymentsSince:isoDay(localDay()-40)};

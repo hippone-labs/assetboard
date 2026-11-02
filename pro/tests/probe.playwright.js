@@ -46,7 +46,7 @@ async (page) => {
    if(msg.action==='probeLiveStart'&&!window.__holdLive)setTimeout(()=>window.assetboardProbe({source:msg.id,live:'open'}),20);
   }}}};
   const server=(id,name,extra={})=>({id,type:'server',name,provider:'Example',source:'manual',art:'generic',cost:'未知',...extra});
-  window.__ASSETBOARD_NATIVE__={data:{blocks:[{id:'server',width:50,height:null,density:'full',folded:false}],assets:[
+  window.__ASSETBOARD_NATIVE__={pro:{on:true,kind:'licensed',id:'K3Q7NVHM'},data:{blocks:[{id:'server',width:50,height:null,density:'full',folded:false}],assets:[
    server('s1','tokyo-vps',{ips:['203.0.113.10']}),server('s2','backup-box'),server('s3','paris-vps'),server('s4','spare')],deletedExternalIds:[]},
    probeSources:[{id:'src1',kind:'cfsm',name:'我的探针',url:'https://status.example.com',hasLogin:false,username:''},{id:'src2',kind:'cfsm',name:'私有面板',url:'https://private.example.net',hasLogin:true,username:'admin'}],
    cloudflareConnected:false,githubConnected:false,gmailConfigured:false};
@@ -270,7 +270,7 @@ async (page) => {
 
  // The demo: made-up readings with no panel, and the screenshot switches.
  const demo=async demoOpen=>open(o=>{window.webkit={messageHandlers:{assetboard:{postMessage(msg){window.__sent=(window.__sent||[]).concat(msg.action);if(msg.action==='save')setTimeout(()=>window.assetboardSaved?.(msg.sequence,true),5);}}}};
-  window.__ASSETBOARD_NATIVE__={data:null,demo:true,demoOpen:o,cloudflareConnected:false,githubConnected:false,gmailConfigured:false,probeSources:[]};},demoOpen);
+  window.__ASSETBOARD_NATIVE__={pro:{on:true,kind:'licensed',id:'K3Q7NVHM'},data:null,demo:true,demoOpen:o,cloudflareConnected:false,githubConnected:false,gmailConfigured:false,probeSources:[]};},demoOpen);
  const one=await demo({asset:'demo-s3'});
  try{
   await until(one.p,()=>!!document.querySelector('#detail-content .probe-facts')&&!document.querySelector('#detail').hidden);
@@ -297,7 +297,7 @@ async (page) => {
  }finally{await two.context.close();}
  // Outside the demo the switches do nothing: the page looks the same with and without them.
  const look=async demoOpen=>{const r=await open(o=>{window.webkit={messageHandlers:{assetboard:{postMessage(msg){if(msg.action==='save')setTimeout(()=>window.assetboardSaved?.(msg.sequence,true),5);}}}};
-  window.__ASSETBOARD_NATIVE__={data:{blocks:[{id:'server',width:50,height:null,density:'full',folded:false}],assets:[{id:'x1',type:'server',name:'x',source:'manual',art:'generic'},{id:'x2',type:'server',name:'y',source:'manual',art:'generic'}]},demoOpen:o,probeSources:[],cloudflareConnected:false,githubConnected:false,gmailConfigured:false};},demoOpen);
+  window.__ASSETBOARD_NATIVE__={pro:{on:true,kind:'licensed',id:'K3Q7NVHM'},data:{blocks:[{id:'server',width:50,height:null,density:'full',folded:false}],assets:[{id:'x1',type:'server',name:'x',source:'manual',art:'generic'},{id:'x2',type:'server',name:'y',source:'manual',art:'generic'}]},demoOpen:o,probeSources:[],cloudflareConnected:false,githubConnected:false,gmailConfigured:false};},demoOpen);
   try{await wait(300);return await r.p.evaluate(()=>({detail:document.querySelector('#detail').hidden?null:activeAsset,pano:panoOpen}));}finally{await r.context.close();}};
  const without=await look(undefined),withSwitches=await look({asset:'x2',panorama:true});
  check(JSON.stringify(without)===JSON.stringify(withSwitches)&&!withSwitches.pano,'the switches are ignored outside the demo: '+JSON.stringify({without,withSwitches}));

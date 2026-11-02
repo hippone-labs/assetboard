@@ -16,6 +16,8 @@ async (page) => {
   await p.goto('http://127.0.0.1:4317/');
   await p.evaluate(()=>{try{localStorage.removeItem('assetboard-view-v1');}catch{}});
   await p.reload();
+  // The browser holds no licence: turn Pro on in place, as an activation does.
+  await p.evaluate(()=>{proEnable();render();});
   await p.evaluate(()=>{save=()=>{noteCostChanges();};const day=n=>isoDay(localDay()+n),old='2025-01-01T00:00:00Z';
    const a=(id,type,name,extra={})=>({id,type,name,provider:'Test',account:'',purpose:'',date:'',cost:'',art:'generic',url:'',source:'manual',createdAt:old,...extra});
    state={blocks:['domain','server','subscription','ai','repository'].map(id=>({id,width:50,height:null,density:'full',folded:false})),assets:[

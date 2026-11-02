@@ -11,7 +11,7 @@ async (page) => {
   window.__sent=[];
   const replies={save:m=>assetboardSaved(m.sequence,true),evidenceList:()=>assetboardEvidenceList([]),aiRecognize:m=>assetboardAIResult({kind:'recognize',requestId:m.requestId,ok:false,error:'stub'})};
   window.webkit={messageHandlers:{assetboard:{postMessage(m){window.__sent.push(m);if(replies[m.action])setTimeout(()=>replies[m.action](m),5);}}}};
-  window.__ASSETBOARD_NATIVE__={data:{blocks:[{id:'domain'}],assets:[]},cloudflareConnected:false,githubConnected:false,ai:{provider:'anthropic',baseURL:'https://api.anthropic.com',model:'claude-opus-5-5',autoImages:true,host:'api.anthropic.com'},aiKeySaved:true};
+  window.__ASSETBOARD_NATIVE__={pro:{on:true,kind:'licensed',id:'K3Q7NVHM'},data:{blocks:[{id:'domain'}],assets:[]},cloudflareConnected:false,githubConnected:false,ai:{provider:'anthropic',baseURL:'https://api.anthropic.com',model:'claude-opus-5-5',autoImages:true,host:'api.anthropic.com'},aiKeySaved:true};
  });
  // Built at run time, so a scan of the tree for key and token prefixes stays clean.
  const FAKE_TOKEN='gh'+'p_'+'FAKE'.repeat(7);

@@ -1,6 +1,7 @@
-// Pro: the connectors in the import window and under 添加资产 — GitHub through the local gh (or a token), MCP 接入 for agents and scripts,
-// Cloudflare, 阿里云 · 腾讯云 (测试版) and AI recognition (配置 AI). The dialogs and bridge calls they open stay in the core; the free edition just never offers them.
-// Loaded after money-view.js and before app.js; with ?free, or while Pro is off in the Mac app, it registers nothing (proRegister).
+// The full build's connectors in the import window and under 添加资产 — GitHub through the local gh (or a token), MCP 接入 for agents and scripts,
+// Cloudflare, 阿里云 · 腾讯云 (测试版) and AI recognition (配置 AI). They need no licence (Cloudflare's 12-hour sync is Pro, in app.js); the
+// dialogs and bridge calls they open stay in the core, and the free edition just never offers them.
+// Loaded after money-view.js and before app.js; with ?free it registers nothing (proBuild).
 
 function importGitHubButton({cli}){
  const accounts=cli.ghAccounts||[],tags=accounts.map(n=>`<span class="account-tag">${esc(n)}</span>`).join('');
@@ -10,7 +11,7 @@ function importConnectorSources({native,source}){
  return (featureOn('agent')?source('agent-setup','terminal',tr('MCP 接入'),tr('让外部 AI 工具或脚本查询、添加、修改资产')):'')+(native?source('cloudflare-import','cloud','Cloudflare'):'');
 }
 
-proRegister(()=>{
+proBuild(()=>{
  proSlots.importCli.push(importGitHubButton);
  proSlots.importSources.push(importConnectorSources);
  proSlots.captureImportLabel=()=>tr('从文件、GitHub、Cloudflare 导入…');

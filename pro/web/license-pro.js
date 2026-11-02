@@ -1,87 +1,79 @@
-// Assetboard Pro's licence on the board (Mac app only): the sidebar line, the panel (试用 / 购买 / 激活) and the small Pro marks shown
-// while Pro is off. The app decides the state in pro/desktop/License.swift and passes it at document start as nativeStore.pro:
-//   {on, kind:'trial'|'licensed'|'lapsed'|'expired', daysLeft, id, updatesUntil, buildDate}
-// The page verifies nothing and sends nothing: buying opens the browser (openExternal, the app never talks to Stripe), activating hands
+// Assetboard Pro's licence on the board: the Assetboard Pro section of 设置 (status, buying, 输入许可证, removing), the edition in
+// 关于 and the calm Pro hints where a locked feature would be. The Mac app checks the licence offline (pro/desktop/License.swift) and
+// passes the result at document start as nativeStore.pro:
+//   {on, kind:'free'|'licensed'|'demo', id}
+// The page verifies nothing and sends nothing: buying opens the browser (openExternal; the app never talks to Stripe), activating hands
 // the pasted text to the app (licenseActivate), which answers window.assetboardLicenseResult({ok, state, error, removed}). A licence that
-// arrives while the board is open turns Pro on in place (proEnable); removing one takes effect at the next launch. Without
-// nativeStore.pro (the browser, a build without Pro) nothing here registers; ?free registers nothing either. See docs/2026-10-24-pro-purchase.md.
-const proOffer={price:'HK$39',
- // Buying opens the Stripe Payment Link in the browser (its "after payment" setting sends the buyer to the worker's /thanks page).
- // One purchase, lifetime updates: licences carry upd 9999-12-31 and there is no renewal. The worker (pro/worker) answers
- // on pay.assetboard.app (/thanks after paying, /recover); the site itself (assetboard.app, ~/projects/assetboard-site) is static.
- // Prices are this version's words, the checkout page decides.
- buy:'https://buy.stripe.com/28E4gB8T7gdIbniadUdMI01',
- pay:'https://pay.assetboard.app',releases:'https://assetboard.app/downloads/'};
+// arrives while the board is open turns Pro on in place (proEnable); removing one takes effect at the next launch. The browser has no
+// licence: it runs the free features (?demo shows Pro). With ?free nothing here registers.
+// One purchase, US$10, lifetime updates, every Mac of the buyer's own. The checkout page decides the price; PRO_PRICE is what the
+// panel says.
+const PRO_PRICE='US$10';
+// The Stripe Payment Link for Pro. Placeholder until the owner creates the US$10 link: replace it with https://buy.stripe.com/…
+// (the same link goes into pro/worker/wrangler.toml as PAYMENT_LINK). Its "after payment" page must be the worker's
+// /thanks?session_id={CHECKOUT_SESSION_ID}.
+const PRO_BUY_URL='https://buy.stripe.com/PAYMENT_LINK_PLACEHOLDER';
+// The purchase worker (pro/worker): /recover mails a lost licence again.
+const PRO_PAY_URL='https://pay.assetboard.app';
+// What Pro adds, and what is still to come (the slots in pro-slots.js), for the section's list.
+const PRO_INCLUDES=[tr('付款账本、未来 12 个月预测和价格变动'),tr('每周自动核对注册局'),tr('Cloudflare 每 12 小时自动同步'),tr('项目合计、关停清单和定期清理'),tr('探针与 SSH 直读'),tr('MCP 添加、修改和删除，命令行，Inbox 文件夹')];
+const PRO_COMING=[tr('写进「提醒事项」'),tr('加密快照写到你选的文件夹'),tr('「如果我出事」接手包')];
 function proState(){return (typeof window!=='undefined'&&window.__ASSETBOARD_NATIVE__?.pro)||null;}
 function proLicenseId(id){return String(id||'').replace(/(.{4})(?=.)/g,'$1-');}
-// The one line that says where things stand, used by the panel and the sidebar tip.
-function proStateText(s){
- if(!s)return '';
- if(s.kind==='trial')return tr('试用还剩 {n} 天',{n:formatCount(s.daysLeft)});
- if(s.kind==='licensed')return tr('许可证 {id} · 永久更新',{id:proLicenseId(s.id)});
- if(s.kind==='lapsed')return tr('这一版发布于 {build}，你的更新期到 {until}',{build:s.buildDate,until:s.updatesUntil});
- return tr('试用已结束');
+function proLicensed(){return proState()?.kind==='licensed';}
+function proStateText(){
+ if(demoMode)return tr('演示模式：显示全部 Pro 功能');
+ if(proLicensed())return tr('已激活 · 许可证 {id}',{id:proLicenseId(proState().id)});
+ return tr('免费版');
 }
+function proEditionText(){return demoMode?tr('演示（显示 Pro 功能）'):proLicensed()?'Assetboard Pro':tr('免费版');}
 function proOpen(url){if(typeof nativeStore!=='undefined'&&nativeStore)window.webkit.messageHandlers.assetboard.postMessage({action:'openExternal',url});else window.open(url,'_blank','noopener,noreferrer');}
-function proDialog(){
- const s=proState();if(!s)return;
- const kind=s.kind,hasLicence=kind==='licensed'||kind==='lapsed';
- modal('Assetboard Pro',`<div class="form pro-panel">
-  <p class="pro-state ${esc(kind)}" id="pro-state">${esc(proStateText(s))}</p>
-  <p class="form-note">${tr('Pro 加的是自动和记账：定时同步与多账户、阿里云 / 腾讯云到期、探针与 SSH 直读、付款账本、涨价与预计、按项目合计与关停清单、定期清理、Gmail 自动扫描（测试版）、MCP 写入。')}</p>
-  <p class="form-note">${tr('免费版一直能用：看板、全景、关联、提醒、导入、导出、核对注册局。数据永远在你机器上，试用结束什么都不会少。')}</p>
-  ${kind==='licensed'?'':`<p class="pro-price">${tr('{price} 一次买断，永久更新。',{price:esc(proOffer.price)})}<span class="quiet-fact">${tr('以结账页为准。')}</span></p>`}
-  <div class="confirm-actions">
-   ${kind==='licensed'?'':`<button class="button primary" data-action="pro-buy" title="${tr('在浏览器里打开 Stripe 结账页；付完的页面给出许可证，永久更新；App 不访问任何服务器')}">${tr('购买 Pro ↗')}</button>`}
-   ${kind==='lapsed'?`<button class="button" data-action="pro-older" title="${tr('打开发布页；{date} 之前发布的版本对这份许可证永久可用',{date:esc(s.updatesUntil)})}">${tr('下载 {date} 之前的版本 ↗',{date:esc(s.updatesUntil)})}</button>`:''}
-   ${hasLicence?`<button class="button" data-action="pro-remove" title="${tr('删除本机保存的许可证文件，下次启动后回到免费功能；数据不变')}">${tr('移除许可证')}</button>`:`<button class="button" data-action="pro-recover" title="${tr('在浏览器里打开找回页，填购买时的邮箱，许可证会再发一遍')}">${tr('找回许可证 ↗')}</button>`}
-  </div>
-  ${kind==='licensed'?'':`<label>${tr('已有许可证')}<input id="pro-key" class="pro-key" autocomplete="off" spellcheck="false" placeholder="${tr('粘贴 ASB1. 开头的那段文本')}"></label><div class="confirm-actions"><button id="pro-activate" class="button" data-action="pro-activate">${tr('激活')}</button><span id="pro-status" class="form-note" role="status"></span></div>`}
-  <p class="form-note platform-note">${ui('lock')}${tr('许可证在本机离线验证：不激活设备、不联网、不上报。购买在浏览器里完成。')}</p>
- </div>`,'pro');
+// 设置 › Assetboard Pro, drawn with the panel's own row(label, control, title).
+function proLicenceSection(row){
+ const licensed=proLicensed(),list=items=>`<ul class="pro-list">${items.map(t=>`<li>${esc(t)}</li>`).join('')}</ul>`;
+ return [row(tr('状态'),`<span class="pro-state${licensed?' ok':''}" id="pro-state">${esc(proStateText())}</span>`),
+  licensed?'':`<p class="pro-price">${tr('{price} 一次买断，终身更新；你自己的 Mac 不限台数。',{price:esc(PRO_PRICE)})}</p>`,
+  licensed?'':row(tr('购买'),`<button class="button primary" data-action="pro-buy">${tr('购买 Pro（{price}）↗',{price:esc(PRO_PRICE)})}</button>`,tr('在浏览器里打开 Stripe 结账页；付完的页面和邮件给出许可证。App 不访问任何服务器')),
+  licensed?'':row(tr('输入许可证'),`<span class="pro-key-row"><input id="pro-key" class="pro-key" autocomplete="off" spellcheck="false" aria-label="${tr('输入许可证')}" placeholder="${tr('粘贴 ASB1. 开头的那段文本')}"><button id="pro-activate" class="button" data-action="pro-activate">${tr('激活')}</button></span>`),
+  licensed?'':`<p id="pro-status" class="form-note pro-status" role="status"></p>`,
+  licensed?'':row(tr('找回许可证'),`<button class="button" data-action="pro-recover">${tr('找回 ↗')}</button>`,tr('在浏览器里打开找回页，填购买时的邮箱，许可证会再发一遍')),
+  licensed?row(tr('移除许可证'),`<button class="button" data-action="pro-remove">${tr('移除…')}</button>`,tr('删除本机保存的许可证，下次启动回到免费版；数据不变')):'',
+  `<details class="pro-includes"><summary>${tr('Pro 包含')}</summary>${list(PRO_INCLUDES)}<p class="form-note">${tr('即将推出')}</p>${list(PRO_COMING)}</details>`,
+  `<p class="form-note platform-note">${ui('lock')}${tr('许可证在本机离线验证，不联网；没有 Pro 时 Pro 记下的数据照常显示。')}</p>`].join('');
 }
 function proActivate(){
- const input=$('#pro-key'),text=(input?.value||'').trim();
+ const input=$('#pro-key'),text=(input?.value||'').trim(),status=$('#pro-status');
  if(!text){input?.focus();return;}
  if(demoMode){window.assetboardDemoBlocked?.();return;}
- if(!nativeStore){$('#pro-status').textContent=tr('只有 Mac App 能激活');return;}
- $('#pro-activate').disabled=true;$('#pro-status').textContent=tr('验证中…');
+ if(!nativeStore){if(status)status.textContent=tr('只有 Mac App 能激活');return;}
+ $('#pro-activate').disabled=true;if(status){status.classList.remove('bad');status.textContent=tr('验证中…');}
  window.webkit.messageHandlers.assetboard.postMessage({action:'licenseActivate',text});
 }
 window.assetboardLicenseResult=result=>{
- const s=proState();
+ const before=proLicensed();
  if(result?.state&&typeof result.state==='object'&&window.__ASSETBOARD_NATIVE__)window.__ASSETBOARD_NATIVE__.pro=result.state;
- const now=proState();
+ const prefsOpen=$('#modal')?.open&&$('#modal').dataset.view==='prefs';
  if(result?.ok){
-  if(now?.on&&proOff)proEnable();
-  if($('#modal')?.open)$('#modal').close();
+  if(proState()?.on)proEnable();
   render();
-  if(result.removed)toast(tr('已移除许可证，下次启动后回到免费功能'));
-  else if(now?.on)toast(now.kind==='licensed'&&s?.kind!=='licensed'?tr('Pro 已激活'):tr('许可证已更新'));
-  else proDialog();
+  if(prefsOpen)prefsDialog('pro');
+  if(result.removed)toast(tr('已移除许可证，下次启动后回到免费版'));
+  else if(proLicensed())toast(before?tr('许可证已更新'):tr('Pro 已激活'));
   return;
  }
  const status=$('#pro-status'),button=$('#pro-activate');
- if(status)status.textContent=result?.error||tr('没能激活');
+ if(status){status.textContent=result?.error||tr('没能激活');status.classList.add('bad');}
  if(button)button.disabled=false;
- if(status)status.classList.add('bad');
 };
-// Registered whenever the app reports a state (on or off); nothing in the browser or with ?free.
-if(proState()&&!(typeof location!=='undefined'&&new URLSearchParams(location.search).has('free'))){
- const off=()=>!proState()?.on;
- proSlots.toolsNav.push(()=>{const s=proState();if(!s)return '';const count=s.kind==='trial'?`<span class="nav-count${s.daysLeft<=3?' soon':''}">${tr('{n} 天',{n:formatCount(s.daysLeft)})}</span>`:'';
-  return `<button class="nav-item pro-nav" data-action="pro-dialog" data-id="pro" title="${esc(proStateText(s))}">${ui('spark')}<span class="nav-label">Assetboard Pro</span>${count}</button>`;});
- // While Pro is off: the sources the Pro scripts would add, each marked Pro, and one line in the cost panel. They open the panel.
- const mark='<i class="pro-tag">Pro</i>';
- proSlots.importSources.push(({native,source})=>off()&&native?source('pro-dialog','cloud',tr('同步')+mark,tr('Cloudflare、GitHub、阿里云 / 腾讯云的定时同步在 Pro 里'))+source('pro-dialog','pulse',tr('探针')+mark,tr('探针与 SSH 直读在 Pro 里'))+source('pro-dialog','terminal',tr('MCP 接入')+mark,tr('MCP 写入和 Inbox 在 Pro 里')):'');
- proSlots.costExtras.push(()=>off()?`<p class="form-note pro-note"><button type="button" class="text-button inline-button" data-action="pro-dialog">${tr('账本、预计和项目合计在 Pro 里')}</button></p>`:'');
+proBuild(()=>{
+ // The cost panel's one line while Pro is off: where the ledger and the forecast are.
+ proSlots.costExtras.push(()=>proHint(tr('付款账本、未来 12 个月预测和项目合计在 Pro 里。')));
  Object.assign(proSlots.actions,{
-  'pro-dialog':()=>proDialog(),
-  'pro-buy':()=>proOpen(`${proOffer.buy}?locale=${appLang}`),
-  'pro-recover':()=>proOpen(`${proOffer.pay}/recover?lang=${appLang}`),
-  'pro-older':()=>proOpen(proOffer.releases),
+  'pro-dialog':()=>prefsDialog('pro'),
+  'pro-buy':()=>proOpen(PRO_BUY_URL),
+  'pro-recover':()=>proOpen(`${PRO_PAY_URL}/recover?lang=${appLang}`),
   'pro-activate':()=>proActivate(),
-  'pro-remove':()=>confirmDialog(tr('移除许可证'),tr('移除后下次启动回到免费功能，数据不变。'),tr('移除'),true).then(ok=>{if(!ok)return;if(demoMode){window.assetboardDemoBlocked?.();return;}window.webkit.messageHandlers.assetboard.postMessage({action:'licenseRemove'});})
+  'pro-remove':()=>confirmDialog(tr('移除许可证'),tr('移除后下次启动回到免费版，数据不变。'),tr('移除'),true).then(ok=>{if(!ok)return;if(demoMode){window.assetboardDemoBlocked?.();return;}window.webkit.messageHandlers.assetboard.postMessage({action:'licenseRemove'});})
  });
  document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.id==='pro-key'){e.preventDefault();proActivate();}});
-}
+});

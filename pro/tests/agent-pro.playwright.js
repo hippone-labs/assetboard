@@ -45,7 +45,7 @@ async (page) => {
    if(msg.action==='cloudflareSync')answer(()=>window.assetboardCloudflareResult(window.__cfFail?{ok:false,error:'Cloudflare refused cfTOKENabcdefghijklmnopqrstuvwxyz0123'}:{ok:true,connected:true,resources:window.__cf,queriedKinds:['zone'],warnings:[]}),30);
   }}}};
   const server=(id,name,extra={})=>({id,type:'server',name,provider:'Example',source:'manual',art:'generic',cost:'未知',...extra});
-  window.__ASSETBOARD_NATIVE__={data:saved||{blocks:[{id:'server',width:50,height:null,density:'full',folded:false}],assets:[
+  window.__ASSETBOARD_NATIVE__={pro:{on:true,kind:'licensed',id:'K3Q7NVHM'},data:saved||{blocks:[{id:'server',width:50,height:null,density:'full',folded:false}],assets:[
    server('s1','tokyo-vps',{ips:['203.0.113.10']}),server('s2','backup-box'),server('s3','paris-vps'),server('s4','spare'),
    {id:'w1',type:'bankcard',name:'Wise 卡',provider:'Wise',source:'manual',art:'generic',last4:'1234'},{id:'w2',type:'bankcard',name:'Wise 备用',provider:'Wise',source:'manual',art:'generic',last4:'5678'}],
    deletedExternalIds:['cloudflare:zone:z9','cloudflare-zone-z9','github:4242','asset-abc']},
@@ -201,7 +201,7 @@ async (page) => {
  // The demo refuses every call; with ?free the methods are not there (tests/free-edition.playwright.js).
  const demo=await browser.newContext(),d=await demo.newPage();
  try{
-  await d.addInitScript(()=>{window.webkit={messageHandlers:{assetboard:{postMessage(){}}}};window.__ASSETBOARD_NATIVE__={data:null,demo:true,probeSources:[],cloudflareConnected:false,githubConnected:false,gmailConfigured:false};});
+  await d.addInitScript(()=>{window.webkit={messageHandlers:{assetboard:{postMessage(){}}}};window.__ASSETBOARD_NATIVE__={pro:{on:true,kind:'licensed',id:'K3Q7NVHM'},data:null,demo:true,probeSources:[],cloudflareConnected:false,githubConnected:false,gmailConfigured:false};});
   await d.goto('http://127.0.0.1:4317/');await until(d,()=>typeof assetboardAgent==='function');
   const refused=await d.evaluate(()=>['probeSources','sshHosts','iconFetch','cloudflareSync','syncUnblock'].map(method=>assetboardAgent({requestId:'d',method,params:{}})));
   check(refused.every(r=>!r.ok&&/演示模式/.test(r.error)),'The demo refuses: '+JSON.stringify(refused));

@@ -6,6 +6,8 @@ async (page) => {
  const context=await page.context().browser().newContext({viewport:{width:1280,height:900}});const p=await context.newPage();const errors=[];p.on('pageerror',e=>errors.push(e.message));
  try {
   await p.goto('http://127.0.0.1:4317/');
+  // The browser holds no licence: turn Pro on in place, as an activation does.
+  await p.evaluate(()=>{proEnable();render();});
   await until(p,()=>typeof assetboardAgent==='function');
   await p.evaluate(()=>{localStorage.clear();state={blocks:[{id:'domain'}],assets:[
    {id:'d1',type:'domain',name:'example.com',provider:'Namecheap',source:'manual',date:'2027-03-01',dateKind:'expire',art:'generic',notes:'主站'},
@@ -130,7 +132,7 @@ async (page) => {
   check(!errors.length,'Page errors: '+errors.join(' | '));
   // In the Mac app: one tab per tool, each block copied on its own, the chosen tool remembered.
   const mac=await page.context().browser().newContext({viewport:{width:1100,height:820}});const m=await mac.newPage();
-  await m.addInitScript(()=>{window.__sent=[];window.webkit={messageHandlers:{assetboard:{postMessage(x){window.__sent.push(x);if(x.action==='save')setTimeout(()=>assetboardSaved(x.sequence,true),5);if(x.action==='evidenceList')setTimeout(()=>assetboardEvidenceList([]),5);}}}};window.__ASSETBOARD_NATIVE__={data:{blocks:[],assets:[]},ai:null,cliPath:'/Applications/Assetboard.app/Contents/MacOS/assetboard-cli'};});
+  await m.addInitScript(()=>{window.__sent=[];window.webkit={messageHandlers:{assetboard:{postMessage(x){window.__sent.push(x);if(x.action==='save')setTimeout(()=>assetboardSaved(x.sequence,true),5);if(x.action==='evidenceList')setTimeout(()=>assetboardEvidenceList([]),5);}}}};window.__ASSETBOARD_NATIVE__={pro:{on:true,kind:'licensed',id:'K3Q7NVHM'},data:{blocks:[],assets:[]},ai:null,cliPath:'/Applications/Assetboard.app/Contents/MacOS/assetboard-cli'};});
   await m.goto('http://127.0.0.1:4317/');await until(m,()=>typeof agentSetupDialog==='function');
   await m.evaluate(()=>agentSetupDialog());
   check(await m.locator('.agent-tabs .choice').count()===5&&await m.evaluate(()=>document.querySelector('.agent-tabs [aria-checked="true"]').dataset.id==='claude-code'),'Five tools, Claude Code first');

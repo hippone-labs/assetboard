@@ -17,7 +17,7 @@ async (page) => {
     if(msg.action==='evidenceList')setTimeout(()=>window.assetboardEvidenceList?.([]),5);
     if(msg.action==='cloudflareSync'){window.__sent.push(msg);setTimeout(()=>window.assetboardCloudflareResult({ok:true,connected:true,resources:window.__answer,queriedKinds:['zone','registrar'],warnings:[]}),30);}
    }}}};
-   window.__ASSETBOARD_NATIVE__={data:{blocks:[{id:'domain',width:50,height:null,density:'full',folded:false}],assets:[
+   window.__ASSETBOARD_NATIVE__={pro:{on:true,kind:'licensed',id:'K3Q7NVHM'},data:{blocks:[{id:'domain',width:50,height:null,density:'full',folded:false}],assets:[
     {id:'cloudflare-zone-z1',type:'domain',name:'kept.example',syncName:'kept.example',provider:'Cloudflare',account:'Acct',source:'cloudflare',resourceKind:'zone',externalId:'z1',syncStatus:'active',syncedAt:old,art:'generic',event:'active'}],deletedExternalIds:[]},
     cloudflareConnected:false,githubConnected:false,gmailConfigured:false};
   });

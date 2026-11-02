@@ -1,7 +1,7 @@
 // Pro: the money bookkeeping and analysis on top of the free board — what was actually paid (the 已续费 amount, 记一笔, a charge
 // of a different amount, the payment list), price rises, promotions and owners in the form, project totals and the shutdown list,
-// 定期清理, the payment ledger and the cost panel's paid / forecast / split part. It fills the slots in pro-slots.js; the data it
-// writes stays readable by the free edition. Loaded after money-view.js and before app.js; with ?free it registers nothing.
+// 定期清理, the payment ledger and the cost panel's paid / forecast / split part. It fills the slots in pro-slots.js while Pro is on; the data it
+// writes stays readable without it (money-view.js). Loaded after money-view.js and before app.js; it registers through proRegister.
 
 // ---- 已续费: what was paid, and the price when it moved.
 function renewPaidFields(a,{base}){

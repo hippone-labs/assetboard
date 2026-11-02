@@ -5,6 +5,8 @@ async (page) => {
  const context=await page.context().browser().newContext({viewport:{width:1280,height:900}});const p=await context.newPage();const errors=[];p.on('pageerror',e=>errors.push(e.message));
  try {
   await p.goto('http://127.0.0.1:4317/');
+  // The browser holds no licence: turn Pro on in place, as an activation does.
+  await p.evaluate(()=>{proEnable();render();});
   await until(p,()=>typeof linkSection==='function');
   await p.evaluate(()=>{
    const day=n=>{const d=new Date();d.setDate(d.getDate()+n);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;};

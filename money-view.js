@@ -121,6 +121,8 @@ function extraFacts(a){
  else if(a.registryExpires&&['differs','missing'].includes(rdapCompare(a,{expires:a.registryExpires}).state))out.push(row(tr('注册局'),`${tr('{date} 到期',{date:esc(a.registryExpires)})}${a.registryCheckedAt?' · '+tr('{date} 查询',{date:esc(String(a.registryCheckedAt).slice(0,10))}):''} <button class="text-button" data-action="rdap-apply" data-id="${esc(a.id)}">${tr('改成这个')}</button>`));
  // A check that agreed leaves only its date (research D4); after 30 days it is said as an age, quietly, so a new check looks due.
  else if(a.type==='domain'&&!hold&&Date.parse(a.registryCheckedAt||'')){const days=Math.floor((Date.now()-Date.parse(a.registryCheckedAt))/86400000);out.push(row(tr('注册局'),days>30?`<span class="quiet-fact">${tr('{n} 天前核对',{n:days})}</span>`:`${tr('核对一致')} · ${esc(String(a.registryCheckedAt).slice(0,10))}`));}
+ // Without Pro what it wrote stays readable: the project and the last price change.
+ if(proOff){if(a.project)out.push(row(tr('项目'),esc(a.project)));const c=priceChange(a);if(c)out.push(row(c.up?tr('涨价'):tr('降价'),`<span class="price-delta ${c.up?'up':'down'}">${esc(formatMoney(c.before,c.currency))} → ${esc(formatMoney(c.after,c.currency))}</span>`));}
  return out.join('')+slotHtml('facts',a,row);
 }
 function paymentsSection(a){
@@ -128,8 +130,12 @@ function paymentsSection(a){
  // Cards, numbers and accounts have no payments of their own, but a keep-alive deadline that came due still asks here.
  const own=ownPayments(a),renewals=pendingRenewals([a],{since:state.paymentsSince}),charges=own?pendingChargesAsked([a]):[];
  if(own&&proSlots.paymentsSection)return proSlots.paymentsSection(a,{renewals,charges});
- if(!renewals.length&&!charges.length)return '';
- return `<section class="pay-section" aria-label="${tr('待确认')}"><div class="pay-head"><h3>${tr('待确认')}</h3></div>${renewals.map(c=>renewalRow(c)).join('')}${charges.map(c=>chargeRow(c)).join('')}</section>`;
+ // Payments recorded with Pro stay listed without it, read-only (the latest five).
+ const paid=own?paymentList(a).slice().reverse():[],shown=paid.slice(0,5);
+ if(!renewals.length&&!charges.length&&!paid.length)return '';
+ const list=shown.length?`<ul class="pay-list">${shown.map(p=>`<li class="${p.status==='missed'?'missed':''}"><span class="pay-date">${esc(p.paidOn)}</span><span class="pay-amount">${p.status==='missed'?tr('未扣款'):esc(formatMoney(p.amount,p.currency))}</span><span class="pay-via">${esc([PAYMENT_VIA[p.via]||'',p.note].filter(Boolean).join(' · '))}</span></li>`).join('')}</ul>${paid.length>shown.length?`<p class="pay-more">${tr('另有 {n} 条',{n:formatCount(paid.length-shown.length)})}</p>`:''}`:'';
+ const title=paid.length?tr('付款'):tr('待确认');
+ return `<section class="pay-section" aria-label="${title}"><div class="pay-head"><h3>${title}</h3>${paid.length?proTag():''}</div>${renewals.map(c=>renewalRow(c)).join('')}${charges.map(c=>chargeRow(c)).join('')}${list}</section>`;
 }
 
 // ---- The form: billing type (inside 更多); Pro adds the project, promotion, owner and person in charge.
@@ -243,7 +249,8 @@ function rdapApply(a,date){
 // Each answer also stores the hold, the registrar and the nameservers (rdapRemember), so the next check can say they changed.
 const RDAP_REFRESH_DAYS=7;
 let rdapQueue=[],rdapBusy=false,rdapGapMs=4000;
-function rdapAutoOn(){return !!state.rdapAuto&&!!nativeStore&&!demoMode;}
+// Weekly checks are Pro: without it state.rdapAuto stays as it was and nothing is sent; 核对注册局 by hand stays free.
+function rdapAutoOn(){return !!state.rdapAuto&&!!nativeStore&&!demoMode&&!proOff;}
 function rdapAutoDue(now=new Date()){
  const last=a=>Math.max(Date.parse(a.registryCheckedAt)||0,Date.parse(a.registryTriedAt)||0);
  return state.assets.filter(a=>a.type==='domain'&&!a.hiddenAt&&!a.stopped&&rdapDomain(a)&&!rdapMissing(rdapDomain(a))&&now-last(a)>=RDAP_REFRESH_DAYS*86400000).sort((x,y)=>last(x)-last(y)).map(a=>a.id);

@@ -36,7 +36,7 @@ async (page) => {
    if(msg.action==='probeRefresh')for(const s of window.__ASSETBOARD_NATIVE__.probeSources)setTimeout(()=>window.assetboardProbe({source:s.id,kind:'cfsm',data:{servers:[{id:'a',name:'tokyo-vps',cpu:5,ram_used:100,ram_total:1000,disk_used:1,disk_total:10,last_updated:now}]},at:Date.now()}),10);
   }}}};
   const server=(id,name,extra={})=>({id,type:'server',name,provider:'Example',source:'manual',art:'generic',cost:'未知',...extra});
-  window.__ASSETBOARD_NATIVE__={data:{blocks:[{id:'server',width:50,height:null,density:'full',folded:false}],assets:[
+  window.__ASSETBOARD_NATIVE__={pro:{on:true,kind:'licensed',id:'K3Q7NVHM'},data:{blocks:[{id:'server',width:50,height:null,density:'full',folded:false}],assets:[
    server('s1','tokyo-vps',{ips:['203.0.113.10']}),server('s2','build',{ips:['198.51.100.7']}),server('s3','edge-node',{host:'edge.example.net'}),server('s4','spare',{source:'ssh',externalId:'spare',host:'198.51.100.9'}),server('s5','auto-box',{ips:['198.51.100.50']})],deletedExternalIds:[]},
    probeSources:[{id:'cf',kind:'cfsm',name:'面板',url:'https://status.example.com',hasToken:false}],sshProbe:{enabled:['box','edge','tokyo'],interval:60},
    cloudflareConnected:false,githubConnected:false,gmailConfigured:false};
@@ -102,7 +102,7 @@ async (page) => {
 
  // The demo: frankfurt-vps is read over SSH (made up, linked by hand), with rings and a sparkline, and no ssh is asked for.
  const demo=async demoOpen=>open(o=>{window.webkit={messageHandlers:{assetboard:{postMessage(msg){window.__sent=(window.__sent||[]).concat(msg.action);if(msg.action==='save')setTimeout(()=>window.assetboardSaved?.(msg.sequence,true),5);}}}};
-  window.__ASSETBOARD_NATIVE__={data:null,demo:true,demoOpen:o,cloudflareConnected:false,githubConnected:false,gmailConfigured:false,probeSources:[]};},demoOpen);
+  window.__ASSETBOARD_NATIVE__={pro:{on:true,kind:'licensed',id:'K3Q7NVHM'},data:null,demo:true,demoOpen:o,cloudflareConnected:false,githubConnected:false,gmailConfigured:false,probeSources:[]};},demoOpen);
  const one=await demo({asset:'demo-s2'});
  try{
   await until(one.p,()=>!!document.querySelector('#detail-content .probe-card')&&!document.querySelector('#detail').hidden);

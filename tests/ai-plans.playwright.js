@@ -18,6 +18,8 @@ async (page) => {
  const open=async({scheme='light',width=1280,demo=false}={})=>{
   const context=await page.context().browser().newContext({viewport:{width,height:900},colorScheme:scheme,reducedMotion:'reduce'});const p=await context.newPage();const errors=[];p.on('pageerror',e=>errors.push(e.message));
   await p.goto('http://127.0.0.1:4317/'+(demo?'?demo':''));
+  // The browser holds no licence: turn Pro on in place, as an activation does.
+  await p.evaluate(()=>{proEnable();render();});
   await until(p,()=>typeof aiPlansDialog==='function'&&typeof render==='function');
   if(!demo)await p.evaluate(()=>{localStorage.clear();state={blocks:[{id:'ai',folded:false}],assets:[{id:'c1',type:'ai',name:'Claude Pro',provider:'Anthropic',cost:'$20 / 月',cycle:'monthly',dateKind:'renew',source:'manual',art:'generic'}],deletedExternalIds:[]};window.__saves=0;save=()=>{window.__saves++;};render();});
   return {p,context,errors};

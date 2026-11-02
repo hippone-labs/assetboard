@@ -14,7 +14,7 @@ async (page) => {
     if(m.action==='evidenceList')setTimeout(()=>window.assetboardEvidenceList?.([]),5);
     if(m.action==='localCliDetect')setTimeout(()=>window.assetboardLocalCliDetect?.({gh:false,ghAccounts:[],sshConfig:false}),5);
    }}}};
-   window.__ASSETBOARD_NATIVE__={data:{blocks:[{id:'domain',folded:false},{id:'server',folded:false}],assets:[
+   window.__ASSETBOARD_NATIVE__={pro:{on:true,kind:'licensed',id:'K3Q7NVHM'},data:{blocks:[{id:'domain',folded:false},{id:'server',folded:false}],assets:[
     {id:'d1',type:'domain',name:'example.com',provider:'Registrar',source:'manual',art:'generic',date:'2099-03-01',dateKind:'expire'},
     {id:'s1',type:'server',name:'box-one',provider:'Example Cloud',source:'manual',art:'generic',ips:'192.0.2.10'}]},
     cloudflareConnected:true,githubConnected:false,statusItem:true,autoUpdate:true,version:'2026.10.3',notifications:'denied',probeSources:[],sshProbe:{enabled:[],interval:60}};
@@ -25,8 +25,8 @@ async (page) => {
   // One way in from the sidebar; three groups.
   await p.click('#sidebar [data-action="prefs"]');
   const groups=await p.$$eval('#modal .prefs-group h3',hs=>hs.map(h=>h.textContent));
-  check(groups.join()==='通用,功能,连接,关于','Four sections: '+groups.join());
-  check(await p.$$eval('#modal .prefs-tab',ts=>ts.map(t=>t.dataset.id+':'+t.getAttribute('aria-selected')).join())==='general:true,features:false,connections:false,about:false','The list at the left, 通用 first');
+  check(groups.join()==='通用,功能,连接,Assetboard Pro,关于','Five sections: '+groups.join());
+  check(await p.$$eval('#modal .prefs-tab',ts=>ts.map(t=>t.dataset.id+':'+t.getAttribute('aria-selected')).join())==='general:true,features:false,connections:false,pro:false,about:false','The list at the left, 通用 first');
   check(await p.$$eval('#modal .prefs-group',gs=>gs.filter(g=>!g.hidden).length)===1,'One section shown at a time');
   const switches=await p.$$eval('#modal input.prefs-switch',ns=>Object.fromEntries(ns.map(n=>[n.dataset.id||n.dataset.action,n.checked])));
   check(switches.probe===false&&switches.panorama===true&&switches.agent===true,'Probes start off, the rest on: '+JSON.stringify(switches));

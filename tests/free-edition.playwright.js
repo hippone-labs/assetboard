@@ -12,8 +12,9 @@ async (page) => {
     payments:[{id:'m1',paidOn:isoDay(localDay()-30),covers:isoDay(localDay()-30),amount:10,currency:'USD'}]}]};
    render();costDialog();
    const cost=document.querySelector('#modal').innerHTML;
-   // The agent interface keeps only the core methods: the probe, SSH 直读, icon and Cloudflare tools are Pro.
-   const agent=['probeSources','probeSourceAdd','sshHosts','sshSet','iconPlatforms','iconFetch','cloudflareSync','syncBlocklist'].map(method=>assetboardAgent({requestId:'f',method,params:{}}));
+   // The agent interface keeps only the core methods (asked through MCP, whose lookups are free): the probe, SSH 直读, icon and
+   // Cloudflare tools are Pro.
+   const agent=['probeSources','probeSourceAdd','sshHosts','sshSet','iconPlatforms','iconFetch','cloudflareSync','syncBlocklist'].map(method=>assetboardAgent({requestId:'f',via:'mcp',method,params:{}}));
    return {slots:Object.entries(proSlots).filter(([k,v])=>Array.isArray(v)?v.length:['actions','agentMethods','agentConfirms','agentFields'].includes(k)?Object.keys(v).length:v).map(([k])=>k),
     agent:agent.every(r=>!r.ok&&/未知方法/.test(r.error))&&!/probe|ssh|icon|cloudflare|sync/i.test(agent[0].error.split('可用：')[1]??'probe'),
     costMore:cost.includes('cost-more'),menu:assetMenuItems(state.assets[0],true).map(x=>x.action).filter(Boolean)};
@@ -40,8 +41,8 @@ async (page) => {
   check(!capture.actions.includes('agent-setup'),'?free 添加资产 links to MCP 接入');
   check(!/MCP|GitHub|Cloudflare|Gmail/.test(capture.text),'?free 添加资产 names a Pro source: '+capture.text);
   check(capture.actions.includes('import-hub'),'?free 添加资产 lost its import link');
-  // 项目 is Pro: no sidebar group, detail row, form field, project view or 全景 按项目, yet the label a record has survives
-  // editing, a table import over it, a backup restore and the exports.
+  // 项目 is Pro: no sidebar group, form field, project view or 全景 按项目; the label a record has shows in the detail as plain
+  // text (read-only) and survives editing, a table import over it, a backup restore and the exports.
   const projects=await p.evaluate(()=>{
    if(typeof panoramaOpen==='function')panoramaOpen(false);
    state={...state,assets:[{id:'pr1',type:'domain',name:'notes-lab.example',provider:'Registrar',account:'',purpose:'',date:'',dateKind:'expire',cost:'未知',art:'generic',source:'manual',project:'notes-lab'},
@@ -49,10 +50,10 @@ async (page) => {
    // A project view remembered from the full edition falls back to 全部资产.
    view='project:notes-lab';render();
    const sidebar=document.querySelector('#sidebar').innerText,shown=currentView();
-   showDetail('pr1');const detail=document.querySelector('#detail')?.innerText||'';
+   showDetail('pr1');const detail=document.querySelector('#detail')?.innerText||'',projectLink=!!document.querySelector('#detail [data-id^="project:"]');
    assetForm('domain','pr1');const form=document.querySelector('#asset-form'),field=!!form.elements.project,summary=form.querySelector('summary').textContent;
    form.elements.purpose.value='site';form.requestSubmit();
-   return {view:shown,sidebar,detail,field,summary};
+   return {view:shown,sidebar,detail,projectLink,field,summary};
   });
   await p.waitForTimeout(100);
   Object.assign(projects,await p.evaluate(()=>{
@@ -64,11 +65,12 @@ async (page) => {
    const handover=handoverHtml(state,{types:Object.fromEntries(Object.entries(cats).map(([id,c])=>[id,c.name])),order:categoryIds()});
    panoramaOpen(true);const lenses=[...document.querySelectorAll('.pano-lens .seg')].map(b=>b.dataset.lens);panoramaOpen(false);
    return {on:projectsOn(),edited:afterEdit.project+'|'+afterEdit.purpose,imported:imported.project+'|'+imported.date,restored:restored.project+'|'+restored.purpose,
-    handover:handover.includes('notes-lab'),lens:panoramaLenses(state.assets,panoSkip()),lenses,agent:assetboardAgent({requestId:'t',method:'projects',params:{}}).result?.projects};
+    handover:handover.includes('notes-lab'),lens:panoramaLenses(state.assets,panoSkip()),lenses,agent:assetboardAgent({requestId:'t',via:'mcp',method:'projects',params:{}}).result?.projects};
   }));
   check(!projects.on,'?free has projects switched on');
   check(projects.view==='all','?free opened a project view: '+projects.view);
-  check(!projects.sidebar.includes('项目')&&!projects.detail.includes('项目'),'?free shows 项目 in the sidebar or the detail');
+  check(!projects.sidebar.includes('项目'),'?free shows 项目 in the sidebar');
+  check(projects.detail.includes('项目')&&projects.detail.includes('notes-lab')&&!projects.projectLink,'?free does not show the stored project read-only in the detail');
   check(!projects.field&&!projects.summary.includes('项目'),'?free 编辑 offers a project field: '+projects.summary);
   check(!projects.lens.includes('project')&&!projects.lenses.includes('project'),'?free 全景 offers 按项目: '+projects.lenses.join());
   check(Array.isArray(projects.agent)&&!projects.agent.length,'?free agent lists projects');
@@ -106,7 +108,7 @@ async (page) => {
   check(!note.ai&&!/AI/.test(note.text),'the free Mac app\'s 添加资产 offers 配置 AI: '+note.text);
   // The page's agent interface reports no charges waiting.
   const agent=await m.evaluate(()=>{state.assets=[{id:'u1',type:'subscription',name:'Notes Pro',provider:'Notes',account:'',purpose:'',date:isoDay(localDay()-5),dateKind:'renew',cycle:'monthly',cost:'$8 / 月',art:'generic',source:'manual',createdAt:'2025-01-01T00:00:00Z'}];state.paymentsSince=isoDay(localDay()-40);
-   return {due:pendingCharges(state.assets,{since:state.paymentsSince}).length,list:assetboardAgent({requestId:'t',method:'charges',params:{}}).result?.charges,asset:agentAsset(state.assets[0])};});
+   return {due:pendingCharges(state.assets,{since:state.paymentsSince}).length,list:assetboardAgent({requestId:'t',via:'mcp',method:'charges',params:{}}).result?.charges,asset:agentAsset(state.assets[0])};});
   check(agent.due===1&&Array.isArray(agent.list)&&!agent.list.length&&!('unconfirmedCharges' in agent.asset),'the free agent interface reports charges: '+JSON.stringify(agent));
  } finally { await context.close(); }
  // The free demo does not show a GitHub sync it does not have: a few repositories written down by hand, no account tag.

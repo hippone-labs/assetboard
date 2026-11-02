@@ -43,7 +43,7 @@ async (page) => {
   }
   for(const type of types)await step('add '+type,type=>assetForm(type),type);
   for(const [label,fn] of Object.entries({
-   capture:()=>captureDialog(''),importHub:()=>importHub(),exportDialog:()=>exportDialog(),prefsDialog:()=>prefsDialog('general'),prefsFeatures:()=>prefsDialog('features'),prefsConnections:()=>prefsDialog('connections'),prefsAbout:()=>prefsDialog('about'),themeDialog:()=>themeDialog(),
+   capture:()=>captureDialog(''),importHub:()=>importHub(),exportDialog:()=>exportDialog(),prefsDialog:()=>prefsDialog('general'),prefsFeatures:()=>prefsDialog('features'),prefsConnections:()=>prefsDialog('connections'),prefsAbout:()=>prefsDialog('about'),prefsPro:()=>prefsDialog('pro'),themeDialog:()=>themeDialog(),
    inbox:()=>inboxDialog(),cloudflare:()=>cloudflareDialog(),github:()=>githubDialog(),ai:()=>aiDialog(),iconBatch:()=>iconBatchDialog(),network:()=>networkDialog(),
    agent:()=>agentSetupDialog(),probe:()=>probeDialog(),ssh:()=>sshProbeDialog(),shutdown:()=>shutdownDialog?.(),
    settings:()=>settings('domain'),keys:()=>toggleKeysHelp(true)}))await step(label,fn);
