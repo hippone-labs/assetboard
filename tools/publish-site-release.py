@@ -5,9 +5,26 @@ import datetime
 import hashlib
 import html
 import json
+import plistlib
 import re
 import shutil
+import zipfile
 from pathlib import Path
+
+
+def minimum_system(archive, version):
+    """LSMinimumSystemVersion of the app inside the archive, which the app's updater compares with the Mac it runs on."""
+    try:
+        with zipfile.ZipFile(archive) as bundle:
+            info = plistlib.loads(bundle.read("Assetboard.app/Contents/Info.plist"))
+    except (KeyError, zipfile.BadZipFile, plistlib.InvalidFileException) as error:
+        raise ValueError(f"Archive has no readable Assetboard.app/Contents/Info.plist: {error}") from None
+    if info.get("CFBundleShortVersionString") != version:
+        raise ValueError("The app's CFBundleShortVersionString must match the release version")
+    minimum = info.get("LSMinimumSystemVersion")
+    if not isinstance(minimum, str) or not re.fullmatch(r"\d+(\.\d+){0,2}", minimum):
+        raise ValueError("The app must name its LSMinimumSystemVersion")
+    return minimum
 
 
 def stage(site, archive, version, notes):
@@ -25,6 +42,7 @@ def stage(site, archive, version, notes):
         raise ValueError("Release archives are immutable")
     if not notes.strip():
         raise ValueError("Release notes are required")
+    minimum = minimum_system(archive, version)
     pages = {}
     for path in [site / "index.html", site / "en/index.html"]:
         text = path.read_text()
@@ -44,7 +62,7 @@ def stage(site, archive, version, notes):
     shutil.copyfile(archive, destination)
     for path, text in pages.items():
         path.write_text(text)
-    manifest_path.write_text(json.dumps({"version": version, "notes": notes, "assets": [
+    manifest_path.write_text(json.dumps({"version": version, "minimumSystemVersion": minimum, "notes": notes, "assets": [
         {"name": name, "url": f"https://assetboard.app/downloads/{name}", "sha256": digest}
     ]}, ensure_ascii=False, indent=2) + '\n')
 

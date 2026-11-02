@@ -23,9 +23,9 @@
 
 ## 下载与安装
 
-到 [assetboard.app](https://assetboard.app/) 下载最新的 `Assetboard-macOS-arm64-*.zip`，解压后打开 `Assetboard.app`。安装包只在官网发布；App 的「检查更新」每天最多读一次官网的版本文件（`/downloads/latest.json`），下载后核对校验值、签名和公证再替换。
+到 [assetboard.app](https://assetboard.app/) 下载最新的 `Assetboard-macOS-arm64-*.zip`，解压后打开 `Assetboard.app`。安装包只在官网发布；App 的「检查更新」每天最多读一次官网的版本文件（`/downloads/latest.json`），下载后核对校验值、签名、公证和最低系统，先让新版自检启动一次再替换；替换下来的旧版留在 `~/Library/Application Support/Assetboard/previous.app`，新版没能启动就自动换回。这台 Mac 的系统低于新版要求时，不会提供那个版本。
 
-- 系统：macOS 12 或更高，仅提供 Apple Silicon（arm64）版本。
+- 系统：macOS 15 或更高，仅提供 Apple Silicon（arm64）版本。
 - 安装包已签名并公证，双击即可打开。
 - 也可以不装，直接在浏览器里试：见下文“从源码构建”。
 
@@ -200,7 +200,7 @@ MCP 工具：`list_asset_types`、`list_assets`、`get_asset`、`get_cost_totals
 
 ## 从源码构建
 
-需要 macOS 和 Xcode 命令行工具。
+需要 macOS 和 Xcode 命令行工具。App 按 macOS 15 编译（`-target arm64-apple-macos15.0`），构建后核对每个二进制的最低系统和 `Info.plist` 的 `LSMinimumSystemVersion` 一致，不一致就失败。
 
 ```sh
 zsh desktop/build.sh     # 输出 dist/Assetboard.app（本机临时签名），并跑原生自检
