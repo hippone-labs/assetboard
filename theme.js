@@ -134,7 +134,7 @@ function themeDialog(){
  modal(tr('主题'),`<div class="theme-options">${(open?themePresets:themePresets.slice(0,1)).map(([id,name,,,mood])=>swatch(id,name,mood,presetTheme(id))).join('')}${open?swatch('system',tr('跟随系统'),tr('系统强调色'),{accent:systemAccent(),tint:.45}):''}</div>
   ${open?`<div class="theme-custom"><label>${tr('自定义强调色')}<input id="theme-color" type="color" value="${current.accent}"></label></div>
   <details class="theme-json"><summary>${tr('粘贴主题 JSON')}</summary><textarea id="theme-json" rows="3" maxlength="2000" spellcheck="false" aria-label="${tr('主题 JSON')}" placeholder='{"name":"${tr('我的主题')}","accent":"#0a6fe8","accentDark":"#5ea4ff","tint":0.5}'></textarea><div class="theme-json-row"><button class="button" id="theme-json-apply" type="button">${tr('预览')}</button><span class="form-note" id="theme-json-status" role="status"></span></div></details>`:''}
-  <p class="form-note">${tr('强调色用于按钮、选中和链接；底色跟随系统的浅色或深色。明度会自动调到文字对比度达标（WCAG AA），到期红、橙色保持不变。主题只存在这台设备上。')}</p><button class="button primary" id="save-theme">${tr('使用这个主题')}</button>`);
+  <div class="theme-actions"><button class="button primary" id="save-theme" title="${tr('强调色用于按钮、选中和链接；底色跟随系统的浅色或深色。明度会自动调到文字对比度达标（WCAG AA），到期红、橙色保持不变。主题只存在这台设备上。')}">${tr('使用这个主题')}</button><span class="form-note">${tr('只存在这台设备上')}</span></div>`);
  const mark=()=>document.querySelectorAll('[data-theme-id]').forEach(el=>el.setAttribute('aria-pressed',String(el.dataset.themeId===pending.id)));
  const preview=next=>{pending=next;applyBoardTheme(themeFor(next));mark();};
  mark();

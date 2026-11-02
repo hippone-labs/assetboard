@@ -54,13 +54,13 @@ function confirmCharges(list){
 // Automatic charges that came due: one answer each — paid as usual, paid a different amount, or not taken.
 function chargeRow(c,{named=false}={}){
  const a=c.asset,amount=c.money&&c.money.value>0?formatMoney(c.money.value,c.money.currency):tr('金额未知');
- return `<div class="charge-row" data-asset="${esc(a.id)}">${named?tile(a,'sm'):''}<span class="charge-main">${named?`<span class="charge-name">${esc(displayName(a))}</span>`:''}<span class="charge-sub">${tr('{date} 扣款',{date:esc(c.due)})} · ${esc(amount)} · ${c.days?tr('{n} 天前',{n:c.days}):tr('今天')}</span></span><span class="charge-actions"><button class="button primary" data-action="charge-paid" data-id="${esc(a.id)}" data-due="${esc(c.due)}"${c.money?.value>0?'':' disabled'}>${tr('已扣款')}</button>${proAction('charge-edit')?`<button class="button" data-action="charge-edit" data-id="${esc(a.id)}" data-due="${esc(c.due)}">${tr('金额不同')}</button>`:''}<button class="button quiet" data-action="charge-missed" data-id="${esc(a.id)}" data-due="${esc(c.due)}" title="${tr('这次没有扣款（取消了或扣款失败）')}">${tr('没扣')}</button></span></div>`;
+ return `<div class="charge-row" data-asset="${esc(a.id)}">${named?tile(a,'sm'):''}<span class="charge-main">${named?`<span class="charge-name">${esc(displayName(a))}</span>`:''}<span class="charge-sub">${tr('{date} 扣款',{date:esc(c.due)})} · ${esc(amount)} · ${c.days?tr('{n} 天前',{n:c.days}):tr('今天')}</span></span><span class="charge-actions"><button class="button" data-action="charge-paid" data-id="${esc(a.id)}" data-due="${esc(c.due)}"${c.money?.value>0?'':' disabled'}>${tr('已扣款')}</button>${proAction('charge-edit')?`<button class="button" data-action="charge-edit" data-id="${esc(a.id)}" data-due="${esc(c.due)}">${tr('金额不同')}</button>`:''}<button class="button quiet" data-action="charge-missed" data-id="${esc(a.id)}" data-due="${esc(c.due)}" title="${tr('这次没有扣款（取消了或扣款失败）')}">${tr('没扣')}</button></span></div>`;
 }
 // Auto-renewals and repeating keep-alives that came due: either can fail silently, so the date waits for a yes before it rolls on, and
 // a no makes it an expiry. The question stays until answered; past the registrar's grace it says the record may have expired.
 function renewalRow(c,{named=false}={}){
  const a=c.asset;
- return `<div class="charge-row renewal-row" data-asset="${esc(a.id)}">${named?tile(a,'sm'):''}<span class="charge-main">${named?`<span class="charge-name">${esc(displayName(a))}</span>`:''}<span class="charge-sub">${esc(c.due)} ${confirmWords[c.kind].due} · ${c.days===1?tr('昨天'):tr('{n} 天前',{n:c.days})} · ${c.overdue?`<span class="due-bad">${tr('可能已过期')}</span> · `:''}${confirmWords[c.kind].ask}</span></span><span class="charge-actions"><button class="button primary" data-action="renewal-yes" data-id="${esc(a.id)}" data-due="${esc(c.due)}">${confirmWords[c.kind].yes}</button><button class="button quiet" data-action="renewal-no" data-id="${esc(a.id)}" data-due="${esc(c.due)}">${confirmWords[c.kind].no}</button></span></div>`;
+ return `<div class="charge-row renewal-row" data-asset="${esc(a.id)}">${named?tile(a,'sm'):''}<span class="charge-main">${named?`<span class="charge-name">${esc(displayName(a))}</span>`:''}<span class="charge-sub">${esc(c.due)} ${confirmWords[c.kind].due} · ${c.days===1?tr('昨天'):tr('{n} 天前',{n:c.days})} · ${c.overdue?`<span class="due-bad">${tr('可能已过期')}</span> · `:''}${tr('{ask}？',{ask:confirmWords[c.kind].ask})}</span></span><span class="charge-actions"><button class="button" data-action="renewal-yes" data-id="${esc(a.id)}" data-due="${esc(c.due)}">${confirmWords[c.kind].yes}</button><button class="button quiet" data-action="renewal-no" data-id="${esc(a.id)}" data-due="${esc(c.due)}">${confirmWords[c.kind].no}</button></span></div>`;
 }
 function renewalsBandHtml(){
  const list=pendingRenewals(state.assets,{since:state.paymentsSince});if(!list.length)return '';
@@ -101,7 +101,8 @@ function priceMark(a){
 function extraFacts(a){
  const row=(k,html)=>`<div class="fact"><span>${k}</span><span>${html}</span></div>`,out=[];
  const type=billingTypeOf(a);
- if(BILLING_TYPES.includes(a.billingType)||type==='free')out.push(row(tr('计费'),esc(billingLabels[type])));
+ // 计费 only when it says more than the 费用 row: a free record whose cost already reads 免费 is not told twice.
+ if((BILLING_TYPES.includes(a.billingType)||type==='free')&&!(type==='free'&&isFreeCost(a.cost)))out.push(row(tr('计费'),esc(billingLabels[type])));
  const promo=validPromotion(a.promotion);
  if(promo)out.push(row(tr('优惠'),esc(promo.settledAt?tr('已于 {end} 结束，恢复 {price}',{end:promo.end,price:formatMoney(promo.regularAmount,promo.currency)}):tr('{price} 至 {end}，之后 {regular}',{price:formatMoney(promo.amount,promo.currency),end:promo.end,regular:formatMoney(promo.regularAmount,promo.currency)}))));
  const life=lifecycleRule(a);
@@ -177,10 +178,10 @@ function exportDialog(){
  const dated=state.assets.filter(a=>!a.hiddenAt&&!a.stopped&&dayNumber(a.date)!==null).length;
  const readOnly=`<span class="fmt" title="${tr('只用来阅读，导不回来；恢复用资产备份')}">${tr('只读')}</span>`;
  modal(tr('导出'),`<div class="export-list">
-  <section class="export-card"><div><h3>${ui('stack')}${tr('资产备份')}</h3><p class="form-note">${tr('全部资料、关联和付款记录，换机器或出了问题时从这里恢复。导入时可以合并，也可以整体替换，⌘Z 可撤销。')}</p></div><div class="export-buttons"><button class="button primary" data-action="export-board">${tr('导出 .json')}</button><button class="button" data-action="restore-backup">${tr('从备份恢复…')}</button><input type="file" id="backup-file" accept=".json,application/json" hidden></div></section>
-  <section class="export-card"><div><h3>${ui('clock')}${tr('日历')}${readOnly}</h3><p class="form-note">${tr('{n} 个到期和扣款日，按周期重复，提前提醒和 App 一样。导入“日历”或任何日历软件；日期变了要重新导出。',{n:formatCount(dated)})}</p><p class="form-note">${tr('iCloud 日历不做端到端加密。')}</p><label class="check-label"><input type="checkbox" id="ics-minimal"${privacy?' checked':''}>${tr('只写类别和天数')}</label></div><button class="button" data-action="export-ics">${tr('导出 .ics')}</button></section>
+  <section class="export-card"><div><h3>${ui('stack')}${tr('资产备份')}</h3><p class="form-note">${tr('全部资料、关联和付款记录；恢复时可合并或整体替换。')}</p></div><div class="export-buttons"><button class="button primary" data-action="export-board">${tr('导出 .json')}</button><button class="button" data-action="restore-backup">${tr('从备份恢复…')}</button><input type="file" id="backup-file" accept=".json,application/json" hidden></div></section>
+  <section class="export-card"><div><h3>${ui('clock')}${tr('日历')}${readOnly}</h3><p class="form-note">${tr('{n} 个到期和扣款日，按周期重复，提醒与 App 相同；日期变了要重新导出。',{n:formatCount(dated)})}</p><p class="form-note">${tr('iCloud 日历不做端到端加密。')}</p><label class="check-label"><input type="checkbox" id="ics-minimal"${privacy?' checked':''}>${tr('只写类别和天数')}</label></div><button class="button" data-action="export-ics">${tr('导出 .ics')}</button></section>
   ${slotHtml('exportCards')}
-  <section class="export-card"><div><h3>${ui('mail')}${tr('交接清单')}${readOnly}</h3><p class="form-note">${tr('一页能离开 App 独立阅读的清单：有什么、在哪个账号、多少钱、什么时候到期、谁付款。给家人、合伙人或接手的人。不含密码。')}</p><label class="check-label"><input type="checkbox" id="handover-mask"${privacy?' checked':''}>${tr('遮住名称、账号、地址、备注和链接')}</label></div><button class="button" data-action="export-handover">${tr('导出 .html')}</button></section>
+  <section class="export-card"><div><h3>${ui('mail')}${tr('交接清单')}${readOnly}</h3><p class="form-note">${tr('一页离开 App 也能读的清单：有什么、在哪个账号、多少钱、何时到期、谁付款。不含密码。')}</p><label class="check-label"><input type="checkbox" id="handover-mask"${privacy?' checked':''}>${tr('遮住名称、账号、地址、备注和链接')}</label></div><button class="button" data-action="export-handover">${tr('导出 .html')}</button></section>
  </div>`,'export');
  $('#backup-file').addEventListener('change',async e=>{const file=e.target.files?.[0];e.target.value='';if(!file)return;$('#modal').close();routeImportText(await file.text(),{filename:file.name,mime:file.type});});
 }

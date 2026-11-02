@@ -10,8 +10,8 @@ const FEATURES={
  probe:{name:tr('探针与 SSH 直读'),note:tr('从你的监控面板或 SSH 读取服务器的在线状态、CPU、内存和磁盘。这是实时读数，不是登记状态'),on:false,mac:true,full:true,pro:true},
  agent:{name:tr('外部工具接入（MCP）'),note:tr('让 Claude、ChatGPT、Cursor 等工具或脚本通过 assetboard-cli 查询和修改资产；关掉后它们的调用一律被拒绝'),on:true,mac:true,full:true},
  // Under 外部工具接入, shown while it is on. Off until switched, in a demo too: they decide what leaves the Mac.
- agentAddresses:{name:tr('把地址和联系方式交给 AI 工具'),note:tr('关着时，外部工具读到的 IP、SSH 主机和用户、手机号和邮箱都是遮住的；搜索仍按真实值匹配'),on:false,mac:true,full:true,under:'agent'},
- agentCards:{name:tr('把银行卡和手机号交给 AI 工具'),note:tr('关着时，外部工具读不到也改不了银行卡和手机号这两类记录'),on:false,mac:true,full:true,under:'agent'}
+ agentAddresses:{name:tr('把地址和联系方式交给 AI 工具'),note:tr('关着时，AI 工具读到的 IP、SSH 主机和用户、手机号和邮箱都是遮住的；搜索仍按真实值匹配'),on:false,mac:true,full:true,under:'agent'},
+ agentCards:{name:tr('把银行卡和手机号交给 AI 工具'),note:tr('关着时，AI 工具读不到也改不了银行卡和手机号这两类记录'),on:false,mac:true,full:true,under:'agent'}
 };
 const featureDemo=typeof window!=='undefined'&&!!(window.__ASSETBOARD_NATIVE__?.demo||!window.__ASSETBOARD_NATIVE__&&new URLSearchParams(location.search).has('demo'));
 let featurePrefs=(()=>{if(featureDemo)return {};try{const v=JSON.parse(localStorage.getItem(FEATURES_KEY)||'{}');return v&&typeof v==='object'&&!Array.isArray(v)?v:{};}catch{return {};}})();

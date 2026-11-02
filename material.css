@@ -2011,3 +2011,62 @@ body::before,.native-app body::before{background:radial-gradient(70vw 65vh at 0%
 .pro-tag{display:inline-block;flex:none;margin:0 0 0 5px;padding:0 4px;border:1px solid rgba(var(--tone-primary),.55);border-radius:4px;background:none;font:inherit;font-size:9px;font-style:normal;font-weight:600;line-height:14px;color:rgb(var(--tone-primary));vertical-align:1px;cursor:pointer}
 .pro-tag:focus-visible{outline:2px solid rgb(var(--tone-primary));outline-offset:1px}
 :root #modal input.prefs-switch:disabled{opacity:.55;cursor:not-allowed}
+
+/* Polish (2026-11-02): the add form's 更多 and 找回 groups spaced like the rest of the form (a <details> is not laid out as a grid in
+   every engine, so margins, not gap); a picked provider chip tinted like every other picked chip; the export dialog's switches with a
+   gap after the box; the inspector's pending charge on two lines (the question, then its answers) instead of cutting the date off;
+   a narrow window wraps a band's question instead of cutting it off; the 设置 list keeps each name on one line. */
+.more-fields,.keep-fields{display:block}
+.more-fields>*:not(summary)+*,.keep-fields>*:not(summary)+*{margin-top:16px}
+.more-fields[open]>summary,.keep-fields[open]>summary{margin-bottom:16px}
+.choice[aria-pressed="true"]{border-color:rgba(var(--tone-primary),.5);background:rgba(var(--tone-primary),.1);color:rgb(var(--tone-primary));font-weight:500}
+:root #modal .export-card .check-label{display:flex;align-items:center;gap:6px}
+.pay-section .charge-row{flex-wrap:wrap;row-gap:8px}
+.pay-section .charge-main{flex:1 1 100%}
+.pay-section .charge-sub{white-space:normal}
+:root #modal .prefs-tab{white-space:nowrap}
+@media(max-width:760px){.charge-sub{white-space:normal}}
+/* A button whose icon is a probe glyph (SSH 直读 in the import window) lays out like one with a ui() icon. */
+.button:has(>.pg-ic){display:inline-flex;align-items:center;gap:6px}
+/* 整体替换 is the preview's main action too: as wide as 导入, not squeezed into the back button's 44px. */
+.import-preview .confirm-actions .button.danger{flex:1;width:auto}
+.import-actions .button>.pg-ic{width:15px;height:15px}
+/* Notes in a dialog's form take the form's own gap; a paragraph's default margins on top of it made loose, uneven gaps (MCP, Cloudflare, AI). */
+:root #modal .form>p.form-note{margin:0}
+:root #modal .agent-setup .form-note .text-button{margin-left:6px;padding:0}
+/* Narrow: the title's meta gives way as it does on a narrow card (the flags keep their numbers, then count and cost go), and a
+   server row's live line drops its bars and the network figure so the numbers and the age stay whole. */
+@media(max-width:760px){#view-meta .mf-word{display:none}#view-meta .meta-flag{gap:3px}}
+@media(max-width:560px){#view-meta>:not(.meta-flag){display:none}}
+#board[data-size=s] .r-probe{gap:8px}
+#board[data-size=s] .r-probe .pg-bar,#board[data-size=s] .r-probe .pg-net{display:none}
+/* An off switch keeps a visible track in both schemes (non-text contrast): a tinted fill and a firmer edge. */
+:root #modal input.prefs-switch:not(:checked){background:rgba(var(--tone-ink),.12);border-color:rgba(var(--tone-ink),.45)}
+/* The base sheet hides every <kbd> below 1100px (meant for the search field's ⌘K); the shortcut overlay and menu shortcuts keep theirs. */
+.keys kbd,#menu kbd{display:inline-block}
+/* A group head's name wins over its hover action: on a narrow window a long action (按常用价格全部确认) is cut, not the name. */
+.group-head .group-title{flex:0 0 auto;max-width:100%}
+.group-head .g-actions{min-width:0;flex:0 1 auto}
+.group-head .g-actions .button{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* 主题: the button and where the theme is kept on one line; what the accent does is the button's tip. */
+.theme-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+:root #modal .theme-actions .form-note{margin:0}
+/* Import and restore previews at a narrow width: a row wraps (name on its own line, then the times and the category) instead of
+   squeezing the name to one character per line and running off the dialog; a group's hint drops under its title. */
+@media(max-width:560px){
+ :root #modal .import-row{flex-wrap:wrap;row-gap:2px}
+ :root #modal .import-row strong{flex:1 1 100%;min-width:0;overflow-wrap:anywhere}
+ :root #modal .check-label.import-row strong{flex:1 1 calc(100% - 32px)}
+ :root #modal .check-label.import-row .import-facts{margin-left:24px}
+ :root #modal .import-row .import-facts{margin-left:0;flex:1 1 auto;white-space:normal}
+ :root #modal .import-group h3{flex-wrap:wrap}
+ :root #modal .import-group .hint{flex:1 1 100%;margin-left:13px}
+}
+/* A narrow row's date column keeps to its width: a long state (续上了吗？… 应自动续费) wraps inside its pill instead of running over
+   the name. */
+#board[data-size=m] .row .r-when>*,#board[data-size=s] .row .r-when>*{max-width:100%}
+#board[data-size=m] .row .r-date,#board[data-size=s] .row .r-date{white-space:normal;text-align:right}
+#board[data-size=m] .row .r-date.warn,#board[data-size=m] .row .r-date.overdue,#board[data-size=s] .row .r-date.warn,#board[data-size=s] .row .r-date.overdue{border-radius:8px}
+/* 设置 at a narrow width: a switch stays at the end of its row and a long label wraps beside it. */
+:root #modal .prefs-row:has(>input.prefs-switch){flex-wrap:nowrap}
+:root #modal .prefs-row:has(>input.prefs-switch) .prefs-label{flex:1 1 0;min-width:0}
