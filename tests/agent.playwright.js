@@ -125,6 +125,7 @@ async (page) => {
   await m.goto('http://127.0.0.1:4317/');await until(m,()=>typeof agentSetupDialog==='function');
   await m.evaluate(()=>agentSetupDialog());
   check(await m.locator('.agent-tabs .choice').count()===5&&await m.evaluate(()=>document.querySelector('.agent-tabs [aria-checked="true"]').dataset.id==='claude-code'),'Five tools, Claude Code first');
+  check(await m.evaluate(()=>{const t=document.querySelector('.agent-setup .form-note').textContent;return t.includes('模型服务商')&&!t.includes('不经网络');}),'The panel says the AI tool sends what it reads to its model provider');
   await m.click('[data-action="agent-tab"][data-id="codex"]');
   const codex=await m.locator('.agent-tool pre').allInnerTexts();
   check(codex.length===2&&codex[0].startsWith('codex mcp add assetboard -- "/Applications/')&&codex[1].startsWith('[mcp_servers.assetboard]')&&codex[1].includes('args = ["mcp"]'),'Codex: the command and the TOML are separate blocks');
