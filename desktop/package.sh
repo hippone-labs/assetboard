@@ -7,6 +7,11 @@ if [[ "${SIGNING_IDENTITY:-}" != 'Developer ID Application:'* ]]; then
 fi
 
 project_dir="${0:A:h:h}"
+# A signed full build must carry the production licence key: with the placeholder in pro/desktop/License.swift no licence verifies.
+if [[ "${ASSETBOARD_EDITION:-}" != free && -f "$project_dir/pro/desktop/License.swift" ]] && grep -q 'PRODUCTION_PUBLIC_KEY_PLACEHOLDER' "$project_dir/pro/desktop/License.swift"; then
+  print -u2 'Put the production public key into ProLicense.publicKeyBase64 (pro/desktop/License.swift) first: node pro/worker/keygen.mjs'
+  exit 1
+fi
 "$project_dir/desktop/build.sh"
 
 # ASSETBOARD_EDITION=free packages dist/free/ as Assetboard-Free-…; the in-app update picks its archive by this name

@@ -9,6 +9,9 @@ free=0
 # The free edition compiles without MCP, the connectors and AI (#if !ASSETBOARD_FREE) and ships no assetboard-cli.
 swift_flags=()
 (( free )) && swift_flags=(-D ASSETBOARD_FREE)
+# Pro's Swift (pro/desktop/: the offline licence check) when this checkout has it; the free edition leaves it out.
+pro_swift=()
+if [[ -d "$project_dir/pro/desktop" ]] && (( ! free )); then pro_swift=("$project_dir"/pro/desktop/*.swift); swift_flags+=(-D ASSETBOARD_PRO); fi
 app_dir="$out_dir/Assetboard.app"
 # The oldest macOS the app runs on comes from LSMinimumSystemVersion. Without -target, swiftc builds for the macOS of the build
 # machine, and dyld then stops the app at launch on every older system.
@@ -17,7 +20,7 @@ target=(-target "arm64-apple-macos$min_macos")
 # Start from an empty bundle: files left by an older build (or the other edition) must not ship.
 rm -rf "$app_dir"
 mkdir -p "$app_dir/Contents/MacOS" "$app_dir/Contents/Resources/Board"
-xcrun swiftc "${target[@]}" "$project_dir/desktop/Assetboard.swift" "$project_dir/desktop/Localization.swift" "$project_dir/desktop/LocalizationEN.swift" "$project_dir/desktop/CloudflareInventory.swift" "$project_dir/desktop/ProbeSource.swift" "$project_dir/desktop/SSHProbe.swift" "$project_dir/desktop/LocalDatabase.swift" "$project_dir/desktop/OCRImporter.swift" "$project_dir/desktop/AIRecognizer.swift" "$project_dir/desktop/IconFetcher.swift" "$project_dir/desktop/LocalCLI.swift" "$project_dir/desktop/AgentInbox.swift" "$project_dir/desktop/AgentSocket.swift" "$project_dir/desktop/NetworkLog.swift" "$project_dir/desktop/ExchangeRates.swift" "$project_dir/desktop/Reminders.swift" "$project_dir/desktop/MoneyBridge.swift" "$project_dir/desktop/Updater.swift" "$project_dir/desktop/WindowChrome.swift" "${swift_flags[@]}" -o "$app_dir/Contents/MacOS/Assetboard" -framework Cocoa -framework WebKit -framework UserNotifications -framework PDFKit -framework Vision -lsqlite3 -O
+xcrun swiftc "${target[@]}" "$project_dir/desktop/Assetboard.swift" "$project_dir/desktop/Localization.swift" "$project_dir/desktop/LocalizationEN.swift" "$project_dir/desktop/CloudflareInventory.swift" "$project_dir/desktop/ProbeSource.swift" "$project_dir/desktop/SSHProbe.swift" "$project_dir/desktop/LocalDatabase.swift" "$project_dir/desktop/OCRImporter.swift" "$project_dir/desktop/AIRecognizer.swift" "$project_dir/desktop/IconFetcher.swift" "$project_dir/desktop/LocalCLI.swift" "$project_dir/desktop/AgentInbox.swift" "$project_dir/desktop/AgentSocket.swift" "$project_dir/desktop/NetworkLog.swift" "$project_dir/desktop/ExchangeRates.swift" "$project_dir/desktop/Reminders.swift" "$project_dir/desktop/MoneyBridge.swift" "$project_dir/desktop/Updater.swift" "$project_dir/desktop/WindowChrome.swift" "${pro_swift[@]}" "${swift_flags[@]}" -o "$app_dir/Contents/MacOS/Assetboard" -framework Cocoa -framework WebKit -framework UserNotifications -framework PDFKit -framework Vision -lsqlite3 -O
 # The command line and MCP server for agents; it only talks to the running app over its local socket.
 if (( ! free )); then
   xcrun swiftc "${target[@]}" -parse-as-library "$project_dir/desktop/AssetboardCLI.swift" "$project_dir/desktop/Localization.swift" "$project_dir/desktop/LocalizationEN.swift" "$project_dir/desktop/AgentSocket.swift" -o "$app_dir/Contents/MacOS/assetboard-cli" -O
@@ -86,6 +89,7 @@ codesign --verify --deep --strict "$app_dir"
 "$app_dir/Contents/MacOS/Assetboard" --test-rdap
 "$app_dir/Contents/MacOS/Assetboard" --test-agent-socket
 "$app_dir/Contents/MacOS/Assetboard" --test-update
+(( ${#pro_swift} == 0 )) || "$app_dir/Contents/MacOS/Assetboard" --test-license
 (( free )) || "$app_dir/Contents/MacOS/assetboard-cli" --self-test
 if (( free )); then
   leftovers="$(find "$app_dir" -name assetboard-cli)"

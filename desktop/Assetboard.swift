@@ -252,6 +252,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
     let reminders = ReminderScheduler()
     /// A notification clicked before the page finished loading (it launched the app) waits here.
     var pendingReminderOpen: String?
+    #if ASSETBOARD_PRO
+    /// Pro's licence (pro/desktop/License.swift); nil until the store exists.
+    var proLicense: ProLicenseStore?
+    /// An activation link that arrived before launch finished, and a result for a page that has not loaded yet.
+    var pendingLicenseKey: String?
+    var pendingLicenseResult: String?
+    #endif
     var notificationStatus: String?
     /// 反馈与建议: a mail to the project address (the site's contact page says the same); GitHub issues work too.
     static let feedbackURL = URL(string: "mailto:assetboard@163.com?subject=Assetboard%20%E5%8F%8D%E9%A6%88")!
@@ -267,6 +274,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         deliverAgentFiles()
         deliverIntake()
         if let pending = pendingReminderOpen { pendingReminderOpen = nil; webView.evaluateJavaScript("window.assetboardReminderOpen?.(\(pending))") }
+        #if ASSETBOARD_PRO
+        if let pending = pendingLicenseResult { pendingLicenseResult = nil; webView.evaluateJavaScript("window.assetboardLicenseResult?.(\(pending))") }
+        #endif
         publishNotificationStatus()
         // tools/site-screenshots.sh: `--demo --snapshot=<path>` draws the window into a PNG once the board has settled, then quits.
         if demoMode, let path = CommandLine.arguments.first(where: { $0.hasPrefix("--snapshot=") })?.dropFirst("--snapshot=".count) {
@@ -310,6 +320,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
     // In demo mode tables, backups and mails still open into the preview (the page keeps what is imported on the demo board and
     // saves nothing); screenshots and PDFs are not recognised there, since recognising keeps a copy as evidence.
     func application(_ sender: NSApplication, open urls: [URL]) {
+        #if ASSETBOARD_PRO
+        // assetboard://activate?key=… from the purchase page or mail. Before launch has finished (the link started the app) it waits for the store.
+        for url in urls where url.scheme?.lowercased() == "assetboard" {
+            guard let key = ProLicense.activationKey(from: url) else { continue }
+            if demoMode { if webView != nil { demoBlocked() }; continue }
+            if proLicense == nil { pendingLicenseKey = key } else { activateLicense(key, confirm: true) }
+        }
+        #endif
         let files = urls.filter(\.isFileURL)
         var images: [URL] = []
         for url in files.prefix(20) {
@@ -363,7 +381,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
             recordAgentCall(method, ok: false, started: Date(), note: L("App 正在启动")); reply(AgentSocketServer.failure(L("Assetboard 正在启动，请稍后再试"))); return
         }
         let id = UUID().uuidString
-        let call: [String: Any] = ["requestId": id, "method": method, "params": request["params"] as? [String: Any] ?? [:]]
+        // `via` says which client called: "mcp" from assetboard-cli's MCP server, anything else is the command line (the page keeps the
+        // MCP lookups free and the rest for Pro).
+        let call: [String: Any] = ["requestId": id, "method": method, "params": request["params"] as? [String: Any] ?? [:],
+                                   "via": request["via"] as? String == "mcp" ? "mcp" : "cli"]
         guard let data = try? JSONSerialization.data(withJSONObject: call), let json = String(data: data, encoding: .utf8) else {
             recordAgentCall(method, ok: false, started: Date(), note: L("请求无法编码")); reply(AgentSocketServer.failure(L("请求无法编码"))); return
         }
@@ -414,6 +435,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
             }
             let demoRoot = temporary.appendingPathComponent("assetboard-demo-" + UUID().uuidString, isDirectory: true)
             store = try demoMode ? BoardStore(root: demoRoot) : BoardStore()
+            #if ASSETBOARD_PRO
+            proLicense = ProLicenseStore(root: store.directory)
+            #endif
             ai = AIRecognizer(directory: store.directory)
             if !demoMode { NSApp.servicesProvider = self; NSUpdateDynamicServices() }
             if !demoMode {
@@ -515,6 +539,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
             window.makeKeyAndOrderFront(nil)
             placeTrafficLights()
             NSApplication.shared.activate(ignoringOtherApps: true)
+            #if ASSETBOARD_PRO
+            if let key = pendingLicenseKey { pendingLicenseKey = nil; activateLicense(key, confirm: true) }
+            #endif
             if demoMode || freeEdition {
                 // The free edition has no connectors or AI, so it never reads their tokens from the Keychain.
                 connectionStateJSON = "{\"cloudflareChecking\":false,\"githubChecking\":false,\"cloudflareConnected\":false,\"githubConnected\":false,\"aiKeySaved\":false}"
@@ -553,6 +580,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
     @objc func openPanorama() { webView.evaluateJavaScript("togglePanorama()") }
     @objc func openTheme() { webView.evaluateJavaScript("themeDialog()") }
     func demoBlocked() { webView.evaluateJavaScript("window.assetboardDemoBlocked?.()") }
+    #if ASSETBOARD_PRO
+    /// The app menu's Assetboard Pro…: 设置 opened at its Assetboard Pro section.
+    @objc func openProDialog() { webView.evaluateJavaScript("prefsDialog('pro')") }
+    /// A pasted licence (设置 › Assetboard Pro), or one from assetboard://activate?key=… (the purchase page and mail). The link asks first,
+    /// since any web page can open it; the answer goes to the page as assetboardLicenseResult, which turns Pro on in place.
+    func activateLicense(_ text: String, confirm: Bool) {
+        guard let proLicense else { return }
+        if confirm {
+            guard case .success(let payload) = ProLicense.verify(text) else {
+                publishLicenseResult(["ok": false, "error": ProLicense.Failure.tampered.message, "state": proLicense.state().json])
+                return
+            }
+            let alert = NSAlert()
+            alert.messageText = L("激活 Assetboard Pro 许可证 {license}？", ["license": payload.display])
+            alert.informativeText = L("签发于 {issued}，终身更新。许可证只保存在这台 Mac 上，离线验证。", ["issued": payload.issued])
+            alert.addButton(withTitle: L("激活"))
+            alert.addButton(withTitle: L("取消"))
+            window?.makeKeyAndOrderFront(nil)
+            NSApplication.shared.activate(ignoringOtherApps: true)
+            guard alert.runModal() == .alertFirstButtonReturn else { return }
+        }
+        switch proLicense.activate(text) {
+        case .success(let state): publishLicenseResult(["ok": true, "state": state.json])
+        case .failure(let failure): publishLicenseResult(["ok": false, "error": failure.message, "state": proLicense.state().json])
+        }
+    }
+    func publishLicenseResult(_ result: [String: Any]) {
+        guard let data = try? JSONSerialization.data(withJSONObject: result), let json = String(data: data, encoding: .utf8) else { return }
+        if boardLoaded { webView.evaluateJavaScript("window.assetboardLicenseResult?.(\(json))") } else { pendingLicenseResult = json }
+    }
+    #endif
     @objc func openCloudflare() { if demoMode { demoBlocked(); return }; webView.evaluateJavaScript("cloudflareDialog()") }
     @objc func openGitHub() { if demoMode { demoBlocked(); return }; webView.evaluateJavaScript("githubDialog()") }
     @objc func openImport() { webView.evaluateJavaScript("importHub()") }
@@ -1044,6 +1102,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
             webView.evaluateJavaScript("window.assetboardLocalResult?.(\(opened))")
             return
         }
+        #if ASSETBOARD_PRO
+        // 设置 › Assetboard Pro (pro/web/license-pro.js): a pasted licence, or removing the kept one. Checked and kept on this Mac only.
+        if body["action"] as? String == "licenseActivate" { activateLicense(body["text"] as? String ?? "", confirm: false); return }
+        if body["action"] as? String == "licenseRemove" {
+            proLicense?.remove()
+            publishLicenseResult(["ok": true, "removed": true, "state": proLicense?.state().json ?? [:]])
+            return
+        }
+        #endif
         if body["action"] as? String == "openExternal" {
             if let raw = body["url"] as? String, let url = URL(string: raw),
                ["https", "http"].contains(url.scheme?.lowercased() ?? ""),
@@ -1205,6 +1272,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         initial["autoUpdate"] = Updater.automatic
         initial["lang"] = AppLanguage.current
         initial["version"] = Updater.currentVersion
+        #if ASSETBOARD_PRO
+        // Pro's state (free, licensed, or the demo, which shows every Pro feature and never reads or writes a licence): pro-slots.js reads it.
+        initial["pro"] = (demoMode ? ProState.demo : proLicense?.state() ?? ProState(kind: .free, licence: nil)).json
+        #endif
         // `--demo --sidebar-collapsed` opens the demo with the sidebar folded to icons; `--sidebar-more` also opens its 更多 menu
         // and `--sidebar-tip` shows the tip on 域名. For screenshots only: demo mode, never remembered.
         if demoMode, let rail = [("--sidebar-collapsed", "rail"), ("--sidebar-more", "more"), ("--sidebar-tip", "tip")]
@@ -1244,6 +1315,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         let settingsItem = NSMenuItem(title: L("设置…"), action: #selector(openSettings), keyEquivalent: ",")
         settingsItem.target = self
         appMenu.addItem(settingsItem)
+        #if ASSETBOARD_PRO
+        let proItem = NSMenuItem(title: "Assetboard Pro…", action: #selector(openProDialog), keyEquivalent: "")
+        proItem.target = self
+        appMenu.addItem(proItem)
+        #endif
         appMenu.addItem(.separator())
         appMenu.addItem(withTitle: L("退出 Assetboard"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         appItem.submenu = appMenu
@@ -2133,6 +2209,9 @@ func testWebView() {
 
 @main struct AssetboardMain {
 static func main() {
+#if ASSETBOARD_PRO
+if CommandLine.arguments.contains("--test-license") { testLicense(); exit(0) }
+#endif
 if CommandLine.arguments.contains(Updater.launchCheckFlag) {
     selfCheckLaunch()
 } else if CommandLine.arguments.contains("--test-store") {

@@ -1,17 +1,18 @@
 import Foundation
 import CryptoKit
 
-/// Assetboard Pro's licence. One App for everyone: the first launch starts 14 days of Pro, then the free features stay until a licence is
-/// pasted in the panel or arrives through assetboard://activate?key=… (docs/2026-10-24-pro-purchase.md). A licence is one line of text,
-/// `ASB1.<payload>.<signature>`: the payload is base64url JSON {v:1, id, plan:"pro", iss, upd} (issue day, updates-until day), the
-/// signature Ed25519 over the ASCII of `ASB1.<payload>`, made by the purchase worker (pro/worker) with a key this app never holds. The app
-/// only checks it with the public key below: nothing is sent anywhere, no activation, no device count, no report. Updates end on `upd`:
-/// a version built on or before that day keeps Pro for good; a later version runs the free features. The worker signs every licence
-/// with 9999-12-31 (lifetime updates), so every build accepts it.
+/// Assetboard Pro's licence. One app for everyone: without a licence it runs the free features; a licence pasted in 设置 › Assetboard Pro
+/// or arriving through assetboard://activate?key=… turns Pro on. There is no trial: the free edition is the trial. A licence is one line
+/// of text, `ASB1.<payload>.<signature>`: the payload is base64url JSON {v:1, id, plan:"pro", iss, upd} (issue day, updates-until day),
+/// the signature Ed25519 over the ASCII of `ASB1.<payload>`, made by the purchase worker (pro/worker) with a key this app never holds.
+/// The app only checks it with the public key below: nothing is sent anywhere, no activation, no device count, no report. Every licence
+/// carries lifetime updates (the worker writes upd 9999-12-31), so `upd` is checked as a day and otherwise not used.
 enum ProLicense {
-    /// The production worker's public key, raw 32 bytes. Its private key is held in LICENSE_PRIVATE_KEY.
-    static let publicKey = Data(base64Encoded: "u+6hRjhsyw/svI+x9OmWYJapcFDUXK5q/y43nE7XeM0=")!
-    static let trialDays = 14
+    /// The production worker's public key, raw 32 bytes, base64. PLACEHOLDER: replace it at deploy time with the `publicKey (License.swift)`
+    /// line that `node pro/worker/keygen.mjs` prints (its private key goes into the worker's LICENSE_PRIVATE_KEY secret). While the
+    /// placeholder is here no licence verifies, and desktop/package.sh refuses to package.
+    static let publicKeyBase64 = "PRODUCTION_PUBLIC_KEY_PLACEHOLDER"
+    static var publicKey: Data { Data(base64Encoded: publicKeyBase64) ?? Data() }
 
     struct Payload: Equatable {
         let id: String
@@ -89,43 +90,31 @@ enum ProLicense {
     }
 }
 
-/// What the page is told as nativeStore.pro, and what the app reads to decide Pro's schedulers.
+/// What the page is told as nativeStore.pro (pro-slots.js and pro/web/license-pro.js read it), and what the app reads to decide.
 struct ProState: Equatable {
-    enum Kind: String { case trial, licensed, lapsed, expired }
+    enum Kind: String { case free, licensed, demo }
     let kind: Kind
-    let daysLeft: Int
     let licence: ProLicense.Payload?
-    let buildDate: String
-    var on: Bool { kind == .trial || kind == .licensed }
+    var on: Bool { kind != .free }
     var json: [String: Any] {
-        var out: [String: Any] = ["on": on, "kind": kind.rawValue, "buildDate": buildDate]
-        if kind == .trial { out["daysLeft"] = daysLeft }
-        if let licence { out["id"] = licence.id; out["issued"] = licence.issued; out["updatesUntil"] = licence.updatesUntil }
+        var out: [String: Any] = ["on": on, "kind": kind.rawValue]
+        if let licence { out["id"] = licence.id }
         return out
     }
-    /// `--demo` always runs as a fresh trial, so screenshots show Pro and the demo never reads or writes a licence.
-    static func demo(buildDate: String) -> ProState { ProState(kind: .trial, daysLeft: ProLicense.trialDays, licence: nil, buildDate: buildDate) }
+    /// `--demo` shows every Pro feature, so screenshots show Pro; it never reads or writes a licence.
+    static let demo = ProState(kind: .demo, licence: nil)
 }
 
-/// The licence and the trial clock in the data directory (`license/pro.license`, `license/trial.json`, both 0600; not the Keychain,
-/// so a backup of the folder carries them). Reading never fails loudly: a bad file is the free features, not an error.
+/// The licence in the data directory (`license/pro.license`, 0600; not the Keychain, so a backup of the folder carries it). Reading
+/// never fails loudly: a missing or bad file is the free features, not an error.
 final class ProLicenseStore {
     let directory: URL
-    let buildDate: String
     private let verificationKey: Data
     var file: URL { directory.appendingPathComponent("pro.license") }
-    var trialFile: URL { directory.appendingPathComponent("trial.json") }
 
-    init(root: URL, buildDate: String? = nil, verificationKey: Data = ProLicense.publicKey) {
+    init(root: URL, verificationKey: Data = ProLicense.publicKey) {
         directory = root.appendingPathComponent("license", isDirectory: true)
-        self.buildDate = buildDate ?? Self.bundleBuildDate
         self.verificationKey = verificationKey
-    }
-
-    /// The day this build was made (desktop/build.sh writes AssetboardBuildDate into Info.plist); a build without it counts as today.
-    static var bundleBuildDate: String {
-        if let text = Bundle.main.infoDictionary?["AssetboardBuildDate"] as? String, ProLicense.isDay(text) { return text }
-        return ProLicense.day(Date())
     }
 
     func licence(now: Date = Date()) -> Result<ProLicense.Payload, ProLicense.Failure>? {
@@ -134,30 +123,11 @@ final class ProLicenseStore {
     }
 
     func state(now: Date = Date()) -> ProState {
-        if case .success(let payload)? = licence(now: now) {
-            return ProState(kind: payload.updatesUntil >= buildDate ? .licensed : .lapsed, daysLeft: 0, licence: payload, buildDate: buildDate)
-        }
-        let left = ProLicense.trialDays - daysUsed(now: now)
-        return ProState(kind: left > 0 ? .trial : .expired, daysLeft: max(0, left), licence: nil, buildDate: buildDate)
+        if case .success(let payload)? = licence(now: now) { return ProState(kind: .licensed, licence: payload) }
+        return ProState(kind: .free, licence: nil)
     }
 
-    /// Days since the trial began, the first day counting as 0. The start is written at the first launch; a file that is missing, unreadable
-    /// or dated in the future starts again today (a reinstall does too: accepted, nothing is phoned home to prevent it).
-    func daysUsed(now: Date) -> Int {
-        let today = ProLicense.day(now)
-        var started = today
-        if let data = try? Data(contentsOf: trialFile), let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-           let text = object["started"] as? String, ProLicense.isDay(text), text <= today {
-            started = text
-        } else {
-            write(["started": today], to: trialFile)
-        }
-        guard let from = ProLicense.dayFormatter.date(from: started), let to = ProLicense.dayFormatter.date(from: today) else { return 0 }
-        return Calendar.current.dateComponents([.day], from: from, to: to).day ?? 0
-    }
-
-    /// Keeps a licence that checks out and answers with the state it gives this build (licensed, or lapsed when the build is newer than
-    /// the updates); a refused text changes nothing.
+    /// Keeps a licence that checks out and answers with the state it gives; a refused text changes nothing.
     func activate(_ text: String, now: Date = Date()) -> Result<ProState, ProLicense.Failure> {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         if case .failure(let failure) = ProLicense.verify(trimmed, key: verificationKey, now: now) { return .failure(failure) }
@@ -168,9 +138,6 @@ final class ProLicenseStore {
 
     func remove() { try? FileManager.default.removeItem(at: file) }
 
-    private func write(_ object: [String: Any], to url: URL) {
-        if let data = try? JSONSerialization.data(withJSONObject: object) { write(data, to: url) }
-    }
     private func write(_ data: Data, to url: URL) {
         do {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
@@ -193,16 +160,16 @@ func testLicense() {
     let version2 = "ASB1.eyJ2IjoyLCJpZCI6IkszUTdOVkhNIiwicGxhbiI6InBybyIsImlzcyI6IjIwMjYtMTAtMDEiLCJ1cGQiOiIyMDI3LTEwLTAxIn0.Yva5YZMb-8ESermmGGq3JJABA2-OwTB13fn8chomeU4e9CldlK7iWsfKrNuJLpQqO9RZiRtB0KfqYnjLWAEfCA"
     // Noon, so adding whole days never crosses a day boundary through a DST change.
     let now = ProLicense.dayFormatter.date(from: "2026-10-24")!.addingTimeInterval(43_200)
-    let days = { (n: Int) in now.addingTimeInterval(Double(n) * 86_400) }
     let payload = ProLicense.Payload(id: "K3Q7NVHM", issued: "2026-10-01", updatesUntil: "2027-10-01")
 
     // The format and the signature
     check(ProLicense.verify(valid, key: key, now: now) == .success(payload), "a signed licence is accepted")
-    check(ProLicense.verify(valid, now: now) == .failure(.tampered), "the production key refuses test licences")
+    check(ProLicense.verify(valid, now: now) == .failure(.tampered), "the production key (or its placeholder) refuses test licences")
     check(ProLicense.verify("  \n" + valid + "\n", key: key, now: now) == .success(payload), "pasted whitespace around it is forgiven")
     check(payload.display == "K3Q7-NVHM", "the id is shown in two halves")
     check(ProLicense.verify(valid, key: Data(repeating: 1, count: 32), now: now) == .failure(.tampered), "another key refuses it")
     check(ProLicense.verify(valid, key: Data(repeating: 1, count: 31), now: now) == .failure(.tampered), "a malformed key refuses it")
+    check(ProLicense.verify(valid, key: Data(), now: now) == .failure(.tampered), "an empty key (the placeholder) refuses it")
     var changed = valid; changed.replaceSubrange(changed.index(changed.startIndex, offsetBy: 12)...changed.index(changed.startIndex, offsetBy: 12), with: "A")
     check(ProLicense.verify(changed, key: key, now: now) == .failure(.tampered), "one changed character in the payload: tampered")
     // The last character carries two unused bits, so the change goes in the middle of the signature.
@@ -219,47 +186,34 @@ func testLicense() {
     check(ProLicense.verify(future, key: key, now: now) == .failure(.tampered), "an issue day in the future is refused")
     check(ProLicense.verify(version2, key: key, now: now) == .failure(.tampered), "a payload version we do not know is refused")
     check(ProLicense.verify(old, key: key, now: now) == .success(ProLicense.Payload(id: "K3Q7NVHM", issued: "2025-01-01", updatesUntil: "2026-01-01")),
-          "a licence whose updates ended still verifies; the build date decides what it gives")
+          "an older licence still verifies: every licence carries lifetime updates")
     check(ProLicense.isDay("2026-02-28") && !ProLicense.isDay("2026-02-30") && !ProLicense.isDay("2026-2-8") && !ProLicense.isDay("2026-13-01"), "days are checked")
 
-    // The trial clock and its file
+    // No licence, activation, removal
     let root = FileManager.default.temporaryDirectory.appendingPathComponent("assetboard-licence-" + UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: root) }
-    let store = ProLicenseStore(root: root, buildDate: "2026-11-01", verificationKey: key)
+    let store = ProLicenseStore(root: root, verificationKey: key)
     var state = store.state(now: now)
-    check(state == ProState(kind: .trial, daysLeft: 14, licence: nil, buildDate: "2026-11-01") && state.on, "the first launch starts 14 days: \(state)")
-    let attributes = try? FileManager.default.attributesOfItem(atPath: store.trialFile.path)
-    check((attributes?[.posixPermissions] as? Int) == 0o600, "the trial file is private")
-    check((try? JSONSerialization.jsonObject(with: Data(contentsOf: store.trialFile)) as? [String: String])?["started"] == "2026-10-24", "the start day is written")
-    check(store.state(now: days(13)).daysLeft == 1 && store.state(now: days(13)).kind == .trial, "the 14th day is the last: \(store.state(now: days(13)))")
-    state = store.state(now: days(14))
-    check(state.kind == .expired && !state.on && state.daysLeft == 0, "the 15th day is over: \(state)")
-    check(state.json["on"] as? Bool == false && state.json["kind"] as? String == "expired" && state.json["daysLeft"] == nil, "expired JSON: \(state.json)")
-    try? Data("{\"started\":\"2099-01-01\"}".utf8).write(to: store.trialFile)
-    check(store.state(now: now).daysLeft == 14, "a start in the future starts again today")
-    check((try? JSONSerialization.jsonObject(with: Data(contentsOf: store.trialFile)) as? [String: String])?["started"] == "2026-10-24", "and is written down")
-    try? Data("not json".utf8).write(to: store.trialFile)
-    check(store.state(now: days(3)).daysLeft == 14, "a broken file starts again")
-    check(store.state(now: days(3)).json["daysLeft"] as? Int == 14 && store.state(now: days(3)).json["buildDate"] as? String == "2026-11-01", "trial JSON")
-
-    // Activation, the build date, removal
+    check(state == ProState(kind: .free, licence: nil) && !state.on, "without a licence it is the free edition, no trial: \(state)")
+    check(state.json["on"] as? Bool == false && state.json["kind"] as? String == "free" && state.json["id"] == nil, "free JSON: \(state.json)")
+    check(!FileManager.default.fileExists(atPath: store.directory.path), "nothing is written without a licence")
+    try? FileManager.default.createDirectory(at: store.directory, withIntermediateDirectories: true)
+    try? Data("not a licence".utf8).write(to: store.file)
+    check(store.state(now: now).kind == .free, "a broken file is the free edition")
     switch store.activate(" " + valid + "\n", now: now) {
     case .success(let activated):
         check(activated.kind == .licensed && activated.on && activated.licence == payload, "a good licence turns Pro on: \(activated)")
-        check(activated.json["id"] as? String == "K3Q7NVHM" && activated.json["updatesUntil"] as? String == "2027-10-01" && activated.json["on"] as? Bool == true, "licensed JSON: \(activated.json)")
+        check(activated.json["id"] as? String == "K3Q7NVHM" && activated.json["on"] as? Bool == true && activated.json["kind"] as? String == "licensed", "licensed JSON: \(activated.json)")
     case .failure(let failure): check(false, "a good licence was refused: \(failure)")
     }
     check((try? FileManager.default.attributesOfItem(atPath: store.file.path))?[.posixPermissions] as? Int == 0o600, "the licence file is private")
     check((try? String(contentsOf: store.file, encoding: .utf8)) == valid, "the licence is kept trimmed")
-    check(store.state(now: days(400)).kind == .licensed, "a licence has no end of its own")
-    check(ProLicenseStore(root: root, buildDate: "2027-10-01", verificationKey: key).state(now: now).kind == .licensed, "a build on the last day of updates is still Pro")
-    let later = ProLicenseStore(root: root, buildDate: "2027-10-02", verificationKey: key).state(now: now)
-    check(later.kind == .lapsed && !later.on && later.json["updatesUntil"] as? String == "2027-10-01" && later.json["buildDate"] as? String == "2027-10-02", "a build after the updates ended: lapsed, off, both dates told: \(later)")
+    check(store.state(now: now.addingTimeInterval(4000 * 86_400)).kind == .licensed, "a licence has no end of its own")
     if case .failure(let failure) = store.activate("ASB1.eyJ2IjoxfQ.c2ln", now: now) { check(failure == .incomplete, "a short text is incomplete") } else { check(false, "a short text was accepted") }
     check(store.state(now: now).kind == .licensed, "a refused text leaves the good licence alone")
-    if case .success(let lapsed) = store.activate(old, now: now) { check(lapsed.kind == .lapsed && !lapsed.on, "an old licence is kept but gives nothing to this build") } else { check(false, "an old licence was refused") }
+    check(ProLicenseStore(root: root).state(now: now).kind == .free, "the production key (or its placeholder) does not accept the test licence on disk")
     store.remove()
-    check(store.state(now: now).kind == .trial && store.licence(now: now) == nil, "removing goes back to the trial clock")
+    check(store.state(now: now).kind == .free && store.licence(now: now) == nil, "removing goes back to the free edition")
     store.remove()
 
     // Activation links
@@ -273,7 +227,6 @@ func testLicense() {
     check(activationKey("assetboard://activate?key=" + String(repeating: "a", count: 2001)) == nil, "an oversized key is ignored")
 
     // The demo
-    let demo = ProState.demo(buildDate: "2026-11-01")
-    check(demo.on && demo.json["kind"] as? String == "trial" && demo.json["daysLeft"] as? Int == 14, "the demo is a fresh trial")
-    print("PASS: licence format and signature, the refusals and their sentences, the trial clock and its file, activation, updates-until against the build date, removal, activation links, the demo")
+    check(ProState.demo.on && ProState.demo.json["kind"] as? String == "demo" && ProState.demo.json["id"] == nil, "the demo shows Pro without a licence")
+    print("PASS: licence format and signature, the refusals and their sentences, no trial, activation, removal, activation links, the demo")
 }
