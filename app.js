@@ -351,7 +351,7 @@ function panoNavItem(){if(!state.assets.length||!featureOn('panorama'))return ''
 // Only sources that sync by themselves are checked: Cloudflare while it is connected.
 let cloudflareAutoError='';
 function staleHtml(scope){
- const auto=demoMode||!nativeStore?.cloudflareConnected?[]:['cloudflare'],stale=staleSyncs(scope,{auto});if(!stale.length)return '';
+ const auto=demoMode||proOff||!nativeStore?.cloudflareConnected?[]:['cloudflare'],stale=staleSyncs(scope,{auto});if(!stale.length)return '';
  const worst=stale[0],error=cloudflareAutoError,why=error?tr('：{error}',{error}):'';
  const tip=stale.map(g=>`${g.name}${g.account?` · ${g.account}`:''}`+tr('：{days} 天没同步（{n} 项）',{days:g.days,n:g.count})).join('\n')+(why?'\n'+tr('上次自动同步失败')+why:'');
  return `<button class="meta-flag stale" data-action="stale-sync" data-id="${esc(worst.source)}" title="${esc(tip)}">${esc(worst.name)}<span class="mf-word"> ${tr('{n} 天没同步',{n:worst.days})}</span></button>`;
@@ -902,6 +902,7 @@ function agentSetupDialog(){
  modal(tr('MCP 接入'),`<div class="form agent-setup">
   <p class="form-note">${tr('让 Claude、ChatGPT（Codex）、Cursor 等 AI 工具或你的脚本查询、添加、修改资产：新增和修改立即生效，可用 ⌘Z 撤销；删除会先到「待确认」，你确认才删。通道在本机，但你的 AI 工具会把读到的内容发给它的模型服务商；每次调用都记在「网络记录」里。')}</p>
   <p class="form-note">${tr('它读到的 IP、SSH 主机和用户、手机号和邮箱是遮住的，银行卡和手机号两类记录不给它；要改，在「设置 › 功能」里。')}<button class="text-button" data-action="prefs" data-id="features">${tr('打开设置')}</button></p>
+  ${proHint(tr('没有 Pro 时 MCP 只能查询；添加、修改、删除，命令行和 Inbox 文件夹在 Pro 里。'))}
   <div class="chip-group agent-tabs" role="radiogroup" aria-label="${tr('选择工具')}">${tabs}</div>
   <section class="agent-tool">${agentToolHtml(agentTool,cli)}</section>
   <p class="form-note platform-note">${ui('info')}${tr('也可以把 JSON 文件放进 ~/Library/Application Support/Assetboard/Inbox/，格式见 README；这种方式每次都要你在导入预览里确认。')}</p>
@@ -950,7 +951,7 @@ const importSource=(action,glyph,label,title)=>`<button class="button source" da
 // and only this row changes when the answer comes: 检测中 until the first answer, then the buttons; the rest stays usable.
 function importCliInner(){
  const cli=window.__localCli||{},known='gh' in cli;
- // GitHub (gh or a token) is Pro: it comes from proSlots.importCli.
+ // GitHub (gh or a token) comes from proSlots.importCli: the full build has it, the free edition not.
  const sshButton=cli.sshConfig?`<button class="button primary" data-action="ssh-import" title="${tr('从 ~/.ssh/config 读取服务器')}">${ui('terminal')}~/.ssh/config</button>`:'';
  const waiting=localCliPending&&!known?`<span class="form-note import-cli-wait" role="status">${tr('正在检测本机 gh 和 SSH 配置…')}</span>`:'';
  return `${known?slotHtml('importCli',{native:true,cli,source:importSource})+sshButton:''}${waiting}<button class="icon-button" data-action="local-cli-refresh" title="${tr('重新检测')}" aria-label="${tr('重新检测本机 gh 和 SSH 配置')}"${localCliPending?' disabled aria-busy="true"':''}>${ui('refresh')}</button>`;
@@ -962,7 +963,7 @@ function importHub(){
  const cli=window.__localCli||{};
  const cliTitle=tr('本机已登录：只调用 gh 等命令读公开元数据，不读它们自存的凭据；SSH 只读 Host、HostName、User、Port');
  const source=importSource;
- // MCP and Cloudflare are Pro: they come from proSlots.importSources.
+ // MCP and Cloudflare come from proSlots.importSources: the full build has them, the free edition not.
  const ctx={native,cli,source};
  if(native&&!demoMode)requestLocalCliDetect();
  const cliRow=native?`<div class="import-cli" title="${esc(cliTitle)}">${importCliInner()}</div>`:'';
@@ -1081,7 +1082,7 @@ function commitImportPlan(plan,meta={},opts={}){
 }
 // After the first import that brings in domains, the result asks once whether to turn on the weekly registry check (off by default
 // because it reaches public registries). Mac app only; asked once per board (state.rdapAsked), and never when it is already on.
-function rdapAskDue(added){return !!nativeStore&&!demoMode&&!state.rdapAuto&&!state.rdapAsked&&added.some(a=>a.type==='domain'&&!rdapMissing(rdapDomain(a))&&rdapDomain(a));}
+function rdapAskDue(added){return !!nativeStore&&!demoMode&&!proOff&&!state.rdapAuto&&!state.rdapAsked&&added.some(a=>a.type==='domain'&&!rdapMissing(rdapDomain(a))&&rdapDomain(a));}
 function rdapAskToast(message){clearTimeout(toastTimer);const t=$('#toast');t.classList.add('notice','show','ask');t.setAttribute('role','status');t.innerHTML=`<span class="toast-ask"><span>${esc(message)}</span><span>${tr('每周向注册局核对这些域名的到期日？')}</span><small>${tr('只问该后缀的注册局，记在网络记录里')}</small></span><button class="toast-undo" data-action="rdap-ask-on">${tr('打开每周核对')}</button>${history.length?`<button class="toast-undo" data-action="undo">${tr('撤销')}</button>`:''}<button class="toast-close" data-action="toast-close" aria-label="${tr('关闭提示')}" title="${tr('关闭')}">×</button>`;toastTimer=setTimeout(hideToast,NOTICE_MS);}
 function runImportPlan(plan,meta={}){
  importPlan=plan;
@@ -1164,6 +1165,8 @@ window.assetboardIntake=entries=>{
   if(entry.error){problems.push(`${name.slice(0,100)}${tr('：{error}',{error:entry.error})}`);continue;}
   if(typeof entry.text!=='string'||!entry.text.trim())continue;
   if(source==='inbox'&&intake.some(item=>item.source==='inbox'&&item.name===name))continue;
+  // The Inbox folder is Pro: without it the files stay in the folder untouched, and it is said once per launch.
+  if(source==='inbox'&&proOff){inboxWaiting++;continue;}
   // The Inbox folder takes only the agent format, as documented; anything else is reported and moved aside at once.
   if(source==='inbox'&&classifyImportPayload({text:entry.text,filename:name}).kind!=='agent'){
    problems.push(`${name.slice(0,100)}${tr('：{error}',{error:parseAgentImport(entry.text).error||tr('无法读取')})}`);
@@ -1173,8 +1176,10 @@ window.assetboardIntake=entries=>{
   fresh.push({source,name,text:entry.text.slice(0,source==='service'?20000:5e6)});
  }
  if(problems.length)notice(problems.join(tr('；')));
+ else if(inboxWaiting&&!inboxSaid){inboxSaid=true;notice(tr('Inbox 文件夹里的文件在 Assetboard Pro 里导入；它们留在文件夹里'),proBuilt()?{action:'pro-dialog',label:tr('了解 Pro')}:null);}
  queueIntake(fresh);
 };
+let inboxWaiting=0,inboxSaid=false;
 function queueIntake(entries){
  if(!entries.length)return;
  const ids=entries.map(entry=>{const id='intake-'+(++intakeSequence);intake.push({mime:'',...entry,id});return id;});
@@ -1701,10 +1706,20 @@ document.addEventListener('submit',e=>{
  if(applied||failed)toast(failed?tr('已允许 {n} 项，{failed} 项没有成功',{n:formatCount(applied),failed:formatCount(failed)}):tr('已允许 {n} 项',{n:formatCount(applied)}));
  drainIntake();
 });
+// Without Pro an external tool gets the read-only MCP tools; the command line, every write and Pro's own readings wait for a licence.
+// The app passes which client called (via: 'mcp' from the MCP server, otherwise the command line).
+const AGENT_PRO_METHODS=['add','update','updateMany','delete','deleteMany','recordPayment','renew','forecast','costHistory'];
+function agentProRefusal(call){
+ if(!proOff)return '';
+ if(call?.via!=='mcp')return tr('命令行在 Assetboard Pro 里；MCP 的查询工具免费');
+ if(AGENT_PRO_METHODS.includes(call.method)||Object.hasOwn(proSlots.agentMethods,call.method))return tr('添加、修改和删除在 Assetboard Pro 里；没有 Pro 时 MCP 只能查询');
+ return '';
+}
 window.assetboardAgent=call=>{
  const send=body=>{if(nativeStore&&call?.requestId)window.webkit.messageHandlers.assetboard.postMessage({action:'agentReply',requestId:String(call.requestId),reply:JSON.stringify(body)});return body;};
  if(demoMode)return send({ok:false,error:'演示模式不接受外部调用'});
  if(!featureOn('agent'))return send({ok:false,error:'外部工具接入已在 Assetboard 的设置里关闭'});
+ const refused=agentProRefusal(call);if(refused)return send({ok:false,error:refused});
  const handler=Object.hasOwn(agentMethods,call?.method)?agentMethods[call.method]:Object.hasOwn(proSlots.agentMethods,call?.method)?proSlots.agentMethods[call.method]:null;
  if(!handler)return send({ok:false,error:`未知方法 ${String(call?.method).slice(0,40)}，可用：${[...Object.keys(agentMethods),...Object.keys(proSlots.agentMethods)].join('、')}`});
  try{return send({ok:true,result:handler(call.params&&typeof call.params==='object'&&!Array.isArray(call.params)?call.params:{})});}
@@ -1938,7 +1953,7 @@ function aiPlansDialog(){
 }
 function captureNote(){
  if(!nativeStore||demoMode)return `${ui('lock')}${nativeStore?tr('在此 Mac按规则识别，不上传'):tr('在此浏览器按规则识别，不上传')}`;
- // AI is Pro: the free edition has no 配置 AI (proSlots.captureAiLink).
+ // The free edition has no 配置 AI (proSlots.captureAiLink, from pro/web/import-pro.js).
  return aiReady()?`${ui('lock')}${tr('点「识别」时，本地认不全的文字会发送到 {host} 由 AI 识别，按你的账号计费',{host:esc(nativeStore.ai.host)})}`:`${ui('lock')}${tr('按规则识别，不上传')}${proSlots.captureAiLink?tr('；')+proSlots.captureAiLink():''}`;
 }
 // With a model configured, the typed or pasted text goes to it (only on this explicit click); rules remain the fallback.
@@ -2039,7 +2054,7 @@ function cloudflareDialog(){
  const connected=nativeStore.cloudflareConnected,last=lastCloudflareSync();
  const tokenUrl=cloudflareTokenTemplateUrl({name:'Assetboard'});
  const status=connected?tr('已连接'):nativeStore.cloudflareChecking?tr('检查钥匙串…'):nativeStore.keychainUnavailable?tr('钥匙串没有响应，可重新输入令牌'):tr('未连接');
- modal('Cloudflare',`<div class="form"><div class="platform-bar"><span id="cloudflare-status" class="chip ${connected?'ok':''}">${status}</span><button class="button" data-action="setup-cloudflare" data-url="${esc(tokenUrl)}" title="${tr('打开预填只读权限的建令牌页：Zone、Account Settings、Pages、Workers Scripts、R2 Read；含 Registrar 读权限时还会读域名到期日')}">${tr('建令牌 ↗')}</button></div><label>${connected?tr('更换令牌'):tr('令牌')}<input id="cloudflare-token" type="password" autocomplete="off" spellcheck="false" placeholder="${connected?tr('留空使用已保存的令牌'):tr('粘贴只读令牌')}"></label><div class="confirm-actions"><button id="cloudflare-sync" class="button primary">${connected?tr('重新同步'):tr('验证并同步')}</button>${connected?`<button id="cloudflare-disconnect" class="button" title="${tr('删除本机保存的令牌；Cloudflare 后台的令牌需自行撤销，已同步资产保留')}">${tr('断开')}</button>`:''}</div>${connected?`<p class="form-note cloudflare-last">${last?tr('上次同步 {when}。',{when:esc(new Date(last).toLocaleString(trLocale()))}):''}${tr('之后新增的域名和资源，点「重新同步」即可读入；App 打开时也会每 12 小时自动同步一次。')}</p>`:''}<p class="form-note platform-note">${ui('lock')}${tr('只读；令牌存入 macOS 钥匙串')}</p></div>`);
+ modal('Cloudflare',`<div class="form"><div class="platform-bar"><span id="cloudflare-status" class="chip ${connected?'ok':''}">${status}</span><button class="button" data-action="setup-cloudflare" data-url="${esc(tokenUrl)}" title="${tr('打开预填只读权限的建令牌页：Zone、Account Settings、Pages、Workers Scripts、R2 Read；含 Registrar 读权限时还会读域名到期日')}">${tr('建令牌 ↗')}</button></div><label>${connected?tr('更换令牌'):tr('令牌')}<input id="cloudflare-token" type="password" autocomplete="off" spellcheck="false" placeholder="${connected?tr('留空使用已保存的令牌'):tr('粘贴只读令牌')}"></label><div class="confirm-actions"><button id="cloudflare-sync" class="button primary">${connected?tr('重新同步'):tr('验证并同步')}</button>${connected?`<button id="cloudflare-disconnect" class="button" title="${tr('删除本机保存的令牌；Cloudflare 后台的令牌需自行撤销，已同步资产保留')}">${tr('断开')}</button>`:''}</div>${connected?`<p class="form-note cloudflare-last">${last?tr('上次同步 {when}。',{when:esc(new Date(last).toLocaleString(trLocale()))}):''}${proOff?tr('之后新增的域名和资源，点「重新同步」即可读入。'):tr('之后新增的域名和资源，点「重新同步」即可读入；App 打开时也会每 12 小时自动同步一次。')}</p>`:''}<p class="form-note platform-note">${ui('lock')}${tr('只读；令牌存入 macOS 钥匙串')}</p>${connected?proHint(tr('每 12 小时自动同步在 Pro 里。')):''}</div>`);
  if(cloudflareAuto){$('#cloudflare-sync').disabled=true;$('#cloudflare-status').textContent=tr('正在自动同步…');}
  $('#cloudflare-sync').onclick=()=>{const token=$('#cloudflare-token').value;$('#cloudflare-token').value='';$('#cloudflare-sync').disabled=true;$('#cloudflare-status').textContent=tr('验证中…');window.webkit.messageHandlers.assetboard.postMessage({action:'cloudflareSync',token});};
  if(connected)$('#cloudflare-disconnect').onclick=()=>window.webkit.messageHandlers.assetboard.postMessage({action:'cloudflareDisconnect'});
@@ -2236,6 +2251,8 @@ function prefsDialog(section){
  if(typeof section==='string')prefsSection=section;
  const mac=!!nativeStore&&!demoMode,row=(label,control,title='')=>`<div class="prefs-row"${title?` title="${esc(title)}"`:''}><span class="prefs-label">${label}</span>${control}</div>`;
  const toggle=(action,on,label,extra='')=>`<input type="checkbox" class="prefs-switch" role="switch" data-action="${action}"${extra} aria-label="${esc(label)}"${on?' checked':''}>`;
+ // A Pro switch without Pro keeps its stored value, can't be changed, and carries the Pro mark (which opens the licence section).
+ const proToggle=(action,on,label,extra='')=>proOff&&proBuilt()?`${proTag()}${toggle(action,on,label,extra+' disabled')}`:toggle(action,on,label,extra);
  const cur=totalCurrency(),chips=MAIN_CURRENCIES.map(c=>`<button type="button" class="choice" role="radio" aria-checked="${c===cur}" data-action="prefs-currency" data-id="${c}">${esc(currencyDisplay[c]||c)} ${c}</button>`).join('');
  const notify={allowed:['ok',tr('已允许')],denied:['bad',tr('已关闭')]}[nativeStore?.notifications]||['',tr('未询问')];
  const langs=Object.entries(LANGS).map(([id,l])=>`<button type="button" class="choice" role="radio" aria-checked="${id===appLang}" data-action="prefs-lang" data-id="${id}" lang="${l.html}">${esc(l.name)}</button>`).join('');
@@ -2244,21 +2261,24 @@ function prefsDialog(section){
   row(tr('隐私模式'),toggle('prefs-privacy',privacy,tr('隐私模式')),tr('遮住名称、账号和 IP，适合共享屏幕；只改显示')),
   mac?row(tr('在菜单栏显示'),toggle('prefs-native',nativeStore.statusItem!==false,tr('在菜单栏显示'),' data-id="statusItem"'),tr('菜单栏的小日历：7 天内到期和待确认扣款的数量')):'',
   mac?row(tr('系统通知'),`<span class="chip ${notify[0]}">${notify[1]}</span><button class="button" data-action="notification-settings">${tr('通知设置…')}</button>`,tr('到期前的提醒用 macOS 通知发出')):''].join('');
- const usable=f=>(!f.mac||nativeStore||demoMode)&&(!f.pro||proLoaded());
- const features=[...Object.entries(FEATURES).filter(([,f])=>usable(f)&&(!f.under||featureOn(f.under))).map(([key,f])=>{const html=row(f.name,toggle('prefs-feature',featureOn(key),f.name,` data-id="${key}"`),f.note);return f.under?html.replace('class="prefs-row"','class="prefs-row prefs-sub"'):html;}),
+ const usable=f=>(!f.mac||nativeStore||demoMode)&&(!f.full||proBuilt());
+ const features=[...Object.entries(FEATURES).filter(([,f])=>usable(f)&&(!f.under||featureOn(f.under))).map(([key,f])=>{const html=row(f.name,(f.pro?proToggle:toggle)('prefs-feature',featureOn(key),f.name,` data-id="${key}"`),f.note);return f.under?html.replace('class="prefs-row"','class="prefs-row prefs-sub"'):html;}),
   mac?row(tr('自动获取网站图标'),toggle('auto-icons',state.autoIcons!==false,tr('自动获取网站图标')),tr('新添加的资产认出是已知平台时，从它的官网取图标；每次请求都记在网络记录里')):'',
-  mac?row(tr('每周核对域名到期日'),toggle('rdap-auto',!!state.rdapAuto,tr('每周向注册局核对域名到期日')),tr('每周把每个域名发给它的注册局（公开 RDAP）查一次；日期不同只提示，不改')):''].join('');
+  mac?row(tr('每周核对域名到期日'),proToggle('rdap-auto',!!state.rdapAuto,tr('每周向注册局核对域名到期日')),tr('每周把每个域名发给它的注册局（公开 RDAP）查一次；日期不同只提示，不改')):''].join('');
  const link=(name,on,action,title)=>row(name,`${on===null?'':`<span class="chip ${on?'ok':''}">${on?tr('已连接'):tr('未连接')}</span>`}<button class="button" data-action="${action}">${tr('设置…')}</button>`,title);
- const pro=mac&&proLoaded();
- const connections=mac?[pro?link('Cloudflare',!!nativeStore.cloudflareConnected,'cloudflare-import',tr('只读 API 令牌，每 12 小时同步')):'',
-  pro?link('GitHub',!!nativeStore.githubConnected,'github-import',tr('本机 gh 或只读令牌')):'',
-  pro?link(tr('AI 识别'),!!nativeStore.ai?.model,'ai-settings',tr('你自己的模型和 API key，只在你点识别时发送')):'',
-  pro&&featureOn('agent')?link(tr('MCP 接入'),null,'agent-setup',tr('给外部工具的配置')):'',
-  pro&&typeof probeOn==='function'&&probeOn()?link(tr('探针数据源'),null,'probe-sources',tr('监控面板的地址和账号')):'',
-  pro&&typeof sshOn==='function'&&sshOn()?link(tr('SSH 直读'),null,'ssh-probe-open',tr('逐台开启、读取间隔')):''].join(''):'';
- const about=nativeStore?[row(tr('版本'),`<span class="prefs-version">${esc(nativeStore.version||'')}${mac?`<button class="button" data-action="check-updates">${tr('检查更新…')}</button>`:''}</span>`),
-  mac?row(tr('自动检查更新'),toggle('prefs-native',nativeStore.autoUpdate!==false,tr('自动检查更新'),' data-id="autoUpdate"'),tr('每天最多读一次官网的版本文件')):''].join(''):'';
- const sections=[['general',tr('通用'),'gear',general],['features',tr('功能'),'spark',features],['connections',tr('连接'),'cloud',connections],['about',tr('关于'),'info',about]].filter(s=>s[3]);
+ // The connectors, AI and MCP are in the full build (the free edition compiles without them); the 12-hour sync and probes are Pro.
+ const full=mac&&proBuilt();
+ const connections=mac?[full?link('Cloudflare',!!nativeStore.cloudflareConnected,'cloudflare-import',proOff?tr('只读 API 令牌，点同步时读取；每 12 小时自动同步在 Pro 里'):tr('只读 API 令牌，每 12 小时同步')):'',
+  full?link('GitHub',!!nativeStore.githubConnected,'github-import',tr('本机 gh 或只读令牌')):'',
+  full?link(tr('AI 识别'),!!nativeStore.ai?.model,'ai-settings',tr('你自己的模型和 API key，只在你点识别时发送')):'',
+  full&&featureOn('agent')?link(tr('MCP 接入'),null,'agent-setup',tr('给外部工具的配置')):'',
+  full&&typeof probeOn==='function'&&probeOn()?link(tr('探针数据源'),null,'probe-sources',tr('监控面板的地址和账号')):'',
+  full&&typeof sshOn==='function'&&sshOn()?link(tr('SSH 直读'),null,'ssh-probe-open',tr('逐台开启、读取间隔')):''].join(''):'';
+ const edition=row(tr('版本类型'),`<span class="prefs-edition">${esc(typeof proEditionText==='function'&&proBuilt()?proEditionText():tr('免费版'))}</span>`);
+ const about=[edition,nativeStore?row(tr('版本'),`<span class="prefs-version">${esc(nativeStore.version||'')}${mac?`<button class="button" data-action="check-updates">${tr('检查更新…')}</button>`:''}</span>`):'',
+  mac?row(tr('自动检查更新'),toggle('prefs-native',nativeStore.autoUpdate!==false,tr('自动检查更新'),' data-id="autoUpdate"'),tr('每天最多读一次官网的版本文件')):''].join('');
+ const licence=proBuilt()?proLicenceSection(row):'';
+ const sections=[['general',tr('通用'),'gear',general],['features',tr('功能'),'spark',features],['connections',tr('连接'),'cloud',connections],['pro','Assetboard Pro','check',licence],['about',tr('关于'),'info',about]].filter(s=>s[3]);
  if(!sections.some(s=>s[0]===prefsSection))prefsSection='general';
  const nav=sections.map(([id,name,icon])=>`<button type="button" class="prefs-tab" role="tab" id="prefs-tab-${id}" aria-controls="prefs-pane-${id}" aria-selected="${id===prefsSection}" tabindex="${id===prefsSection?0:-1}" data-action="prefs-section" data-id="${id}">${ui(icon)}<span>${name}</span></button>`).join('');
  const panes=sections.map(([id,name,,html])=>`<section class="prefs-group" role="tabpanel" id="prefs-pane-${id}" aria-labelledby="prefs-tab-${id}"${id===prefsSection?'':' hidden'}><h3>${name}</h3>${html}</section>`).join('');

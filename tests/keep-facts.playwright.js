@@ -7,6 +7,8 @@ async (page) => {
  const check=(ok,message)=>{if(!ok)throw new Error(message);};
  const errors=[];page.on('pageerror',e=>errors.push(e.message));
  await page.goto('http://127.0.0.1:4317/');
+ // The browser holds no licence: turn Pro on in place, as an activation does.
+ await page.evaluate(()=>{proEnable();render();});
  await page.evaluate(()=>{save=()=>{};
   const day=n=>{const d=new Date();d.setDate(d.getDate()+n);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;};
   state={blocks:[{id:'google'},{id:'server'},{id:'domain'},{id:'subscription'}],deletedExternalIds:[],assets:[

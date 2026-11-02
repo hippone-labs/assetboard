@@ -899,4 +899,17 @@ Object.assign(I18N.en,{
  '已添加 {n} 个套餐，下次扣款日期在各自的资料里填':['Added {n} plan; set its next charge date in its details','Added {n} plans; set each next charge date in its details'],
  '同一订阅含 Grok、Cursor 与 X':'One subscription covers Grok, Cursor and X',
  '原 Windsurf':'Formerly Windsurf',
+ // Assetboard Pro: the locked features and their hints
+ '没有 Pro 时 MCP 只能查询；添加、修改、删除，命令行和 Inbox 文件夹在 Pro 里。':'Without Pro, MCP can only look things up; adding, changing and deleting, the command line and the Inbox folder are in Pro.',
+ 'Inbox 文件夹里的文件在 Assetboard Pro 里导入；它们留在文件夹里':'Files in the Inbox folder are imported with Assetboard Pro; they stay in the folder',
+ '了解 Pro':'About Pro',
+ '命令行在 Assetboard Pro 里；MCP 的查询工具免费':'The command line is in Assetboard Pro; the MCP lookup tools are free',
+ '添加、修改和删除在 Assetboard Pro 里；没有 Pro 时 MCP 只能查询':'Adding, changing and deleting are in Assetboard Pro; without Pro, MCP can only look things up',
+ '之后新增的域名和资源，点「重新同步」即可读入。':'Domains and resources added later come in when you click Sync again.',
+ '每 12 小时自动同步在 Pro 里。':'Automatic sync every 12 hours is in Pro.',
+ '只读 API 令牌，点同步时读取；每 12 小时自动同步在 Pro 里':'Read-only API token, read when you click Sync; automatic sync every 12 hours is in Pro',
+ '版本类型':'Edition',
+ '免费版':'Free edition',
+ '另有 {n} 条':['{n} more','{n} more'],
+ 'Assetboard Pro 的功能':'An Assetboard Pro feature'
 });
