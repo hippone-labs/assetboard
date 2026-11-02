@@ -355,5 +355,8 @@ Object.assign(I18N.en,{
  '项资产':'assets',
  '周期费用':'recurring cost',
  '项 90 天内到期或扣款':'due or charged within 90 days',
- '最先要处理的':'Handle first'
+ '最先要处理的':'Handle first',
+ // Registry holds
+ '注册局冻结了这个域名，解析已停止':'The registry has put this domain on hold; it no longer resolves',
+ '注册商冻结了这个域名，解析已停止':'The registrar has put this domain on hold; it no longer resolves'
 });
