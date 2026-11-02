@@ -232,6 +232,11 @@ final class StatusMenu: NSObject {
                     entry.image = NSImage(systemSymbolName: "circle.fill", accessibilityDescription: level == "overdue" ? L("已过期") : L("快到期"))
                     entry.image?.isTemplate = false
                     entry.image = entry.image?.withSymbolConfiguration(.init(pointSize: 7, weight: .regular).applying(.init(paletteColors: [level == "overdue" ? .systemRed : .systemOrange])))
+                    // macOS 27 hides symbol images in menus of apps linked on the 26 SDK or later; the dot is the only colour in the row.
+                    // preferredImageVisibility exists only in the macOS 27 SDK, which comes with Swift 6.4, so older toolchains skip it.
+                    #if compiler(>=6.4)
+                    if #available(macOS 27, *) { entry.preferredImageVisibility = .visible }
+                    #endif
                 }
                 menu.addItem(entry)
             }

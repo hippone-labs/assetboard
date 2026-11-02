@@ -71,6 +71,12 @@ let englishStrings: [String: [String]] = [
     "新版本的 Bundle ID 与当前不一致": ["the new version has a different bundle ID"],
     "安装包的版本不比当前新": ["the downloaded version is not newer than this one"],
     "无法启动安装": ["the installation could not be started"],
+    "Assetboard {version} 需要 macOS {minimum} 或更高，这台 Mac 是 macOS {system}。": ["Assetboard {version} needs macOS {minimum} or later. This Mac has macOS {system}."],
+    "新版本没有写明需要的 macOS 版本": ["the new version does not name the macOS version it needs"],
+    "新版本需要 macOS {minimum} 或更高，这台 Mac 是 macOS {system}": ["the new version needs macOS {minimum} or later, and this Mac has macOS {system}"],
+    "新版本在这台 Mac 上无法启动": ["the new version cannot start on this Mac"],
+    "新版本的命令行工具无法启动": ["the new version's command-line tool cannot start"],
+    "新版本没能启动，已换回 {version}。": ["The new version did not start, so Assetboard {version} was put back."],
     // Platform sync
     "网络请求失败，请检查连接后重试。": ["The network request failed. Check the connection and try again."],
     "未收到有效的平台响应。": ["No valid response from the platform."],
