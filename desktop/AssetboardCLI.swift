@@ -296,6 +296,7 @@ enum MCPServer {
         let unlinkFrom: [String: Any] = ["type": "array", "items": ["type": "string"], "description": "Ids of linked assets to unlink"]
         return [
             "name": text("Display name, e.g. example.com or Notion Plus (max 100)"),
+            "plan": text("Add only: a common AI plan by name, e.g. Claude Max (see list_asset_types plans for the ai category). Fills name, provider, cost, cycle and url; cycle yearly picks the yearly price where there is one; other fields given beside it win"),
             "type": type,
             "provider": text("Vendor, registrar, bank or carrier; prefer a name from list_asset_types providers"),
             "account": text("Login or account the asset belongs to"),
