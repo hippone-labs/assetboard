@@ -18,7 +18,12 @@ codesign --verify --deep --strict --verbose=2 "$app"
 xcrun notarytool submit "dist/Assetboard-macOS-arm64-$version.zip" \
   --keychain-profile "$NOTARY_PROFILE" --wait --output-format json > "$RELEASE_DIR/notary.json"
 /usr/bin/python3 -c 'import json,sys; assert json.load(open(sys.argv[1]))["status"] == "Accepted", "Notarization rejected"' "$RELEASE_DIR/notary.json"
-xcrun stapler staple "$app"
+# The ticket can take a few minutes to reach Apple's ticket service after notarization is accepted (stapler error 73 meanwhile).
+for attempt in {1..10}; do
+  xcrun stapler staple "$app" && break
+  (( attempt < 10 )) || exit 1
+  sleep 30
+done
 xcrun stapler validate "$app"
 spctl -a -vv "$app"
 archive="$RELEASE_DIR/Assetboard-macOS-arm64-$version.zip"
