@@ -2053,7 +2053,9 @@ function demoImportSampleCsv(){
 // Renewals and payments (v21). A payment is what was actually paid for one due date and lives on the asset:
 // {id, paidOn, amount, currency, months, covers, via, status}. status 'missed' records that an expected charge did not happen and
 // never counts as spending. Charges on recurring dates still roll by themselves; confirming them only adds the record.
-const PAYMENT_LIMIT=240,CONFIRM_DAYS=45,RENEWABLE_KINDS=['expire','renew','keep'];
+// CONFIRM_DAYS is how far back automatic charges are asked about; RENEWAL_GRACE_DAYS is the gTLD auto-renew grace, used for a missed
+// renewal when the provider has no published rule.
+const PAYMENT_LIMIT=240,CONFIRM_DAYS=45,RENEWAL_GRACE_DAYS=45,RENEWABLE_KINDS=['expire','renew','keep'];
 let paymentSequence=0;
 function paymentId(){return `pay-${Date.now().toString(36)}-${(++paymentSequence).toString(36)}${Math.random().toString(36).slice(2,6)}`;}
 function paymentList(asset){return Array.isArray(asset?.payments)?asset.payments.filter(p=>p&&dayNumber(p.paidOn)!==null):[];}
@@ -2111,14 +2113,18 @@ function pendingCharges(assets,{now=new Date(),since=''}={}){
 }
 // Repeating expiries and keep-alive deadlines whose day has passed and nobody has confirmed: renewals fail silently (a stopped card,
 // notices going to an old address) and a keep-alive only counts when it was done, so the date does not just roll on as if it worked.
-// Asked from the day after, same window as pendingCharges.
+// Asked from the day after until answered, never about a date before `since` or before the record existed. Within the registrar's
+// grace (renewalGrace) the question counts as due soon; past it, unanswered, the record counts as expired (`overdue`).
+function renewalGrace(asset){return lifecycleRule(asset)?.stages[0]?.to||RENEWAL_GRACE_DAYS;}
 function pendingRenewals(assets,{now=new Date(),since=''}={}){
- const today=localDay(now),floor=Math.max(today-CONFIRM_DAYS+1,dayNumber(since)??-Infinity),out=[];
+ const today=localDay(now),floor=dayNumber(since)??-Infinity,out=[];
  for(const asset of assets||[]){
   if(asset.hiddenAt||asset.stopped||!needsConfirm(asset))continue;
   const answered=new Set(paymentList(asset).map(p=>p.covers).filter(Boolean)),from=Math.max(floor,createdDay(asset)??-Infinity);
   const due=occurrencesBetween(asset,from,today-1).filter(day=>!answered.has(day)).pop();
-  if(due)out.push({asset,due,days:today-dayNumber(due),kind:asset.dateKind==='keep'?'keep':'expire',money:moneyOn(asset,dayNumber(due))});
+  if(!due)continue;
+  const days=today-dayNumber(due),grace=renewalGrace(asset);
+  out.push({asset,due,days,grace,overdue:days>grace,kind:asset.dateKind==='keep'?'keep':'expire',money:moneyOn(asset,dayNumber(due))});
  }
  return out.sort((left,right)=>dayNumber(left.due)-dayNumber(right.due)||String(left.asset.name).localeCompare(String(right.asset.name)));
 }
@@ -2338,33 +2344,82 @@ ${ids.map(type=>`<h2>${escHtml(types[type]||type)}</h2>${assets.filter(asset=>as
 </body></html>`;
 }
 
-// RDAP (the registries' JSON successor to WHOIS): the expiry date and registrar of a domain, read from what the registry returned, and
-// the lifecycle phase when the domain is past expiry (RFC 8056 status names).
+// RDAP (the registries' JSON successor to WHOIS): the expiry date, registrar and nameservers of a domain, read from what the registry
+// returned; the lifecycle phase when the domain is past expiry and a hold when it is frozen (RFC 8056 status names; EPP's camelCase
+// spellings such as pendingDelete or clientHold are read the same way).
 const RDAP_PHASES={'auto renew period':'autoRenew','redemption period':'redemption','pending restore':'pendingRestore','pending delete':'pendingDelete'};
 const rdapPhaseLabels={autoRenew:tr('自动续费宽限期'),redemption:tr('赎回期'),pendingRestore:tr('正在赎回'),pendingDelete:tr('待删除')};
+// A hold takes the domain out of the DNS: client hold is set by the registrar (often an unpaid bill, a failed verification or an
+// abuse report), server hold by the registry. Either way it does not resolve until the side that set it lifts it.
+const RDAP_HOLDS={'server hold':'server','client hold':'client'};
+const rdapHoldLabels={server:tr('注册局冻结了这个域名，解析已停止'),client:tr('注册商冻结了这个域名，解析已停止')};
+// TLDs whose registries publish no RDAP server in IANA's bootstrap file, so there is nothing to ask.
+const RDAP_MISSING_TLDS=['io','co','me','sh','ac','cn','de','eu','jp'];
+const NS_LIMIT=13;
+function rdapWord(value){return String(value||'').trim().replace(/([a-z])([A-Z])/g,'$1 $2').toLowerCase().replace(/\s+/g,' ');}
+function rdapMissing(domain){return RDAP_MISSING_TLDS.includes(String(domain||'').trim().toLowerCase().replace(/\.$/,'').split('.').pop());}
+function rdapNameservers(list){
+ const out=new Set();
+ for(const item of Array.isArray(list)?list:[]){const name=String((typeof item==='string'?item:item?.ldhName)||'').trim().toLowerCase().replace(/\.$/,'');if(/^(?:[a-z0-9-]+\.)+[a-z0-9-]{2,}$/.test(name)&&name.length<=253)out.add(name);}
+ return [...out].sort().slice(0,NS_LIMIT);
+}
 function rdapFacts(json){
- if(!json||typeof json!=='object')return {expires:'',registrar:'',phase:''};
+ if(!json||typeof json!=='object')return {expires:'',registrar:'',phase:'',hold:'',ns:[]};
  const event=(json.events||[]).find(item=>String(item?.eventAction||'').toLowerCase()==='expiration'),time=Date.parse(event?.eventDate||'');
  const registrarEntity=(json.entities||[]).find(item=>(item?.roles||[]).includes('registrar')),card=registrarEntity?.vcardArray?.[1]||[];
  const fn=card.find(entry=>entry?.[0]==='fn')?.[3];
- const statuses=(Array.isArray(json.status)?json.status:[]).map(item=>String(item||'').toLowerCase().trim());
+ const statuses=(Array.isArray(json.status)?json.status:[]).map(rdapWord);
  const phase=['pendingDelete','pendingRestore','redemption','autoRenew'].find(key=>statuses.some(item=>RDAP_PHASES[item]===key))||'';
- return {expires:Number.isNaN(time)?'':new Date(time).toISOString().slice(0,10),registrar:typeof fn==='string'?fn.slice(0,80):'',phase};
+ const hold=['server','client'].find(key=>statuses.some(item=>RDAP_HOLDS[item]===key))||'';
+ return {expires:Number.isNaN(time)?'':new Date(time).toISOString().slice(0,10),registrar:typeof fn==='string'?fn.trim().slice(0,80):'',phase,hold,ns:rdapNameservers(json.nameservers)};
 }
 // The registry date against the stored one, for a domain; a recurring record compares by its next due date. Past expiry the registry
 // date says nothing about a renewal: gTLD registries add a year the day after expiry and take it back if the registrar does not renew
 // within the 45-day auto-renew grace, so a domain in a lifecycle phase is reported as such instead of as a newer date.
+// A frozen domain is never 一致: the state is `hold`, and `dates` says how the dates compared.
 // A lifecycle phase read from the registry, while it is recent enough to mean something (the auto-renew grace is 45 days).
 function registryPhaseOf(asset,now=new Date()){
  const phase=asset?.registryPhase,time=Date.parse(asset?.registryCheckedAt||'');
  return rdapPhaseLabels[phase]&&!Number.isNaN(time)&&localDay(now)-localDay(new Date(time))<=CONFIRM_DAYS?phase:'';
 }
+// A hold stays until a later check reads none: a frozen domain that is no longer checked is still the last thing known about it.
+function registryHoldOf(asset){return asset?.type==='domain'&&rdapHoldLabels[asset.registryHold]&&!asset.hiddenAt?asset.registryHold:'';}
+function registryChangeOf(asset){const change=asset?.registryChange;return asset?.type==='domain'&&change&&typeof change==='object'&&!Number.isNaN(Date.parse(change.at||''))?change:null;}
 function rdapCompare(asset,facts,now=new Date()){
- if(facts?.phase)return {state:'phase',phase:facts.phase,registry:facts.expires||''};
- if(!facts?.expires)return {state:'unknown'};
+ const hold=facts?.hold&&RDAP_HOLDS[`${facts.hold} hold`]?facts.hold:'';
+ if(facts?.phase)return {state:'phase',phase:facts.phase,registry:facts.expires||'',...(hold?{hold}:{})};
  const stored=dayNumber(asset?.date)===null?'':billingCycles[asset.cycle]?nextOccurrence(asset.date,asset.cycle,localDay(now)):asset.date;
- if(!stored)return {state:'missing',registry:facts.expires};
- return stored===facts.expires?{state:'same',registry:facts.expires}:{state:'differs',registry:facts.expires,stored};
+ const dates=!facts?.expires?{state:'unknown'}:!stored?{state:'missing',registry:facts.expires}:stored===facts.expires?{state:'same',registry:facts.expires}:{state:'differs',registry:facts.expires,stored};
+ return hold?{...dates,state:'hold',hold,dates:dates.state}:dates;
 }
-
-if(typeof module!=='undefined')module.exports={LEGACY_WORDS,LEGACY_STATES,MFA_KINDS,RECOVERY_TYPES,RECOVERY_FIELDS,BACKUP_KINDS,BACKUP_TYPES,IMPORTANCE,looksLikeSecret,recoveryText,recoveryGap,backupText,mailHost,mailDependents,selfRecovery,mailStake,PHONE_STATUSES,phoneTrouble,carrierNote,cardPaysPhone,setCardPays,CREDIT_RULES,creditRule,settleCreditExpiry,PLATFORM_SOURCES,missedReminders,reminderDays,STALE_SYNC_DAYS,staleSyncs,AUTO_RENEW_WORDS,CARD_STATUSES,cardTrouble,sourceTrouble,IMPACT_WORDS,verifyNumbers,phoneReach,phoneStake,syncedLabel,BILLING_TYPES,billingLabels,isFreeCost,billingTypeOf,validPromotion,moneyOn,settlePromotions,noteCostChange,costForecast,PAYMENT_LIMIT,CONFIRM_DAYS,paymentList,paidPayments,lastPayment,recordPayment,removePayment,occurrencesBetween,pendingCharges,pendingRenewals,confirmRenewal,cardOutlook,runsOut,needsConfirm,confirmWords,LIFECYCLE_RULES,lifecycleRule,lifecycleOf,AFTER_DUE_DAYS,monthsBetween,renewBase,canRenew,renewOptions,costFromPayment,renewAsset,confirmCharge,priceChange,paidTotals,ledgerRows,csvCell,ledgerCsv,cleanProject,projectNames,projectAssets,shutdownPlan,REVIEW_QUIET_DAYS,reviewQueue,icsFold,calendarIcs,escHtml,handoverHtml,rdapFacts,rdapCompare,rdapPhaseLabels,registryPhaseOf,maskName,PROVIDER_PRESETS,providerPresets,MAIN_CURRENCIES,FALLBACK_RATES,costAmount,syncMoney,convertMoney,formatMoney,costTotals,MOUNT_TYPES,relationKind,linkAllowed,LINK_KINDS,LINK_KIND_ORDER,linkKind,linkRisks,linkImpact,serverChain,serverChainCount,linkRelation,linkMetaOf,setLinkMeta,serverTone,peekSet,dropLinkMeta,IP_LIMIT,normalizeIp,parseIps,assetIps,primaryIp,maskIp,validIpList,ACTION_FIELDS,QUICK_LIMIT,validActionField,sshCommand,cloneUrl,quickActions,recencyTime,recentFirst,arrangeAssets,touchedPrefix,bringToFront,DISPLAY_LIMITS,formatCount,ensureBlock,iconHost,iconVendor,iconVendors,vendorForHost,iconPlan,iconSiteHost,iconSiteFor,iconPlatformOf,iconRows,guessAssetType,regionList,regionName,regionFlag,phoneParts,regionFromPhone,maskPhone,maskEmail,cardExpiry,expiryText,looksLikeCardNumber,linkAssets,unlinkAssets,linkedAssets,removeLinksTo,assetFingerprint,removeUntouchedDemo,orderAssets,moveAsset,dateKinds,billingCycles,dayNumber,localDay,isoDay,addMonths,nextOccurrence,assetDateStatus,upcomingEvents,REMINDER_LIMIT,reminderLeads,reminderPlan,syncKey,assetSyncKey,isBlacklisted,findByExternal,findNameCollision,mergeCloudflare,mergeGitHub,applyCollision,parseSender,registrableDomain,cleanMerchant,findAmounts,findDates,findDomains,evidenceFacts,inferCycle,formatCost,matchAsset,buildCandidates,evidencePayload,parseAiItems,applyAiItem,IMPORT_ROW_LIMIT,parseLooseDate,shiftDate,costParts,formatCostParts,inferTypeFromName,parseQuickLine,AGENT_FIELDS,isAgentImport,parseAgentImport,parseDelimitedText,importHeaderField,rowsToImportItems,isCfsmBackup,parseCfsmBackup,classifyImportPayload,planImport,applyImport,parseBoardBackup,planBoardBackup,applyBoardBackup,demoImportSampleCsv,csvSyncKey,VENDOR_CSV_PRESETS,cloudflareTokenTemplateUrl,githubTokenTemplateUrl,CLOUDFLARE_TOKEN_PERMISSIONS,parseSshConfig,mergeSshConfig,parseEml,delimitedRecords,splitDelimitedLine,resolvePresetValue,SECRET_KINDS,secretKinds,rowSecrets,looksLikeEnv,screenText,PASSWORD_EXPORTS,passwordExportOf,importFileKind,importGate,screenBackup};
+// What a check leaves on the record besides the date: the hold, the registrar's name (registryRegistrar) and the nameservers
+// (registryNS). When an earlier check stored a registrar or nameservers and this one reads others, registryChange keeps the earlier
+// values (the first ones seen, if it changes again before anyone looked) until the person has seen it. Returns that change, or null.
+function rdapRemember(asset,facts,now=new Date()){
+ if(!asset||!facts)return null;
+ if(facts.hold)asset.registryHold=facts.hold;else delete asset.registryHold;
+ const was={registrar:String(asset.registryRegistrar||''),ns:rdapNameservers(asset.registryNS)},ns=rdapNameservers(facts.ns);
+ const registrarMoved=!!(was.registrar&&facts.registrar&&was.registrar.toLowerCase()!==facts.registrar.toLowerCase());
+ const nsMoved=!!(was.ns.length&&ns.length&&was.ns.join(' ')!==ns.join(' '));
+ if(facts.registrar)asset.registryRegistrar=facts.registrar;
+ if(ns.length)asset.registryNS=ns;
+ if(!registrarMoved&&!nsMoved)return null;
+ const before=registryChangeOf(asset)||{};
+ asset.registryChange={at:now.toISOString(),...(registrarMoved||before.registrar?{registrar:before.registrar||was.registrar}:{}),...(nsMoved||before.ns?{ns:before.ns||was.ns}:{})};
+ return asset.registryChange;
+}
+// The domains 即将到来 names apart from dates: frozen ones, and ones whose registrar or nameservers changed since an earlier check.
+function registryAlerts(assets){
+ const live=(assets||[]).filter(a=>a.type==='domain'&&!a.hiddenAt&&!a.stopped);
+ return {frozen:live.filter(a=>registryHoldOf(a)),changed:live.filter(a=>registryChangeOf(a))};
+}
+// How a record counts in the sidebar, the group summaries and the menu bar: a frozen domain is overdue; a renewal nobody confirmed is
+// due soon while the registrar's grace lasts and overdue after it; anything else goes by its date.
+function dueLevel(asset,{now=new Date(),since=''}={}){
+ if(!asset||asset.stopped||asset.hiddenAt)return 'none';
+ if(registryHoldOf(asset))return 'overdue';
+ const renewal=pendingRenewals([asset],{now,since})[0];
+ if(renewal)return renewal.overdue?'overdue':'soon';
+ return assetDateStatus(asset,now).level;
+}
+if(typeof module!=='undefined')module.exports={LEGACY_WORDS,LEGACY_STATES,MFA_KINDS,RECOVERY_TYPES,RECOVERY_FIELDS,BACKUP_KINDS,BACKUP_TYPES,IMPORTANCE,looksLikeSecret,recoveryText,recoveryGap,backupText,mailHost,mailDependents,selfRecovery,mailStake,PHONE_STATUSES,phoneTrouble,carrierNote,cardPaysPhone,setCardPays,CREDIT_RULES,creditRule,settleCreditExpiry,PLATFORM_SOURCES,missedReminders,reminderDays,STALE_SYNC_DAYS,staleSyncs,AUTO_RENEW_WORDS,CARD_STATUSES,cardTrouble,sourceTrouble,IMPACT_WORDS,verifyNumbers,phoneReach,phoneStake,syncedLabel,BILLING_TYPES,billingLabels,isFreeCost,billingTypeOf,validPromotion,moneyOn,settlePromotions,noteCostChange,costForecast,PAYMENT_LIMIT,CONFIRM_DAYS,paymentList,paidPayments,lastPayment,recordPayment,removePayment,occurrencesBetween,pendingCharges,pendingRenewals,confirmRenewal,cardOutlook,runsOut,needsConfirm,confirmWords,LIFECYCLE_RULES,lifecycleRule,lifecycleOf,AFTER_DUE_DAYS,monthsBetween,renewBase,canRenew,renewOptions,costFromPayment,renewAsset,confirmCharge,priceChange,paidTotals,ledgerRows,csvCell,ledgerCsv,cleanProject,projectNames,projectAssets,shutdownPlan,REVIEW_QUIET_DAYS,reviewQueue,icsFold,calendarIcs,escHtml,handoverHtml,rdapFacts,rdapCompare,rdapPhaseLabels,registryPhaseOf,RDAP_HOLDS,rdapHoldLabels,RDAP_MISSING_TLDS,rdapMissing,rdapNameservers,registryHoldOf,registryChangeOf,rdapRemember,registryAlerts,dueLevel,renewalGrace,RENEWAL_GRACE_DAYS,maskName,PROVIDER_PRESETS,providerPresets,MAIN_CURRENCIES,FALLBACK_RATES,costAmount,syncMoney,convertMoney,formatMoney,costTotals,MOUNT_TYPES,relationKind,linkAllowed,LINK_KINDS,LINK_KIND_ORDER,linkKind,linkRisks,linkImpact,serverChain,serverChainCount,linkRelation,linkMetaOf,setLinkMeta,serverTone,peekSet,dropLinkMeta,IP_LIMIT,normalizeIp,parseIps,assetIps,primaryIp,maskIp,validIpList,ACTION_FIELDS,QUICK_LIMIT,validActionField,sshCommand,cloneUrl,quickActions,recencyTime,recentFirst,arrangeAssets,touchedPrefix,bringToFront,DISPLAY_LIMITS,formatCount,ensureBlock,iconHost,iconVendor,iconVendors,vendorForHost,iconPlan,iconSiteHost,iconSiteFor,iconPlatformOf,iconRows,guessAssetType,regionList,regionName,regionFlag,phoneParts,regionFromPhone,maskPhone,maskEmail,cardExpiry,expiryText,looksLikeCardNumber,linkAssets,unlinkAssets,linkedAssets,removeLinksTo,assetFingerprint,removeUntouchedDemo,orderAssets,moveAsset,dateKinds,billingCycles,dayNumber,localDay,isoDay,addMonths,nextOccurrence,assetDateStatus,upcomingEvents,REMINDER_LIMIT,reminderLeads,reminderPlan,syncKey,assetSyncKey,isBlacklisted,findByExternal,findNameCollision,mergeCloudflare,mergeGitHub,applyCollision,parseSender,registrableDomain,cleanMerchant,findAmounts,findDates,findDomains,evidenceFacts,inferCycle,formatCost,matchAsset,buildCandidates,evidencePayload,parseAiItems,applyAiItem,IMPORT_ROW_LIMIT,parseLooseDate,shiftDate,costParts,formatCostParts,inferTypeFromName,parseQuickLine,AGENT_FIELDS,isAgentImport,parseAgentImport,parseDelimitedText,importHeaderField,rowsToImportItems,isCfsmBackup,parseCfsmBackup,classifyImportPayload,planImport,applyImport,parseBoardBackup,planBoardBackup,applyBoardBackup,demoImportSampleCsv,csvSyncKey,VENDOR_CSV_PRESETS,cloudflareTokenTemplateUrl,githubTokenTemplateUrl,CLOUDFLARE_TOKEN_PERMISSIONS,parseSshConfig,mergeSshConfig,parseEml,delimitedRecords,splitDelimitedLine,resolvePresetValue,SECRET_KINDS,secretKinds,rowSecrets,looksLikeEnv,screenText,PASSWORD_EXPORTS,passwordExportOf,importFileKind,importGate,screenBackup};

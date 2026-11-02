@@ -255,5 +255,22 @@ Object.assign(I18N.en,{
  '还没有可以{action}的资产。':'No assets to {action} yet.',
  '{name}：{text}':'{name}: {text}',
  // demo-data.js
- '官网没有可下载的图标':'The site has no icon to download'
+ '官网没有可下载的图标':'The site has no icon to download',
+ // Registry check: holds, registrar and NS changes, TLDs without RDAP, renewals past the grace
+ '冻结':'On hold',
+ '{name}：冻结':'{name}: on hold',
+ '可能已过期':'May have expired',
+ '可能已过期 · {ask}？':'May have expired · {ask}?',
+ '{ask}？':'{ask}?',
+ '{name}：注册商或 NS 变了':'{name}: registrar or nameservers changed',
+ '注册商或 NS 变了':'Registrar or nameservers changed',
+ '原注册商 {name}':'Was registrar {name}',
+ '原 NS {list}':'Was NS {list}',
+ '多半是欠费、没完成邮箱验证或被投诉，去注册商后台看原因。':'Usually an unpaid bill, an unfinished email verification or a complaint; the registrar\'s dashboard says why.',
+ '注册局冻结通常和投诉或法律程序有关，去注册商那里问原因。':'A registry hold usually follows a complaint or a legal process; ask the registrar why.',
+ '注册局没有提供 RDAP':'Registry offers no RDAP',
+ '这个后缀的注册局没有提供 RDAP，到期日只能在注册商后台看':'This TLD\'s registry offers no RDAP; the expiry date is only in the registrar\'s dashboard',
+ '每周向注册局核对这些域名的到期日？':'Check these domains\' expiry with their registries every week?',
+ '只问该后缀的注册局，记在网络记录里':'Only each TLD\'s own registry is asked, and every request is in the Network log',
+ '打开每周核对':'Turn on weekly check'
 });

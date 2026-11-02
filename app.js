@@ -65,12 +65,12 @@ function syncReminders(){if(!nativeStore||demoMode)return;try{const items=remind
 // A click on a notification: one record opens in 即将到来 with the inspector; a merged day opens 即将到来.
 window.assetboardReminderOpen=id=>{if($('#modal')?.open)$('#modal').close();if(typeof panoOpen!=='undefined'&&panoOpen)togglePanorama(false);setView('upcoming');if(id&&state.assets.some(a=>a.id===id))showDetail(id,{focus:true});};
 function checkpoint(){history.push(JSON.stringify(state));if(history.length>25)history.shift();future=[];}
-function toast(message,undoable=false,redoable=false){clearTimeout(toastTimer);$('#toast').classList.remove('notice');$('#toast').setAttribute('role','status');const offer=(undoable&&history.length)||(redoable&&future.length);$('#toast').innerHTML=`<span>${esc(message)}</span>${undoable&&history.length?'<button class="toast-undo" data-action="undo">'+tr('撤销')+'</button>':redoable&&future.length?'<button class="toast-undo" data-action="redo">'+tr('重做')+'</button>':''}`;$('#toast').classList.add('show');toastTimer=setTimeout(()=>$('#toast').classList.remove('show'),offer?6000:3000);}
+function toast(message,undoable=false,redoable=false){clearTimeout(toastTimer);$('#toast').classList.remove('notice','ask');$('#toast').setAttribute('role','status');const offer=(undoable&&history.length)||(redoable&&future.length);$('#toast').innerHTML=`<span>${esc(message)}</span>${undoable&&history.length?'<button class="toast-undo" data-action="undo">'+tr('撤销')+'</button>':redoable&&future.length?'<button class="toast-undo" data-action="redo">'+tr('重做')+'</button>':''}`;$('#toast').classList.add('show');toastTimer=setTimeout(()=>$('#toast').classList.remove('show'),offer?6000:3000);}
 // A notice is a toast that matters: something the person tried did not happen. It is louder, stays longer, waits while hovered
 // or focused, and has its own close button.
 const NOTICE_MS=10000;
 function hideToast(){clearTimeout(toastTimer);$('#toast').classList.remove('show');}
-function notice(message,act=null){clearTimeout(toastTimer);const t=$('#toast');t.classList.add('notice','show');t.setAttribute('role','alert');t.innerHTML=`${ui('warn')}<span>${esc(message)}</span>${act?`<button class="toast-undo" data-action="${esc(act.action)}"${act.id?` data-id="${esc(act.id)}"`:''}>${esc(act.label)}</button>`:''}<button class="toast-close" data-action="toast-close" aria-label="${tr('关闭提示')}" title="${tr('关闭')}">×</button>`;toastTimer=setTimeout(hideToast,NOTICE_MS);}
+function notice(message,act=null){clearTimeout(toastTimer);const t=$('#toast');t.classList.remove('ask');t.classList.add('notice','show');t.setAttribute('role','alert');t.innerHTML=`${ui('warn')}<span>${esc(message)}</span>${act?`<button class="toast-undo" data-action="${esc(act.action)}"${act.id?` data-id="${esc(act.id)}"`:''}>${esc(act.label)}</button>`:''}<button class="toast-close" data-action="toast-close" aria-label="${tr('关闭提示')}" title="${tr('关闭')}">×</button>`;toastTimer=setTimeout(hideToast,NOTICE_MS);}
 for(const [type,ms] of [['mouseenter',0],['focusin',0],['mouseleave',4000],['focusout',4000]])$('#toast').addEventListener(type,()=>{const t=$('#toast');if(!t.classList.contains('notice')||!t.classList.contains('show'))return;clearTimeout(toastTimer);if(ms&&!t.matches(':hover,:focus-within'))toastTimer=setTimeout(hideToast,ms);});
 function restoreSnapshot(json){const actions=state.agentActions;state=JSON.parse(json);if(actions)state.agentActions=actions;rememberCosts();save();if(activeAsset&&!state.assets.some(a=>a.id===activeAsset))closeDetail();else if(activeAsset&&!$('#detail').hidden)showDetail(activeAsset,{focus:false});render();}
 function undo(){if(!history.length){toast(tr('没有可撤销的'));return;}future.push(JSON.stringify(state));if(future.length>25)future.shift();restoreSnapshot(history.pop());toast(tr('已撤销'),false,true);}
@@ -105,7 +105,7 @@ function ageText(iso){const t=Date.parse(iso);if(!t)return '';const days=Math.fl
 // The last push says how alive a repository is (research R1); GitHub's updated_at also moves on stars and settings, and a hand-made
 // record's updatedAt is only its last edit, so that one says nothing until a sync brings pushed_at.
 function quietEvent(a){const e=a.event||'';if(a.type==='repository'&&(e==='公开仓库'||e==='私有仓库'||!e))return a.pushedAt?tr('推送于 {when}',{when:ageText(a.pushedAt)}):a.source==='github'?ageText(a.updatedAt):'';return e==='日期待补充'?'':tr(e);}
-function eventInfo(a){if(a.syncMissing)return {text:tr('本次未返回'),cls:'warn'};if(a.stopped&&a.type==='phone'&&linkImpact(state.assets,a).length)return {text:tr('已停用，仍有账号靠它验证'),cls:'warn overdue'};if(a.stopped){const s=assetDateStatus(a);return {text:s.level==='none'?'':s.label,cls:''};}const trouble=cardTrouble(a)||phoneTrouble(a);if(trouble)return {text:trouble.label,cls:'warn overdue'};const renewal=pendingRenewals([a],{since:state.paymentsSince})[0];if(renewal)return {text:tr('{ask}？{date} {due}',{ask:confirmWords[renewal.kind].ask,date:renewal.due,due:confirmWords[renewal.kind].due}),cls:'warn'};const life=lifecycleOf(a);if(life)return {text:life.label,cls:'warn overdue'};const phase=registryPhaseOf(a);if(phase)return {text:tr('注册局：{phase}',{phase:rdapPhaseLabels[phase]}),cls:'warn overdue'};const status=assetDateStatus(a);if(status.level==='none')return {text:assetProfiles[a.type]?'':quietEvent(a),cls:''};if(a.type==='bankcard'&&status.level==='upcoming')return {text:tr('有效期 {date}',{date:expiryText(a.date)}),cls:''};return {text:a.creditExpiry?tr('额度{status}',{status:status.label}):status.label,cls:status.level==='overdue'?'warn overdue':status.level==='soon'?'warn':''};}
+function eventInfo(a){if(a.syncMissing)return {text:tr('本次未返回'),cls:'warn'};if(a.stopped&&a.type==='phone'&&linkImpact(state.assets,a).length)return {text:tr('已停用，仍有账号靠它验证'),cls:'warn overdue'};if(a.stopped){const s=assetDateStatus(a);return {text:s.level==='none'?'':s.label,cls:''};}const trouble=cardTrouble(a)||phoneTrouble(a);if(trouble)return {text:trouble.label,cls:'warn overdue'};if(registryHoldOf(a))return {text:tr('冻结'),cls:'warn overdue'};const renewal=pendingRenewals([a],{since:state.paymentsSince})[0];if(renewal)return renewal.overdue?{text:tr('可能已过期 · {ask}？',{ask:confirmWords[renewal.kind].ask}),cls:'warn overdue'}:{text:tr('{ask}？{date} {due}',{ask:confirmWords[renewal.kind].ask,date:renewal.due,due:confirmWords[renewal.kind].due}),cls:'warn'};const life=lifecycleOf(a);if(life)return {text:life.label,cls:'warn overdue'};const phase=registryPhaseOf(a);if(phase)return {text:tr('注册局：{phase}',{phase:rdapPhaseLabels[phase]}),cls:'warn overdue'};const status=assetDateStatus(a);if(status.level==='none')return {text:assetProfiles[a.type]?'':quietEvent(a),cls:''};if(a.type==='bankcard'&&status.level==='upcoming')return {text:tr('有效期 {date}',{date:expiryText(a.date)}),cls:''};return {text:a.creditExpiry?tr('额度{status}',{status:status.label}):status.label,cls:status.level==='overdue'?'warn overdue':status.level==='soon'?'warn':''};}
 function lockMark(a){return isPrivateRepo(a)?`<span class="lock-mark" role="img" aria-label="${tr('私有仓库')}" title="${tr('私有仓库')}">${ui('lock')}</span>`:'';}
 // The board itself lives on this Mac only (research Q6): 文件 › 导出资产备份 is the way to keep a copy elsewhere. The Mac app reports
 // each export (assetboardExported, a per-viewer note in localStorage, never in state), and 即将到来 says so once the last copy is a
@@ -285,7 +285,8 @@ function currentView(){if(view==='all'||view==='upcoming')return view;if(project
 function setView(next){if(!['all','upcoming','hidden'].includes(next)&&!cats[next]&&!projectViewName(next))return;view=next;writeViewPrefs();if(query){query='';$('#search').value='';}render();boardScroller().scrollTo(0,0);}
 function setLayout(next){if(!['list','grid'].includes(next)||next===layoutMode)return;layoutMode=next;writeViewPrefs();render();}
 function liveAssets(){return state.assets.filter(a=>!isHidden(a));}
-function dueLevels(list){let overdue=0,soon=0;for(const a of list){if(a.stopped)continue;const level=assetDateStatus(a).level;if(level==='overdue')overdue++;else if(level==='soon')soon++;}return {overdue,soon};}
+// Frozen domains and renewals waiting for an answer count too (dueLevel), so a lapsed auto-renewal does not read as all clear.
+function dueLevels(list){let overdue=0,soon=0;for(const a of list){const level=dueLevel(a,{since:state.paymentsSince});if(level==='overdue')overdue++;else if(level==='soon')soon++;}return {overdue,soon};}
 function dueWords({overdue,soon}){return [overdue&&tr('{n} 项已过期',{n:overdue}),soon&&tr('{n} 项 30 天内到期',{n:soon})].filter(Boolean).join(tr('，'));}
 function navCount(n,level=''){return `<span class="nav-count${level?' '+level:''}"${n>DISPLAY_LIMITS.count?` title="${n}"`:''}>${formatCount(n)}</span>`;}
 function navItem(id,label,glyph,count,attrs=''){const on=!query&&currentView()===id&&!(typeof panoOpen!=='undefined'&&panoOpen);return `<button class="nav-item${on?' active':''}" data-action="view" data-id="${id}"${on?' aria-current="page"':''} ${attrs}>${glyph}<span class="nav-label">${esc(label)}</span>${count}</button>`;}
@@ -420,11 +421,14 @@ function boardHtml(v){
   return {html,count:hits.length};
  }
  if(v==='upcoming'){
-  const events=upcomingEvents(state.assets,new Date(),Infinity),charges=chargesBandHtml();
-  if(!events.length&&!charges)return {html:viewEmpty(ui('clock'),tr('还没有到期或扣款日期'),`<button class="button" data-action="inbox">${tr('粘贴续费通知')}</button>`),count:0};
+  // Frozen domains come first as their own group (and leave the date bands); a changed registrar or NS is one amber line each.
+  const alerts=registryAlerts(state.assets),frozenIds=new Set(alerts.frozen.map(a=>a.id));
+  const events=upcomingEvents(state.assets,new Date(),Infinity).filter(e=>!frozenIds.has(e.asset.id)),charges=chargesBandHtml();
+  const registry=alerts.changed.map(a=>`<p class="registry-note" role="note">${ui('warn')}<span>${tr('{name}：注册商或 NS 变了',{name:esc(displayName(a))})}</span><button class="button" data-action="detail" data-id="${esc(a.id)}">${tr('查看')}</button></p>`).join('')+(alerts.frozen.length?groupHtml({id:'frozen',title:tr('冻结'),list:alerts.frozen,withType:true}):'');
+  if(!events.length&&!charges&&!registry)return {html:viewEmpty(ui('clock'),tr('还没有到期或扣款日期'),`<button class="button" data-action="inbox">${tr('粘贴续费通知')}</button>`),count:0};
   const left=[...events],off=exportNoteHtml()+handoverNoteHtml()+(nativeStore?.notifications==='denied'&&!demoMode?`<p class="notify-off" role="note">${ui('warn')}<span>${tr('系统通知已关闭，到期前不会提醒')}</span><button class="button" data-action="notification-settings">${tr('打开通知设置')}</button></p>`:'');
-  const html=off+charges+UPCOMING_BANDS.map(([id,title,fits])=>{const band=[];while(left.length&&fits(left[0].status))band.push(left.shift().asset);return band.length?groupHtml({id,title,list:band,withType:true}):'';}).join('');
-  return {html,count:events.length};
+  const html=off+registry+charges+UPCOMING_BANDS.map(([id,title,fits])=>{const band=[];while(left.length&&fits(left[0].status))band.push(left.shift().asset);return band.length?groupHtml({id,title,list:band,withType:true}):'';}).join('');
+  return {html,count:events.length+alerts.frozen.length};
  }
  if(projectViewName(v))return projectBoardHtml(projectViewName(v));
  if(v==='hidden'){
@@ -500,7 +504,7 @@ function assetMenuItems(a,full=false){
  if(!a.hiddenAt){items.push({action:'pin-front',label:tr('放到前面'),key:'F'});if(manualOrder(a.type))items.push({action:'auto-order',label:tr('恢复自动排序')});items.push({action:'link-picker',label:tr('关联…'),key:'L'});}
  if(renewable(a))items.push({action:'renew',label:`${renewWord(a)}…`,key:'R'});
  if(!a.hiddenAt&&ownPayments(a)&&proAction('payment-add')&&(costAmount(a)||canRenew(a)||paymentList(a).length))items.push({action:'payment-add',label:tr('记一笔付款…')});
- if(nativeStore&&a.type==='domain'&&rdapDomain(a))items.push({action:'rdap',label:tr('核对注册局日期')});
+ if(nativeStore&&a.type==='domain'&&rdapDomain(a))items.push(rdapMissing(rdapDomain(a))?{action:'rdap-none',label:tr('注册局没有提供 RDAP')}:{action:'rdap',label:tr('核对注册局日期')});
  if(nativeStore)items.push({action:'icon-dialog',label:tr('网站图标…')});
  if(STOPPABLE.includes(a.type)&&!a.hiddenAt)items.push({action:'toggle-stopped',label:a.stopped?tr('恢复启用'):tr('标为停用'),key:'S'});
  items.push({action:a.hiddenAt?'restore-asset':'hide-asset',label:a.hiddenAt?tr('恢复显示'):tr('隐藏'),key:'H'},'-',{action:'delete-asset',label:tr('删除…'),danger:true});
@@ -1009,20 +1013,25 @@ function commitImportPlan(plan,meta={},opts={}){
  const restoreKeys=opts.restoreKeys||[];
  const applySame=opts.applySame||[];
  const applyCollisions=opts.applyCollisions||[];
- const beforeCount=state.assets.length;
+ const beforeCount=state.assets.length,beforeIds=new Set(state.assets.map(a=>a.id));
  checkpoint();
  if(importKind==='json')state=applyBoardBackup(state,plan,{restoreKeys});
  else state=applyImport(state,plan,{restoreKeys,applySame,applyCollisions});
  if(!Array.isArray(state.deletedExternalIds))state.deletedExternalIds=[];
+ const askRdap=rdapAskDue(state.assets.filter(a=>!beforeIds.has(a.id)));if(askRdap)state.rdapAsked=true;
  save();render();
  const added=state.assets.length-beforeCount;
  const updated=(plan.updated||[]).length+(plan.hidden||[]).length+applySame.length+applyCollisions.length;
  const skipped=(plan.skippedSame||[]).length;const parts=[added?tr('新增 {n}',{n:added}):'',updated?tr('更新 {n}',{n:updated}):'',restoreKeys.length?tr('恢复 {n}',{n:restoreKeys.length}):'',skipped?tr('跳过 {n}',{n:skipped}):''].filter(Boolean);
  $('#modal').close();
- toast(parts.length?parts.join(' · '):tr('没有写入新内容'),true);
+ if(askRdap)rdapAskToast(parts.join(' · '));else toast(parts.length?parts.join(' · '):tr('没有写入新内容'),true);
  importPlan=null;importKind=null;
  if(importIntakeId){finishIntake(importIntakeId);importIntakeId=null;}
 }
+// After the first import that brings in domains, the result asks once whether to turn on the weekly registry check (off by default
+// because it reaches public registries). Mac app only; asked once per board (state.rdapAsked), and never when it is already on.
+function rdapAskDue(added){return !!nativeStore&&!demoMode&&!state.rdapAuto&&!state.rdapAsked&&added.some(a=>a.type==='domain'&&!rdapMissing(rdapDomain(a))&&rdapDomain(a));}
+function rdapAskToast(message){clearTimeout(toastTimer);const t=$('#toast');t.classList.add('notice','show','ask');t.setAttribute('role','status');t.innerHTML=`<span class="toast-ask"><span>${esc(message)}</span><span>${tr('每周向注册局核对这些域名的到期日？')}</span><small>${tr('只问该后缀的注册局，记在网络记录里')}</small></span><button class="toast-undo" data-action="rdap-ask-on">${tr('打开每周核对')}</button>${history.length?`<button class="toast-undo" data-action="undo">${tr('撤销')}</button>`:''}<button class="toast-close" data-action="toast-close" aria-label="${tr('关闭提示')}" title="${tr('关闭')}">×</button>`;toastTimer=setTimeout(hideToast,NOTICE_MS);}
 function runImportPlan(plan,meta={}){
  importPlan=plan;
  // A file handed over from outside the window always stops at the preview, and stays queued until it is imported.
