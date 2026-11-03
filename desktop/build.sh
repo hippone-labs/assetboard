@@ -55,7 +55,7 @@ icon_src="$project_dir/desktop/icon-1024.png"
 icon_dir="$out_dir/AppIcon.iconset"
 rm -rf "$icon_dir"
 mkdir -p "$icon_dir"
-# icon-1024.png is full-bleed with no baked shadow: macOS applies the mask and shadow (see desktop/icons.py, --legacy for the pre-masked variant).
+# icon-1024.png is full-bleed with no baked shadow: macOS applies the mask and shadow. It is rendered from desktop/icon.svg.
 for size in 16 32 128 256 512; do
   sips -z "$size" "$size" "$icon_src" --out "$icon_dir/icon_${size}x${size}.png" >/dev/null
   double=$((size * 2))
