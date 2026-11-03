@@ -2689,6 +2689,30 @@ rememberCosts();
 // Promotions that ended while the app was closed settle now (the regular price becomes the cost, with history); checked hourly.
 function settleDue(){if(demoMode)return;const changed=settlePromotions(state.assets);if(changed.length){rememberCosts();save();render();}}
 settleDue();setInterval(settleDue,3600000);
+// Day counts, the overview, 即将到来, the timeline's today line and the sidebar dots are all counted from today, so a new day redraws the board
+// (checked every minute and on coming back to the front, since a sleeping Mac skips timers).
+let drawnDay=localDay();
+function dayRollover(){const d=localDay();if(d===drawnDay||gesture?.active)return;drawnDay=d;if(!demoMode&&settlePromotions(state.assets).length){rememberCosts();save();}dayRender();}
+// The whole board is drawn again with motion: records slide to where they now sort (into another band of 即将到来 too, measured
+// against their group so a moving group is not counted twice), new ones fade in, and every row, tile, cell or count whose text changed fades in anew.
+function dayRender(){
+ if(reduceMotion()){render();return;}
+ const keyOf=el=>el.dataset.asset?'a:'+el.dataset.asset:el.dataset.group?'g:'+el.dataset.group:el.matches('.nav-item')?'n:'+el.dataset.id:el.id||el.className.split(' ')[0];
+ const snap=()=>{const out=new Map(),seen=new Map();for(const el of document.querySelectorAll('#board .group,#board [data-asset],#board .tl-today,#board .ov-tile,#board .cal-day,#sidebar .nav-item,#view-meta')){const k=keyOf(el),n=(seen.get(k)||0)+1;seen.set(k,n);out.set(k+'#'+n,{el,rect:el.getBoundingClientRect(),text:el.textContent+'|'+el.className});}return out;};
+ const before=snap();skipLayoutAnimation=true;render();
+ cancelAnimationFrame(layoutFrame);layoutFrame=requestAnimationFrame(()=>{
+  layoutFrame=0;const after=snap(),moved=new Map();
+  for(const [k,now] of after){const was=before.get(k);if(was&&k.startsWith('g:'))moved.set(now.el,{dx:was.rect.left-now.rect.left,dy:was.rect.top-now.rect.top});}
+  for(const [k,now] of after){
+   const was=before.get(k);
+   if(!was){if(!k.startsWith('n:'))now.el.animate([{opacity:0},{opacity:1}],{duration:MOTION_MS,easing:'ease-out'});continue;}
+   const group=k.startsWith('a:')&&moved.get(now.el.closest('.group'))||{dx:0,dy:0},dx=k.startsWith('g:')?moved.get(now.el).dx:was.rect.left-now.rect.left-group.dx,dy=k.startsWith('g:')?moved.get(now.el).dy:was.rect.top-now.rect.top-group.dy;
+   const slide=Math.abs(dx)>=1||Math.abs(dy)>=1,fade=was.text!==now.text&&!k.startsWith('g:');if(!slide&&!fade)continue;
+   now.el.animate([{transform:slide?`translate(${dx}px,${dy}px)`:'none',opacity:fade?.35:1},{transform:'none',opacity:1}],{duration:MOTION_MS,easing:settleEase});
+  }
+ });
+}
+setInterval(dayRollover,60000);document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')dayRollover();});window.addEventListener('focus',dayRollover);
 new ResizeObserver(([entry])=>{const w=entry.contentRect.width,size=w<600?'s':w<860?'m':'l';if($('#board').dataset.size!==size)$('#board').dataset.size=size;}).observe($('#main'));
 render();
 // What came due while the board was not in front of anyone (U3): checked on opening, on coming back to the front and every few minutes
