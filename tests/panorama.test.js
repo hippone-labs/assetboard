@@ -205,7 +205,7 @@ test('login lens: Apple IDs and Google accounts hold what signs in with them, no
  assert.equal(m.unmounted.total,0);assert.ok(P.panoramaLenses(a).includes('login'));
  assert.equal(P.canHang(a,'tool','g','login'),true);assert.equal(P.canHang(a,'s','g','login'),false,'servers do not sign in with a Google account');
 });
-test('project lens: one virtual card per project; dropping or ticking sets the label, one project per thing',()=>{
+test('project lens: one virtual card per project; dropping or ticking adds the label, a thing can serve several',()=>{
  const a=cloud();for(const [id,p] of [['d','web'],['r','web'],['v','web'],['ai','web'],['park','old'],['hidden','web']])if(a.find(x=>x.id===id))a.find(x=>x.id===id).project=p;
  assert.ok(P.panoramaLenses(a).includes('project'));
  let m=P.buildPanorama(a,{lens:'project'});
@@ -216,7 +216,9 @@ test('project lens: one virtual card per project; dropping or ticking sets the l
  assert.deepEqual(m.totals.map(t=>t.key+':'+t.n),['project:2','domain:2','repository:1','infra:1','service:1'],'kinds count only what has a project');
  assert.equal(P.panoramaHub(a,'project:web','project').name,'web');assert.equal(P.panoramaHub(a,'project:nope','project'),null);
  let r=P.moveMount(a,'park',{from:'project:old',to:'project:web',keep:true,lens:'project'});
- assert.deepEqual([r.ok,r.kind,a.find(x=>x.id==='park').project],[true,'move','web'],'⌥ cannot keep two projects; it moves');
+ assert.deepEqual([r.ok,r.kind,a.find(x=>x.id==='park').project],[true,'also',['old','web']],'⌥ keeps both projects');
+ assert.deepEqual(P.buildPanorama(a,{lens:'project'}).lanes.map(l=>l.id+':'+l.total),['project:web:5','project:old:1'],'a shared thing sits in both');
+ r=P.moveMount(a,'park',{from:'project:old',to:null,lens:'project'});assert.deepEqual([r.kind,a.find(x=>x.id==='park').project],['detach','web'],'taking it off one project keeps the other');
  assert.equal(P.panoramaLenses(a).includes('project'),true);assert.deepEqual(P.buildPanorama(a,{lens:'project'}).lanes.map(l=>l.id),['project:web'],'an emptied project disappears');
  r=P.moveMount(a,'park',{from:'project:web',to:null,lens:'project'});assert.deepEqual([r.ok,r.kind,'project' in a.find(x=>x.id==='park')],[true,'detach',false]);
  const g=P.hubCandidates(a,'project:web','project');assert.ok(g.some(x=>x.items.some(i=>i.asset.id==='card'&&!i.on)),'any kind can join a project');
