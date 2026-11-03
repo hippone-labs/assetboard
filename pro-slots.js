@@ -33,7 +33,7 @@
 //   agentFields[key] = (raw, asset) => {value} | {error}   an update field the core does not know (value null removes it)
 const proSlots={facts:[],priceMarks:[],formFields:[],formRead:[],renewFields:[],renewRead:[],projectBar:[],toolsNav:[],exportCards:[],costExtras:[],
  importCli:[],importSources:[],captureLinks:[],topnavActions:[],
- paymentsSection:null,chargesBand:null,captureImportLabel:null,captureAiLink:null,projectNav:null,serverProbe:null,remindersApp:null,snapshot:null,handoverPack:null,actions:{},agentMethods:{},agentConfirms:{},agentFields:{}};
+ paymentsSection:null,chargesBand:null,captureImportLabel:null,captureAiLink:null,projectNav:null,serverProbe:null,platformProbe:null,remindersApp:null,snapshot:null,handoverPack:null,actions:{},agentMethods:{},agentConfirms:{},agentFields:{}};
 // Two switches. ?free in the address shows the free edition from a full checkout: no Pro script registers anything, like a build made
 // with ASSETBOARD_EDITION=free. Otherwise Pro is on with a licence the Mac app has checked (nativeStore.pro.on, from
 // pro/desktop/License.swift) and on the demo board, which shows every Pro feature; without a licence (and in the browser) the free
@@ -55,7 +55,9 @@ function proBuilt(){return !proFree&&typeof proLicenceSection==='function';}
 function slotHtml(name,...args){return proSlots[name].map(fn=>fn(...args)||'').join('');}
 function projectsOn(){return !!proSlots.projectNav;}
 // A server's state from its probe, or null (not a server, no probe link, or the free edition).
-function probeState(a){return a?.type==='server'&&proSlots.serverProbe?proSlots.serverProbe.status(a):null;}
+// 实时状态 for one record: a server's probe or SSH reading, or a database's or deployment's platform state (null when there is none).
+function probeState(a){if(!a)return null;if(a.type==='server')return proSlots.serverProbe?proSlots.serverProbe.status(a):null;return proSlots.platformProbe?proSlots.platformProbe.status(a):null;}
+function liveRowHtml(a){return a?.type==='server'?proSlots.serverProbe?.rowHtml(a)||'':proSlots.platformProbe?.rowHtml(a)||'';}
 // Whether a Pro script filled anything: the free edition (?free, ASSETBOARD_FREE) leaves every slot empty.
 function proLoaded(){if(proFree)return false;return Object.entries(proSlots).some(([key,value])=>Array.isArray(value)?value.length:['actions','agentMethods','agentConfirms','agentFields'].includes(key)?Object.keys(value).length:!!value);}
 // The one calm line a locked Pro feature shows where it would be, with a button to the licence section; the small Pro mark beside a

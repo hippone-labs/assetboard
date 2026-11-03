@@ -405,7 +405,7 @@ function itemHtml(a,{withType=false,grid=false}={}){
  const subHtml=withType&&impact.length?`${esc(cats[a.type].one)}${short?`<span class="sub-sep" aria-hidden="true">·</span>${esc(short)}`:''}${impactHtml}`:withType?`${esc(cats[a.type].one)}${a.reason?`<span class="sub-sep" aria-hidden="true">·</span><span class="r-reason">${esc(a.reason)}</span>`:sub.text?`<span class="sub-sep" aria-hidden="true">·</span>${sub.html}`:''}`:sub.html;
  // A server linked to a probe shows its state on a line under the address: in place of the implied 运行中, and red when offline.
  // 已停用, set by hand, still stands (the readings show beside it), and a stopped server is never drawn as down.
- const live=probeState(a),probeLine=live?proSlots.serverProbe.rowHtml(a):'';
+ const live=probeState(a),probeLine=live?liveRowHtml(a):'';
  const name=`<span class="r-name"><span class="r-text">${esc(displayName(a))}</span>${lockMark(a)}${stopRing(a)}${relMark(a)}</span>`,subSpan=`<span class="r-sub${sub.cls&&!withType?' '+sub.cls:''}"${sub.text?` title="${esc(sub.text)}"`:''}>${subHtml}</span>`;
  const selected=activeAsset===a.id&&!$('#detail').hidden,hero=grid?cardHero(a,e):'',when=hero?cardWhen(a,e):e;
  return `<div class="${grid?'gcard':'row'}${hero?' has-hero':''}${a.stopped?' stopped':''}${live&&!live.online&&!a.stopped?' probe-down':''}${isHidden(a)?' is-hidden':''}${selected?' selected':''}" data-asset="${esc(a.id)}"><button class="item-open" data-action="detail" data-id="${esc(a.id)}" aria-label="${esc(itemLabel(a,e,cost))}" title="${esc(hint)}">${tile(a,grid?'':'sm')}<span class="r-main">${name}${subSpan}${probeLine}${searchHit(a)}</span>${hero?`<span class="g-hero-wrap">${hero}</span>`:''}<span class="r-when">${statusHtml(when)}<span class="r-cost"${costHint(a)?` title="${esc(costHint(a))}"`:''}>${priceMark(a)}${esc(cost)}</span></span></button><span class="r-actions">${itemActions(a)}</span></div>`;
@@ -2308,7 +2308,8 @@ function prefsDialog(section){
   full?link(tr('AI 识别'),!!nativeStore.ai?.model,'ai-settings',tr('你自己的模型和 API key，只在你点识别时发送')):'',
   full&&featureOn('agent')?link(tr('MCP 接入'),null,'agent-setup',tr('给外部工具的配置')):'',
   full&&typeof probeOn==='function'&&probeOn()?link(tr('探针数据源'),null,'probe-sources',tr('监控面板的地址和账号')):'',
-  full&&typeof sshOn==='function'&&sshOn()?link(tr('SSH 直读'),null,'ssh-probe-open',tr('逐台开启、读取间隔')):''].join(''):'';
+  full&&typeof sshOn==='function'&&sshOn()?link(tr('SSH 直读'),null,'ssh-probe-open',tr('逐台开启、读取间隔')):'',
+  full&&typeof platformOn==='function'&&platformOn()?link(tr('平台状态'),platform.sources.length>0,'platform-sources',tr('Supabase、Vercel、Render、Upstash 上的项目状态')):''].join(''):'';
  const edition=row(tr('版本类型'),`<span class="prefs-edition">${esc(typeof proEditionText==='function'&&proBuilt()?proEditionText():tr('免费版'))}</span>`);
  const about=[edition,nativeStore?row(tr('版本'),`<span class="prefs-version">${esc(nativeStore.version||'')}${mac?`<button class="button" data-action="check-updates">${tr('检查更新…')}</button>`:''}</span>`):'',
   mac?row(tr('自动检查更新'),toggle('prefs-native',nativeStore.autoUpdate!==false,tr('自动检查更新'),' data-id="autoUpdate"'),tr('每天最多读一次官网的版本文件')):''].join('');
@@ -2339,7 +2340,7 @@ function prefsChanged(){if($('#modal').open&&$('#modal').dataset.view==='prefs')
 function setFeatureNow(key,on){
  setFeature(key,on);
  if(key==='panorama'&&!on&&typeof panoOpen!=='undefined'&&panoOpen)panoramaOpen(false);
- if(key==='probe'&&on){if(typeof probeStart==='function')probeStart();if(typeof sshStart==='function')sshStart();}
+ if(key==='probe'&&on){if(typeof probeStart==='function')probeStart();if(typeof sshStart==='function')sshStart();if(typeof platformStart==='function')platformStart();}
  drawTopnavActions();render();prefsChanged();toast(on?tr('{name}：已打开',{name:FEATURES[key].name}):tr('{name}：已关闭',{name:FEATURES[key].name}));
 }
 document.addEventListener('click',e=>{const button=e.target.closest('[data-action]');if(!button)return;const {action,id}=button.dataset;
