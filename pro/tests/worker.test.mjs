@@ -190,16 +190,16 @@ test('/thanks shows the licence of a paid session, waits briefly for the webhook
  const html=await res.text();
  assert.ok(html.includes('付款成功')&&html.includes(record.text)&&html.includes(display(record.id))&&html.includes('终身更新')&&!html.includes('9999'),html);
  assert.ok(html.includes('href="assetboard://activate?key='+encodeURIComponent(record.text)+'"'),'the activation link');
- assert.ok(html.includes('<html lang="zh-CN"')&&html.includes('noindex')&&!/https?:\/\/(?!example\.com\/releases)/.test(html.replace(/<style>[\s\S]*<\/style>/,'')),'the page loads nothing external: '+html);
+ assert.ok(html.includes('<html lang="zh-CN"')&&html.includes('noindex')&&!/(src|href)="https?:\/\/(?!example\.com\/)|<link rel="stylesheet|url\(/.test(html),'the page loads nothing external: '+html);
  assert.equal(res.headers.get('cache-control'),'no-store');
  const unpaid=await handle(new Request('https://pay.example.com/thanks?session_id=cs_test_9'),env,io);
- assert.match(await unpaid.text(),/还没有收到付款/);
+ assert.match(await unpaid.text(),/还没收到这笔付款/);
  let waits=0;const slow={...io,wait:async()=>{waits++;}};
  const late=await handle(new Request('https://pay.example.com/thanks?session_id=cs_test_5'),env,slow);
  assert.equal(waits,6);assert.match(await late.text(),/on its way/);
  for(const q of ['','?session_id=nope','?session_id=%7BCHECKOUT_SESSION_ID%7D','?session_id=cs_missing']){
   const res=await handle(new Request('https://pay.example.com/thanks'+q),env,io),html=await res.text();
-  assert.equal(res.status,404);assert.ok(html.includes('No order here')&&html.includes('href="/recover?lang=en"')&&html.includes('Download Assetboard'),'no order says where the licence is: '+q);
+  assert.equal(res.status,404);assert.ok(html.includes('No order here')&&html.includes('href="/recover?lang=en"')&&html.includes('Download it free'),'no order says where the licence is: '+q);
  }
  const zh=await handle(new Request('https://pay.example.com/thanks',{headers:{'Accept-Language':'zh-CN,zh;q=0.9,en;q=0.8'}}),env,io);
  assert.ok((await zh.text()).includes('这里没有订单'),'the browser language picks Chinese without ?lang');
