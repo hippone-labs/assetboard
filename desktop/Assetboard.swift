@@ -1124,6 +1124,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         #if !ASSETBOARD_FREE
         if let action = body["action"] as? String, action.hasPrefix("probe") { handleProbe(action, body); return }
         if let action = body["action"] as? String, action.hasPrefix("sshProbe") { handleSshProbe(action, body); return }
+        if let action = body["action"] as? String, action.hasPrefix("platform") { handlePlatform(action, body); return }
         // Cloudflare, GitHub and AI are Pro: the free edition has no bridge for them, so their messages are ignored.
         if body["action"] as? String == "cloudflareDisconnect" {
             if cloudflare.disconnect() { cloudflareResult(["ok": true, "disconnected": true]) }
@@ -1286,6 +1287,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         initial["probeSources"] = demoMode ? [] : probes.summary()
         // SSH 直读: which aliases are on and how often; the demo makes up its own hosts.
         initial["sshProbe"] = demoMode ? NSNull() as Any : sshProbeSettings.summary as Any
+        // 平台状态: the sources without their tokens; the demo reads no platform.
+        initial["platformSources"] = demoMode ? [] : platformSources.summary()
         #endif
         // Screenshots (the window can only be captured, not clicked): `--demo --open-asset=<id>` opens that record's detail,
         // `--demo --panorama` opens 全景, `--demo --probe-sources` the probe settings (探针数据源). Only the demo reads them.
@@ -2265,6 +2268,12 @@ if CommandLine.arguments.contains(Updater.launchCheckFlag) {
     testSSHProbe()
     #else
     print("PASS: SSH probe is not in the free edition")
+    #endif
+} else if CommandLine.arguments.contains("--test-platform") {
+    #if !ASSETBOARD_FREE
+    testPlatformStatus()
+    #else
+    print("PASS: platform status is not in the free edition")
     #endif
 } else if CommandLine.arguments.contains("--test-probe") {
     #if !ASSETBOARD_FREE
