@@ -9,7 +9,7 @@ const WIDTH=1686,HEIGHT=1050,QUALITY=0.8;
  const [from,to]=process.argv.slice(2);
  if(!from||!to){console.error('usage: node tools/site-screenshots-webp.js <png-dir> <out-dir>');process.exit(2);}
  const files=fs.readdirSync(from).filter(f=>/^app-[a-z-]+-(zh|en)\.png$/.test(f)).sort();
- if(files.length!==6)throw new Error(`expected 6 screenshots in ${from}, found ${files.length}`);
+ if(files.length!==16)throw new Error(`expected 16 screenshots in ${from}, found ${files.length}`);
  fs.mkdirSync(to,{recursive:true});
  const browser=await chromium.launch(process.env.PLAYWRIGHT_CHROMIUM?{executablePath:process.env.PLAYWRIGHT_CHROMIUM}:{}),page=await browser.newPage();
  try{

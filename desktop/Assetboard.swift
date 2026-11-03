@@ -1297,6 +1297,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
             if CommandLine.arguments.contains("--open-sources") { open["probeSources"] = true }
             if CommandLine.arguments.contains("--open-ssh-settings") { open["ssh"] = true }
             if CommandLine.arguments.contains("--open-theme") { open["theme"] = true }
+            // `--open-view=upcoming|<category>`, `--layout=list|grid|timeline|calendar` and `--open-cost` (费用) for the site's
+            // feature screenshots; the page ignores a view or layout it does not know.
+            for (flag, key) in [("--open-view=", "view"), ("--layout=", "layout")] {
+                if let value = CommandLine.arguments.first(where: { $0.hasPrefix(flag) })?.dropFirst(flag.count),
+                   String(value).range(of: "^[a-z]{1,20}$", options: .regularExpression) != nil { open[key] = String(value) }
+            }
+            if CommandLine.arguments.contains("--open-cost") { open["cost"] = true }
             if !open.isEmpty { initial["demoOpen"] = open }
         }
         return initial
