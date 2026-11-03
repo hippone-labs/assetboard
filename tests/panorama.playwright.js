@@ -24,12 +24,12 @@ async (page) => {
   const m=await p.evaluate(()=>({trays:[...document.querySelectorAll('.pano-card')].map(c=>c.dataset.lane+':'+(c.querySelector('.pl-band span')?.textContent||'')),lanes:[...document.querySelectorAll('.pano-lane')].map(l=>l.dataset.lane),totals:[...document.querySelectorAll('.pano-total')].map(t=>t.getAttribute('aria-label')),tokyo:[...document.querySelectorAll('.pano-chip[data-lane="demo-s1"]')].map(c=>c.dataset.chip),ip:document.querySelector('[data-lane="demo-s1"] .pl-ip').textContent.trim(),loose:document.querySelector('.pano-loose').getAttribute('aria-label'),looseChips:document.querySelectorAll('.pano-loose .pano-chip').length,more:document.querySelector('.pano-loose [data-loose-more]')?.textContent}));
   check(m.trays.join()==='demo-s1:Acme Cloud,demo-s2:Acme Cloud,demo-s3:'&&m.lanes.at(-1)==='demo-s3','One card per server, its account on the card, the server without one last: '+m.trays.join());
   const repos=await p.evaluate(()=>state.assets.filter(a=>a.type==='repository'&&!a.hiddenAt).length);
-  check(m.totals.join()===`服务器 3,域名 3,仓库 ${repos},数据库 1`,'Totals count visible things: '+m.totals.join());
+  check(m.totals.join()===`服务器 3,域名 3,仓库 ${repos},数据库 2`,'Totals count visible things: '+m.totals.join());
   check(m.tokyo.join()==='demo-d1,demo-d2,demo-r0,demo-r1,demo-db1','tokyo-vps lists its domains, repositories and database (the hidden domain stays out): '+m.tokyo.join());
   check(/203\.0\.113\.10/.test(m.ip),'Lane shows the address: '+m.ip);
   // The free demo has five repositories, all but the two on tokyo-vps loose and under the cap.
-  if(await p.evaluate(()=>proLoaded()))check(m.loose==='未挂载，12 项'&&m.looseChips===7&&m.more==='+5','Unmounted card: 12 things, seven shown then +N: '+JSON.stringify(m));
-  else check(m.loose==='未挂载，3 项'&&m.looseChips===3&&!m.more,'Unmounted card in the free demo: 3 things, no +N: '+JSON.stringify(m));
+  if(await p.evaluate(()=>proLoaded()))check(m.loose==='未挂载，13 项'&&m.looseChips===7&&m.more==='+6','Unmounted card: 13 things (notes-auth, on no server, among them), seven shown then +N: '+JSON.stringify(m));
+  else check(m.loose==='未挂载，4 项'&&m.looseChips===4&&!m.more,'Unmounted card in the free demo: 4 things, no +N: '+JSON.stringify(m));
   check(await p.evaluate(()=>!document.querySelector('.pano-loose .warn,.pano-loose .red,.pano-loose .amber')),'The unmounted strip raises no warning');
   // Honest wording and no green. 在线/离线 may appear only where a probe (Pro, 探针数据源) reports it.
   const words=await p.evaluate(()=>{const c=document.querySelector('#panorama').cloneNode(true);c.querySelectorAll('.pano-probe').forEach(n=>n.remove());c.querySelectorAll('[data-lane-head],[data-hero],.pano-lane[data-lane]').forEach(n=>{const id=n.dataset.laneHead||n.dataset.hero||n.dataset.lane;if(typeof probeState==='function'&&probeState(state.assets.find(a=>a.id===id)))n.querySelectorAll('.pl-state').forEach(x=>x.remove());});return c.textContent;});
@@ -49,7 +49,7 @@ async (page) => {
   // (The free demo's strip already shows everything, so there is nothing to expand.)
   if(await p.evaluate(()=>proLoaded())){
    await p.click('[data-loose-more]');await p.waitForTimeout(100);
-   check(await p.evaluate(()=>document.querySelectorAll('.pano-loose .pano-chip').length)===12,'The strip expands to every item');
+   check(await p.evaluate(()=>document.querySelectorAll('.pano-loose .pano-chip').length)===13,'The strip expands to every item');
    await p.click('[data-loose-more]');
   }
   // Keyboard: arrows move between lanes and chips; Enter opens the detail above; Esc peels layers.
