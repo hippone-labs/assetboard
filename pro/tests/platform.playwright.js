@@ -1,7 +1,8 @@
 // Run with the browser tool's filename option. 平台状态 (part of 实时状态), against a stubbed Mac app: with 实时状态 on, a connected
 // Supabase source is read on launch and its paused project shows on the matching database as one red line, counts in the 实时 tile
 // and has a detail row; each source's reading interval is the person's; a Vercel token (which cannot be read-only) is kept only
-// after a confirmation, and declining sends nothing; tokens and readings never reach the board; the demo asks for nothing.
+// after a confirmation, and declining sends nothing; tokens and readings never reach the board; the demo shows made-up states and
+// asks the app for nothing.
 async (page) => {
  const check=(ok,message)=>{if(!ok)throw new Error(message);};
  const until=async(p,fn,arg)=>{for(let i=0;i<150;i++){if(await p.evaluate(fn,arg))return;await new Promise(r=>setTimeout(r,40));}throw new Error('Timed out: '+String(fn).slice(0,90));};
@@ -86,9 +87,13 @@ async (page) => {
  const demo=await open(()=>{window.webkit={messageHandlers:{assetboard:{postMessage(m){window.__sent=(window.__sent||[]).concat(m.action);if(m.action==='save')setTimeout(()=>window.assetboardSaved?.(m.sequence,true),5);}}}};
   window.__ASSETBOARD_NATIVE__={pro:{on:true,kind:'licensed',id:'K3Q7NVHM'},data:null,demo:true,cloudflareConnected:false,githubConnected:false,probeSources:[]};});
  try{
-  await until(demo.p,()=>typeof platformOn==='function'&&document.querySelectorAll('.row').length>3);
-  check(await demo.p.evaluate(()=>!platformOn()&&!(window.__sent||[]).some(a=>/^platform/.test(a))&&!document.querySelector('[data-platform-row]')),'the demo asks for nothing and shows no platform state');
+  await until(demo.p,()=>document.querySelectorAll('[data-platform-row] .live-text').length>=3);
+  const lines=await demo.p.evaluate(()=>Object.fromEntries([...document.querySelectorAll('[data-platform-row]')].map(el=>[el.dataset.platformRow,el.querySelector('.live-text').textContent])));
+  check(lines['demo-p1']==='已上线'&&lines['demo-p2']==='部署失败'&&lines['demo-db2']==='已暂停','the demo shows made-up platform states: '+JSON.stringify(lines));
+  check(await demo.p.evaluate(()=>!(window.__sent||[]).some(a=>/^platform/.test(a))),'the demo asks the app for nothing');
+  await demo.p.evaluate(()=>{platformDialog();document.querySelector('.platform-add').open=true;document.querySelector('#platform-secret').value='sbp_fcdemo';document.querySelector('#platform-form [type="submit"]').click();});
+  check(await demo.p.evaluate(()=>/演示模式/.test(document.querySelector('#platform-status').textContent)&&platform.sources.length===3),'connecting is refused in the demo');
   check(!demo.errors.length,'demo page errors: '+demo.errors.join(' | '));
  }finally{await demo.context.close();}
- return 'PASS: a paused Supabase project as one red line, the 实时 tile, the detail row; a source\'s own interval; a Vercel token kept only after confirming (declining sends nothing), marked 权限大; links undo; nothing reaches the board; the demo reads nothing';
+ return 'PASS: a paused Supabase project as one red line, the 实时 tile, the detail row; a source\'s own interval; a Vercel token kept only after confirming (declining sends nothing), marked 权限大; links undo; nothing reaches the board; the demo shows made-up states and asks for nothing';
 }

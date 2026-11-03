@@ -33,6 +33,7 @@ window.assetboardDemoBoard=function(){
   '示例钱包':'Example Wallet',
   '美区 Google 账号':'US Google account',
   '主库':'Primary database',
+  '登录与用户':'Sign-in and users',
   '$6/月':'$6/mo',
   '$8/月':'$8/mo',
   '$12/月':'$12/mo',
@@ -67,6 +68,11 @@ window.assetboardDemoBoard=function(){
   {...base,id:'demo-c2',updatedAt:ago(11),type:'bankcard',name:t('多币种借记卡'),provider:t('示例钱包'),network:'Mastercard',last4:'8812',date:day(24),dateKind:'expire'},
   {...base,id:'demo-g1',updatedAt:ago(13),type:'google',name:t('美区 Google 账号'),provider:'Google',account:'someone@example.com',region:'US'},
   {...base,id:'demo-db1',updatedAt:ago(12),type:'database',name:'postgres-main',provider:'ManagedDB',purpose:t('主库'),port:'5432',date:day(70),dateKind:'renew',cycle:'yearly'},
+  // 平台状态 (实时状态): a Vercel site that is live, a Render API whose last deploy failed, and a free Supabase project that paused,
+  // shared by two projects, with its sleep rule and a keep-alive in its detail. platform-data.js platformDemo answers for them.
+  {...base,id:'demo-p1',updatedAt:ago(9),type:'deployment',name:'notes-web',provider:'Vercel',purpose:t('笔记站点'),url:'https://vercel.com/example/notes-web'},
+  {...base,id:'demo-p2',updatedAt:ago(16),type:'deployment',name:'notes-api',provider:'Render',purpose:t('API 服务'),url:'https://dashboard.render.com/web/srv-demo000001'},
+  {...base,id:'demo-db2',updatedAt:ago(20),type:'database',name:'notes-auth',provider:'Supabase',purpose:t('登录与用户'),cost:t('免费'),keepAlive:{url:'https://notes-api.example.com/health',every:1440}},
   ...(free?repos.slice(0,5):repos).map(repoRecord)
  ];
  // Server relations: two VPS, one account, domains and repositories mounted on them, two orphans (v13).
@@ -80,7 +86,8 @@ window.assetboardDemoBoard=function(){
  const set=(id,fields)=>Object.assign(assets.find(a=>a.id===id),fields);
  const paid=(paidOn,amount,currency,months,covers=paidOn,via='confirm')=>({id:'demo-pay-'+paidOn+amount,paidOn,amount,currency,months,covers,via,status:'paid'});
  for(const id of ['demo-d1','demo-r3','demo-u2'])set(id,{project:'studio'});
- for(const id of ['demo-d2','demo-r1','demo-db1','demo-s1'])set(id,{project:'notes-lab'});
+ for(const id of ['demo-d2','demo-r1','demo-db1','demo-s1','demo-p1','demo-p2'])set(id,{project:'notes-lab'});
+ set('demo-db2',{project:['notes-lab','studio']});
  set('demo-s1',{payments:[paid(day(-64),5,'USD',1,day(-64)),paid(day(-34),6,'USD',1,day(-34)),paid(day(-4),6,'USD',1,day(-4))]});
  set('demo-d1',{cost:t('$14.98 / 年'),payments:[paid(day(-353),10.98,'USD',12,day(-353),'renew')]});
  set('demo-a1',{promotion:{start:day(-50),end:day(40),amount:10,regularAmount:20,currency:'USD'}});
@@ -91,5 +98,5 @@ window.assetboardDemoBoard=function(){
  for(const a of assets)if(a.type==='repository')icon(a.id,'github.com');
  icon('demo-d1','namecheap.com');icon('demo-s2','hetzner.example.com');
  const block=id=>({id,folded:false});
- return {blocks:['domain','server','repository','subscription','ai','database','license'].map(block),assets,deletedExternalIds:[],cardOrder:{domain:['demo-d1']},featuredRepositoryIds:[],evidenceDecisions:{},iconSites:{'hetzner.com':'hetzner.example.com'}};
+ return {blocks:['domain','server','repository','subscription','ai','database','deployment','license'].map(block),assets,deletedExternalIds:[],cardOrder:{domain:['demo-d1']},featuredRepositoryIds:[],evidenceDecisions:{},iconSites:{'hetzner.com':'hetzner.example.com'}};
 };

@@ -20,7 +20,7 @@ if(typeof module!=='undefined'&&typeof tr==='undefined')globalThis.tr=require('.
  const PROBE_KINDS={
   cfsm:{
    name:'CF-Server-Monitor',
-   // GET /api/servers (and /api/history/all, /api/ws): public on a public site; a private one is read with the panel's own account
+   // GET /api/servers (and /api/ws): public on a public site; a private one is read with the panel's own account
    // (the Mac app logs in, keeps the JWT in memory). It never gives addresses (ip_v4/ip_v6 are only "0"/"1" reachability flags)
    // and has no hostname field, so its servers are matched by name.
    account:true,
@@ -136,7 +136,7 @@ if(typeof module!=='undefined'&&typeof tr==='undefined')globalThis.tr=require('.
  }
  const PROBE_DEMO_SOURCE={id:'demo-probe',kind:'cfsm',name:tr('演示探针'),url:'https://status.example.com',hasLogin:false,username:''};
 
- // ---- task-15: errors, history, live updates ----------------------------------------------------------------------------------
+ // ---- task-15: errors, live updates -----------------------------------------------------------------------------------------
  // A refused read, by the reason the Mac app gives (desktop/ProbeSource.swift ProbeKind.refusal): a wrong or missing account, a
  // human check (Turnstile) the app cannot pass, a private panel without an account, or anything else. All keep what was read before.
  function probeErrorKind(status,reason){

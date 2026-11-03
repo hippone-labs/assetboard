@@ -5,12 +5,14 @@
 // Readings stay in memory, never in the board, an export, a handover or an AI tool; only a hand-made link (asset.platformLink) is
 // board data. A token that can do more than read is said so before it is kept, and the person can still keep it (it is marked 权限大).
 // Reading: on launch, by hand (刷新), and while the window is visible each source once its own reading interval has passed.
-// Loaded after platform-data.js and before app.js; with ?free it registers nothing. The demo reads no platform and shows none.
+// Loaded after platform-data.js and before app.js; with ?free it registers nothing. The demo shows made-up platforms (platformDemo)
+// and asks the app for nothing.
 const platform={sources:[],state:new Map(),links:new Map(),unmatched:[],started:false,timer:0,signature:'',pending:null};
 const PLATFORM_TICK_MS=15*1000;
 const PLATFORM_MESSAGES=['platformList','platformSave','platformRemove','platformRead'];
-function platformOn(){return !proOff&&!!nativeStore&&!demoMode&&featureOn('probe');}
+function platformOn(){return !proOff&&(!!nativeStore||demoMode)&&featureOn('probe');}
 function platformSend(message){
+ if(demoMode){platformDemoAnswer(message);return;}
  if(!PLATFORM_MESSAGES.includes(message?.action))throw new Error('platform: not an allowed message');
  window.webkit.messageHandlers.assetboard.postMessage(message);
 }
@@ -23,6 +25,13 @@ function platformRelink(){
 function platformOf(a){return platformOn()&&['database','deployment'].includes(a?.type)?platform.links.get(a.id)||null:null;}
 
 // Asking: one source, or every one that is due (its interval passed and nothing is on its way), only while the window is visible.
+// The demo answers here, from platform-data.js: reads come back at once, changes stay in memory, connecting is refused.
+function platformDemoAnswer(m){
+ const demo=platformData.platformDemo();
+ if(m.action==='platformRead')setTimeout(()=>platformTake({source:m.id,items:demo.items[m.id]||[],at:Date.now()}),0);
+ else if(m.action==='platformSave'&&m.id&&!m.secret){const s=platform.sources.find(x=>x.id===m.id);if(s)s.interval=m.interval;platformRepaint();}
+ else{if($('#platform-status'))$('#platform-status').textContent=tr('演示模式下不可用');else toast(tr('演示模式下不可用'));}
+}
 function platformRead(id){const st=platform.state.get(id)||{};if(st.loading&&Date.now()-st.asked<60000)return;platform.state.set(id,{...st,loading:true,asked:Date.now()});platformSend({action:'platformRead',id});}
 function platformTick(now=Date.now()){
  if(!platformOn()||document.visibilityState!=='visible')return [];
@@ -170,7 +179,7 @@ proRegister(()=>{
 // off later, the ticks find platformOn() false and read nothing.
 function platformStart(){
  if(platform.started||!platformOn())return;platform.started=true;
- platform.sources=Array.isArray(nativeStore?.platformSources)?nativeStore.platformSources:[];
+ platform.sources=demoMode?platformData.platformDemo().sources.map(s=>({...s})):Array.isArray(nativeStore?.platformSources)?nativeStore.platformSources:[];
  // Every redraw matches again first: an undo, an import or an edit changes the board without telling this file.
  const draw=render;render=(...args)=>{platformRelink();return draw(...args);};
  platformRelink();platformTick(Date.now()+3600*1000);

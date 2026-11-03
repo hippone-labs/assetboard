@@ -60,19 +60,17 @@ test('not Linux, cut short or garbage: said, not guessed',()=>{
  assert.deepEqual(older.net,{rx:17284208546,tx:11516046893});
 });
 
-test('sessions: the rate comes from two readings, history is capped, a reboot gives no rate',()=>{
+test('sessions: the rate comes from two readings, a reboot gives no rate',()=>{
  const later=sample.replace('17284208546','17294208546').replace('11516046893','11517046893').replace('262904.83','262964.83');
  let h=d.sshSession('box');
  h=d.sshRecord(h,{output:sample,at:now},now);
- assert.equal(h.rate,null,'one reading has no rate');assert.equal(h.history.length,1);assert.equal(h.lastOk,now);
+ assert.equal(h.rate,null,'one reading has no rate');assert.equal(h.lastOk,now);
  h=d.sshRecord(h,{output:later,at:now+60000},now+60000);
  assert.deepEqual(h.rate,{rx:10000000/60,tx:1000000/60});
- assert.equal(Math.round(h.history[1].net),Math.round(11000000/60));
  const rebooted=d.sshRecord(h,{output:sample.replace('262904.83','30.00'),at:now+120000},now+120000);
  assert.equal(rebooted.rate,null);
- let long=d.sshSession('box');for(let i=0;i<d.SSH_HISTORY+5;i++)long=d.sshRecord(long,{output:sample,at:now+i*1000},now);
- assert.equal(long.history.length,d.SSH_HISTORY);
- assert.equal(h.history.length,2,'the old session is left as it was');
+ const before=d.sshSession('box'),after=d.sshRecord(before,{output:sample,at:now},now);
+ assert.equal(before.reading,null,'the old session is left as it was');assert.ok(after.reading);
 });
 
 test('failures: backoff doubles, hosts that need the person wait longest, a skipped host shows nothing',()=>{
@@ -101,7 +99,7 @@ test('a host becomes a probe server, drawn with the same gauges; fresh while rea
  h=d.sshRecord(h,{output:sample.replace('17284208546','17284268546'),at:now},now);
  const s=d.sshServer(h,{name:'Build-Box',host:'Build.Example.NET.'},now,ms);
  assert.equal(s.id,'Build-Box');assert.deepEqual(s.hostnames,['build-box','build.example.net']);assert.deepEqual(s.ips,[]);
- assert.equal(s.online,true);assert.equal(s.history.length,2);
+ assert.equal(s.online,true);assert.ok(s.rate);
  const g=probeGauges(s,now);
  assert.deepEqual(g.map(x=>x.key),['cpu','mem','disk','net']);
  assert.equal(g[3].value,'1000 B/s');assert.match(g[3].label,/网速 ↓ 1000 B\/s ↑ 0 B\/s/);
