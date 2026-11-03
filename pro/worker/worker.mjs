@@ -14,7 +14,7 @@
 // Stripe: the payment and customer carry metadata license_id, license, license_status (tag), so the dashboard is the buyer list.
 // KV: license:<id> {id, iss, upd, text, email (sha256 of the lower-cased address), sessions, customer?, revoked?}; session:<cs_id> → id;
 // other:<cs_id> → day (a paid session that was not Pro at US$10); email:<hash> → [ids]; intent:<pi_id> → id and refund:<pi_id> → day
-// (refunds); rate:<ip> → count, an hour. Addresses are kept only as hashes; Stripe has them.
+// (refunds); sent:<email hash> → [send times], a day (recovery mail). Addresses are kept only as hashes; Stripe has them.
 import {sign,newId,day,LIFETIME,importPrivateKey,ID_PATTERN,display} from './license.mjs';
 
 // What a licence is sold for: Stripe amounts are in the smallest unit (cents), currencies lower-case.
@@ -166,15 +166,20 @@ function noOrder(url,env,lg){const t=T[lg];return view(url,env,lg,{status:404,to
 
 // MARK: /recover
 function recoverForm(url,env,lg){const t=T[lg];return view(url,env,lg,{label:'Assetboard Pro',title:t.recover,lead:t.recoverNote,body:`<form method="post" action="/recover?lang=${lg}"><label for="e">${t.email}</label><div class="field"><input id="e" type="email" name="email" required autocomplete="email" placeholder="you@example.com"><button type="submit" class="btn btn-accent">${t.send}</button></div></form>`});}
+// Recovery mail is limited per recipient, so a buyer's address cannot be flooded from many IPs: one send per RECOVER_GAP_MS and
+// RECOVER_PER_DAY a day. Only an address that bought a licence is counted; a request for any other address reads and writes nothing more.
+const RECOVER_GAP_MS=15*60*1000,RECOVER_PER_DAY=3,DAY_MS=24*60*60*1000;
 async function recover(request,url,env,io,lg){
  const data=await request.formData().catch(()=>null),email=String(data?.get('email')||'').trim().toLowerCase(),t=T[lg];
  const answer=view(url,env,lg,{tone:'ok',label:t.recoverSentLabel,title:t.recoverSent,lead:t.recoverSentNote,actions:`<a class="btn btn-dark" href="/recover?lang=${lg}">${t.again}</a>`});
  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)||email.length>254)return answer;
- const ip=request.headers.get('CF-Connecting-IP')||'0',key='rate:'+await sha256(ip),count=Number(await env.LICENSES.get(key))||0;
- if(count>=5)return answer;
- await env.LICENSES.put(key,String(count+1),{expirationTtl:3600});
- const ids=JSON.parse(await env.LICENSES.get('email:'+await sha256(email))||'[]');
- for(const id of ids){const record=await getLicense(env,id);if(record&&!record.revoked)await mail(env,io,email,record,lg);}
+ const hash=await sha256(email),ids=JSON.parse(await env.LICENSES.get('email:'+hash)||'[]');
+ const records=[];for(const id of ids){const record=await getLicense(env,id);if(record&&!record.revoked)records.push(record);}
+ if(!records.length)return answer;
+ const now=io.now().getTime(),key='sent:'+hash,sent=JSON.parse(await env.LICENSES.get(key)||'[]').filter(at=>now-at<DAY_MS);
+ if(sent.length>=RECOVER_PER_DAY||sent.some(at=>now-at<RECOVER_GAP_MS))return answer;
+ await env.LICENSES.put(key,JSON.stringify([...sent,now]),{expirationTtl:DAY_MS/1000});
+ for(const record of records)await mail(env,io,email,record,lg);
  return answer;
 }
 

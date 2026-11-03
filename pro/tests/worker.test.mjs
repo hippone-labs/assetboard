@@ -208,28 +208,35 @@ test('/thanks shows the licence of a paid session, waits briefly for the webhook
  assert.equal((await handle(new Request('https://pay.example.com/thanks?session_id=cs_test_1'),env,down)).status,500,'Stripe being down stays the error page');
 });
 
-test('/recover answers the same sentence either way, mails what the address bought, and stops at five an hour',async()=>{
- const env=fakeEnv(),io=fakeIo();
+test('/recover answers the same sentence either way, mails what the address bought, at most once per 15 minutes and three times a day',async()=>{
+ const env=fakeEnv();let now=Date.parse('2026-10-24T10:00:00Z');const io={...fakeIo(),now:()=>new Date(now)};
  const record=await issue(paidSession(),env,io);
  const ask=(email,ip='203.0.113.9')=>handle(new Request('https://pay.example.com/recover?lang=zh',{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded','CF-Connecting-IP':ip},body:'email='+encodeURIComponent(email)}),env,io);
  const form=await handle(new Request('https://pay.example.com/recover'),env,io);
  assert.match(await form.text(),/<form method="post"/);
  let res=await ask('buyer@example.com');
  assert.match(await res.text(),/如果这个邮箱买过/);assert.equal(io.mails().length,2);assert.ok(io.mails()[1].text.includes(record.text));
+ const writes=env.kv.size;
  res=await ask('nobody@example.com');
  assert.match(await res.text(),/如果这个邮箱买过/);assert.equal(io.mails().length,2,'nothing is sent and nothing is revealed');
+ for(let i=0;i<20;i++)await ask(`stranger${i}@example.com`,'198.51.100.'+i);
+ assert.equal(env.kv.size,writes,'addresses that bought nothing write nothing');
  res=await ask('not an address');assert.equal(res.status,200);assert.equal(io.mails().length,2);
- for(let i=0;i<4;i++)await ask('buyer@example.com');
- assert.equal(io.mails().length,5,'five sends from one address: '+io.mails().length);
- await ask('buyer@example.com');
- assert.equal(io.mails().length,5,'the sixth in an hour is dropped quietly');
- await ask('buyer@example.com','198.51.100.7');
- assert.equal(io.mails().length,6,'another address has its own count');
- const options=[...env.kv.keys()].filter(k=>k.startsWith('rate:'));assert.equal(options.length,2);
- // Revoked licences are not re-sent.
+ // Many IPs asking for one buyer: the recipient's limit holds.
+ for(let i=0;i<10;i++)await ask('buyer@example.com','192.0.2.'+i);
+ assert.equal(io.mails().length,2,'a second send within 15 minutes is dropped, whatever the IP');
+ now+=16*60*1000;await ask('Buyer@Example.com','192.0.2.50');
+ assert.equal(io.mails().length,3,'after 15 minutes it goes again, the address case aside');
+ now+=16*60*1000;await ask('buyer@example.com');
+ now+=16*60*1000;await ask('buyer@example.com');
+ assert.equal(io.mails().length,4,'three a day: '+io.mails().length);
+ now+=24*60*60*1000;await ask('buyer@example.com');
+ assert.equal(io.mails().length,5,'the next day it can be sent again');
+ // Revoked licences are not re-sent, and a buyer whose only licence was refunded is not counted.
+ now+=24*60*60*1000;
  const r=JSON.parse(env.kv.get('license:'+record.id));r.revoked='2026-10-25';await env.LICENSES.put('license:'+record.id,JSON.stringify(r));
- await ask('buyer@example.com','192.0.2.1');
- assert.equal(io.mails().length,6);
+ await ask('buyer@example.com');
+ assert.equal(io.mails().length,5);
 });
 
 test('the other pages and errors say nothing about anything',async()=>{
