@@ -45,13 +45,13 @@ async (page) => {
  await shot(s.p,'shell-panorama.png');
  await done(s);
 
- // 1024 × 700, sidebar expanded: a 6 px margin, a 320 px detail, and the due flags keep their numbers.
+ // 1024 × 700, sidebar expanded: a 6 px margin, a 320 px detail, and the overview strip keeps the due numbers (the bar has none in 全部资产).
  s=await open(1024,700);
  const nm=await rect(s.p,'#main'),nd=await rect(s.p,'#detail');
  check(nm.right===1018&&nm.bottom===694&&nd.width===320,'Narrow margins: '+JSON.stringify({nm,nd}));
  const head=await s.p.evaluate(()=>{const bar=$('#topbar'),last=[...bar.querySelectorAll('button')].filter(b=>b.getClientRects().length).at(-1).getBoundingClientRect();
-  return {flags:[...document.querySelectorAll('#view-meta .meta-flag')].filter(n=>n.getClientRects().length).map(n=>n.textContent),title:Math.round($('#view-title').getBoundingClientRect().width),spill:Math.round(last.right-bar.getBoundingClientRect().right)};});
- check(head.flags.length===2&&head.title>40&&head.spill<=0,'The narrow toolbar keeps the due flags: '+JSON.stringify(head));
+  return {flags:[...document.querySelectorAll('#board .overview .ov-tile.soon,#board .overview .ov-tile.overdue')].filter(n=>n.getClientRects().length).map(n=>n.querySelector('.ov-value').textContent),title:Math.round($('#view-title').getBoundingClientRect().width),spill:Math.round(last.right-bar.getBoundingClientRect().right)};});
+ check(head.flags.length===2&&head.title>40&&head.spill<=0,'The narrow window keeps the due numbers: '+JSON.stringify(head));
  const nw=await s.p.evaluate(()=>{const n=document.querySelector('#detail-content .fact-date span:last-child');return n&&Math.round(n.getBoundingClientRect().height);});
  check(nw<=20,'The next date wraps in a narrow detail: '+nw);
  await shot(s.p,'shell-narrow.png');

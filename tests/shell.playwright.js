@@ -30,7 +30,7 @@ async (page) => {
   // The overview shows everything: no truncation, no 查看全部; empty categories stay in the sidebar only.
   check(await p.locator('#board [data-asset]').count()===161&&await p.locator('#board [data-action="all"]').count()===0,'Every visible record is listed in the overview');
   check(await groups()==='domain,server,repository','Groups follow the sidebar order and skip empty categories: '+await groups());
-  check(await p.evaluate(()=>document.querySelector('#view-title').textContent==='全部资产'&&/99\+ 项/.test(document.querySelector('#view-meta').textContent)&&document.querySelector('#view-meta span').title==='161 项'&&/1 已过期/.test(document.querySelector('#view-meta').textContent)),'The bar names the view and its counts');
+  check(await p.evaluate(()=>document.querySelector('#view-title').textContent==='全部资产'&&/99\+ 项/.test(document.querySelector('#view-meta').textContent)&&document.querySelector('#view-meta span').title==='161 项'&&!document.querySelector('#view-meta .meta-flag.overdue')&&document.querySelector('#board .overview .ov-tile.overdue')?.textContent.includes('1 过期')),'The bar names the view and its count; the overview strip carries what is due');
   const cols=await p.evaluate(()=>{const xs=sel=>new Set([...document.querySelectorAll(sel)].slice(0,20).map(n=>Math.round(n.getBoundingClientRect().left)));return [xs('#board .group[data-group="domain"] .r-sub').size,new Set([...document.querySelectorAll('#board .group[data-group="domain"] .r-date')].slice(0,20).map(n=>Math.round(n.getBoundingClientRect().right))).size,xs('#board .group[data-group="domain"] .r-text').size];});
   check(cols.every(n=>n===1),'Columns line up row to row: '+cols);
 
