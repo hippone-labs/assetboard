@@ -395,6 +395,66 @@ final class Updater {
     }
 }
 
+/// Offers, once, to move the app into Applications when it was opened from somewhere else: the Downloads folder, the disk image, or
+/// the read-only copy macOS runs a quarantined app from (App Translocation). Updates replace the app where it is, so a copy left in
+/// Downloads or on the disk image never updates. Only Developer ID builds ask: builds from desktop/build.sh and every --test/--demo
+/// run stay quiet.
+enum AppLocation {
+    static let declinedKey = "AssetboardMoveToApplicationsDeclined"
+    static let destination = URL(fileURLWithPath: "/Applications/Assetboard.app", isDirectory: true)
+
+    /// Whether an app at this path should offer the move: not inside /Applications or ~/Applications already.
+    static func shouldOffer(bundlePath: String, home: String) -> Bool {
+        let path = (bundlePath as NSString).standardizingPath
+        guard path.hasSuffix(".app") else { return false }
+        return !["/Applications/", (home as NSString).standardizingPath + "/Applications/"].contains { path.hasPrefix($0) }
+    }
+    /// The original can go to the Trash only when the app runs from it: not from a mounted disk image, not from a translocated copy.
+    static func canRemoveOriginal(bundlePath: String) -> Bool { !bundlePath.hasPrefix("/Volumes/") && !bundlePath.contains("/AppTranslocation/") }
+
+    static func offerIfNeeded(window: NSWindow?) {
+        let bundle = Bundle.main.bundleURL
+        guard !demoMode, !CommandLine.arguments.dropFirst().contains(where: { $0.hasPrefix("--") }),
+              !UserDefaults.standard.bool(forKey: declinedKey), Updater.ownTeamIdentifier() != nil,
+              shouldOffer(bundlePath: bundle.path, home: NSHomeDirectory()) else { return }
+        let alert = NSAlert()
+        alert.messageText = L("把 Assetboard 移到「应用程序」文件夹？")
+        alert.informativeText = L("从「应用程序」打开，Assetboard 才能自动更新。")
+        alert.addButton(withTitle: L("移到「应用程序」"))
+        alert.addButton(withTitle: L("不移动"))
+        let answer: (NSApplication.ModalResponse) -> Void = { response in
+            guard response == .alertFirstButtonReturn else { UserDefaults.standard.set(true, forKey: declinedKey); return }
+            if let failure = move(from: bundle) {
+                let note = NSAlert()
+                note.messageText = L("没能移到「应用程序」")
+                note.informativeText = failure
+                note.runModal()
+            }
+        }
+        if let window { alert.beginSheetModal(for: window, completionHandler: answer) } else { answer(alert.runModal()) }
+    }
+
+    /// Copies the app into /Applications (an older copy there goes to the Trash first), removes the original when it can, and starts
+    /// the copy once this process has ended. Returns the reason when it could not.
+    static func move(from bundle: URL) -> String? {
+        let files = FileManager.default
+        if files.fileExists(atPath: destination.path) {
+            do { try files.trashItem(at: destination, resultingItemURL: nil) } catch { return L("「应用程序」里已有一个 Assetboard，无法替换它。") }
+        }
+        guard Updater.run("/usr/bin/ditto", [bundle.path, destination.path]).status == 0 else {
+            try? files.removeItem(at: destination)
+            return L("没有写入「应用程序」文件夹的权限。")
+        }
+        if canRemoveOriginal(bundlePath: bundle.path) { try? files.trashItem(at: bundle, resultingItemURL: nil) }
+        let relaunch = Process()
+        relaunch.executableURL = URL(fileURLWithPath: "/bin/sh")
+        relaunch.arguments = ["-c", "while kill -0 \"$0\" 2>/dev/null; do sleep 0.2; done; /usr/bin/open \"$1\"", String(getpid()), destination.path]
+        do { try relaunch.run() } catch { return L("已复制到「应用程序」，请从那里打开 Assetboard。") }
+        NSApplication.shared.terminate(nil)
+        return nil
+    }
+}
+
 /// --self-check-launch: the installer starts a downloaded app with it before the swap. Getting this far means dyld found every library
 /// and symbol on this macOS; the board files must be in the bundle. Prints "Assetboard <version>" and reads or writes no data.
 func selfCheckLaunch() -> Never {
@@ -417,6 +477,14 @@ func testUpdate() {
                            ("1.0.0-beta", "1.0.0-alpha.9"), ("1.0.0-alpha.1", "1.0.0-alpha"), ("0.5", "0.4.9"), ("1.0.0+build.9", "0.9.9")] {
         check(Updater.isNewer(newer, than: older) && !Updater.isNewer(older, than: newer), "\(newer) must be newer than \(older)")
     }
+    // Where the app runs from
+    for (path, offer) in [("/Applications/Assetboard.app", false), ("/Applications/Tools/Assetboard.app", false), ("/Users/someone/Applications/Assetboard.app", false),
+                          ("/Users/someone/Downloads/Assetboard.app", true), ("/Volumes/Assetboard/Assetboard.app", true),
+                          ("/private/var/folders/xy/T/AppTranslocation/0A1B/d/Assetboard.app", true), ("/Users/someone/Downloads/Assetboard", false)] {
+        check(AppLocation.shouldOffer(bundlePath: path, home: "/Users/someone") == offer, "Move to Applications offered for \(path): \(!offer)")
+    }
+    check(AppLocation.canRemoveOriginal(bundlePath: "/Users/someone/Downloads/Assetboard.app") && !AppLocation.canRemoveOriginal(bundlePath: "/Volumes/Assetboard/Assetboard.app")
+          && !AppLocation.canRemoveOriginal(bundlePath: "/private/var/folders/xy/T/AppTranslocation/0A1B/d/Assetboard.app"), "Only a copy the app runs from goes to the Trash")
     check(Updater.compare("0.4", "0.4.0") == .orderedSame && Updater.compare("v0.4.6", "0.4.6+12") == .orderedSame, "Equal versions compare the same")
     check(!Updater.isNewer("0.4.6", than: "0.4.6"), "The same version is not newer")
     for broken in ["", "garbage", "0..1", "1.0.0-", "-1.0", "1.2.3.4.5", "1.0.0-beta..1"] {
@@ -559,5 +627,5 @@ func testUpdate() {
     check(kept.status == 0 && kept.installed.contains("# new") && kept.kept?.contains("# old") == true && !kept.marker, "A new app that keeps running replaces the old one, which is kept: \(kept)")
     let back = replace("crashes", new: "exit 134 # new")
     check(back.status != 0 && back.installed.contains("# old") && back.kept == nil && back.marker, "A new app that does not start is replaced by the old one again: \(back)")
-    print("PASS: version comparison and pre-releases, archive names for both editions, the site's version file and its refusals, checksums, notes excerpt, TeamIdentifier, once a day, one plain GET for each edition, minimum macOS from the version file and the bundle, launch check of this build and of fakes, helper swap with backup and rollback")
+    print("PASS: version comparison and pre-releases, archive names for both editions, the site's version file and its refusals, checksums, notes excerpt, TeamIdentifier, once a day, one plain GET for each edition, minimum macOS from the version file and the bundle, launch check of this build and of fakes, helper swap with backup and rollback, when to offer the move to Applications")
 }

@@ -102,6 +102,8 @@ jobs:
           mkdir -p "$RUNNER_TEMP/apps"
           [ -d dist/Assetboard.app ] && ditto -c -k --keepParent dist/Assetboard.app "$RUNNER_TEMP/apps/Assetboard-full-$short.zip"
           [ -d dist/free/Assetboard.app ] && ditto -c -k --keepParent dist/free/Assetboard.app "$RUNNER_TEMP/apps/Assetboard-free-$short.zip"
+          # The drag-to-Applications disk image, unsigned here; release.sh signs and notarizes it.
+          [ -d dist/Assetboard.app ] && zsh desktop/dmg.sh dist/Assetboard.app "$RUNNER_TEMP/apps/Assetboard-full-$short.dmg"
           ls -la "$RUNNER_TEMP/apps"
           {
             echo "### Build $short"
@@ -115,7 +117,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: apps-${{ github.sha }}
-          path: ${{ runner.temp }}/apps/*.zip
+          path: |
+            ${{ runner.temp }}/apps/*.zip
+            ${{ runner.temp }}/apps/*.dmg
           retention-days: 7
           if-no-files-found: ignore
 

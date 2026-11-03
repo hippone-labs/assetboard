@@ -1,0 +1,14 @@
+<!-- The disk image's window background (desktop/dmg/settings.py). 660×400 points; the app icon sits at (180,190), Applications at
+     (480,190), both 128 pt, and Finder writes their names below them. Rendered to background.png and background@2x.png. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 660 400" width="660" height="400">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fbfbfc"/><stop offset="1" stop-color="#eef0f3"/></linearGradient>
+    <radialGradient id="glow" cx=".5" cy="0" r=".8"><stop offset="0" stop-color="#7aa9f2" stop-opacity=".16"/><stop offset="1" stop-color="#7aa9f2" stop-opacity="0"/></radialGradient>
+  </defs>
+  <rect width="660" height="400" fill="url(#bg)"/>
+  <rect width="660" height="400" fill="url(#glow)"/>
+  <path d="M262 190 C 300 168, 360 168, 398 190" fill="none" stroke="#5f93ea" stroke-width="3.5" stroke-linecap="round" stroke-dasharray="1 9"/>
+  <path d="M386 178 L 401 191 L 383 199" fill="none" stroke="#5f93ea" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="330" y="330" text-anchor="middle" font-family="-apple-system, 'SF Pro Text', 'PingFang SC', 'Helvetica Neue', sans-serif" font-size="14" fill="#5d6370">拖到 Applications 文件夹即可安装</text>
+  <text x="330" y="352" text-anchor="middle" font-family="-apple-system, 'SF Pro Text', 'Helvetica Neue', sans-serif" font-size="12" fill="#8a8f99">Drag Assetboard to Applications to install</text>
+</svg>

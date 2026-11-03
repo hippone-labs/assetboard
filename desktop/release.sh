@@ -1,5 +1,6 @@
 #!/bin/zsh
-# Produce a signed, notarized and stapled archive. Signing credentials stay on the Mac runner.
+# Produce the signed, notarized and stapled release: the zip the in-app update installs and the disk image the site offers.
+# Signing credentials stay on the Mac runner.
 set -euo pipefail
 cd "${0:A:h:h}"
 : "${SIGNING_IDENTITY:?Set SIGNING_IDENTITY}"
@@ -33,3 +34,13 @@ xcrun stapler validate "$audit/Assetboard.app"
 "$audit/Assetboard.app/Contents/MacOS/Assetboard" --test-store
 rm -rf "$audit"
 shasum -a 256 "$archive"
+# The disk image is built from the stapled app, then signed, notarized and stapled itself, so it opens without a warning offline too.
+dmg="$RELEASE_DIR/Assetboard-macOS-arm64-$version.dmg"
+./desktop/dmg.sh "$app" "$dmg"
+codesign --sign "$SIGNING_IDENTITY" --timestamp "$dmg"
+xcrun notarytool submit "$dmg" --keychain-profile "$NOTARY_PROFILE" "${notary_kc[@]}" --wait --output-format json > "$RELEASE_DIR/notary-dmg.json"
+/usr/bin/python3 -c 'import json,sys; assert json.load(open(sys.argv[1]))["status"] == "Accepted", "Disk image notarization rejected"' "$RELEASE_DIR/notary-dmg.json"
+xcrun stapler staple "$dmg"
+xcrun stapler validate "$dmg"
+spctl -a -t open --context context:primary-signature -vv "$dmg"
+shasum -a 256 "$dmg"

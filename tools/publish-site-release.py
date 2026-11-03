@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Stage a notarized archive in a clean site clone, without deploying or pushing."""
+"""Stage a notarized release in a clean site clone, without deploying or pushing: the disk image people download from the pages and the
+zip the in-app update reads from latest.json."""
 import argparse
 import datetime
 import hashlib
@@ -27,18 +28,21 @@ def minimum_system(archive, version):
     return minimum
 
 
-def stage(site, archive, version, notes):
+def stage(site, archive, disk_image, version, notes):
     if not re.fullmatch(r"\d+\.\d+\.\d+", version):
         raise ValueError("Expected a stable x.y.z version")
     name = f"Assetboard-macOS-arm64-{version}.zip"
     if archive.name != name or not archive.is_file():
         raise ValueError("Archive name must match the release version")
+    image = f"Assetboard-macOS-arm64-{version}.dmg"
+    if disk_image.name != image or not disk_image.is_file():
+        raise ValueError("Disk image name must match the release version")
     manifest_path = site / "downloads/latest.json"
     previous = json.loads(manifest_path.read_text())
     if tuple(map(int, version.split('.'))) <= tuple(map(int, previous['version'].split('.'))):
         raise ValueError("Release must be newer than the published version")
-    destination = site / "downloads" / name
-    if destination.exists():
+    destination, image_destination = site / "downloads" / name, site / "downloads" / image
+    if destination.exists() or image_destination.exists():
         raise ValueError("Release archives are immutable")
     if not notes.strip():
         raise ValueError("Release notes are required")
@@ -46,15 +50,16 @@ def stage(site, archive, version, notes):
     pages = {}
     for path in [site / "index.html", site / "en/index.html"]:
         text = path.read_text()
-        text, links = re.subn(r"/downloads/Assetboard-macOS-arm64-\d+\.\d+\.\d+\.zip", f"/downloads/{name}", text)
+        text, links = re.subn(r"/downloads/Assetboard-macOS-arm64-\d+\.\d+\.\d+\.(?:zip|dmg)", f"/downloads/{image}", text)
         text, labels = re.subn(r"v\d+\.\d+\.\d+(?= · macOS)", f"v{version}", text)
         if links != 2 or labels != 1:
             raise ValueError(f"Unexpected download layout: {path.name}")
         pages[path] = text
     digest = hashlib.sha256(archive.read_bytes()).hexdigest()
+    image_digest = hashlib.sha256(disk_image.read_bytes()).hexdigest()
     today = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).date()
-    row = (f'\n  <li><a href="/downloads/{name}" download>Assetboard {html.escape(version)}</a><span class="v-meta">{today} · SHA-256 '
-           f'<code title="{digest}">{digest[:8]}…{digest[-8:]}</code></span></li>')
+    row = (f'\n  <li><a href="/downloads/{image}" download>Assetboard {html.escape(version)}</a><span class="v-meta">{today} · SHA-256 '
+           f'<code title="{image_digest}">{image_digest[:8]}…{image_digest[-8:]}</code></span></li>')
     for history in [site / "downloads/index.html", site / "en/downloads/index.html"]:
         text = pages.get(history, history.read_text())
         if text.count('<ul class="versions">') != 1:
@@ -69,6 +74,7 @@ def stage(site, archive, version, notes):
             raise ValueError(f"No minimum macOS on {path.relative_to(site)}")
         pages[path] = text
     shutil.copyfile(archive, destination)
+    shutil.copyfile(disk_image, image_destination)
     for path, text in pages.items():
         path.write_text(text)
     manifest_path.write_text(json.dumps({"version": version, "minimumSystemVersion": minimum, "notes": notes, "assets": [
@@ -79,8 +85,9 @@ def stage(site, archive, version, notes):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--site', type=Path, required=True)
-    parser.add_argument('--archive', type=Path, required=True)
+    parser.add_argument('--archive', type=Path, required=True, help='the zip the in-app update installs')
+    parser.add_argument('--disk-image', type=Path, required=True, help='the .dmg the download buttons offer')
     parser.add_argument('--version', required=True)
     parser.add_argument('--notes', type=Path, required=True)
     args = parser.parse_args()
-    stage(args.site, args.archive, args.version, args.notes.read_text())
+    stage(args.site, args.archive, args.disk_image, args.version, args.notes.read_text())

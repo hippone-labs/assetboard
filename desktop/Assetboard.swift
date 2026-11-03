@@ -535,6 +535,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
             }
             createMenu()
             if !demoMode { updater.window = window; updater.reportRollback(); updater.startAutomaticChecks() }
+            DispatchQueue.main.async { [weak self] in AppLocation.offerIfNeeded(window: self?.window) }
             webView.loadFileURL(root.appendingPathComponent("index.html"), allowingReadAccessTo: root)
             window.makeKeyAndOrderFront(nil)
             placeTrafficLights()
