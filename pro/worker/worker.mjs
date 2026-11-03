@@ -23,7 +23,7 @@ export const PRO_PRICE={amount:1000,currency:'usd'};
 export default {fetch:(request,env)=>handle(request,env,{fetch:(...args)=>fetch(...args),now:()=>new Date(),wait:ms=>new Promise(r=>setTimeout(r,ms))})};
 
 export async function handle(request,env,io){
- const url=new URL(request.url),path=url.pathname.replace(/\/+$/,'')||'/',lg=lang(url);
+ const url=new URL(request.url),path=url.pathname.replace(/\/+$/,'')||'/',lg=lang(url,request);
  try{
   // Each branch is awaited here so the catch below sees its errors.
   if(path==='/buy'&&request.method==='GET')return buy(env);
@@ -39,7 +39,8 @@ export async function handle(request,env,io){
  }
 }
 
-const lang=url=>url.searchParams.get('lang')==='zh'?'zh':'en';
+// ?lang= first, then the browser's own first language, so a page opened by hand reads in the visitor's language.
+const lang=(url,request)=>{const q=url.searchParams.get('lang');return q==='zh'||q==='en'?q:/^zh\b/i.test(request.headers.get('Accept-Language')||'')?'zh':'en';};
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
 // MARK: Stripe
@@ -136,10 +137,10 @@ async function tag(env,io,session,record){
 // MARK: /thanks
 async function thanks(url,env,io,lg){
  const sid=url.searchParams.get('session_id')||'';
- if(!/^cs_[A-Za-z0-9_]{5,200}$/.test(sid))return page(`<h1>${T[lg].notFound}</h1>`,404,lg);
+ if(!/^cs_[A-Za-z0-9_]{5,200}$/.test(sid))return noOrder(env,lg);
  // An id Stripe does not know is a missing page; any other Stripe failure stays the error page.
  const session=await stripe(env,io,'GET','/v1/checkout/sessions/'+sid).catch(error=>{if(/^stripe 404 /.test(error.message))return null;throw error;});
- if(!session)return page(`<h1>${T[lg].notFound}</h1>`,404,lg);
+ if(!session)return noOrder(env,lg);
  lg=(session.metadata?.lang||session.locale||lg).startsWith('zh')?'zh':'en';
  if(session.payment_intent&&await env.LICENSES.get('refund:'+session.payment_intent))return page(`<h1>${T[lg].refunded}</h1><p>${T[lg].refundedNote}</p>`,200,lg);
  if(session.payment_status!=='paid')return page(`<h1>${T[lg].unpaid}</h1><p>${T[lg].unpaidNote}</p>`,200,lg);
@@ -158,6 +159,9 @@ async function thanks(url,env,io,lg){
 <p class="small">${t.refund}</p>
 <script>document.getElementById('c').onclick=()=>{const k=document.getElementById('k');k.select();navigator.clipboard?.writeText(k.value);document.getElementById('c').textContent=${JSON.stringify(t.copied)};};</script>`,200,lg);
 }
+
+// Opened without an order Stripe knows (by hand, from a bookmark, a link without its session): where the licence is instead.
+function noOrder(env,lg){const t=T[lg];return page(`<h1>${t.noOrder}</h1><p>${t.noOrderNote}</p><p class="row"><a class="button" href="/recover?lang=${lg}">${t.recover}</a></p><p>${t.noApp} <a href="${esc(env.DOWNLOAD||'https://assetboard.app/')}">${t.download}</a></p>`,404,lg);}
 
 // MARK: /recover
 function recoverForm(lg){const t=T[lg];return `<h1>${t.recover}</h1><p>${t.recoverNote}</p><form method="post" action="/recover?lang=${lg}"><input type="email" name="email" required autocomplete="email" placeholder="you@example.com"><button type="submit">${t.send}</button></form>`;}
@@ -200,6 +204,7 @@ export const T={
   unpaid:'还没有收到付款',unpaidNote:'如果你刚付完，稍等片刻刷新；否则可以回到 App 重新购买。',later:'许可证稍后会发到邮箱',laterNote:'付款已到，许可证正在签发，几分钟内发到你结账用的邮箱；没收到就用找回页。',
   cancelled:'没有扣款',cancelledNote:'结账取消了，回到 App 随时可以再来。',
   recover:'找回许可证',recoverNote:'填购买时用的邮箱，许可证会再发一遍。',send:'发送',recoverSent:'如果这个邮箱买过，许可证已经发过去了',recoverSentNote:'几分钟内到达；也看看垃圾邮件。',
+  noOrder:'这里没有订单',noOrderNote:'付款完成后会自动回到这一页并显示许可证；同一段许可证也发到了结账用的邮箱。找不到邮件就用找回页再发一次。',
   notFound:'没有这一页',error:'出了点问题',errorNote:'稍后再试；付款不会丢，许可证可以用找回页再发。',
   mailSubject:'你的 Assetboard Pro 许可证',mail:(r,env)=>`这是你的 Assetboard Pro 许可证（编号 ${display(r.id)}，终身更新）：\n\n${r.text}\n\n在 App 的「设置 › Assetboard Pro」里粘贴并激活，或点这个链接：\nassetboard://activate?key=${encodeURIComponent(r.text)}\n\n终身更新：以后发布的每个版本都能用。\n找回：${env.SITE}/recover?lang=zh\n14 天内不满意，回这封邮件即退款。`},
  en:{paid:'Paid. Here is your licence',licenceIs:'Licence',lifetime:', with lifetime updates: every version released from now on works with it.',activate:'Activate in Assetboard',copy:'Copy',copied:'Copied',
@@ -208,6 +213,7 @@ export const T={
   unpaid:'No payment yet',unpaidNote:'If you just paid, wait a moment and reload; otherwise go back to the app and try again.',later:'Your licence is on its way',laterNote:'The payment is in and the licence is being issued; it reaches your checkout email within minutes. If not, use the recovery page.',
   cancelled:'Nothing was charged',cancelledNote:'The checkout was cancelled. You can come back from the app any time.',
   recover:'Recover a licence',recoverNote:'Enter the email you bought with; the licence is sent again.',send:'Send',recoverSent:'If that address bought a licence, it has been sent',recoverSentNote:'It arrives within minutes; check the spam folder too.',
+  noOrder:'No order here',noOrderNote:'After paying you come back to this page with your licence, and the same licence is sent to your checkout email. Can\'t find the email? The recovery page sends it again.',
   notFound:'No such page',error:'Something went wrong',errorNote:'Try again later. Payments are not lost; the recovery page can resend a licence.',
   mailSubject:'Your Assetboard Pro licence',mail:(r,env)=>`Here is your Assetboard Pro licence (${display(r.id)}, lifetime updates):\n\n${r.text}\n\nPaste it into Settings › Assetboard Pro in the app, or open this link:\nassetboard://activate?key=${encodeURIComponent(r.text)}\n\nLifetime updates: every version released from now on works with it.\nRecover: ${env.SITE}/recover\nNot happy within 14 days? Reply to this email for a refund.`}
 };

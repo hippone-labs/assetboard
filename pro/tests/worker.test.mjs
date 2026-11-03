@@ -197,7 +197,12 @@ test('/thanks shows the licence of a paid session, waits briefly for the webhook
  let waits=0;const slow={...io,wait:async()=>{waits++;}};
  const late=await handle(new Request('https://pay.example.com/thanks?session_id=cs_test_5'),env,slow);
  assert.equal(waits,6);assert.match(await late.text(),/on its way/);
- assert.equal((await handle(new Request('https://pay.example.com/thanks?session_id=nope'),env,io)).status,404);
+ for(const q of ['','?session_id=nope','?session_id=%7BCHECKOUT_SESSION_ID%7D','?session_id=cs_missing']){
+  const res=await handle(new Request('https://pay.example.com/thanks'+q),env,io),html=await res.text();
+  assert.equal(res.status,404);assert.ok(html.includes('No order here')&&html.includes('href="/recover?lang=en"')&&html.includes('Download Assetboard'),'no order says where the licence is: '+q);
+ }
+ const zh=await handle(new Request('https://pay.example.com/thanks',{headers:{'Accept-Language':'zh-CN,zh;q=0.9,en;q=0.8'}}),env,io);
+ assert.ok((await zh.text()).includes('这里没有订单'),'the browser language picks Chinese without ?lang');
  assert.equal((await handle(new Request('https://pay.example.com/thanks?session_id=cs_missing'),env,io)).status,404,'an id Stripe does not know is a missing page');
  const down={...io,fetch:async()=>({ok:false,status:503,json:async()=>({})})};
  assert.equal((await handle(new Request('https://pay.example.com/thanks?session_id=cs_test_1'),env,down)).status,500,'Stripe being down stays the error page');
