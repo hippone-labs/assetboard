@@ -816,11 +816,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         case "probeRemove":
             if let id = body["id"] as? String { probeLive.stop(id); probeClient.forget(id); probes.remove(id) }
             probeResult(["sources": probes.summary(), "removed": body["id"] as? String ?? ""])
-        case "probeHistory":
-            // A source's history for the servers on cards, one GET each, one after another; at most 30.
-            guard let id = body["id"] as? String, let source = probes.all.first(where: { $0.id == id }) else { return }
-            let servers = Array((body["servers"] as? [String] ?? []).filter(ProbeKind.validServerId).prefix(30))
-            fetchProbeHistory(source, servers, login: probes.login(source.id), into: [:])
         case "probeLiveStart":
             guard let id = body["id"] as? String, let source = probes.all.first(where: { $0.id == id }) else { return }
             let ids = body["servers"] as? [String] ?? []
@@ -861,24 +856,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         }
     }
 
-    func fetchProbeHistory(_ source: ProbeSourceConfig, _ servers: [String], login: ProbeLogin?, into found: [String: Any]) {
-        guard let next = servers.first else {
-            probeResult(["source": source.id, "history": found, "at": Date().timeIntervalSince1970 * 1000]); return
-        }
-        probeClient.read(source, .history(next), login: login) { result in
-            DispatchQueue.main.async {
-                var found = found
-                switch result {
-                case .success(let json): found[next] = ProbeFetcher.historyRows(json)
-                case .failure(let error) where error.code == 401 || error.code == 403 || error.code == 429 || (error.userInfo["reason"] as? String) != "net":
-                    self.probeResult(["source": source.id, "history": found, "historyError": error.localizedDescription, "status": error.code,
-                                      "reason": error.userInfo["reason"] as? String ?? "net"]); return
-                case .failure: break
-                }
-                self.fetchProbeHistory(source, Array(servers.dropFirst()), login: login, into: found)
-            }
-        }
-    }
     @objc func openProbes() { webView.evaluateJavaScript("window.probeDialog?.()") }
     #endif
 

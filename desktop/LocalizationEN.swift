@@ -221,7 +221,6 @@ let englishStrings: [String: [String]] = [
     "面板地址无效": ["Invalid panel address"],
     "实时推送不走这里": ["Live updates do not come this way"],
     "面板的回答不是探针数据": ["The panel's answer is not probe data"],
-    "面板的回答不是历史数据": ["The panel's answer is not history data"],
     "稍后再登录面板（{n} 秒后）": ["Log in to the panel again later (in {n} second)", "Log in to the panel again later (in {n} seconds)"],
     "实时推送断开": ["Live updates disconnected"],
     "实时推送（只订阅）": ["Live updates (subscribe only)"],
