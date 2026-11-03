@@ -1,11 +1,18 @@
-# The site's screenshots in each language, from the demo board on the Mac mini (tools/site-screenshots.sh). Run by hand, or by
-# pushing a branch named shots/<anything> (a workflow only becomes dispatchable once it is on main); the
-# PNGs come back as an artifact and go into the site repository as WebP. Demo mode only: fictional data, nothing is saved.
-# It runs on the mini, whose runner is attached to this public repository, so it has no pull_request trigger (see release-app.yml).
+# The site's screenshots in each language, from the demo board (tools/site-screenshots.sh), put on the site. Run by hand, or by
+# pushing a branch named shots/<anything> (a workflow only becomes dispatchable once it is on main). The Mac mini takes the PNGs;
+# hans-mac, which holds the GitHub login that can push the site (as release-app.yml uses it), turns them into WebP
+# (tools/site-screenshots-webp.js), commits them to the site repository, waits for its deployment and checks the live files.
+# Demo mode only: fictional data, nothing is saved. Both runners are attached to this public repository, so there is no
+# pull_request trigger (see release-app.yml).
 name: site-screenshots
 
 on:
   workflow_dispatch:
+    inputs:
+      publish:
+        description: Put the screenshots on the site (otherwise they only come back as an artifact)
+        type: boolean
+        default: true
   push:
     branches: ['shots/**']
 
@@ -37,3 +44,66 @@ jobs:
           path: ${{ runner.temp }}/site-screenshots
           retention-days: 14
           if-no-files-found: error
+
+  publish:
+    needs: screenshots
+    if: ${{ github.event_name == 'push' || inputs.publish }}
+    runs-on: [self-hosted, macOS, ARM64, hans-mac]
+    timeout-minutes: 20
+    # One push to the site at a time: a release publishes there too.
+    concurrency:
+      group: app-production-release
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: site-screenshots-${{ github.run_number }}
+          path: ${{ runner.temp }}/site-screenshots
+
+      - name: WebP
+        run: |
+          set -euo pipefail
+          # The same cached Playwright as release-app.yml's browser regression.
+          pw_home="$HOME/.cache/assetboard-ci/playwright-1.64.1"
+          if [ ! -d "$pw_home/node_modules/playwright" ]; then
+            npm install --prefix "$pw_home" --no-audit --no-fund playwright@1.64.1
+          fi
+          "$pw_home/node_modules/.bin/playwright" install chromium
+          NODE_PATH="$pw_home/node_modules" node tools/site-screenshots-webp.js "$RUNNER_TEMP/site-screenshots" "$RUNNER_TEMP/site-webp" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Commit to the site and wait for deployment
+        run: |
+          set -euo pipefail
+          gh api repos/hippone/assetboard-site --jq '.permissions.push' | grep -qx true
+          site="$(mktemp -d "$RUNNER_TEMP/assetboard-site.XXXXXX")"
+          git -c credential.helper= -c 'credential.helper=!gh auth git-credential' clone --depth=1 https://github.com/hippone/assetboard-site.git "$site"
+          cp "$RUNNER_TEMP"/site-webp/app-*.webp "$site/assets/"
+          cd "$site"
+          if git diff --quiet -- assets; then echo 'The screenshots are unchanged.' | tee -a "$GITHUB_STEP_SUMMARY"; exit 0; fi
+          python3 tools/check_links.py .
+          git add assets/app-*.webp
+          git -c user.name=lihaosong-code -c user.email=207678397+lihaosong-code@users.noreply.github.com commit -m "Screenshots from ${GITHUB_SHA::7} (${GITHUB_REF_NAME})"
+          site_commit="$(git rev-parse HEAD)"
+          git -c credential.helper= -c 'credential.helper=!gh auth git-credential' push origin HEAD:main
+          run_id=''
+          for attempt in {1..12}; do
+            run_id="$(gh run list --repo hippone/assetboard-site --workflow deploy-site.yml --commit "$site_commit" --json databaseId --jq '.[0].databaseId // empty')"
+            [[ -n "$run_id" ]] && break
+            sleep 5
+          done
+          test -n "$run_id"
+          gh run watch "$run_id" --repo hippone/assetboard-site --exit-status --interval 10
+
+      - name: Verify the live screenshots
+        run: |
+          set -euo pipefail
+          for file in "$RUNNER_TEMP"/site-webp/app-*.webp; do
+            name="$(basename "$file")"
+            live="$(curl -fsS "https://assetboard.app/assets/$name?run=$GITHUB_RUN_ID" | shasum -a 256 | cut -d' ' -f1)"
+            test "$live" = "$(shasum -a 256 "$file" | cut -d' ' -f1)" || { echo "::error::$name on the site is not this run's"; exit 1; }
+          done
+          echo "Published the screenshots at https://assetboard.app/" >> "$GITHUB_STEP_SUMMARY"
