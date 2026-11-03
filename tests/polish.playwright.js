@@ -10,9 +10,9 @@ async (page) => {
   // Wide: the inspector is there from the start with the first row selected; focus did not move into it.
   const s=await p.evaluate(()=>({open:!document.querySelector('#detail').hidden,first:document.querySelector('#board [data-asset]').dataset.asset,selected:document.querySelector('#board .row.selected')?.dataset.asset,docked:document.body.classList.contains('inspecting'),focusIn:!!document.activeElement?.closest('#detail')}));
   check(s.open&&s.selected===s.first&&s.docked&&!s.focusIn,'Wide window opens with the first item in the docked inspector, focus untouched: '+JSON.stringify(s));
-  // One right column: the amount sits under the status, right edges line up.
-  const r=await p.evaluate(()=>{const row=document.querySelector('#board .row[data-asset="demo-s1"]'),d=row.querySelector('.r-date').getBoundingClientRect(),m=row.querySelector('.r-cost').getBoundingClientRect();return {below:m.top>=d.bottom-1,right:Math.abs(m.right-d.right)<2};});
-  check(r.below&&r.right,'Amount stacks under the status in one right-aligned column: '+JSON.stringify(r));
+  // Wide list: the date and the amount are their own columns on one line, the amount right of the date (v17 calm board).
+  const r=await p.evaluate(()=>{const row=document.querySelector('#board .row[data-asset="demo-s1"]'),d=row.querySelector('.r-date').getBoundingClientRect(),m=row.querySelector('.r-cost').getBoundingClientRect();return {line:Math.abs(m.top-d.top)<4,after:m.left>=d.right-1};});
+  check(r.line&&r.after,'Date and amount are two columns on one line: '+JSON.stringify(r));
   // Group heads lead the rhythm.
   check(await p.evaluate(()=>parseFloat(getComputedStyle(document.querySelector('.group-title')).fontSize)>=15),'Group titles are larger than rows');
   // Sidebar entry opens the panorama in the middle column; the sidebar stays.

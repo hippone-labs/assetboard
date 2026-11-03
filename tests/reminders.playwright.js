@@ -27,7 +27,7 @@ async (page) => {
   check(/7 天内[\s\S]*soon\.dev[\s\S]*客户站点仍在使用[\s\S]*7 天后到期/.test(agenda),'Soon asset shows its keep reason and relative date');
   check(!agenda.includes('Hidden tool'),'Hidden assets stay out of 即将到来');
   check(/Editor Pro[\s\S]*天后扣款/.test(agenda),'Monthly renewal rolls forward to its next charge');
-  check(await p.locator('#layout-toggle').isHidden(),'即将到来 is always a list');
+  check(await p.locator('#layout-toggle [data-id="calendar"]').isVisible()&&await p.locator('#layout-toggle [data-id="grid"]').isHidden()&&await p.locator('#layout-toggle [data-id="timeline"]').isHidden(),'即将到来 offers a list or a month calendar');
 
   // Delete asks in-page (works in WKWebView) and can be undone from the toast.
   await p.locator('[data-asset="late"] .item-open').click();

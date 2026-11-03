@@ -29,5 +29,7 @@ Object.assign(I18N.en,{
  '资产详情':'Asset details',
  '关闭详情':'Close details',
  '关闭弹窗':'Close',
- '操作':'Actions'
+ '操作':'Actions',
+ '时间轴':'Timeline',
+ '月历':'Calendar'
 });

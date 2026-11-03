@@ -34,7 +34,11 @@ async (page) => {
   const types=await p.evaluate(()=>Object.keys(cats));
   for(const v of ['upcoming','all','hidden',...types])await step('view '+v,v=>setView(v),v);
   await step('grid',()=>{setView('all');setLayout('grid');});
+  await step('timeline',()=>{setView('all');setLayout('timeline');});
   await p.evaluate(()=>setLayout('list'));
+  await step('calendar',()=>{setView('upcoming');setLayout('calendar');});
+  await step('next month',()=>shiftCalendar(1));
+  await p.evaluate(()=>{shiftCalendar(0);setLayout('list');setView('all');});
   const ids=await p.evaluate(()=>state.assets.map(a=>a.id));
   for(const id of ids){
    await step('detail '+id,id=>showDetail(id),id);

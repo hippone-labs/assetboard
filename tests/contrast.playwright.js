@@ -58,7 +58,10 @@ async (page) => {
    await p.locator('#sidebar .nav-item[data-id="upcoming"]').click();await audit(scheme+' upcoming');
    await p.locator('#sidebar .nav-item[data-id="all"]').click();
    await p.locator('#layout-toggle [data-id="grid"]').click();await audit(scheme+' grid');
+   await p.locator('#layout-toggle [data-id="timeline"]').click();await audit(scheme+' timeline');
    await p.locator('#layout-toggle [data-id="list"]').click();
+   await p.locator('#sidebar .nav-item[data-id="upcoming"]').click();await p.locator('#layout-toggle [data-id="calendar"]').click();await audit(scheme+' calendar');
+   await p.locator('#layout-toggle [data-id="list"]').click();await p.locator('#sidebar .nav-item[data-id="all"]').click();
    await p.locator('#search').fill('nothing-matches');await audit(scheme+' empty search');await p.locator('#search').fill('');
    await p.evaluate(()=>inboxDialog(false));await audit(scheme+' inbox');
    await p.locator('[data-action="candidate-review"]').first().click();await audit(scheme+' review');

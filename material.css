@@ -2073,3 +2073,82 @@ body::before,.native-app body::before{background:radial-gradient(70vw 65vh at 0%
 /* The privacy line under 添加资产: its lock keeps a gap from the words. */
 .capture-note{display:flex;align-items:flex-start;gap:6px}
 .capture-note .ui-icon{width:13px;height:13px;margin-top:2px;flex:none}
+/* v17 · calm board (2026-11-03, user-confirmed: board-ui research, all four changes). Colour only for what needs attention: a date
+   is plain text, amber within SOON_DAYS and red when overdue, with its dot and no pill. The wide list has five aligned columns
+   (icon, name, source, date, cost); 全部资产 opens with the overview strip and each group head gives its cost a month. A grid card
+   leads with its day count. The timeline and the month calendar are drawn by board-views.js. */
+:root .r-date.warn,:root .r-date.overdue{padding:0;background:none;border-radius:0}
+:root .meta-flag.soon,:root .meta-flag.overdue{background:none;padding:0}
+#board[data-size=l] .row .item-open{grid-template-columns:20px minmax(0,1fr) minmax(0,15em) 10.5em 7.5em}
+#board[data-size=l] .row .r-when{display:contents}
+#board[data-size=l] .row .r-date{grid-column:4;grid-row:1}
+#board[data-size=l] .row .r-cost{grid-column:5;grid-row:1;font-size:12px}
+.group-head .g-cost{margin-left:auto;padding-left:12px;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.group-head .g-cost~.g-actions{margin-left:8px}
+/* Overview strip: four answers, each a button into the place that explains it. */
+.overview{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;margin:14px 0 6px;border:1px solid var(--hairline);border-radius:var(--radius-md);background:var(--hairline);overflow:hidden}
+.ov-tile{display:flex;flex-direction:column;align-items:flex-start;gap:1px;min-width:0;padding:11px 14px 12px;border:0;background:var(--surface-content);color:var(--ink);font:inherit;text-align:left;cursor:default;transition:background-color var(--motion-fast) var(--ease)}
+.ov-tile:hover{background:var(--hover)}
+.ov-label,.ov-note{max-width:100%;font-size:12px;line-height:16px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ov-value{font-size:22px;line-height:28px;font-weight:600;letter-spacing:-.01em;font-variant-numeric:tabular-nums}
+.ov-tile.soon .ov-value{color:var(--warning)}.ov-tile.overdue .ov-value{color:var(--danger)}
+#board[data-size=m] .overview,#board[data-size=s] .overview{grid-template-columns:repeat(2,minmax(0,1fr))}
+/* Grid card: the day count, then how much of this cycle has gone. */
+.gcard .g-hero-wrap{grid-column:1/-1;display:flex;flex-direction:column;gap:8px;min-width:0}
+.g-hero{display:flex;align-items:baseline;gap:5px;color:var(--ink)}
+.g-hero b{font-size:26px;line-height:28px;font-weight:600;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.g-hero small{font-size:12px;color:var(--muted)}
+.g-hero.soon b{color:var(--warning)}.g-hero.overdue b{color:var(--danger)}
+.g-bar{display:block;height:4px;border-radius:2px;background:var(--hairline);overflow:hidden}
+.g-bar i{display:block;height:100%;border-radius:inherit;background:rgba(var(--tone-ink),.35)}
+.g-bar.soon i{background:var(--warning)}.g-bar.overdue i{background:var(--danger)}
+/* Timeline: a name column, then twelve months. */
+.timeline{position:relative;padding:6px 0 26px;overflow-x:auto;--tl-name:200px}
+.timeline>*{min-width:680px}
+#board[data-size=s] .timeline{--tl-name:130px}
+.tl-head,.tl-row{display:grid;grid-template-columns:var(--tl-name) minmax(0,1fr);align-items:center}
+.tl-head{height:26px;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+.tl-months{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));height:100%;align-items:center;border-left:1px solid var(--hairline)}
+.tl-months span{padding-left:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-right:1px solid var(--hairline);line-height:26px}
+.tl-cat{margin:12px 0 0;padding:6px 0 4px;font-size:11px;font-weight:600;letter-spacing:.04em;color:var(--muted)}
+.tl-row{height:32px;border-top:1px solid var(--hairline)}
+.tl-row .tl-name{display:flex;align-items:center;gap:8px;height:100%;padding:0 10px 0 4px;border-radius:6px;font-size:13px;font-weight:500}
+.tl-row .tl-name:hover{background:var(--hover)}
+.tl-row:has(.tl-name:focus-visible) .tl-track{background-color:var(--hover)}
+.tl-track{position:relative;height:100%;background:repeating-linear-gradient(90deg,var(--hairline) 0 1px,transparent 1px calc(100%/12))}
+.tl-mark{position:absolute;top:50%;width:11px;height:11px;margin:-5.5px 0 0 -5.5px;border-radius:50%;background:rgba(var(--tone-ink),.45);box-shadow:0 0 0 2px var(--surface-content)}
+.tl-mark.soon{background:var(--warning)}.tl-mark.overdue{background:var(--danger)}
+.tl-mark.later{width:6px;height:6px;margin:-3px 0 0 -3px;background:rgba(var(--tone-ink),.3)}
+.tl-label{position:absolute;top:50%;transform:translateY(-50%);margin-left:10px;padding:0 6px 0 3px;border-radius:4px;background:var(--surface-content);font-size:11px;line-height:16px;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums;z-index:1}
+.tl-label.soon{color:var(--warning)}.tl-label.overdue{color:var(--danger)}
+.tl-today{position:absolute;top:6px;bottom:20px;left:calc(var(--tl-name) + (100% - var(--tl-name)) * var(--tl-at));width:0;border-left:1.5px solid rgb(var(--tone-primary));pointer-events:none;z-index:2;min-width:0}
+.tl-today span{position:absolute;bottom:-18px;left:0;transform:translateX(-50%);font-size:11px;font-weight:600;color:rgb(var(--tone-primary));white-space:nowrap}
+.tl-note{margin:4px 0 0;font-size:12px;color:var(--muted)}
+/* Month calendar of 即将到来: weeks from Monday, the month's total and list beside it. */
+.calendar{padding:10px 0 20px}
+.cal-head{display:flex;align-items:center;gap:6px;margin-bottom:10px}
+.cal-title{margin:0 auto 0 0;font-size:15px;font-weight:600}
+.cal-head .icon-button{display:inline-grid;place-items:center;width:28px;height:28px;padding:0;border-radius:6px;color:var(--muted)}
+.cal-head .icon-button .ui-icon{width:15px;height:15px}.cal-head .cal-next .ui-icon{transform:scaleX(-1)}
+.cal-body{display:grid;grid-template-columns:minmax(0,1fr) 220px;gap:20px;align-items:start}
+.cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border-top:1px solid var(--hairline);border-left:1px solid var(--hairline)}
+.cal-dow{padding:5px 6px;border-right:1px solid var(--hairline);border-bottom:1px solid var(--hairline);font-size:11px;color:var(--muted)}
+.cal-day{display:flex;flex-direction:column;gap:3px;min-width:0;min-height:76px;padding:5px;border-right:1px solid var(--hairline);border-bottom:1px solid var(--hairline)}
+.cal-day.out .cal-n{opacity:.45}
+.cal-n{font-size:11px;line-height:18px;color:var(--muted);font-variant-numeric:tabular-nums}
+.cal-day.today .cal-n{align-self:flex-start;min-width:18px;padding:0 4px;border-radius:9px;background:rgb(var(--tone-primary));color:var(--on-primary);font-weight:600;text-align:center}
+.cal-ev{display:block;width:100%;min-width:0;padding:1px 5px;border:0;border-radius:4px;background:var(--hover);color:var(--ink);font:inherit;font-size:11px;line-height:16px;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:default}
+.cal-ev.soon{background:var(--soon-soft)}.cal-ev.overdue{background:var(--overdue-soft)}
+.cal-amt{color:var(--muted);font-variant-numeric:tabular-nums}
+.cal-side h3{margin:0;font-size:12px;font-weight:600;color:var(--muted)}
+.cal-total{display:block;font-size:24px;line-height:30px;font-weight:600;font-variant-numeric:tabular-nums}
+.cal-rest{font-size:12px;color:var(--muted)}
+.cal-list{margin:10px 0 0;padding:0;list-style:none}
+.cal-list li{display:flex;align-items:baseline;gap:8px;padding:6px 0;border-top:1px solid var(--hairline);font-size:12px}
+.cal-list .text-button{display:flex;gap:8px;flex:1;min-width:0;padding:0;border:0;background:none;color:var(--ink);font:inherit;text-align:left;cursor:default}
+.cal-list .text-button.soon .cal-when{color:var(--warning)}.cal-list .text-button.overdue .cal-when{color:var(--danger)}
+.cal-when{flex:none;color:var(--muted);font-variant-numeric:tabular-nums}
+.cal-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#board[data-size=m] .cal-body,#board[data-size=s] .cal-body{grid-template-columns:minmax(0,1fr)}
+#board[data-size=s] .cal-grid{display:none}
+@media(prefers-reduced-motion:reduce){.ov-tile{transition:none}}
