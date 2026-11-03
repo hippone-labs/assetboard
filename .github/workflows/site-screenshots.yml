@@ -93,9 +93,10 @@ jobs:
           git -c credential.helper= -c 'credential.helper=!gh auth git-credential' clone --depth=1 https://github.com/hippone/assetboard-site.git "$site"
           cp "$RUNNER_TEMP"/site-webp/app-*.webp "$site/assets/"
           cd "$site"
-          if git diff --quiet -- assets; then echo 'The screenshots are unchanged.' | tee -a "$GITHUB_STEP_SUMMARY"; exit 0; fi
-          python3 tools/check_links.py .
+          # Staged first, so a screenshot the site does not have yet counts as a change.
           git add assets/app-*.webp
+          if git diff --cached --quiet -- assets; then echo 'The screenshots are unchanged.' | tee -a "$GITHUB_STEP_SUMMARY"; exit 0; fi
+          python3 tools/check_links.py .
           git -c user.name=lihaosong-code -c user.email=207678397+lihaosong-code@users.noreply.github.com commit -m "Screenshots from ${GITHUB_SHA::7} (${GITHUB_REF_NAME})"
           site_commit="$(git rev-parse HEAD)"
           git -c credential.helper= -c 'credential.helper=!gh auth git-credential' push origin HEAD:main
