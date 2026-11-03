@@ -808,6 +808,9 @@ function maskAsset(asset,set){
  const out={...asset},opts={domain:!!rule.domain},mask=rule.mask||[];
  for(const key of rule.drop||[])if(key in out)out[key]='';
  for(const key of mask)if(key!=='mail'&&out[key]!=null&&out[key]!=='')out[key]=maskValue(key,out[key],opts);
+ // The keep-alive address names the app's host: masked wherever hosts are, dropped where links are.
+ if(out.keepAlive?.url&&(mask.includes('host')||mask.includes('url')))out.keepAlive={...out.keepAlive,url:maskValue('url',out.keepAlive.url)};
+ if(out.keepAlive&&(rule.drop||[]).includes('url'))delete out.keepAlive;
  if(mask.includes('mail'))for(const [key,value] of Object.entries(out))if(key!=='id'&&typeof value==='string'&&value.includes('@')&&!/^data:/.test(value))out[key]=maskMail(value,opts);
  return out;
 }
