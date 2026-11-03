@@ -58,3 +58,11 @@ test('deployment and database presets include the common free hosts, each with a
  for(const name of ['Supabase','Neon','Turso','Upstash','Appwrite'])assert.ok(D.providerPresets('database').includes(name),name);
  for(const name of [...D.providerPresets('deployment'),...D.providerPresets('database')])assert.ok(D.iconVendor({type:'subscription',provider:name}),name);
 });
+
+test('the keep-alive address is masked wherever hosts are, and left out of a minimal calendar',()=>{
+ const a={id:'x',type:'deployment',name:'api',keepAlive:{url:'https://api.example.com/health',every:60}};
+ for(const set of ['agent','handover','screen']){const out=D.maskAsset(a,set);assert.ok(D.hasMask(out.keepAlive.url)&&!out.keepAlive.url.includes('api.example.com'),set);assert.equal(out.keepAlive.every,60);}
+ assert.equal(a.keepAlive.url,'https://api.example.com/health','the record itself is untouched');
+ assert.equal('keepAlive' in D.maskAsset(a,'calendar'),false);
+ assert.equal(D.maskAsset(a,'present').keepAlive.url,'https://api.example.com/health','presentation masks addresses only');
+});
