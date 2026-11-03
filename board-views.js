@@ -11,15 +11,17 @@ function overviewHtml(scope){
  const cur=totalCurrency(),today=localDay(),end=dayNumber(addMonths(isoDay(today).slice(0,8)+'01',1))-1;
  const totals=costTotals(scope,{currency:cur,rates:fx.rates}),month=costForecast(scope,{from:isoDay(today),to:isoDay(end),currency:cur,rates:fx.rates});
  const levels=dueLevels(scope),next=upcomingEvents(scope,new Date(),SOON_DAYS).find(e=>e.status.days>=0);
- const down=scope.filter(a=>{const live=probeState(a);return live&&!live.online&&!a.stopped;}).length,attention=levels.overdue+down;
+ const lives=scope.filter(a=>!a.stopped).map(probeState).filter(Boolean),down=lives.filter(l=>!l.online).length,tight=lives.filter(l=>l.online&&l.tone==='amber').length,attention=levels.overdue+down;
  if(!totals.items.length&&!month.items.length&&!next&&!attention)return '';
  const tile=(cls,action,id,label,value,note)=>`<button type="button" class="ov-tile${cls?' '+cls:''}" data-action="${action}"${id?` data-id="${id}"`:''}><span class="ov-label">${label}</span><strong class="ov-value">${value}</strong><span class="ov-note">${note}</span></button>`;
  const parts=[levels.overdue&&tr('{n} 过期',{n:formatCount(levels.overdue)}),down&&tr('{n} 离线',{n:formatCount(down)})].filter(Boolean).join(' · ');
- return `<div class="overview" role="group" aria-label="${tr('概览')}">${[
+ return `<div class="overview${lives.length?' five':''}" role="group" aria-label="${tr('概览')}">${[
   tile('','cost-panel','',tr('本月还要付'),esc(formatMoney(month.total,cur)),month.items.length?tr('{n} 笔',{n:formatCount(month.items.length)}):tr('没有扣款')),
   tile(levels.soon?'soon':'','view','upcoming',tr('{n} 天内到期',{n:SOON_DAYS}),formatCount(levels.soon),next?esc(tr('最近：{name} · {when}',{name:displayName(next.asset),when:agendaWhen(next.status)})):tr('没有')),
   tile(attention?'overdue':'','view','upcoming',tr('需要处理'),formatCount(attention),parts||tr('没有')),
-  tile('','cost-panel','',tr('每年合计'),esc(formatMoney(totals.yearly,cur)),tr('约 {money} / 月',{money:esc(formatMoney(totals.monthly,cur))}))
+  tile('','cost-panel','',tr('每年合计'),esc(formatMoney(totals.yearly,cur)),tr('约 {money} / 月',{money:esc(formatMoney(totals.monthly,cur))})),
+  // 实时: only once 实时状态 reads something. How many of the read servers answer, and what is wrong with the others.
+  lives.length?tile(down?'overdue':tight?'soon':'','view','server',tr('实时'),`${formatCount(lives.length-down)} / ${formatCount(lives.length)}`,[down&&tr('{n} 离线',{n:formatCount(down)}),tight&&tr('{n} 内存紧张',{n:formatCount(tight)})].filter(Boolean).join(' · ')||tr('都有读数')):''
  ].join('')}</div>`;
 }
 // A group's recurring cost a month, beside its title; nothing when no record in it has a readable cycle.

@@ -1384,7 +1384,7 @@ function agentFields(input,type,base=null){
   // was read it leaves the field as it is, any other value holding the mask mark is refused.
   if(hasMask(raw)){if(base&&JSON.stringify(raw)===JSON.stringify(agentMask(base)[key]))continue;return {error:`${key} 里有遮蔽符号 ${MASK_MARK}，是读取时遮住的值，不能写回；不改就不要传这个字段，要改请给出完整的值`};}
   if(['type','id','icon','iconHost','linkTo','unlinkFrom','amount','currency','promotion'].includes(key))continue;
-  // Updates only: hidden and stopped (true or false, like 隐藏 and 已停用), and fields a Pro script adds (probeLink).
+  // Updates only: hidden and stopped (true or false, like 隐藏 and 已停用), and fields a Pro script adds.
   if(key==='hidden'||key==='stopped'||Object.hasOwn(proSlots.agentFields,key)){
    if(!base){ignored.push(key);continue;}
    if(key==='hidden'){if(typeof raw!=='boolean')return {error:'hidden 需要是 true 或 false'};fields.hiddenAt=raw?base.hiddenAt||new Date().toISOString():null;continue;}
@@ -1664,8 +1664,8 @@ function answerAgentAction(actionId,assetId,status,error=''){
  action.status=action.items.some(x=>x.status==='deleted'||x.status==='applied')?'done':action.items.every(x=>x.status==='kept'||x.status==='declined')?'cancelled':action.items.every(x=>x.status==='failed')?'failed':'cancelled';
  action.resolvedAt=new Date().toISOString();
 }
-// Settings an agent asks to change that only the person may allow (Pro registers each kind in proSlots.agentConfirms: removing a
-// probe source, turning on SSH 直读 for a host, letting a sync add back what was deleted). Like a delete, nothing happens at once:
+// Settings an agent asks to change that only the person may allow (Pro registers each kind in proSlots.agentConfirms: letting a
+// sync add back what was deleted). Like a delete, nothing happens at once:
 // the request waits in 待确认 and in state.agentActions; the person ticks what to allow, and only then does the kind's apply() run.
 // Items end applied, declined or failed; asking again for one that already waits is folded into that request.
 function agentRequestConfirm(kind,targets,reason=''){
@@ -2297,7 +2297,7 @@ function prefsDialog(section){
   mac?row(tr('在菜单栏显示'),toggle('prefs-native',nativeStore.statusItem!==false,tr('在菜单栏显示'),' data-id="statusItem"'),tr('菜单栏的小日历：7 天内到期和待确认扣款的数量')):'',
   mac?row(tr('系统通知'),`<span class="chip ${notify[0]}">${notify[1]}</span><button class="button" data-action="notification-settings">${tr('通知设置…')}</button>`,tr('到期前的提醒用 macOS 通知发出')):''].join('');
  const usable=f=>(!f.mac||nativeStore||demoMode)&&(!f.full||proBuilt());
- const features=[...Object.entries(FEATURES).filter(([,f])=>usable(f)&&(!f.under||featureOn(f.under))).map(([key,f])=>{const html=row(f.name,(f.pro?proToggle:toggle)('prefs-feature',featureOn(key),f.name,` data-id="${key}"`),f.note);return f.under?html.replace('class="prefs-row"','class="prefs-row prefs-sub"'):html;}),
+ const features=[...Object.entries(FEATURES).filter(([,f])=>usable(f)&&(!f.under||featureOn(f.under))).map(([key,f])=>{const html=row(f.name,(f.pro?proToggle:toggle)('prefs-feature',featureOn(key),f.name,` data-id="${key}"`),f.note);const sub=key==='probe'&&featureOn('probe')&&typeof liveIntervalField==='function'?row(tr('读取间隔'),liveIntervalField(),tr('多久读一次服务器；只在窗口显示时读，连不上时自动拉长')).replace('class="prefs-row"','class="prefs-row prefs-sub"'):'';return (f.under?html.replace('class="prefs-row"','class="prefs-row prefs-sub"'):html)+sub;}),
   mac?row(tr('自动获取网站图标'),toggle('auto-icons',state.autoIcons!==false,tr('自动获取网站图标')),tr('新添加的资产认出是已知平台时，从它的官网取图标；每次请求都记在网络记录里')):'',
   mac?row(tr('每周核对域名到期日'),proToggle('rdap-auto',!!state.rdapAuto,tr('每周向注册局核对域名到期日')),tr('每周把每个域名发给它的注册局（公开 RDAP）查一次；日期不同只提示，不改')):''].join('');
  const link=(name,on,action,title)=>row(name,`${on===null?'':`<span class="chip ${on?'ok':''}">${on?tr('已连接'):tr('未连接')}</span>`}<button class="button" data-action="${action}">${tr('设置…')}</button>`,title);

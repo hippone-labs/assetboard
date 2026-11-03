@@ -31,7 +31,7 @@
 | 关联、风险连锁、全景 | 每周自动核对注册局 |
 | 待确认续费、冻结提示、手动核对注册局 | Cloudflare 每 12 小时自动同步 |
 | 全部本机导入（CSV、备份、.eml、截图、ssh config）、接 Cloudflare 和 GitHub 后手动同步、AI 套餐点选 | 项目合计、关停清单、定期清理 |
-| 自配 key 的 AI 识别 | 探针与 SSH 直读 |
+| 自配 key 的 AI 识别 | 实时状态（SSH 直读、监控面板） |
 | 费用合计、币种、JSON 备份、.ics 导出、基础交接清单 | MCP 写入工具（添加、修改、删除）、命令行 `assetboard-cli`、Inbox 文件夹 |
 | 隐私模式、网络记录、MCP 只读工具 | 即将推出：写进「提醒事项」、加密快照、「如果我出事」接手包 |
 
@@ -141,7 +141,7 @@ Mac App 在菜单栏有一个小日历图标：显示 7 天内到期和待确认
 菜单“Assetboard → 设置…”（`⌘,`）或侧边栏底部“设置”，一处管所有开关。左边是分区，右边是选中分区的设置：
 
 - **通用：** 语言（简体中文或 English，默认跟随系统；切换后当场生效，菜单也一起换）、计价币种、隐私模式、在菜单栏显示、系统通知状态。
-- **功能：** 全景、探针与 SSH 直读（默认关闭）、外部工具接入（MCP，关掉后一律拒绝调用；下面两个开关默认关：把地址和联系方式交给 AI 工具、把银行卡和手机号交给 AI 工具）、自动获取网站图标、每周核对域名到期日。功能开关按此设备记住，不进资产数据，不随备份走。
+- **功能：** 全景、实时状态（默认关闭；打开后可调读取间隔，15 秒到 60 分钟）、外部工具接入（MCP，关掉后一律拒绝调用；下面两个开关默认关：把地址和联系方式交给 AI 工具、把银行卡和手机号交给 AI 工具）、自动获取网站图标、每周核对域名到期日。功能开关按此设备记住，不进资产数据，不随备份走。
 - **连接：** Cloudflare、GitHub、AI 识别、MCP 接入、探针数据源，各自显示是否已连接，点“设置…”打开对应面板。
 - **关于：** 当前版本、检查更新、自动检查更新。
 
@@ -184,15 +184,15 @@ assetboard-cli totals --currency CNY                   # 周期费用合计；�
 
 MCP 工具：`list_asset_types`、`list_assets`、`get_asset`、`get_cost_totals`、`get_cost_forecast`、`get_cost_history`、`list_projects`、`add_assets`、`update_asset`、`update_assets`、`renew_asset`、`record_payment`、`list_unconfirmed_charges`、`delete_asset`、`request_delete_assets`、`list_pending_actions`、`get_action_status`。
 
-探针、SSH 直读、图标与同步的 MCP 工具：`list_probe_sources`、`refresh_probe_sources`、`list_probe_servers`、`get_server_metrics`、`set_probe_link`、`list_ssh_hosts`、`refresh_ssh`、`list_icon_platforms`、`set_icon_site`、`fetch_icons`、`get_cloudflare_sync_status`、`sync_cloudflare`、`list_sync_blocklist`、`unblock_sync_item`。
+图标与同步的 MCP 工具：`list_icon_platforms`、`set_icon_site`、`fetch_icons`、`get_cloudflare_sync_status`、`sync_cloudflare`、`list_sync_blocklist`、`unblock_sync_item`。
 
 - **默认遮住、默认不给：** 外部工具读到的 IP、SSH 主机和用户、手机号和邮箱是遮住的（带 `•`，字段名列在 `masked` 里），银行卡和手机号两类记录读不到也改不了（`list_assets` 只给数量 `withheld`）；在「设置 › 功能 › 外部工具接入」里有两个开关可以改。搜索仍按真实值匹配。写回时，原样传回的遮住值保持不变，其他带 `•` 的值一律拒收。
-- **探针和 SSH 直读只读：** 外部工具只能读取和刷新；添加、修改、删除探针数据源，开关 SSH 直读和改读取间隔，都只能在 App 里做。探针数据源换了地址（协议、主机或端口）时，App 会丢掉已存的面板账号，要重新填写。
-- **凭据不经过 MCP：** 这些工具不接收、也不返回用户名、密码、令牌或会话；面板不公开时状态为 `needsLogin`，账号只能在 App 的「探针数据源」里填，Cloudflare 令牌只能在「同步 Cloudflare…」里填。SSH 主机只按别名列出，不返回 HostName、IP、用户名、端口、IdentityFile 或 ssh config 原文；读取失败只给原因代码和固定说明。
-- **先返回、再查询：** 读面板、SSH 读取、获取图标和 Cloudflare 同步会立即返回 `refreshing` / `fetching` / `syncing`，结果用 `list_probe_sources`、`list_ssh_hosts`、`get_server_metrics`、`list_icon_platforms`（`lastFetch`）、`get_cloudflare_sync_status` 查看。
+- **实时状态不给外部工具：** 服务器的实时读数、探针数据源和 SSH 主机都没有 MCP 工具，资产里也不带读数；设置和关联只在 App 里做。探针数据源换了地址（协议、主机或端口）时，App 会丢掉已存的面板账号，要重新填写。
+- **凭据不经过 MCP：** 这些工具不接收、也不返回用户名、密码、令牌或会话；面板账号只能在 App 的「探针数据源」里填，Cloudflare 令牌只能在「同步 Cloudflare…」里填。
+- **先返回、再查询：** 获取图标和 Cloudflare 同步会立即返回 `fetching` / `syncing`，结果用 `list_icon_platforms`（`lastFetch`）、`get_cloudflare_sync_status` 查看。
 - **要你确认的：** 删除资产和 `unblock_sync_item` 都返回 `pending` 和 `actionId`，在 App 里勾选允许才生效。
-- **工具标注：** 会覆盖或删除已有内容的写工具标 `destructiveHint: true`；会让 App 联网的工具（取图标、读面板、SSH 读取、Cloudflare 同步，以及新增、修改资产和关联探针：认出平台时自动取图标，关联后读面板历史）标 `openWorldHint: true`，其余只动这台 Mac 上的数据，标 `false`。
-- **撤销：** 看板上的改动（`set_probe_link`、`set_icon_site`、获取到的图标、允许后的解除跳过）可以 `⌘Z`。`update_asset` / `update_assets` 另外接受 `hidden`、`stopped`（true / false）和服务器的 `probeLink`（`{source, serverId}`、`"none"` 或 `"auto"`）。
+- **工具标注：** 会覆盖或删除已有内容的写工具标 `destructiveHint: true`；会让 App 联网的工具（取图标、Cloudflare 同步，以及新增、修改资产：认出平台时自动取图标）标 `openWorldHint: true`，其余只动这台 Mac 上的数据，标 `false`。
+- **撤销：** 看板上的改动（`set_icon_site`、获取到的图标、允许后的解除跳过）可以 `⌘Z`。`update_asset` / `update_assets` 另外接受 `hidden`、`stopped`（true / false）。
 
 - **计费：** `billingType` 为 `recurring` / `one_off` / `free` / `unknown`（留空自动判断），`amount: 0` 即免费；`promotion` 为 `{start, end, amount, regularAmount, currency}`，`null` 删除。查询结果带 `billingType`、`currentPrice`（含 `basis`：promotion / regular / free / cost）、`priceChange`、`unconfirmedCharges`、`payments`、`costHistory`。
 - **项目：** `project`（也接受 `projectId`）；`list_assets`、`get_cost_totals` 和 `get_cost_forecast` 可按项目筛选，`get_cost_totals` 的 `groupBy` 可按项目或类别拆分。
@@ -256,12 +256,12 @@ App 自己会连的：
 |---|---|
 | 每周核对域名到期日（“设置 › 功能”） | `data.iana.org` 的注册局列表和各后缀注册局的 RDAP 服务，只发域名 |
 | AI 识别（配置模型后） | 你填的模型服务（Claude、OpenAI 兼容接口，或本机 Ollama）；导入的截图、PDF、邮件和粘贴的文字会自动发给它，在 AI 识别设置里可以改成只在你点“用 AI 识别”时发送 |
-| 探针（“设置 › 功能 › 探针与 SSH 直读”） | 你自己添加的监控面板，只读固定的几个接口 |
-| SSH 直读（同上，每台主机另外打开） | 你的服务器，用系统 `ssh`、你的 `~/.ssh/config` 和密钥，只跑一条固定的只读命令 |
+| 探针（“设置 › 功能 › 实时状态”） | 你自己添加的监控面板，只读固定的几个接口，按你设的读取间隔 |
+| SSH 直读（同上，每台主机另外打开） | 你的服务器，用系统 `ssh`、你的 `~/.ssh/config` 和密钥，只跑一条固定的只读命令，按你设的读取间隔 |
 
 你点了才会连的：同步 GitHub（`api.github.com`，或本机 `gh` 命令）、第一次连 Cloudflare、“核对注册局日期”、“获取网站图标”批量补齐、“检查更新…”。打开资产的管理链接由你的浏览器完成，不经过 Assetboard。
 
-- 不探活。App 不访问你的域名或 IP。全景里的状态是登记状态（到期情况加手动标记的“已停用”），不是实时状态；只有打开探针或 SSH 直读后，服务器才有实时读数，读数只留在内存，不进数据和导出。
+- 不探活。App 不访问你的域名或 IP。全景里的状态是登记状态（到期情况加手动标记的“已停用”），不是实时状态；只有打开实时状态后，服务器才有实时读数：每行一行（内存、网络、负载），读数只留在内存，不进数据和导出，也不给外部工具。
 - 令牌只读，存在 macOS 钥匙串；用本机 `gh` 时不另存令牌。AI 的 API key、探针面板的账号同样存钥匙串。
 - MCP 接入的通道在本机（`agent.sock`），但你的 AI 工具会把读到的内容发给它的模型服务商。它默认读到的 IP、SSH 主机和用户、手机号和邮箱是遮住的，银行卡和手机号两类记录不给它；不想让它读到任何内容，就在“设置 › 功能”关掉外部工具接入。
 - 全屏展示全景时，IP 默认遮住中间部分，悬停或按住 ⌥ 才显示。
@@ -274,7 +274,7 @@ App 自己会连的：
 App 的数据在本机的 SQLite 文件里，菜单“文件 → 打开本地数据文件夹”可以直接打开；侧边栏“导出 → 资产备份”（或“文件 → 导出资产备份…”）导出 JSON，在新机器上按 `I` 打开“导入”选这个文件，或直接拖进窗口。没有云同步。
 
 **全景里的“运行状态”是实时的吗？**
-默认不是，只显示登记信息：是否到期，以及你手动标的“已停用”（`S`）。在“设置 › 功能”打开探针与 SSH 直读，并接上你自己的监控面板或 SSH 主机后，这些服务器才显示实时读数。
+默认不是，只显示登记信息：是否到期，以及你手动标的“已停用”（`S`）。在“设置 › 功能”打开实时状态，并接上你自己的监控面板或 SSH 主机后，这些服务器才显示实时读数；读取间隔在同一处调，15 秒到 60 分钟。
 
 **没收到提醒？**
 看“即将到来”顶部：如果写着“系统通知已关闭”，点“打开通知设置”，在列表里找到 Assetboard 并打开通知。提醒在当天早上 9 点发出，9 点以后才加的日期，当天那一条不会补发。

@@ -19,7 +19,8 @@ enum SSHProbe {
     /// The one command run on the server, shown verbatim in the settings (pro/web/probe-ssh-data.js SSH_PROBE_COMMAND, checked equal by
     /// pro/tests/probe-ssh.test.js). `env … sh -c '…'` so it reads the same under bash, zsh or fish; reads only, no redirection.
     static let remoteCommand = "env LC_ALL=C sh -c 'echo @@uname; uname -sm; echo @@stat1; head -n 1 /proc/stat; sleep 1; echo @@stat2; head -n 1 /proc/stat; echo @@nproc; getconf _NPROCESSORS_ONLN; echo @@meminfo; cat /proc/meminfo; echo @@df; df -P -k /; echo @@netdev; cat /proc/net/dev; echo @@uptime; cat /proc/uptime; echo @@loadavg; cat /proc/loadavg; echo @@end'"
-    static let intervals = [30, 60, 120, 300]
+    /// The reading interval in seconds is the person's to set, any whole number in this range (pro/web/probe-ssh-data.js checks the same).
+    static let intervalRange = 15...3600
     static let defaultInterval = 60
     static let concurrency = 3
     static let timeout: TimeInterval = 25
@@ -73,7 +74,7 @@ final class SSHProbeSettings {
     var enabled: [String] { (defaults.stringArray(forKey: Self.hostsKey) ?? []).filter(SSHProbe.validAlias) }
     var interval: Int {
         let value = defaults.integer(forKey: Self.intervalKey)
-        return SSHProbe.intervals.contains(value) ? value : SSHProbe.defaultInterval
+        return SSHProbe.intervalRange.contains(value) ? value : SSHProbe.defaultInterval
     }
     var disabled: [String] { (defaults.stringArray(forKey: Self.disabledKey) ?? []).filter(SSHProbe.validAlias) }
     var summary: [String: Any] { ["enabled": enabled, "disabled": disabled, "interval": interval] }
@@ -112,7 +113,7 @@ final class SSHProbeSettings {
 
     @discardableResult
     func setInterval(_ seconds: Int) -> Bool {
-        guard SSHProbe.intervals.contains(seconds) else { return false }
+        guard SSHProbe.intervalRange.contains(seconds) else { return false }
         defaults.set(seconds, forKey: Self.intervalKey)
         return true
     }
@@ -285,7 +286,7 @@ func testSSHProbe() {
     precondition(SSHProbe.reason(stderr: "ssh: Could not resolve hostname x: nodename nor servname provided") == "down")
     precondition(SSHProbe.reason(stderr: "something else") == "other")
 
-    // Settings: in their own defaults, on and off per alias, intervals from the list.
+    // Settings: in their own defaults, on and off per alias, any interval in the range.
     let suite = "assetboard.test.ssh.\(UUID().uuidString)"
     let defaults = UserDefaults(suiteName: suite)!
     defer { defaults.removePersistentDomain(forName: suite) }
@@ -298,7 +299,8 @@ func testSSHProbe() {
     precondition(settings.autoEnable(["tokyo-vps", "web", "ghost", "lab-pi"], known: ["tokyo-vps", "web", "lab-pi"]) == ["web"])
     precondition(settings.enabled == ["lab-pi", "web"])
     precondition(settings.set("tokyo-vps", on: true) && settings.disabled.isEmpty && settings.enabled.contains("tokyo-vps"), "switching on by hand forgets the off")
-    precondition(settings.setInterval(30) && settings.interval == 30 && !settings.setInterval(5) && settings.interval == 30)
+    precondition(settings.setInterval(30) && settings.interval == 30 && !settings.setInterval(5) && !settings.setInterval(3601) && settings.interval == 30)
+    precondition(settings.setInterval(45) && settings.interval == 45 && settings.setInterval(3600) && settings.interval == 3600, "any whole number of seconds in the range")
     print("PASS: SSH probe: aliases, batch-mode command line with the fixed read-only command, failure reasons, per-alias settings")
 }
 #endif
