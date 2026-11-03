@@ -618,7 +618,8 @@ function dayFromDateString(value){
 function guessAssetType(text,domains){
  if(domains.length&&/domain|域名|registrar|whois|注册商/i.test(text))return 'domain';
  if(/\b(?:vps|server|droplet|instance|linode|vultr|hetzner|ec2|lightsail)\b|服务器|云主机|轻量应用/i.test(text))return 'server';
- if(/\b(?:database|postgres(?:ql)?|mysql|redis|mongodb|supabase|planetscale)\b|数据库/i.test(text))return 'database';
+ if(/\b(?:database|postgres(?:ql)?|mysql|redis|mongodb|supabase|planetscale|neon|turso|upstash|appwrite)\b|数据库/i.test(text))return 'database';
+ if(/\b(?:vercel|netlify|render\.com|railway|fly\.io|koyeb|heroku|zeabur)\b/i.test(text))return 'deployment';
  if(/\b(?:licen[cs]e|lifetime)\b|授权|许可证|激活码/i.test(text))return 'license';
  if(/\b(?:openai|chatgpt|anthropic|claude|midjourney|perplexity|cursor|copilot|gemini|runway|elevenlabs|suno|deepseek)\b/i.test(text))return 'ai';
  return 'subscription';
@@ -1123,6 +1124,13 @@ const iconVendors=[
  {host:'heroku.com',label:'Heroku',match:/heroku/i},
  {host:'deno.com',label:'Deno Deploy',match:/\bdeno\b/i},
  {host:'zeabur.com',label:'Zeabur',match:/zeabur/i},
+ {host:'koyeb.com',label:'Koyeb',match:/koyeb/i},
+ {host:'huggingface.co',label:'Hugging Face',match:/hugging\s*face|\bhf\.space\b/i},
+ {host:'streamlit.io',label:'Streamlit',match:/streamlit/i},
+ {host:'replit.com',label:'Replit',match:/replit/i},
+ {host:'sealos.io',label:'Sealos',match:/sealos/i},
+ {host:'leapcell.io',label:'Leapcell',match:/leapcell/i},
+ {host:'northflank.com',label:'Northflank',match:/northflank/i},
  {host:'bandwagonhost.com',label:tr('搬瓦工'),match:/搬瓦工|bandwagon|\bbwh\b/i,tried:['bandwagonhost.com: 页面没有声明图标，/favicon.ico 返回 404']},
  // Code, deployment and storage
  {host:'github.com',label:'GitHub',match:/github|copilot/i},
@@ -1140,6 +1148,8 @@ const iconVendors=[
  {host:'redis.io',label:'Redis Cloud',match:/\bredis\b/i},
  {host:'upstash.com',label:'Upstash',match:/upstash/i},
  {host:'turso.tech',label:'Turso',match:/turso/i},
+ {host:'appwrite.io',label:'Appwrite',match:/appwrite/i},
+ {host:'convex.dev',label:'Convex',match:/\bconvex\b/i},
  // Subscriptions and AI
  {host:'apple.com',label:'Apple',match:/\bapple\b|icloud|app\s*store/i},
  {host:'google.com',label:'Google',match:/\bgoogle\b(?!\s*(cloud|domains))|google\s*one/i},
@@ -1218,13 +1228,55 @@ const PROVIDER_PRESETS={
  ai:['OpenAI','Anthropic','Gemini','DeepSeek','Kimi','豆包','Grok','Perplexity','Midjourney','Cursor','Devin','GitHub Copilot','Poe','OpenRouter','ElevenLabs'],
  domain:['Cloudflare','Namecheap','Porkbun','GoDaddy','Spaceship','NameSilo','Dynadot','Gandi','Squarespace','阿里云','腾讯云','DNSPod','西部数码','新网'],
  subscription:['Apple','Google','Microsoft','YouTube','Netflix','Spotify','Notion','Figma','Adobe','1Password','Bitwarden','Dropbox','Setapp','Raycast','Linear','Slack','Zoom','Canva'],
- database:['Supabase','Neon','PlanetScale','MongoDB Atlas','Redis Cloud','Upstash','Turso','AWS','Google Cloud','Azure','阿里云','腾讯云'],
+ database:['Supabase','Neon','Turso','Upstash','MongoDB Atlas','PlanetScale','Redis Cloud','Appwrite','Convex','AWS','Google Cloud','Azure','阿里云','腾讯云'],
  license:['JetBrains','Adobe','Microsoft','Setapp','Sketch','Parallels','Surge','CleanShot','Typora'],
  repository:['GitHub','GitLab','Gitee','Bitbucket'],
- deployment:['Vercel','Netlify','Cloudflare','Render','Railway','Fly.io','GitHub','Heroku','Deno Deploy','Zeabur'],
+ deployment:['Vercel','Netlify','Cloudflare','Render','Railway','Fly.io','Koyeb','Zeabur','Deno Deploy','Heroku','Hugging Face','Streamlit','Replit','Sealos','Leapcell','Northflank','GitHub','Supabase'],
  storage:['Cloudflare','AWS','Backblaze','Wasabi','阿里云','腾讯云','Google Cloud','Azure','七牛云','又拍云']
 };
 function providerPresets(type){return PROVIDER_PRESETS[type]||[];}
+// Free tiers that go to sleep when nobody uses them, from each vendor's own docs (checked SLEEP_CHECKED). wake 'auto' = the next
+// request wakes it after a cold start; 'manual' = it stays paused until the person resumes it in the dashboard. every = minutes
+// between keep-alive requests that keep it awake; null where a request from outside does not count (Appwrite counts console use,
+// Atlas counts database connections, Streamlit counts visitors). `free` rules hold only while the record is not marked as paid.
+// A record matches by provider, or by the host its app runs on (`hosts`, checked against the url and the keep-alive address).
+const SLEEP_CHECKED='2026-11-03';
+const SLEEP_RULES=[
+ {id:'supabase',types:['database','deployment'],provider:/supabase/i,hosts:/\.supabase\.co$/i,free:true,wake:'manual',every:1440,brief:tr('免费项目 7 天没有请求会暂停，要去控制台恢复；暂停一年内还能恢复'),source:'https://supabase.com/docs/guides/platform/free-project-pausing'},
+ {id:'render',types:['deployment','server'],provider:/^render\b|render\.com/i,hosts:/\.onrender\.com$/i,free:true,wake:'auto',every:10,brief:tr('免费服务 15 分钟没有访问就休眠，再访问要等约 1 分钟；每月 750 小时用完全部停到下个月'),source:'https://render.com/docs/free'},
+ {id:'koyeb',types:['deployment','server'],provider:/koyeb/i,hosts:/\.koyeb\.app$/i,free:true,wake:'auto',every:30,brief:tr('免费实例 1 小时没有访问就休眠，再访问几秒后醒'),source:'https://www.koyeb.com/docs/run-and-scale/scale-to-zero'},
+ {id:'huggingface',types:['deployment'],provider:/hugging\s*face/i,hosts:/\.hf\.space$/i,free:true,wake:'auto',every:720,brief:tr('免费 Space 48 小时没人用就休眠，有人打开时重新启动'),source:'https://huggingface.co/docs/hub/spaces-gpus'},
+ {id:'heroku',types:['deployment','server'],provider:/heroku/i,hosts:/\.herokuapp\.com$/i,free:false,wake:'auto',every:10,brief:tr('Eco dyno 30 分钟没有访问就休眠；保活会更快用完每月 1000 小时'),source:'https://devcenter.heroku.com/articles/eco-dyno-hours'},
+ {id:'streamlit',types:['deployment'],provider:/streamlit/i,hosts:/\.streamlit\.app$/i,free:true,wake:'manual',every:null,brief:tr('12 小时没有访问就休眠，要有人打开页面点唤醒'),source:'https://docs.streamlit.io/deploy/streamlit-community-cloud/manage-your-app'},
+ {id:'mongodb-atlas',types:['database'],provider:/mongodb|mongo\s*atlas/i,free:true,wake:'manual',every:null,brief:tr('免费集群 30 天没有连接会暂停，要去控制台恢复；网页请求不算，要真的连上数据库'),source:'https://www.mongodb.com/docs/atlas/reference/free-shared-limitations/'},
+ {id:'upstash',types:['database'],provider:/upstash/i,free:true,wake:'manual',every:1440,brief:tr('免费库 30 天没有请求会归档，要新建库再从备份恢复'),source:'https://upstash.com/docs/redis/help/faq'},
+ {id:'appwrite',types:['database','deployment'],provider:/appwrite/i,free:true,wake:'manual',every:null,brief:tr('免费项目 7 天没在控制台操作会暂停，暂停 90 天后删除；定时请求不算'),source:'https://appwrite.io/changelog/entry/2026-06-29'}
+];
+const KEEPALIVE_TYPES=['deployment','database','server'];
+const KEEPALIVE_EVERY=[10,30,60,360,720,1440];
+function hostOf(url){try{return new URL(url).hostname;}catch{return '';}}
+function sleepRuleOf(asset){
+ if(!asset||!KEEPALIVE_TYPES.includes(asset.type))return null;
+ const hosts=[asset.url,asset.keepAlive?.url].map(hostOf).filter(Boolean),paid=['recurring','one_off'].includes(billingTypeOf(asset));
+ return SLEEP_RULES.find(rule=>rule.types.includes(asset.type)&&(rule.provider.test(String(asset.provider||''))||!!rule.hosts&&hosts.some(host=>rule.hosts.test(host)))&&!(rule.free&&paid))||null;
+}
+// A keep-alive setting: an http(s) address to request and how often. Addresses with a user name, a quote or a key in them are refused
+// (the workflow is meant to be committed to a repository). → {url, every} or null.
+function cleanKeepAlive(value){
+ if(!value||typeof value!=='object')return null;
+ const url=String(value.url||'').trim(),every=Number(value.every);
+ if(!url||url.length>500||/['"`\s\\]/.test(url)||secretKinds(url).length)return null;
+ let parsed;try{parsed=new URL(url);}catch{return null;}
+ if(!['http:','https:'].includes(parsed.protocol)||parsed.username||parsed.password||!parsed.hostname)return null;
+ return {url,every:KEEPALIVE_EVERY.includes(every)?every:1440};
+}
+// Cron in UTC for GitHub Actions. Hourly and slower runs start at minute 17: GitHub delays or drops runs at the top of the hour.
+function keepAliveCron(every){return {10:'*/10 * * * *',30:'*/30 * * * *',60:'17 * * * *',360:'17 */6 * * *',720:'17 */12 * * *',1440:'17 3 * * *'}[every]||'17 3 * * *';}
+function keepAliveWorkflow(asset){
+ const keep=cleanKeepAlive(asset?.keepAlive);if(!keep)return '';
+ const slug=String(asset.name||'app').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,40)||'app';
+ return [`name: keep-alive-${slug}`,'on:','  schedule:',`    - cron: '${keepAliveCron(keep.every)}'`,'  workflow_dispatch:','jobs:','  ping:','    runs-on: ubuntu-latest','    timeout-minutes: 5','    steps:',`      - run: curl -fsS --http1.1 --max-time 90 --retry 2 -o /dev/null '${keep.url}'`,''].join('\n');
+}
 // Common individual AI plans, so an AI 订阅 is picked rather than typed. Prices are what each vendor's own page showed on the
 // `checked` day (US prices in USD, Kimi's 国内版 in CNY, before tax); `yearly` is one year paid up front where offered. Team,
 // enterprise and API plans are left out. `provider` is a PROVIDER_PRESETS.ai name, so the record gets the vendor's icon;
@@ -2391,7 +2443,7 @@ function paidTotals(assets,{from='',to=''}={}){
 // The ledger: every payment in a period, oldest first, ready for a spreadsheet.
 function ledgerRows(assets,{from='',to='',typeName=type=>type}={}){
  const lo=dayNumber(from)??-Infinity,hi=dayNumber(to)??Infinity,rows=[];
- for(const asset of assets||[])for(const p of paidPayments(asset)){const day=dayNumber(p.paidOn);if(day<lo||day>hi)continue;rows.push({date:p.paidOn,name:asset.name,type:typeName(asset.type),provider:asset.provider==='平台待补充'?'':asset.provider||'',project:asset.project||'',amount:p.amount,currency:p.currency,months:p.months||'',covers:p.covers||'',note:p.note||'',id:asset.id});}
+ for(const asset of assets||[])for(const p of paidPayments(asset)){const day=dayNumber(p.paidOn);if(day<lo||day>hi)continue;rows.push({date:p.paidOn,name:asset.name,type:typeName(asset.type),provider:asset.provider==='平台待补充'?'':asset.provider||'',project:projectsOf(asset).join(' / '),amount:p.amount,currency:p.currency,months:p.months||'',covers:p.covers||'',note:p.note||'',id:asset.id});}
  return rows.sort((left,right)=>dayNumber(left.date)-dayNumber(right.date)||String(left.name).localeCompare(String(right.name)));
 }
 // Spreadsheet-safe CSV: quoted when needed, and a leading = + - @ is defused so a name never runs as a formula.
@@ -2403,20 +2455,29 @@ function ledgerCsv(rows,{converted=null}={}){
 }
 
 // Projects (v21): a free-text label that ties a side project's domain, repo, hosting and subscriptions together.
-const PROJECT_LIMIT=40;
+// One record can serve several projects (a Supabase account or a shared server behind two side projects): `project` is then a list,
+// one name stays a plain string. projectsOf reads either; setProjects writes the shortest form and drops the field when empty.
+const PROJECT_LIMIT=40,PROJECTS_PER_ASSET=8;
 function cleanProject(value){return String(value??'').replace(/\s+/g,' ').trim().slice(0,PROJECT_LIMIT);}
+function projectsOf(asset){const raw=asset?.project,list=Array.isArray(raw)?raw:[raw];return [...new Set(list.map(cleanProject).filter(Boolean))].slice(0,PROJECTS_PER_ASSET);}
+function parseProjects(value){return [...new Set((Array.isArray(value)?value:String(value??'').split(/[,，、;；\n]/)).map(cleanProject).filter(Boolean))].slice(0,PROJECTS_PER_ASSET);}
+function setProjects(asset,list){const names=parseProjects(list);if(!asset)return names;if(!names.length)delete asset.project;else asset.project=names.length===1?names[0]:names;return names;}
+function inProject(asset,name){const want=cleanProject(name);return !!want&&projectsOf(asset).includes(want);}
 function projectNames(assets){
  const counts=new Map();
- for(const asset of assets||[]){const name=cleanProject(asset.project);if(name&&!asset.hiddenAt)counts.set(name,(counts.get(name)||0)+1);}
+ for(const asset of assets||[])if(!asset.hiddenAt)for(const name of projectsOf(asset))counts.set(name,(counts.get(name)||0)+1);
  return [...counts].sort((left,right)=>right[1]-left[1]||left[0].localeCompare(right[0])).map(([name,count])=>({name,count}));
 }
-function projectAssets(assets,name){const want=cleanProject(name);return (assets||[]).filter(asset=>!asset.hiddenAt&&want&&cleanProject(asset.project)===want);}
+function projectAssets(assets,name){return (assets||[]).filter(asset=>!asset.hiddenAt&&inProject(asset,name));}
 const KEEP_ON_SHUTDOWN=['bankcard','phone','appleid','google'];
 // 关停清单: what to do for each record of a project, the last day it still saves money, and what else still depends on it.
 function shutdownPlan(assets,name,{now=new Date(),currency='CNY',rates}={}){
- const today=localDay(now),own=projectAssets(assets,name),ids=new Set(own.map(asset=>asset.id)),steps=[],kept=[];
+ const today=localDay(now),own=projectAssets(assets,name),ids=new Set(own.map(asset=>asset.id)),steps=[],kept=[],staying=[];
  for(const asset of own){
   if(KEEP_ON_SHUTDOWN.includes(asset.type)){kept.push(asset);continue;}
+  // Still serving another project: it stays, only this project's label comes off.
+  const others=projectsOf(asset).filter(other=>other!==cleanProject(name));
+  if(others.length){staying.push({asset,projects:others});continue;}
   const status=assetDateStatus(asset,now),auto=asset.dateKind==='renew'||!!billingCycles[asset.cycle];
   const domainStep=auto?tr('关掉自动续费，或转出给别人'):tr('不再续费，或转出给别人');
   const action={domain:asset.icp?tr('先注销备案，然后{step}',{step:domainStep}):domainStep,server:tr('备份数据，然后删除实例'),repository:tr('归档仓库，或设为私有'),database:tr('导出数据，然后删除实例'),subscription:tr('取消订阅'),ai:tr('取消订阅'),license:tr('停用授权，不再续期')}[asset.type]||tr('停用或取消');
@@ -2426,7 +2487,7 @@ function shutdownPlan(assets,name,{now=new Date(),currency='CNY',rates}={}){
   steps.push({asset,action,deadline,days:deadline?dayNumber(deadline)-today:null,auto,monthly,shared,done:!!(asset.stopped||asset.hiddenAt)});
  }
  steps.sort((left,right)=>(left.deadline?0:1)-(right.deadline?0:1)||(left.days??0)-(right.days??0)||String(left.asset.name).localeCompare(String(right.asset.name)));
- return {name:cleanProject(name),steps,kept,monthlySaving:steps.reduce((sum,step)=>sum+(step.asset.stopped?0:step.monthly||0),0)};
+ return {name:cleanProject(name),steps,kept,shared:staying,monthlySaving:steps.reduce((sum,step)=>sum+(step.asset.stopped?0:step.monthly||0),0)};
 }
 
 // 定期清理: records that cost money or keep a date, most expensive and longest untouched first. The clock starts at the last
@@ -2475,7 +2536,7 @@ function calendarIcs(assets,{now=new Date(),name='Assetboard',minimal=false,type
   if(real.hiddenAt||real.stopped||!real.name||dayNumber(real.date)===null)continue;
   const asset=minimal?{...maskAsset(real,'calendar'),name:types[real.type]||real.type||'Assetboard'}:real;
   const kind=dateKinds[asset.dateKind]?asset.dateKind:'expire',months=billingCycles[asset.cycle]?.months,cost=asset.cost&&asset.cost!=='未知'?asset.cost:'';
-  const details=[asset.provider&&asset.provider!=='平台待补充'?tr('平台：{value}',{value:asset.provider}):'',cost&&tr('费用：{value}',{value:cost}),asset.account&&tr('账号：{value}',{value:asset.account}),asset.project&&tr('项目：{value}',{value:asset.project})].filter(Boolean).join('\n');
+  const details=[asset.provider&&asset.provider!=='平台待补充'?tr('平台：{value}',{value:asset.provider}):'',cost&&tr('费用：{value}',{value:cost}),asset.account&&tr('账号：{value}',{value:asset.account}),projectsOf(asset).length&&tr('项目：{value}',{value:projectsOf(asset).join(tr('、'))})].filter(Boolean).join('\n');
   lines.push('BEGIN:VEVENT',`UID:${minimal?icsHash(real.id):icsText(real.id)}@assetboard.local`,`DTSTAMP:${stamp}`,`DTSTART;VALUE=DATE:${icsDate(asset.date)}`,`DTEND;VALUE=DATE:${icsDate(isoDay(dayNumber(asset.date)+1))}`,`SUMMARY:${icsText(dateStatusWords[kind][4](asset.name))}`);
   if(months)lines.push(icsRepeat(asset.date,months));
   if(details)lines.push(`DESCRIPTION:${icsText(details)}`);
@@ -2503,7 +2564,7 @@ function handoverHtml(board,{now=new Date(),mask=false,types={},order=[],owner='
   const linked=linkedAssets(board.assets||[],real).filter(other=>!other.hiddenAt).map(other=>{const shown=veil(other).name;return tr('{label}：{value}',{label:escHtml(linkKind(real,other).label),value:escHtml(other.type==='bankcard'&&other.last4?`${shown} •••• ${other.last4}`:shown)});});
   const ips=assetIps(real).map(x=>mask?maskValue('ips',x.ip):x.ip);
   const kindLabel=(dateKinds[asset.dateKind]||dateKinds.expire).label,when=billingCycles[asset.cycle]?tr('{a}，{b}',{a:kindLabel,b:billingCycles[asset.cycle].label}):kindLabel;
-  const rows=[[tr('平台'),asset.provider==='平台待补充'?'':asset.provider],[tr('账号'),asset.account],[tr('项目'),asset.project],[tr('下一日期'),status.level==='none'?'':tr('{date}（{what}）',{date:status.date,what:when})],[tr('费用'),asset.cost&&asset.cost!=='未知'?asset.cost:''],[tr('地址'),ips.join('  ')],['SSH',asset.host?`${asset.sshUser?asset.sshUser+'@':''}${asset.host}${asset.sshPort?':'+asset.sshPort:''}`:''],[tr('卡'),[asset.last4?`${asset.network||''} •••• ${asset.last4}`.trim():'',CARD_STATUSES[asset.cardStatus]||''].filter(Boolean).join(tr('，'))],[tr('重要程度'),IMPORTANCE[asset.importance]||''],[tr('用途'),asset.purpose&&asset.purpose!==types[asset.type]?asset.purpose:''],[tr('找回'),recoveryText(asset)],[tr('备份'),backupText(asset)],[tr('保留原因'),asset.reason],[tr('状态'),asset.stopped?tr('已停用'):'']].filter(([,v])=>v);
+  const rows=[[tr('平台'),asset.provider==='平台待补充'?'':asset.provider],[tr('账号'),asset.account],[tr('项目'),projectsOf(asset).join(tr('、'))],[tr('下一日期'),status.level==='none'?'':tr('{date}（{what}）',{date:status.date,what:when})],[tr('费用'),asset.cost&&asset.cost!=='未知'?asset.cost:''],[tr('地址'),ips.join('  ')],['SSH',asset.host?`${asset.sshUser?asset.sshUser+'@':''}${asset.host}${asset.sshPort?':'+asset.sshPort:''}`:''],[tr('卡'),[asset.last4?`${asset.network||''} •••• ${asset.last4}`.trim():'',CARD_STATUSES[asset.cardStatus]||''].filter(Boolean).join(tr('，'))],[tr('重要程度'),IMPORTANCE[asset.importance]||''],[tr('用途'),asset.purpose&&asset.purpose!==types[asset.type]?asset.purpose:''],[tr('找回'),recoveryText(asset)],[tr('备份'),backupText(asset)],[tr('保留原因'),asset.reason],[tr('状态'),asset.stopped?tr('已停用'):'']].filter(([,v])=>v);
   return `<article><h3>${escHtml(asset.name)}</h3><dl>${rows.map(([k,v])=>`<dt>${k}</dt><dd>${escHtml(v)}</dd>`).join('')}${link?`<dt>${tr('管理')}</dt><dd>${mask?escHtml(link):`<a href="${escHtml(link)}">${escHtml(link)}</a>`}</dd>`:''}${linked.length?`<dt>${tr('关联')}</dt><dd>${linked.join('<br>')}</dd>`:''}</dl>${asset.notes?`<p class="notes">${escHtml(asset.notes)}</p>`:''}</article>`;
  };
  const due=upcomingEvents(assets,now,90);
@@ -2604,4 +2665,4 @@ function dueLevel(asset,{now=new Date(),since=''}={}){
  return assetDateStatus(asset,now).level;
 }
 
-if(typeof module!=='undefined')module.exports={touchAsset,editedTime,TOMBSTONE_LIMIT,addTombstone,cleanTombstones,BOARD_SETTINGS,backupSettings,mergeBoardSettings,settleLinks,backupCounts,LEGACY_WORDS,LEGACY_STATES,MFA_KINDS,RECOVERY_TYPES,RECOVERY_FIELDS,BACKUP_KINDS,BACKUP_TYPES,IMPORTANCE,looksLikeSecret,recoveryText,recoveryGap,backupText,mailHost,mailDependents,selfRecovery,mailStake,PHONE_STATUSES,phoneTrouble,carrierNote,cardPaysPhone,setCardPays,CREDIT_RULES,creditRule,settleCreditExpiry,PLATFORM_SOURCES,missedReminders,reminderDays,STALE_SYNC_DAYS,staleSyncs,AUTO_RENEW_WORDS,CARD_STATUSES,cardTrouble,sourceTrouble,IMPACT_WORDS,verifyNumbers,phoneReach,phoneStake,syncedLabel,BILLING_TYPES,billingLabels,isFreeCost,billingTypeOf,validPromotion,moneyOn,settlePromotions,noteCostChange,costForecast,PAYMENT_LIMIT,CONFIRM_DAYS,paymentList,paidPayments,lastPayment,recordPayment,removePayment,occurrencesBetween,pendingCharges,pendingRenewals,confirmRenewal,cardOutlook,runsOut,needsConfirm,confirmWords,LIFECYCLE_RULES,lifecycleRule,lifecycleOf,AFTER_DUE_DAYS,monthsBetween,renewBase,canRenew,renewOptions,costFromPayment,renewAsset,confirmCharge,priceChange,paidTotals,ledgerRows,csvCell,ledgerCsv,cleanProject,projectNames,projectAssets,shutdownPlan,REVIEW_QUIET_DAYS,reviewQueue,icsFold,calendarIcs,escHtml,handoverHtml,rdapFacts,rdapCompare,rdapPhaseLabels,registryPhaseOf,RDAP_HOLDS,rdapHoldLabels,RDAP_MISSING_TLDS,rdapMissing,rdapNameservers,registryHoldOf,registryChangeOf,rdapRemember,registryAlerts,dueLevel,renewalGrace,RENEWAL_GRACE_DAYS,maskName,PROVIDER_PRESETS,providerPresets,MAIN_CURRENCIES,FALLBACK_RATES,costAmount,syncMoney,convertMoney,formatMoney,costTotals,MOUNT_TYPES,relationKind,linkAllowed,LINK_KINDS,LINK_KIND_ORDER,linkKind,linkRisks,linkImpact,serverChain,serverChainCount,linkRelation,linkMetaOf,setLinkMeta,serverTone,peekSet,dropLinkMeta,IP_LIMIT,normalizeIp,parseIps,assetIps,primaryIp,maskIp,validIpList,ACTION_FIELDS,QUICK_LIMIT,validActionField,sshCommand,cloneUrl,quickActions,recencyTime,recentFirst,arrangeAssets,touchedPrefix,bringToFront,DISPLAY_LIMITS,formatCount,ensureBlock,iconHost,iconVendor,iconVendors,vendorForHost,iconPlan,iconSiteHost,iconSiteFor,iconPlatformOf,iconRows,guessAssetType,regionList,regionName,regionFlag,phoneParts,regionFromPhone,maskPhone,maskEmail,cardExpiry,expiryText,looksLikeCardNumber,linkAssets,unlinkAssets,linkedAssets,removeLinksTo,assetFingerprint,removeUntouchedDemo,orderAssets,moveAsset,dateKinds,billingCycles,dayNumber,localDay,isoDay,addMonths,nextOccurrence,assetDateStatus,upcomingEvents,REMINDER_LIMIT,reminderLeads,reminderPlan,syncKey,assetSyncKey,isBlacklisted,findByExternal,findNameCollision,mergeCloudflare,mergeGitHub,applyCollision,parseSender,registrableDomain,cleanMerchant,findAmounts,findDates,findDomains,evidenceFacts,inferCycle,formatCost,matchAsset,buildCandidates,evidencePayload,parseAiItems,applyAiItem,IMPORT_ROW_LIMIT,parseLooseDate,shiftDate,costParts,formatCostParts,inferTypeFromName,parseQuickLine,AGENT_FIELDS,isAgentImport,parseAgentImport,parseDelimitedText,importHeaderField,rowsToImportItems,isCfsmBackup,parseCfsmBackup,classifyImportPayload,planImport,applyImport,parseBoardBackup,planBoardBackup,applyBoardBackup,demoImportSampleCsv,csvSyncKey,VENDOR_CSV_PRESETS,cloudflareTokenTemplateUrl,githubTokenTemplateUrl,CLOUDFLARE_TOKEN_PERMISSIONS,parseSshConfig,mergeSshConfig,parseEml,delimitedRecords,splitDelimitedLine,resolvePresetValue,SECRET_KINDS,secretKinds,rowSecrets,looksLikeEnv,screenText,PASSWORD_EXPORTS,passwordExportOf,importFileKind,importGate,screenBackup,AI_PLANS,AI_PLANS_CHECKED,aiPlanProviders,aiPlansFor,findAiPlan,aiPlanFields,icsRepeat,MASK_MARK,MASK_SETS,maskValue,maskAsset,maskMail,hasMask};
+if(typeof module!=='undefined')module.exports={touchAsset,editedTime,TOMBSTONE_LIMIT,addTombstone,cleanTombstones,BOARD_SETTINGS,backupSettings,mergeBoardSettings,settleLinks,backupCounts,LEGACY_WORDS,LEGACY_STATES,MFA_KINDS,RECOVERY_TYPES,RECOVERY_FIELDS,BACKUP_KINDS,BACKUP_TYPES,IMPORTANCE,looksLikeSecret,recoveryText,recoveryGap,backupText,mailHost,mailDependents,selfRecovery,mailStake,PHONE_STATUSES,phoneTrouble,carrierNote,cardPaysPhone,setCardPays,CREDIT_RULES,creditRule,settleCreditExpiry,PLATFORM_SOURCES,missedReminders,reminderDays,STALE_SYNC_DAYS,staleSyncs,AUTO_RENEW_WORDS,CARD_STATUSES,cardTrouble,sourceTrouble,IMPACT_WORDS,verifyNumbers,phoneReach,phoneStake,syncedLabel,BILLING_TYPES,billingLabels,isFreeCost,billingTypeOf,validPromotion,moneyOn,settlePromotions,noteCostChange,costForecast,PAYMENT_LIMIT,CONFIRM_DAYS,paymentList,paidPayments,lastPayment,recordPayment,removePayment,occurrencesBetween,pendingCharges,pendingRenewals,confirmRenewal,cardOutlook,runsOut,needsConfirm,confirmWords,LIFECYCLE_RULES,lifecycleRule,lifecycleOf,AFTER_DUE_DAYS,monthsBetween,renewBase,canRenew,renewOptions,costFromPayment,renewAsset,confirmCharge,priceChange,paidTotals,ledgerRows,csvCell,ledgerCsv,SLEEP_CHECKED,SLEEP_RULES,KEEPALIVE_TYPES,KEEPALIVE_EVERY,sleepRuleOf,cleanKeepAlive,keepAliveCron,keepAliveWorkflow,cleanProject,PROJECTS_PER_ASSET,projectsOf,parseProjects,setProjects,inProject,projectNames,projectAssets,shutdownPlan,REVIEW_QUIET_DAYS,reviewQueue,icsFold,calendarIcs,escHtml,handoverHtml,rdapFacts,rdapCompare,rdapPhaseLabels,registryPhaseOf,RDAP_HOLDS,rdapHoldLabels,RDAP_MISSING_TLDS,rdapMissing,rdapNameservers,registryHoldOf,registryChangeOf,rdapRemember,registryAlerts,dueLevel,renewalGrace,RENEWAL_GRACE_DAYS,maskName,PROVIDER_PRESETS,providerPresets,MAIN_CURRENCIES,FALLBACK_RATES,costAmount,syncMoney,convertMoney,formatMoney,costTotals,MOUNT_TYPES,relationKind,linkAllowed,LINK_KINDS,LINK_KIND_ORDER,linkKind,linkRisks,linkImpact,serverChain,serverChainCount,linkRelation,linkMetaOf,setLinkMeta,serverTone,peekSet,dropLinkMeta,IP_LIMIT,normalizeIp,parseIps,assetIps,primaryIp,maskIp,validIpList,ACTION_FIELDS,QUICK_LIMIT,validActionField,sshCommand,cloneUrl,quickActions,recencyTime,recentFirst,arrangeAssets,touchedPrefix,bringToFront,DISPLAY_LIMITS,formatCount,ensureBlock,iconHost,iconVendor,iconVendors,vendorForHost,iconPlan,iconSiteHost,iconSiteFor,iconPlatformOf,iconRows,guessAssetType,regionList,regionName,regionFlag,phoneParts,regionFromPhone,maskPhone,maskEmail,cardExpiry,expiryText,looksLikeCardNumber,linkAssets,unlinkAssets,linkedAssets,removeLinksTo,assetFingerprint,removeUntouchedDemo,orderAssets,moveAsset,dateKinds,billingCycles,dayNumber,localDay,isoDay,addMonths,nextOccurrence,assetDateStatus,upcomingEvents,REMINDER_LIMIT,reminderLeads,reminderPlan,syncKey,assetSyncKey,isBlacklisted,findByExternal,findNameCollision,mergeCloudflare,mergeGitHub,applyCollision,parseSender,registrableDomain,cleanMerchant,findAmounts,findDates,findDomains,evidenceFacts,inferCycle,formatCost,matchAsset,buildCandidates,evidencePayload,parseAiItems,applyAiItem,IMPORT_ROW_LIMIT,parseLooseDate,shiftDate,costParts,formatCostParts,inferTypeFromName,parseQuickLine,AGENT_FIELDS,isAgentImport,parseAgentImport,parseDelimitedText,importHeaderField,rowsToImportItems,isCfsmBackup,parseCfsmBackup,classifyImportPayload,planImport,applyImport,parseBoardBackup,planBoardBackup,applyBoardBackup,demoImportSampleCsv,csvSyncKey,VENDOR_CSV_PRESETS,cloudflareTokenTemplateUrl,githubTokenTemplateUrl,CLOUDFLARE_TOKEN_PERMISSIONS,parseSshConfig,mergeSshConfig,parseEml,delimitedRecords,splitDelimitedLine,resolvePresetValue,SECRET_KINDS,secretKinds,rowSecrets,looksLikeEnv,screenText,PASSWORD_EXPORTS,passwordExportOf,importFileKind,importGate,screenBackup,AI_PLANS,AI_PLANS_CHECKED,aiPlanProviders,aiPlansFor,findAiPlan,aiPlanFields,icsRepeat,MASK_MARK,MASK_SETS,maskValue,maskAsset,maskMail,hasMask};

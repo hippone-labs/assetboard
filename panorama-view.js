@@ -432,7 +432,6 @@ document.addEventListener('click',e=>{if(panoOpen&&e.target.closest?.('#sidebar 
 
 // ---- The "+" picker: tick what hangs on (or is paid by) this hub ---------------------------------------------------------------------------
 // Ticked = on this hub now. Ticking adds a link and keeps the thing's other hubs; unticking takes it off this hub only. Done = one undo step.
-// By project, ticking something from another project moves it here (a thing has one project).
 function panoPicker(hubId){
  const hub=panoramaHub(state.assets,hubId,panoLens);if(!hub)return;
  const groups=hubCandidates(state.assets,hubId,panoLens),w=panoWords();

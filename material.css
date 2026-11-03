@@ -2152,3 +2152,7 @@ body::before,.native-app body::before{background:radial-gradient(70vw 65vh at 0%
 #board[data-size=m] .cal-body,#board[data-size=s] .cal-body{grid-template-columns:minmax(0,1fr)}
 #board[data-size=s] .cal-grid{display:none}
 @media(prefers-reduced-motion:reduce){.ov-tile{transition:none}}
+
+/* v18 · keep-alive: the sleep rule and the keep-alive request each take a line in the inspector row */
+.wake-fact .wake-rule,.wake-fact .wake-line{display:block}
+.wake-fact .wake-rule+.wake-line{margin-top:2px;color:var(--muted)}
