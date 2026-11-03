@@ -12,12 +12,14 @@ async (page) => {
   const config='Host box-one\n  HostName 192.0.2.10\n';
   const out=['@@uname','Linux x86_64','@@stat1','cpu  100 0 100 800 0 0 0 0 0 0','@@stat2','cpu  110 0 110 880 0 0 0 0 0 0','@@nproc','2','@@meminfo','MemTotal:        4000000 kB','MemAvailable:    1000000 kB',
    '@@df','Filesystem 1024-blocks Used Available Capacity Mounted','/dev/vda1 10000 5000 5000 50% /','@@netdev','Inter-|   Receive','  eth0: RX 0 0 0 0 0 0 0 TX 0 0 0 0 0 0 0','@@uptime','1000.0 900.0','@@loadavg','0.42 0.30 0.20 1/100 4242','@@end',''].join('\n');
-  const reply=r=>setTimeout(()=>window.assetboardSshProbe?.(r),5);
+  // Answers are made when they arrive, so a late one carries the interval as it is then, as the app's own would.
+  const reply=r=>setTimeout(()=>window.assetboardSshProbe?.(typeof r==='function'?r():r),5);
   window.webkit={messageHandlers:{assetboard:{postMessage(m){window.__sent.push(m);
    if(m.action==='save')setTimeout(()=>window.assetboardSaved?.(m.sequence,true),5);
    if(m.action==='evidenceList')setTimeout(()=>window.assetboardEvidenceList?.([]),5);
-   if(m.action==='sshProbeList'||m.action==='sshProbeSet'||m.action==='sshProbeAuto')reply({list:{enabled:['box-one'],disabled:[],interval:window.__interval,config}});
-   if(m.action==='sshProbeInterval'){window.__interval=m.seconds;reply({list:{enabled:['box-one'],disabled:[],interval:window.__interval,config}});}
+   const list=()=>({list:{enabled:['box-one'],disabled:[],interval:window.__interval,config}});
+   if(m.action==='sshProbeList'||m.action==='sshProbeSet'||m.action==='sshProbeAuto')reply(list);
+   if(m.action==='sshProbeInterval'){window.__interval=m.seconds;reply(list);}
    if(m.action==='sshProbeRun')for(const alias of m.aliases){window.__n=(window.__n||0)+1;reply({result:{alias,output:out.replace('RX',String(1000*window.__n)).replace('TX',String(2000*window.__n)),at:Date.now()}});}
   }}}};
   window.__ASSETBOARD_NATIVE__={pro:{on:true,kind:'licensed',id:'K3Q7NVHM'},data:{blocks:[{id:'server',folded:false}],assets:[
@@ -40,8 +42,8 @@ async (page) => {
   await until(p,()=>window.__interval===300&&sshProbe.interval===300);
   await p.evaluate(()=>{const n=document.querySelector('#modal .live-every'),u=document.querySelector('#modal .live-unit');u.value='60';n.value='2';n.dispatchEvent(new Event('change',{bubbles:true}));});
   await until(p,()=>window.__interval===120&&sshProbe.interval===120);
-  const refused=await p.evaluate(()=>{const n=document.querySelector('#modal .live-every'),u=document.querySelector('#modal .live-unit');u.value='60';n.value='90';n.dispatchEvent(new Event('change',{bubbles:true}));return {msg:n.validationMessage,interval:sshProbe.interval,sent:window.__interval};});
-  check(refused.msg&&refused.interval===120&&refused.sent===120,'90 minutes is refused in place: '+JSON.stringify(refused));
+  const refused=await p.evaluate(()=>{const before=sshProbe.interval,asked=window.__sent.filter(m=>m.action==='sshProbeInterval').length,n=document.querySelector('#modal .live-every'),u=document.querySelector('#modal .live-unit');u.value='60';n.value='90';n.dispatchEvent(new Event('change',{bubbles:true}));return {msg:n.validationMessage,kept:sshProbe.interval===before,sent:window.__sent.filter(m=>m.action==='sshProbeInterval').length-asked};});
+  check(refused.msg&&refused.kept&&refused.sent===0,'90 minutes is refused in place and nothing is sent: '+JSON.stringify(refused));
   await p.evaluate(()=>document.querySelector('#modal').close());
   // A second reading gives a rate; the row is one line, and the overview has its 实时 tile.
   await p.evaluate(()=>sshPoll(true));
