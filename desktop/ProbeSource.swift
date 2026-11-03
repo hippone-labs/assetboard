@@ -16,16 +16,13 @@ enum ProbeKind: String, CaseIterable {
 
     /// Every path the probe code can ever reach: the login (the only POST, action "login" only), three GETs and one WebSocket
     /// subscription. `/api/server` (one server) is allowed but not used: `/api/servers` already carries every field the cards show.
-    static let allowedPaths: Set<String> = ["/admin/api", "/api/servers", "/api/server", "/api/history/all", "/api/ws"]
-    /// History window, from the panel's fixed list of hours.
-    static let historyHours = "24"
+    static let allowedPaths: Set<String> = ["/admin/api", "/api/servers", "/api/server", "/api/ws"]
 
-    enum Read { case servers, history(String), live, login }
+    enum Read { case servers, live, login }
 
     func path(_ read: Read) -> String {
         switch read {
         case .servers: return "/api/servers"
-        case .history: return "/api/history/all"
         case .live: return "/api/ws"
         case .login: return "/admin/api"
         }
@@ -44,9 +41,6 @@ enum ProbeKind: String, CaseIterable {
         parts.path += path
         switch read {
         case .servers, .login: parts.queryItems = nil
-        case .history(let id):
-            guard Self.validServerId(id) else { return nil }
-            parts.queryItems = [URLQueryItem(name: "id", value: id), URLQueryItem(name: "hours", value: Self.historyHours)]
         case .live:
             parts.scheme = parts.scheme == "http" ? "ws" : "wss"
             parts.queryItems = [URLQueryItem(name: "subscribe", value: "all")]
@@ -233,7 +227,7 @@ struct ProbeFetcher {
         return request
     }
 
-    /// One read: the server list (a JSON object) or a server's history (a JSON array). A refusal carries the HTTP status as its code
+    /// One read: the server list (a JSON object). A refusal carries the HTTP status as its code
     /// and a reason (see ProbeKind.refusal). Never on the main thread.
     func fetch(_ source: ProbeSourceConfig, _ read: ProbeKind.Read = .servers, token: String?, completion: @escaping (Result<Any, NSError>) -> Void) {
         guard let request = request(source, read, token: token) else { completion(.failure(Self.failure(L("面板地址无效")))); return }
@@ -249,7 +243,6 @@ struct ProbeFetcher {
             }
             switch read {
             case .servers: guard json is [String: Any] else { completion(.failure(Self.failure(L("面板的回答不是探针数据")))); return }
-            case .history: guard json is [Any] else { completion(.failure(Self.failure(L("面板的回答不是历史数据")))); return }
             case .live, .login: break
             }
             completion(.success(json))
@@ -278,17 +271,6 @@ struct ProbeFetcher {
         guard let data = Data(base64Encoded: text), let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
               let exp = json["exp"] as? NSNumber else { return nil }
         return Date(timeIntervalSince1970: exp.doubleValue)
-    }
-
-    /// A server's history, cut to what the cards draw: time, CPU and memory, the last 240 rows.
-    static func historyRows(_ json: Any) -> [[String: Any]] {
-        let rows = (json as? [[String: Any]] ?? []).suffix(240)
-        return rows.compactMap { row -> [String: Any]? in
-            guard let t = row["timestamp"] as? NSNumber else { return nil }
-            var kept: [String: Any] = ["timestamp": t]
-            for key in ["cpu", "ram_used", "ram_total"] { if let n = row[key] as? NSNumber { kept[key] = n } }
-            return kept
-        }
     }
 
     static func failure(_ message: String, status: Int = 0, reason: String = "net") -> NSError {
@@ -561,16 +543,14 @@ func testProbeSources() {
     let account = ProbeLogin(username: "admin", password: "pw-test")!
     precondition(ProbeLogin(data: account.data!) == account && ProbeLogin(data: Data("old-jwt-token".utf8)) == nil && ProbeLogin(username: "", password: "x") == nil)
 
-    // The allow-list: five paths, one POST (the login), every other read a GET; no credential in any address.
-    precondition(ProbeKind.allowedPaths == ["/admin/api", "/api/servers", "/api/server", "/api/history/all", "/api/ws"])
-    let reads: [ProbeKind.Read] = [.servers, .history("a1"), .live, .login]
+    // The allow-list: four paths, one POST (the login), every other read a GET; no credential in any address.
+    precondition(ProbeKind.allowedPaths == ["/admin/api", "/api/servers", "/api/server", "/api/ws"])
+    let reads: [ProbeKind.Read] = [.servers, .live, .login]
     for read in reads {
         let url = ProbeKind.cfsm.url(read, base: source.url)!
         precondition(ProbeKind.allowedPaths.contains(url.path), "allowed: \(url)")
         precondition(ProbeKind.cfsm.method(read) == (url.path == "/admin/api" ? "POST" : "GET"))
     }
-    precondition(ProbeKind.cfsm.url(.history("a1"), base: source.url)?.absoluteString == "https://status.example.com/api/history/all?id=a1&hours=24")
-    precondition(ProbeKind.cfsm.url(.history("bad id/../admin"), base: source.url) == nil, "server ids are checked")
     precondition(ProbeKind.cfsm.url(.live, base: source.url)?.absoluteString == "wss://status.example.com/api/ws?subscribe=all")
     let plain = ProbeSourceConfig(["id": "src-2", "kind": "cfsm", "url": "http://192.0.2.5:8080"])!
     precondition(ProbeKind.cfsm.url(.live, base: plain.url)?.absoluteString == "ws://192.0.2.5:8080/api/ws?subscribe=all")
@@ -619,14 +599,14 @@ func testProbeSources() {
     panel = { method, path, auth in
         if method == "POST" && path == "/admin/api" { issued += 1; valid = jwt(issued); return (200, #"{"success":true,"token":"\#(valid!)","message":"loginSuccessful"}"#) }
         guard auth == "Bearer \(valid ?? "-")" else { return (401, #"{"error":"Unauthorized","code":401}"#) }
-        return path == "/api/history/all" ? (200, #"[{"timestamp":1000,"cpu":12.5,"ram_used":1024,"ram_total":4096,"gpu_info":"[]"}]"#) : (200, list)
+        return (200, list)
     }
     // Public: no account, no login, no header.
     if case .failure = read(.servers, anonymous: true) { } else { preconditionFailure("a private panel refuses an anonymous read") }
     precondition(seen.last?.auth == nil && !seen.contains { $0.method == "POST" })
     // Private: one login, then reads with the JWT; the session is reused.
     if case .failure(let error) = read() { preconditionFailure("logged-in read: \(error)") }
-    if case .failure(let error) = read(.history("a")) { preconditionFailure("logged-in history: \(error)") }
+    if case .failure(let error) = read() { preconditionFailure("logged-in second read: \(error)") }
     precondition(issued == 1, "one login for two reads")
     precondition(seen.filter { $0.method == "POST" }.allSatisfy { $0.path == "/admin/api" && Set($0.body.keys) == ["action", "username", "password"] && $0.body["action"] as? String == "login" })
     precondition(HTTPCookieStorage.shared.cookies(for: URL(string: "https://status.example.com")!)?.isEmpty ?? true, "the panel's cookie is not kept")
@@ -662,6 +642,6 @@ func testProbeSources() {
     if case .failure(let error) = read(.servers, anonymous: true) { precondition(error.userInfo["reason"] as? String == "turnstile", "a public panel behind Turnstile says so") } else { preconditionFailure("turnstile read") }
     // Every request the probe made: the login POST or a GET of an allowed path, nothing else.
     precondition(seen.allSatisfy { ($0.method == "POST" && $0.path == "/admin/api" && $0.body["action"] as? String == "login") || ($0.method == "GET" && ProbeKind.allowedPaths.contains($0.path) && $0.path != "/admin/api") })
-    print("PASS: probe sources: addresses, accounts in the Keychain only, allow-list (login POST + four reads), session login/reuse/renewal, 401 → login → retry, rate limit, wrong account and Turnstile stop, history rows, live subscription and messages")
+    print("PASS: probe sources: addresses, accounts in the Keychain only, allow-list (login POST + three reads), session login/reuse/renewal, 401 → login → retry, rate limit, wrong account and Turnstile stop, history rows, live subscription and messages")
 }
 #endif

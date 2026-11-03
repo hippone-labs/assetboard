@@ -1,6 +1,6 @@
 // Pro: SSH 直读, the pure part. The Mac app runs one fixed read-only command over the system's ssh (desktop/SSHProbe.swift); this
-// file is that command as the settings show it, the reading of what it prints, the per-host session kept in memory (history for the
-// sparklines, rates from two samples, backoff after failures), and the probe server it becomes, in the same shape as
+// file is that command as the settings show it, the reading of what it prints, the per-host session kept in memory (rates from two
+// samples, backoff after failures), and the probe server it becomes, in the same shape as
 // probe-data.js's. No DOM, no bridge: probe-ssh-pro.js draws, the tests read this file directly. Loaded after probe-data.js.
 // Node (the tests) has no i18n.js loaded before this file: take its tr(), which answers in Chinese.
 if(typeof module!=='undefined'&&typeof tr==='undefined')globalThis.tr=require('../../i18n.js').tr;
@@ -20,7 +20,7 @@ if(typeof module!=='undefined'&&typeof tr==='undefined')globalThis.tr=require('.
 
  // The reading interval is the person's to set: any whole number of seconds from SSH_INTERVAL_MIN to SSH_INTERVAL_MAX (the Mac
  // side checks the same range, SSHProbe.intervalRange). SSH_INTERVALS are only the suggestions offered beside the field.
- const SSH_INTERVALS=[30,60,300,900],SSH_INTERVAL_MIN=15,SSH_INTERVAL_MAX=3600,SSH_DEFAULT_INTERVAL=60,SSH_HISTORY=60,SSH_MAX_WAIT=15*60*1000;
+ const SSH_INTERVALS=[30,60,300,900],SSH_INTERVAL_MIN=15,SSH_INTERVAL_MAX=3600,SSH_DEFAULT_INTERVAL=60,SSH_MAX_WAIT=15*60*1000;
  const sshIntervalOk=s=>Number.isInteger(s)&&s>=SSH_INTERVAL_MIN&&s<=SSH_INTERVAL_MAX;
 
  // Reading. The output is sections, each after a line "@@name"; a Linux host prints all of them and ends with @@end.
@@ -66,10 +66,10 @@ if(typeof module!=='undefined'&&typeof tr==='undefined')globalThis.tr=require('.
  }
 
  // A host's session: what the board knows about it since the app opened. Never saved.
- const sshSession=alias=>({alias,reading:null,at:0,lastOk:0,tried:0,pending:false,fails:0,reason:'',error:'',rate:null,history:[]});
+ const sshSession=alias=>({alias,reading:null,at:0,lastOk:0,tried:0,pending:false,fails:0,reason:'',error:'',rate:null});
  // A result from the app: {output, at} or {reason, error}. Returns the next session; the old one is left as it was.
  function sshRecord(h,r,now=Date.now()){
-  const next={...h,pending:false,history:h.history.slice()};
+  const next={...h,pending:false};
   const fail=(reason,error)=>{next.fails=h.fails+1;next.reason=reason;next.error=error;return next;};
   if(r.output==null)return fail(r.reason||'other',String(r.error||''));
   let p;try{p=parseSshProbe(r.output);}catch(e){return fail('other',e.message);}
@@ -81,8 +81,6 @@ if(typeof module!=='undefined'&&typeof tr==='undefined')globalThis.tr=require('.
    const s=(at-h.at)/1000,rx=(p.net.rx-prev.net.rx)/s,tx=(p.net.tx-prev.net.tx)/s;if(rx>=0&&tx>=0)rate={rx,tx};
   }
   next.reading=p;next.at=at;next.lastOk=at;next.fails=0;next.reason='';next.error='';next.rate=rate;
-  next.history.push({t:at,cpu:p.cpu,mem:p.mem?p.mem.used/p.mem.total*100:null,net:rate?rate.rx+rate.tx:null});
-  if(next.history.length>SSH_HISTORY)next.history.splice(0,next.history.length-SSH_HISTORY);
   return next;
  }
  // Whether to ask again: once per interval, twice as long after each failure in a row (at most 15 minutes); a host that needs the
@@ -115,7 +113,7 @@ if(typeof module!=='undefined'&&typeof tr==='undefined')globalThis.tr=require('.
   const p=h.reading,target=String(host?.host||'').trim(),ip=asset.normalizeIp(target)?.ip;
   return {id:h.alias,name:h.alias,hostnames:[...new Set([h.alias,target].map(x=>String(x).trim().toLowerCase().replace(/\.$/,'')).filter(Boolean))],ips:ip?[ip]:[],
    online:sshOnline(h,now,intervalMs),cpu:p?.cpu??null,mem:p?.mem||null,disk:p?.disk||null,traffic:null,trafficLimit:null,lastSeen:h.lastOk||null,
-   rate:h.rate,history:h.history,uptime:p?.uptime??null,load:p?.load||null,cores:p?.cores||null,error:h.reason?sshProblem(h):'',region:''};
+   rate:h.rate,uptime:p?.uptime??null,load:p?.load||null,cores:p?.cores||null,error:h.reason?sshProblem(h):'',region:''};
  }
 
  // Which server card a ~/.ssh/config host ({name, host}) is: the card with its HostName's IP, or its HostName or alias as the
@@ -154,7 +152,7 @@ if(typeof module!=='undefined'&&typeof tr==='undefined')globalThis.tr=require('.
    '@@uptime',`${864000+tick*60}.12 1000.00`,'@@loadavg','1.21 0.98 0.87 2/310 4242','@@end',''].join('\n')};
  }
 
- const api={SSH_PROBE_OPTIONS,SSH_PROBE_COMMAND,SSH_PROBE_STEPS,SSH_INTERVALS,SSH_INTERVAL_MIN,SSH_INTERVAL_MAX,sshIntervalOk,SSH_DEFAULT_INTERVAL,SSH_HISTORY,sshCommandLine,sshSections,parseSshProbe,
+ const api={SSH_PROBE_OPTIONS,SSH_PROBE_COMMAND,SSH_PROBE_STEPS,SSH_INTERVALS,SSH_INTERVAL_MIN,SSH_INTERVAL_MAX,sshIntervalOk,SSH_DEFAULT_INTERVAL,sshCommandLine,sshSections,parseSshProbe,
   sshSession,sshRecord,sshDue,sshOnline,sshProblem,sshProblemShort,sshServer,sshCardFor,sshAutoAliases,SSH_DEMO_CONFIG,SSH_DEMO_ENABLED,sshDemoOutput};
  if(typeof module!=='undefined'&&typeof window==='undefined')module.exports=api;else root.probeSshData=api;
 })(typeof window!=='undefined'?window:globalThis);

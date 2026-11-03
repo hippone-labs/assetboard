@@ -28,8 +28,6 @@ async (page) => {
      window.assetboardProbe({source:s.id,loading:true});
      setTimeout(()=>window.assetboardProbe(s.id==='src2'?{source:s.id,error:'用户名或密码不对',status:401,reason:'credentials'}:{source:s.id,kind:'cfsm',data:window.__answers[s.id],at:Date.now()}),30);}
    }
-   // 24 hours of history for what was asked, as /api/history/all rows; the live socket opens a moment after it is asked for.
-   if(msg.action==='probeHistory')setTimeout(()=>window.assetboardProbe({source:msg.id,history:Object.fromEntries(msg.servers.map(id=>[id,Array.from({length:120},(_,i)=>({timestamp:now-(119-i)*720000,cpu:20+15*Math.sin(i/9),ram_used:1024+400*Math.sin(i/20),ram_total:4096}))]))}),20);
    // Saving, as the app does it: keep the source (the name falls back to the host), then read it. A host starting with "private."
    // answers 401 until an account is given; pw-test is its password.
    if(msg.action==='probeSave'){

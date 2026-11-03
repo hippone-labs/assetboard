@@ -56,7 +56,7 @@ async (page) => {
   check(!row.edge,'a host that wants its key confirmed is skipped');
   // A second reading: a rate.
   await p.evaluate(()=>sshPoll(true));
-  await until(p,()=>window.__runs.length>=6&&probe.links.get('s2')?.server.history?.length>=2);
+  await until(p,()=>window.__runs.length>=6&&!!probe.links.get('s2')?.server.rate);
   const detail=await p.evaluate(()=>{showDetail('s2');const el=document.querySelector('#detail-content .probe-card');return {said:el.textContent+' | '+[...el.querySelectorAll('[aria-label]')].map(n=>n.getAttribute('aria-label')).join(' | '),rings:el.querySelectorAll('.pg-ring,.ps-card').length,line:el.querySelector('.pc-line')?.textContent||''};});
   check(detail.rings===0&&/SSH 直读/.test(detail.said)&&/网速/.test(detail.said)&&/↓.*\/s ↑.*\/s/.test(detail.line)&&/负载/.test(detail.line),'the detail card is one line with the rate: '+JSON.stringify(detail));
   // The edge card is not linked; its detail says why and what to do.

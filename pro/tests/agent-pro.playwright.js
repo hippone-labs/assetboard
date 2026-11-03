@@ -33,7 +33,6 @@ async (page) => {
    if(msg.action==='probeSave'){const was=list.find(x=>x.id===msg.id),src={id:msg.id||'auto'+list.length,kind:msg.kind,name:msg.name||new URL(msg.url).host,url:msg.url,hasLogin:was?.hasLogin||false,username:was?.username||''};
     if(was)Object.assign(was,src);else list.push(src);answer(()=>{window.assetboardProbe({sources:list.map(x=>({...x})),saved:src.id});read(src);},10);}
    if(msg.action==='probeRemove'){const at=list.findIndex(x=>x.id===msg.id);if(at>=0)list.splice(at,1);answer(()=>window.assetboardProbe({sources:list.map(x=>({...x})),removed:msg.id}));}
-   if(msg.action==='probeHistory')answer(()=>window.assetboardProbe({source:msg.id,history:Object.fromEntries(msg.servers.map(id=>[id,Array.from({length:30},(_,i)=>({timestamp:now-(29-i)*600000,cpu:20+i,ram_used:1024,ram_total:4096}))]))}));
    // SSH 直读: the settings live here, as on the Mac; a run of lab-box fails with ssh's own line, which names the address and the user.
    const sshList=()=>answer(()=>window.assetboardSshProbe({list:{config,enabled:[...ssh.enabled],disabled:[...ssh.disabled],interval:ssh.interval}}));
    if(msg.action==='sshProbeList')sshList();

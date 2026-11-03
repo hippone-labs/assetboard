@@ -21,7 +21,7 @@ function overviewHtml(scope){
   tile(attention?'overdue':'','view','upcoming',tr('需要处理'),formatCount(attention),parts||tr('没有')),
   tile('','cost-panel','',tr('每年合计'),esc(formatMoney(totals.yearly,cur)),tr('约 {money} / 月',{money:esc(formatMoney(totals.monthly,cur))})),
   // 实时: only once 实时状态 reads something. How many of the read servers answer, and what is wrong with the others.
-  lives.length?tile(down?'overdue':tight?'soon':'','view',read.every(a=>a.type==='server')?'server':'all',tr('实时'),`${formatCount(lives.length-down)} / ${formatCount(lives.length)}`,[down&&tr('{n} 离线',{n:formatCount(down)}),tight&&tr('{n} 内存紧张',{n:formatCount(tight)})].filter(Boolean).join(' · ')||tr('都有读数')):''
+  lives.length?tile('ov-live'+(down?' overdue':tight?' soon':''),'view',read.every(a=>a.type==='server')?'server':'all',tr('实时'),`${formatCount(lives.length-down)} / ${formatCount(lives.length)}`,[down&&tr('{n} 离线',{n:formatCount(down)}),tight&&tr('{n} 内存紧张',{n:formatCount(tight)})].filter(Boolean).join(' · ')||tr('都有读数')):''
  ].join('')}</div>`;
 }
 // A group's recurring cost a month, beside its title; nothing when no record in it has a readable cycle.

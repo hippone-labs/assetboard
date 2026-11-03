@@ -98,6 +98,14 @@ if(typeof module!=='undefined'&&typeof tr==='undefined')globalThis.tr=require('.
   return {links,unmatched:items.filter(x=>!claimed.has(x.key))};
  }
 
- const api={PLATFORM_KINDS,PLATFORM_INTERVAL_MIN,PLATFORM_INTERVAL_MAX,platformIntervalOk,platformWide,ITEM_FITS,fitsOf,platformState,platformLine,matchPlatformItems};
+ // The demo's platforms (`--demo`, `?demo`): made up, matching the demo board's notes-web, notes-api and notes-auth; nothing is read.
+ function platformDemo(now=Date.now()){
+  const soon=new Date(now+5*86400000).toISOString();
+  return {sources:[{id:'demo-supabase',kind:'supabase',name:'',interval:300,wide:false,hasToken:true},{id:'demo-vercel',kind:'vercel',name:'',interval:300,wide:true,hasToken:true},{id:'demo-render',kind:'render',name:'',interval:300,wide:true,hasToken:true}],
+   items:{'demo-supabase':[{id:'demoabcdefghijklmnop',name:'notes-auth',kind:'project',state:'INACTIVE',region:'ap-southeast-1'}],
+    'demo-vercel':[{id:'prj_demo000001',name:'notes-web',kind:'project',state:'READY'},{id:'prj_demo000002',name:'landing-old',kind:'project',state:'READY'}],
+    'demo-render':[{id:'srv-demo000001',name:'notes-api',kind:'service',state:'running',deploy:'build_failed'},{id:'dpg-demo000001',name:'notes-cache-db',kind:'postgres',state:'available',plan:'free',expires:soon}]}};
+ }
+ const api={PLATFORM_KINDS,platformDemo,PLATFORM_INTERVAL_MIN,PLATFORM_INTERVAL_MAX,platformIntervalOk,platformWide,ITEM_FITS,fitsOf,platformState,platformLine,matchPlatformItems};
  if(typeof module!=='undefined'&&typeof window==='undefined')module.exports=api;else root.platformData=api;
 })(typeof window!=='undefined'?window:globalThis);

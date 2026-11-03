@@ -46,12 +46,12 @@ async (page) => {
  await done(s);
 
  // 1024 × 700, sidebar expanded: a 6 px margin, a 320 px detail, and the overview strip keeps the due numbers (the bar has none in 全部资产;
-// the 实时 tile, red for the demo's offline server, is not a due number).
+// the 实时 tile, red for the demo's offline server and paused project, is not a due number).
  s=await open(1024,700);
  const nm=await rect(s.p,'#main'),nd=await rect(s.p,'#detail');
  check(nm.right===1018&&nm.bottom===694&&nd.width===320,'Narrow margins: '+JSON.stringify({nm,nd}));
  const head=await s.p.evaluate(()=>{const bar=$('#topbar'),last=[...bar.querySelectorAll('button')].filter(b=>b.getClientRects().length).at(-1).getBoundingClientRect();
-  return {flags:[...document.querySelectorAll('#board .overview .ov-tile.soon:not([data-id="server"]),#board .overview .ov-tile.overdue:not([data-id="server"])')].filter(n=>n.getClientRects().length).map(n=>n.querySelector('.ov-value').textContent),title:Math.round($('#view-title').getBoundingClientRect().width),spill:Math.round(last.right-bar.getBoundingClientRect().right)};});
+  return {flags:[...document.querySelectorAll('#board .overview .ov-tile.soon:not(.ov-live),#board .overview .ov-tile.overdue:not(.ov-live)')].filter(n=>n.getClientRects().length).map(n=>n.querySelector('.ov-value').textContent),title:Math.round($('#view-title').getBoundingClientRect().width),spill:Math.round(last.right-bar.getBoundingClientRect().right)};});
  check(head.flags.length===2&&head.title>40&&head.spill<=0,'The narrow window keeps the due numbers: '+JSON.stringify(head));
  const nw=await s.p.evaluate(()=>{const n=document.querySelector('#detail-content .fact-date span:last-child');return n&&Math.round(n.getBoundingClientRect().height);});
  check(nw<=20,'The next date wraps in a narrow detail: '+nw);

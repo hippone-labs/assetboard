@@ -108,21 +108,21 @@ test('gauges: numbers for the drawing, words for the tip and the screen reader',
  assert.equal(probeGauges(over,now).find(x=>x.key==='net').pct,100);
 });
 
-// ---- task-15: read-only token, history, live ------------------------------------------------------------------------------------
+// ---- task-15: read-only token, live ------------------------------------------------------------------------------------
 const fs=require('node:fs'),path=require('node:path');
 const data=require('../web/probe-data.js');
 
-test('the probe code only calls the login and the four read paths: one POST (action login), everything else GET',()=>{
+test('the probe code only calls the login and the three read paths: one POST (action login), everything else GET',()=>{
  const root=path.join(__dirname,'..','..');
  // The code itself: comments out, and the Swift file up to its test double and self-test (which name refused paths on purpose).
  const code=text=>text.split('\n').filter(line=>!/^\s*\/\//.test(line)).map(line=>line.replace(/\s\/\/ .*$/,'')).join('\n');
  const swift=code(fs.readFileSync(path.join(root,'desktop','ProbeSource.swift'),'utf8').split('final class MockProbeProtocol')[0]);
  const web=code(['pro/web/probe-data.js','pro/web/probe-pro.js'].map(f=>fs.readFileSync(path.join(root,f),'utf8')).join('\n'));
- const allowed=['/admin/api','/api/servers','/api/server','/api/history/all','/api/ws'];
+ const allowed=['/admin/api','/api/servers','/api/server','/api/ws'];
  const named=new Set([...(swift+web).matchAll(/"(\/(?:api|admin)\/[A-Za-z0-9/_-]*)"|'(\/(?:api|admin)\/[A-Za-z0-9/_-]*)'/g)].map(m=>m[1]||m[2]));
- assert.ok(named.size>=5);
+ assert.ok(named.size>=4);
  for(const p of named)assert.ok(allowed.includes(p),`not an allowed path: ${p}`);
- assert.match(swift,/static let allowedPaths: Set<String> = \["\/admin\/api", "\/api\/servers", "\/api\/server", "\/api\/history\/all", "\/api\/ws"\]/);
+ assert.match(swift,/static let allowedPaths: Set<String> = \["\/admin\/api", "\/api\/servers", "\/api\/server", "\/api\/ws"\]/);
  // Methods: GET for reads; the one POST is the login, built in one place with a body that is exactly the login.
  assert.deepEqual([...swift.matchAll(/httpMethod = "([A-Z]+)"/g)].map(m=>m[1]).sort(),['GET','POST']);
  assert.match(swift,/if case \.login = read \{ return "POST" \}\s*return "GET"/);
