@@ -18,7 +18,10 @@ if(typeof module!=='undefined'&&typeof tr==='undefined')globalThis.tr=require('.
   ['cat /proc/uptime',tr('开机时长')],['cat /proc/loadavg',tr('负载')]];
  const sshCommandLine=alias=>['/usr/bin/ssh',...SSH_PROBE_OPTIONS,'--',alias||tr('<别名>'),SSH_PROBE_COMMAND].map(p=>/[\s']/.test(p)?`"${p}"`:p).join(' ');
 
- const SSH_INTERVALS=[30,60,120,300],SSH_DEFAULT_INTERVAL=60,SSH_HISTORY=60,SSH_MAX_WAIT=15*60*1000;
+ // The reading interval is the person's to set: any whole number of seconds from SSH_INTERVAL_MIN to SSH_INTERVAL_MAX (the Mac
+ // side checks the same range, SSHProbe.intervalRange). SSH_INTERVALS are only the suggestions offered beside the field.
+ const SSH_INTERVALS=[30,60,300,900],SSH_INTERVAL_MIN=15,SSH_INTERVAL_MAX=3600,SSH_DEFAULT_INTERVAL=60,SSH_HISTORY=60,SSH_MAX_WAIT=15*60*1000;
+ const sshIntervalOk=s=>Number.isInteger(s)&&s>=SSH_INTERVAL_MIN&&s<=SSH_INTERVAL_MAX;
 
  // Reading. The output is sections, each after a line "@@name"; a Linux host prints all of them and ends with @@end.
  function sshSections(text){
@@ -151,7 +154,7 @@ if(typeof module!=='undefined'&&typeof tr==='undefined')globalThis.tr=require('.
    '@@uptime',`${864000+tick*60}.12 1000.00`,'@@loadavg','1.21 0.98 0.87 2/310 4242','@@end',''].join('\n')};
  }
 
- const api={SSH_PROBE_OPTIONS,SSH_PROBE_COMMAND,SSH_PROBE_STEPS,SSH_INTERVALS,SSH_DEFAULT_INTERVAL,SSH_HISTORY,sshCommandLine,sshSections,parseSshProbe,
+ const api={SSH_PROBE_OPTIONS,SSH_PROBE_COMMAND,SSH_PROBE_STEPS,SSH_INTERVALS,SSH_INTERVAL_MIN,SSH_INTERVAL_MAX,sshIntervalOk,SSH_DEFAULT_INTERVAL,SSH_HISTORY,sshCommandLine,sshSections,parseSshProbe,
   sshSession,sshRecord,sshDue,sshOnline,sshProblem,sshProblemShort,sshServer,sshCardFor,sshAutoAliases,SSH_DEMO_CONFIG,SSH_DEMO_ENABLED,sshDemoOutput};
  if(typeof module!=='undefined'&&typeof window==='undefined')module.exports=api;else root.probeSshData=api;
 })(typeof window!=='undefined'?window:globalThis);

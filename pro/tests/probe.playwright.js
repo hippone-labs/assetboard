@@ -11,7 +11,7 @@ async (page) => {
  const open=async(init,arg)=>{const context=await browser.newContext(),p=await context.newPage();const errors=[];p.on('pageerror',e=>errors.push(e.message));await p.addInitScript(()=>{try{localStorage.setItem('assetboard-features-v1','{"probe":true}');}catch{}});await p.addInitScript(init,arg);await p.goto('http://127.0.0.1:4317/');
   for(let i=0;i<100&&!await p.evaluate(()=>typeof probeDialog==='function'&&typeof state!=='undefined');i++)await wait(40);return {context,p,errors};};
  // say(el), inlined where used (the page's CSP forbids eval): an element's text plus every accessible name and tip inside it,
- // since the gauges are drawn and their words live there.
+ // since the line's words live there too.
  const until=async(p,fn,arg)=>{for(let i=0;i<120;i++){if(await p.evaluate(fn,arg))return;await wait(40);}throw new Error('Timed out: '+String(fn).slice(0,90));};
 
  const {context,p,errors}=await open(()=>{
@@ -56,53 +56,48 @@ async (page) => {
   const rows=await p.evaluate(()=>{const say=(el=>el?[el.textContent,...[el,...el.querySelectorAll('[aria-label],[title]')].flatMap(n=>[n.getAttribute('aria-label'),n.getAttribute('title')])].filter(Boolean).join(' | '):'');return {
    s1:say(document.querySelector('[data-probe-row="s1"]')),s1cls:document.querySelector('[data-probe-row="s1"]')?.className||'',
    s1text:document.querySelector('[data-probe-row="s1"]')?.innerText||'',
-   s1gauges:[...document.querySelectorAll('[data-probe-row="s1"] .pg')].map(g=>({img:g.getAttribute('role')==='img',name:g.getAttribute('aria-label'),tip:g.getAttribute('title'),bar:!!g.querySelector('.pg-bar')})),
    s2:say(document.querySelector('[data-probe-row="s2"]')),s2row:document.querySelector('[data-asset="s2"]').className,
    s2ring:!!document.querySelector('[data-asset="s2"] .stop-ring'),s3:!!document.querySelector('[data-probe-row="s3"]'),
    refreshes:window.__sent.filter(a=>a==='probeRefresh').length};});
-  check(/在线/.test(rows.s1)&&/CPU 23%/.test(rows.s1)&&/内存 25%/.test(rows.s1)&&/磁盘 25%/.test(rows.s1)&&/本月流量 40 GB/.test(rows.s1)&&/on/.test(rows.s1cls),'a linked row shows the probe: '+JSON.stringify(rows));
-  // Drawn, not written: four gauges (CPU, 内存, 磁盘 with a bar; traffic without a limit has none), each an image with words.
-  check(rows.s1gauges.length===4&&rows.s1gauges.every(g=>g.img&&g.name&&g.name===g.tip)&&rows.s1gauges.filter(g=>g.bar).length===3,'row gauges: '+JSON.stringify(rows.s1gauges));
-  check(!/在线|CPU|内存|磁盘|流量/.test(rows.s1text),'the row shows numbers, not words: '+rows.s1text);
+  check(/在线/.test(rows.s1)&&/CPU 23%/.test(rows.s1)&&/内存 25%/.test(rows.s1)&&/本月流量 40 GB/.test(rows.s1)&&/on/.test(rows.s1cls),'a linked row shows the probe: '+JSON.stringify(rows));
+  // The overview only: one line of memory, network and load (CPU when the panel gives no load), and how fresh it is; no gauges, no disk.
+  check(rows.s1text.startsWith('内存 25% · 本月 40 GB · CPU 23%')&&/1 分钟前/.test(rows.s1text)&&!/磁盘/.test(rows.s1),'the row is one line: '+rows.s1text);
   check(/离线/.test(rows.s2)&&/1 小时前/.test(rows.s2)&&/probe-down/.test(rows.s2row),'an offline row is marked down, with when it last reported: '+JSON.stringify(rows));
   check(!rows.s2ring&&!/\bstopped\b/.test(rows.s2row),'a linked server is not drawn as stopped');
   check(!rows.s3,'a card nothing matched has no probe line');
   check(rows.refreshes===1,'one refresh on launch: '+rows.refreshes);
-  const red=await p.evaluate(()=>({dot:getComputedStyle(document.querySelector('[data-probe-row="s2"] .probe-dot')).backgroundColor,seen:getComputedStyle(document.querySelector('[data-probe-row="s2"] .probe-seen')).color,
+  const red=await p.evaluate(()=>({dot:getComputedStyle(document.querySelector('[data-probe-row="s2"] .probe-dot')).backgroundColor,seen:getComputedStyle(document.querySelector('[data-probe-row="s2"] .live-text')).color,
    quiet:getComputedStyle(document.querySelector('[data-probe-row="s1"] .probe-dot')).backgroundColor}));
   const isRed=c=>/rgb\((1[5-9]\d|2\d\d), ?\d{1,2}, ?\d{1,2}\)/.test(c);
-  check(isRed(red.dot)&&isRed(red.seen)&&!isRed(red.quiet),'offline is a red dot and red time; online is quiet: '+JSON.stringify(red));
+  check(isRed(red.dot)&&isRed(red.seen)&&!isRed(red.quiet),'offline is a red dot and a red line; online is quiet: '+JSON.stringify(red));
 
   // The detail: every reading, and where it comes from.
   const detail=await p.evaluate(()=>{showDetail('s1');return (el=>el?[el.textContent,...[el,...el.querySelectorAll('[aria-label],[title]')].flatMap(n=>[n.getAttribute('aria-label'),n.getAttribute('title')])].filter(Boolean).join(' | '):'')(document.querySelector('#detail-content .probe-facts'));});
-  // The detail is a card: three rings filled to their share, a traffic bar, icon buttons with names.
-  const card=await p.evaluate(()=>{const c=document.querySelector('#detail-content .probe-card');const ring=k=>{const f=c.querySelector(`.pg-${k} .pg-fill`),t=c.querySelector(`.pg-${k} .pg-track`);if(!f)return null;const r=+t.getAttribute('r'),[len]=f.getAttribute('stroke-dasharray').split(' ').map(Number);return Math.round(len/(2*Math.PI*r)*100);};
-   return {card:!!c,rings:c.querySelectorAll('.pc-rings .pg-ring').length,cpu:ring('cpu'),mem:ring('mem'),net:!!c.querySelector('.pg-net .pg-bar'),
+  // The detail is the same one line in a card, no rings and no sparkline; icon buttons with names.
+  const card=await p.evaluate(()=>{const c=document.querySelector('#detail-content .probe-card');
+   return {card:!!c,line:c.querySelector('.pc-line')?.textContent||'',rings:c.querySelectorAll('.pg-ring,.ps-card').length,
     buttons:[...c.querySelectorAll('button')].map(b=>b.getAttribute('aria-label')),width:c.scrollWidth<=c.clientWidth+1};});
-  check(card.card&&card.rings===3&&card.cpu===23&&card.mem===25&&card.net&&card.width,'the detail card draws its readings: '+JSON.stringify(card));
+  check(card.card&&card.line==='内存 25% · 本月 40 GB · CPU 23%'&&card.rings===0&&card.width,'the detail card is one line: '+JSON.stringify(card));
   check(card.buttons.includes('刷新探针')&&card.buttons.includes('取消关联'),'icon buttons are named: '+JSON.stringify(card.buttons));
-  for(const word of ['在线','CPU','23%','内存','1 GB / 4 GB','磁盘','20 GB / 80 GB','本月流量','40 GB','最后上报','我的探针','按名称匹配','刷新','取消关联'])check(detail.includes(word),`the detail lacks ${word}: ${detail}`);
+  for(const word of ['在线','CPU','23%','内存','1 GB / 4 GB','本月流量','40 GB','最后上报','我的探针','按名称匹配','刷新','取消关联'])check(detail.includes(word),`the detail lacks ${word}: ${detail}`);
 
-  // ---- task-15 / 15b: history sparklines, live updates, backoff, fallback to polling, refusals, account form ----
-  await until(p,()=>!!document.querySelector('#detail-content .ps-card path.ps-cpu'));
-  const spark=await p.evaluate(()=>{const c=document.querySelector('#detail-content .ps-card');return {name:c.getAttribute('aria-label'),tip:c.getAttribute('title'),cpu:c.querySelector('.ps-cpu').getAttribute('d'),mem:c.querySelector('.ps-mem')?.getAttribute('d')||'',text:c.innerText.trim()};});
-  check(/过去 24 小时/.test(spark.name)&&/CPU 平均 \d+%，最高 \d+%/.test(spark.name)&&/内存 平均/.test(spark.name)&&spark.name===spark.tip,'the sparkline says what it draws: '+JSON.stringify(spark));
-  check(spark.cpu.split('L').length===120&&spark.mem.length>0&&spark.text==='24h','two lines over 120 points, one tiny label: '+JSON.stringify({points:spark.cpu.split('L').length,text:spark.text}));
+  // ---- task-15 / 15b: live updates, backoff, fallback to polling, refusals, account form ----
+  await until(p,()=>probe.live.get('src1')?.state==='open');
   const asked=await p.evaluate(()=>({history:window.__msgs.filter(m=>m.action==='probeHistory'),live:window.__msgs.filter(m=>m.action==='probeLiveStart')}));
-  check(asked.history.length===1&&asked.history[0].id==='src1'&&JSON.stringify(asked.history[0].servers.sort())==='["a","b"]','history is asked once, for the linked servers: '+JSON.stringify(asked.history));
+  check(asked.history.length===0,'no history is asked: the overview has no curves: '+JSON.stringify(asked.history));
   check(asked.live.length===1&&asked.live[0].id==='src1'&&asked.live[0].servers.length===3,'one live socket for the source that answered: '+JSON.stringify(asked.live));
   await until(p,()=>probe.live.get('src1')?.state==='open'&&!!document.querySelector('#detail-content .probe-live'));
   // Live: an update lands on the row without a refresh.
   await p.evaluate(()=>window.assetboardProbe({source:'src1',updates:[{serverId:'a',samples:[{ts:Date.now(),data:{cpu:77}}]}]}));
   await until(p,()=>/CPU 77%/.test(document.querySelector('[data-probe-row="s1"]')?.getAttribute('aria-label')||''));
-  // A tick while src1 is live reads only src2 (which never went live), and asks for no history.
-  const tick=await p.evaluate(()=>{const n=window.__msgs.length;const due=probePollTick();return {due,sent:window.__msgs.slice(n)};});
+  // A tick a reading interval later, while src1 is live, reads only src2 (which never went live).
+  const tick=await p.evaluate(()=>{const n=window.__msgs.length;const due=probePollTick(Date.now()+probePollMs());return {due,sent:window.__msgs.slice(n)};});
   check(JSON.stringify(tick.due)==='["src2"]'&&tick.sent.every(m=>m.action==='probeRefresh'&&m.id==='src2'),'live open: no polling for it, no history: '+JSON.stringify(tick));
   // A drop: tried again after 0.5–1 s (attempt 0), and again on the next drop after 1–2 s.
   await p.evaluate(()=>{window.__holdLive=true;window.assetboardProbe({source:'src1',live:'closed',status:1006});});
   const wait1=await p.evaluate(()=>({state:probe.live.get('src1').state,delay:probe.live.get('src1').delay}));
   check(wait1.state==='waiting'&&wait1.delay>=500&&wait1.delay<=1000,'first retry within a second: '+JSON.stringify(wait1));
-  check(await p.evaluate(()=>probePollTick().includes('src1')),'while live is down, the poll reads the source');
+  check(await p.evaluate(()=>probePollTick(Date.now()+probePollMs()).includes('src1')),'while live is down, the poll reads the source');
   await until(p,()=>window.__msgs.filter(m=>m.action==='probeLiveStart').length===2);
   await p.evaluate(()=>window.assetboardProbe({source:'src1',live:'closed',status:0}));
   const wait2=await p.evaluate(()=>probe.live.get('src1'));
@@ -110,14 +105,14 @@ async (page) => {
   // Refused (401/403) or not offered (426/503): no more tries until 刷新; polling carries on.
   await p.evaluate(()=>window.assetboardProbe({source:'src1',live:'closed',status:403}));
   await new Promise(r=>setTimeout(r,2200));
-  const refused=await p.evaluate(()=>({state:probe.live.get('src1').state,starts:window.__msgs.filter(m=>m.action==='probeLiveStart').length,due:probePollTick()}));
+  const refused=await p.evaluate(()=>({state:probe.live.get('src1').state,starts:window.__msgs.filter(m=>m.action==='probeLiveStart').length,due:probePollTick(Date.now()+probePollMs())}));
   check(refused.state==='refused'&&refused.starts===2&&refused.due.includes('src1'),'a refused socket stops, polling takes over: '+JSON.stringify(refused));
-  // 刷新 by hand: asks the app to lift any stop (manual), reads history again, and live may try again.
+  // 刷新 by hand: asks the app to lift any stop (manual), and live may try again.
   await until(p,()=>!document.querySelector('#detail-content [data-action="probe-refresh"]').disabled);
   await p.evaluate(()=>{window.__holdLive=false;document.querySelector('#detail-content [data-action="probe-refresh"]').click();});
   const manual=await p.evaluate(()=>window.__msgs.filter(m=>m.action==='probeRefresh'&&m.manual).at(-1)||{});
   check(manual.manual===true&&manual.id==='src1','a refresh by hand says so: '+JSON.stringify(manual));
-  await until(p,()=>window.__msgs.filter(m=>m.action==='probeHistory').length===2&&probe.live.get('src1')?.state==='open');
+  await until(p,()=>probe.live.get('src1')?.state==='open');
   // Hidden: the socket closes; back: it opens again.
   await p.evaluate(()=>{Object.defineProperty(document,'visibilityState',{configurable:true,get:()=>'hidden'});document.dispatchEvent(new Event('visibilitychange'));});
   check(await p.evaluate(()=>window.__msgs.at(-1).action==='probeLiveStop'&&probe.live.get('src1').state==='paused'),'hidden: live stops');
@@ -126,7 +121,7 @@ async (page) => {
   // A refusal keeps what was read before: the readings stay on the card.
   await p.evaluate(()=>window.assetboardProbe({source:'src1',error:'面板开了人机验证：为 Assetboard 关掉，或把面板设为公开',status:403,reason:'turnstile'}));
   await new Promise(r=>setTimeout(r,100));
-  const kept=await p.evaluate(()=>({row:!!document.querySelector('[data-probe-row="s1"] .pg-cpu'),mark:document.querySelector('#detail-content .probe-note')?.getAttribute('aria-label')||''}));
+  const kept=await p.evaluate(()=>({row:/CPU/.test(document.querySelector('[data-probe-row="s1"] .live-text')?.textContent||''),mark:document.querySelector('#detail-content .probe-note')?.getAttribute('aria-label')||''}));
   check(kept.row&&/人机验证/.test(kept.mark)&&/上次读到的数据/.test(kept.mark),'a Turnstile refusal keeps the readings and says so in a tip: '+JSON.stringify(kept));
   await p.evaluate(()=>window.assetboardProbe({source:'src1',kind:'cfsm',data:window.__answers.src1,at:Date.now()}));
   // The add form asks for the address only: no type, no name, no account until a panel says it needs one.
@@ -146,10 +141,6 @@ async (page) => {
   const pick=await p.evaluate(()=>{const li=document.querySelector('.probe-loose li'),sel=li.querySelector('select').getBoundingClientRect(),name=li.querySelector('b').getBoundingClientRect();
    return {selH:Math.round(sel.height),centre:Math.round(Math.abs((sel.top+sel.height/2)-(name.top+name.height/2)))};});
   check(pick.selH<=30&&pick.centre<=2,'a compact picker, centred on the row: '+JSON.stringify(pick));
-  // The sparkline's CPU line is the theme accent; 内存 stays grey, and the legend matches.
-  const colors=await p.evaluate(()=>{const c=document.querySelector('#detail-content .ps-card');const primary=getComputedStyle(document.documentElement).getPropertyValue('--tone-primary').trim().split(/[ ,]+/).join(', ');
-   return {primary:`rgb(${primary})`,cpu:getComputedStyle(c.querySelector('.ps-cpu')).stroke,key:getComputedStyle(c.querySelector('.ps-k-cpu')).backgroundColor,mem:getComputedStyle(c.querySelector('.ps-mem')).stroke,memKey:getComputedStyle(c.querySelector('.ps-k-mem')).backgroundColor};});
-  check(colors.cpu===colors.primary&&colors.key===colors.primary&&colors.mem!==colors.primary&&colors.mem===colors.memKey,'CPU in the accent, 内存 grey, legend alike: '+JSON.stringify(colors));
   // A bad address is refused in place; nothing is sent.
   let before=await p.evaluate(()=>window.__msgs.length);
   await p.fill('#probe-url','ftp://panel.example.org');await p.click('[data-action="probe-save"]');
@@ -205,7 +196,7 @@ async (page) => {
   await p.evaluate(()=>document.querySelector('#modal').close());
   // Every message the probe sent was one of the allowed ones, and none names a path, a method or a token.
   const msgs=await p.evaluate(()=>window.__msgs);
-  check(msgs.every(m=>['probeSave','probeRemove','probeRefresh','probeHistory','probeLiveStart','probeLiveStop'].includes(m.action)),'only probe actions: '+[...new Set(msgs.map(m=>m.action))]);
+  check(msgs.every(m=>['probeSave','probeRemove','probeRefresh','probeLiveStart','probeLiveStop'].includes(m.action)),'only probe actions: '+[...new Set(msgs.map(m=>m.action))]);
   check(!msgs.some(m=>/\/api\/|\/admin|GET|POST|token/i.test(JSON.stringify(Object.keys(m)))||/\/api\/|\/admin/.test(JSON.stringify(m))),'no paths, methods or tokens in messages');
 
   // The dialog: each source with its own state, the broken one does not stop the other, the unmatched server can be linked.
@@ -243,20 +234,20 @@ async (page) => {
   await until(p,()=>!!document.querySelector('#panorama .pano-probe'));
   const pano=await p.evaluate(()=>({probes:document.querySelectorAll('#panorama .pano-probe').length,down:document.querySelectorAll('#panorama .probe-down').length,
    text:[...document.querySelectorAll('#panorama .pl-state')].map(e=>e.textContent).join('|'),said:[...document.querySelectorAll('#panorama .pano-probe')].map((el=>el?[el.textContent,...[el,...el.querySelectorAll('[aria-label],[title]')].flatMap(n=>[n.getAttribute('aria-label'),n.getAttribute('title')])].filter(Boolean).join(' | '):'')).join(' || '),
-   words:[...document.querySelectorAll('#panorama .pano-probe')].map(e=>e.innerText).join(' '),gauges:document.querySelectorAll('#panorama .pano-probe .pg[role="img"][aria-label]').length,
+   words:[...document.querySelectorAll('#panorama .pano-probe')].map(e=>e.innerText).join(' '),gauges:document.querySelectorAll('#panorama .pano-probe .pg,#panorama .pano-probe .ps-mini').length,
    overflow:[...document.querySelectorAll('#panorama .pano-probe')].some(e=>e.scrollWidth>e.clientWidth+1)}));
   check(pano.probes>=2&&pano.down>=1&&/离线/.test(pano.text)&&/在线/.test(pano.said)&&/CPU/.test(pano.said),'全景 shows the probe: '+JSON.stringify(pano));
-  check(pano.gauges>=6&&!/在线|CPU|内存|磁盘/.test(pano.words)&&!pano.overflow,'全景 draws gauges, not words, and they fit: '+JSON.stringify(pano));
+  check(pano.gauges===0&&/内存 \d+%/.test(pano.words)&&!/磁盘/.test(pano.words)&&!pano.overflow,'全景 shows the same one line, and it fits: '+JSON.stringify(pano));
   await p.evaluate(()=>panoramaOpen(false));
 
-  // 390 px: the card and the row gauges fit, nothing scrolls sideways. The rows take their narrow layout from #board[data-size],
+  // 390 px: the card and the row line fit, nothing scrolls sideways. The rows take their narrow layout from #board[data-size],
   // which a ResizeObserver sets on a later frame (before it is painted); on a loaded machine 150 ms can pass without one, so wait
   // until that is set, no transition is running and the width holds over two frames, rather than measure a layout still on its way.
   // (The list of wide elements skips the sidebar strip, which scrolls on its own.)
   await p.setViewportSize({width:390,height:844});
   await until(p,()=>$('#board').dataset.size==='s'&&!document.getAnimations().some(a=>a instanceof CSSTransition)&&new Promise(done=>{const w=document.documentElement.scrollWidth;requestAnimationFrame(()=>requestAnimationFrame(()=>done(document.documentElement.scrollWidth===w)));}));
   const narrow=await p.evaluate(()=>{showDetail('s2');const c=document.querySelector('#detail-content .probe-card');
-   return {page:document.documentElement.scrollWidth,card:c&&c.scrollWidth<=c.clientWidth+1,rings:[...c.querySelectorAll('.pg-big')].every(g=>g.getBoundingClientRect().right<=c.getBoundingClientRect().right+1),
+   return {page:document.documentElement.scrollWidth,card:c&&c.scrollWidth<=c.clientWidth+1,rings:[...c.querySelectorAll('.pc-line')].every(g=>g.getBoundingClientRect().right<=c.getBoundingClientRect().right+1),
     rows:[...document.querySelectorAll('.r-probe')].every(r=>r.getBoundingClientRect().right<=innerWidth+1)};});
   const wide=narrow.page>390?await p.evaluate(()=>[...document.querySelectorAll('body *')].filter(e=>e.getBoundingClientRect().right>391&&e.getClientRects().length&&!e.closest('#sidebar')).slice(0,8).map(e=>e.tagName+'.'+[...e.classList].join('.')+'#'+e.id+':'+Math.round(e.getBoundingClientRect().right))):[];
   check(narrow.page<=390&&narrow.card&&narrow.rings&&narrow.rows,'fits at 390 px: '+JSON.stringify(narrow)+' '+wide.join(' | '));
@@ -274,7 +265,7 @@ async (page) => {
  const one=await demo({asset:'demo-s3'});
  try{
   await until(one.p,()=>!!document.querySelector('#detail-content .probe-facts')&&!document.querySelector('#detail').hidden);
-  const d=await one.p.evaluate(()=>({facts:(el=>el?[el.textContent,...[el,...el.querySelectorAll('[aria-label],[title]')].flatMap(n=>[n.getAttribute('aria-label'),n.getAttribute('title')])].filter(Boolean).join(' | '):'')(document.querySelector('#detail-content .probe-facts')),offRing:!!document.querySelector('#detail-content .probe-card.off .pc-rings'),name:document.querySelector('#detail-content h2').textContent,
+  const d=await one.p.evaluate(()=>({facts:(el=>el?[el.textContent,...[el,...el.querySelectorAll('[aria-label],[title]')].flatMap(n=>[n.getAttribute('aria-label'),n.getAttribute('title')])].filter(Boolean).join(' | '):'')(document.querySelector('#detail-content .probe-facts')),offRing:/离线/.test(document.querySelector('#detail-content .probe-card.off .pc-line')?.textContent||''),name:document.querySelector('#detail-content h2').textContent,
    rows:document.querySelectorAll('[data-probe-row]').length,asked:(window.__sent||[]).filter(a=>a.startsWith('probe')).length}));
   check(d.name==='home-nas'&&/离线/.test(d.facts)&&/手动关联/.test(d.facts)&&d.offRing,'--open-asset opens the linked demo server: '+JSON.stringify(d));
   check(d.rows>=3&&d.asked===0,'the demo shows probes without asking the app: '+JSON.stringify(d));

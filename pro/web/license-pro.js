@@ -16,7 +16,7 @@ const PRO_BUY_URL='https://buy.stripe.com/8x23cx2uJ1iO4YUeuadMI02';
 // The purchase worker (pro/worker): /recover mails a lost licence again.
 const PRO_PAY_URL='https://pay.assetboard.app';
 // What Pro adds, and what is still to come (the slots in pro-slots.js), for the section's list.
-const PRO_INCLUDES=[tr('付款账本、未来 12 个月预测和价格变动'),tr('每周自动核对注册局'),tr('Cloudflare 每 12 小时自动同步'),tr('项目合计、关停清单和定期清理'),tr('探针与 SSH 直读'),tr('MCP 添加、修改和删除，命令行，Inbox 文件夹')];
+const PRO_INCLUDES=[tr('付款账本、未来 12 个月预测和价格变动'),tr('每周自动核对注册局'),tr('Cloudflare 每 12 小时自动同步'),tr('项目合计、关停清单和定期清理'),tr('实时状态'),tr('MCP 添加、修改和删除，命令行，Inbox 文件夹')];
 const PRO_COMING=[tr('写进「提醒事项」'),tr('加密快照写到你选的文件夹'),tr('「如果我出事」接手包')];
 function proState(){return (typeof window!=='undefined'&&window.__ASSETBOARD_NATIVE__?.pro)||null;}
 function proLicenseId(id){return String(id||'').replace(/(.{4})(?=.)/g,'$1-');}

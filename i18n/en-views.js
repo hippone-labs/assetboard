@@ -279,6 +279,9 @@ Object.assign(I18N.en,{
  // board-views.js
  '{n} 过期':'{n} overdue',
  '{n} 离线':'{n} offline',
+ '实时':'Live',
+ '{n} 内存紧张':['{n} low on memory','{n} low on memory'],
+ '都有读数':'All reporting',
  '概览':'Overview',
  '{n} 笔':['{n} charge','{n} charges'],
  '本月还要付':'Still to pay this month',

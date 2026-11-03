@@ -2156,3 +2156,15 @@ body::before,.native-app body::before{background:radial-gradient(70vw 65vh at 0%
 /* v18 · keep-alive: the sleep rule and the keep-alive request each take a line in the inspector row */
 .wake-fact .wake-rule,.wake-fact .wake-line{display:block}
 .wake-fact .wake-rule+.wake-line{margin-top:2px;color:var(--muted)}
+
+/* v19 · live status: one line of readings on rows, the detail and 全景; the 实时 tile; the reading interval field */
+.overview.five{grid-template-columns:repeat(5,minmax(0,1fr))}
+#board[data-size=m] .overview.five,#board[data-size=s] .overview.five{grid-template-columns:repeat(2,minmax(0,1fr))}
+.live-line{display:inline-flex;align-items:center;gap:6px;min-width:0;font-size:12px;line-height:16px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.live-line .live-text{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.live-line.amber .live-text{color:var(--warning)}
+.live-line.off .live-text{color:var(--danger)}
+.pc-line{margin:6px 0 0;display:flex}
+.live-interval{display:inline-flex;flex-wrap:wrap;align-items:center;gap:6px}
+.live-interval .live-every{width:64px}
+.live-interval .live-presets{display:inline-flex;flex-wrap:wrap;gap:4px}

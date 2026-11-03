@@ -1,5 +1,5 @@
 // SSH 直读 (Pro). With a stubbed Mac app: only the aliases turned on are asked for, their readings land on the matching server card
-// with the SSH mark, rings and a sparkline; a panel's reading wins a card both could show; a host that needs a password or a host
+// with the SSH mark as one line (memory, network rate, load); a panel's reading wins a card both could show; a host that needs a password or a host
 // key is skipped with the hint to connect once in Terminal; switching a host on asks the app; nothing of it reaches the saved board.
 // The demo: made-up readings, no ssh, and the screenshot switches (`--open-asset=demo-s2`, `--open-ssh-settings`). ?free: nothing.
 async (page) => {
@@ -49,17 +49,16 @@ async (page) => {
   // not one already on.
   check(JSON.stringify(await p.evaluate(()=>window.__auto))==='["auto1"]','turned on by matching: '+JSON.stringify(await p.evaluate(()=>window.__auto)));
   const row=await p.evaluate(()=>({src:document.querySelector('[data-probe-row="s2"] .pg-src')?.getAttribute('aria-label'),
-   cf:document.querySelector('[data-probe-row="s1"]')?.getAttribute('aria-label')||'',cfMark:!!document.querySelector('[data-probe-row="s1"] .pg-src'),gauges:document.querySelectorAll('[data-probe-row="s2"] .pg').length,
+   cf:document.querySelector('[data-probe-row="s1"]')?.getAttribute('aria-label')||'',cfMark:!!document.querySelector('[data-probe-row="s1"] .pg-src'),line:document.querySelector('[data-probe-row="s2"] .live-text')?.textContent||'',
    edge:!!document.querySelector('[data-probe-row="s3"]')}));
-  check(row.src==='来源：SSH 直读'&&row.gauges>=3,'the SSH host is on its card, marked as SSH: '+JSON.stringify(row));
+  check(row.src==='来源：SSH 直读'&&/^内存 \d+% · .*负载 \d/.test(row.line),'the SSH host is on its card as one line, marked as SSH: '+JSON.stringify(row));
   check(/^面板：/.test(row.cf)&&!row.cfMark,'the panel wins the card both could show: '+JSON.stringify(row));
   check(!row.edge,'a host that wants its key confirmed is skipped');
-  // A second reading: a rate and a sparkline.
+  // A second reading: a rate.
   await p.evaluate(()=>sshPoll(true));
   await until(p,()=>window.__runs.length>=6&&probe.links.get('s2')?.server.history?.length>=2);
-  const detail=await p.evaluate(()=>{showDetail('s2');const el=document.querySelector('#detail-content .probe-card');return {said:el.textContent+' | '+[...el.querySelectorAll('[aria-label]')].map(n=>n.getAttribute('aria-label')).join(' | '),rings:el.querySelectorAll('.pc-rings .pg-ring').length,spark:el.querySelectorAll('.ps-card .ps-cpu').length,
-   ring:getComputedStyle(el.querySelector('.pg-cpu .pg-fill')).stroke,line:getComputedStyle(el.querySelector('.ps-card .ps-cpu')).stroke};});
-  check(detail.rings===3&&detail.spark===1&&detail.ring===detail.line&&/SSH 直读/.test(detail.said)&&/网速/.test(detail.said)&&/最近 \d+ 次读取：CPU 平均/.test(detail.said),'the detail card: '+JSON.stringify(detail));
+  const detail=await p.evaluate(()=>{showDetail('s2');const el=document.querySelector('#detail-content .probe-card');return {said:el.textContent+' | '+[...el.querySelectorAll('[aria-label]')].map(n=>n.getAttribute('aria-label')).join(' | '),rings:el.querySelectorAll('.pg-ring,.ps-card').length,line:el.querySelector('.pc-line')?.textContent||''};});
+  check(detail.rings===0&&/SSH 直读/.test(detail.said)&&/网速/.test(detail.said)&&/↓.*\/s ↑.*\/s/.test(detail.line)&&/负载/.test(detail.line),'the detail card is one line with the rate: '+JSON.stringify(detail));
   // The edge card is not linked; its detail says why and what to do.
   const edge=await p.evaluate(()=>{showDetail('s3');return document.querySelector('#detail-content').textContent;});
   check(/先在终端里连一次 ssh edge/.test(edge),'the skipped host says what to do: '+edge.slice(0,300));
@@ -88,28 +87,35 @@ async (page) => {
   await until(p,()=>window.__set?.alias==='auto1'&&sshProbe.disabled.includes('auto1'));
   await p.evaluate(()=>{sshProbe.autoAsked.clear();sshAuto();});await wait(150);
   check(JSON.stringify(await p.evaluate(()=>window.__auto))==='["auto1"]'&&await p.evaluate(()=>!sshEnabled('auto1')),'a host switched off by hand is not turned on again');
-  // The interval sits in the ⋯ menu, closed; no fields to fill in.
-  const bar=await p.evaluate(()=>({open:document.querySelector('.ssh-more').open,fields:document.querySelectorAll('#modal-content input:not([type=checkbox]):not([type=radio]),#modal-content select,#modal-content textarea').length,
+  // The interval sits in the ⋯ menu, closed: a number of seconds or minutes, any from 15 seconds to an hour, and the common ones.
+  const bar=await p.evaluate(()=>({open:document.querySelector('.ssh-more').open,fields:[...document.querySelectorAll('#modal-content input:not([type=checkbox]):not([type=radio]),#modal-content select,#modal-content textarea')].filter(n=>!n.closest('.ssh-more')).length,
    tip:document.querySelector('.ssh-more>summary').getAttribute('title')}));
   check(bar.open===false&&bar.fields===0&&/每 1 分钟/.test(bar.tip),'the interval is in a closed menu, nothing to fill in: '+JSON.stringify(bar));
-  await p.evaluate(()=>{document.querySelector('.ssh-more').open=true;const r=document.querySelector('.ssh-interval[value="30"]');r.checked=true;r.dispatchEvent(new Event('change',{bubbles:true}));});
+  await p.evaluate(()=>{document.querySelector('.ssh-more').open=true;document.querySelector('.ssh-more [data-action="live-every"][data-id="30"]').click();});
   await until(p,()=>window.__interval===30&&sshProbe.interval===30);
+  // Typed by hand: 45 seconds is taken, 5 seconds is refused in place and nothing is sent.
+  const typed=await p.evaluate(()=>{document.querySelector('.ssh-more').open=true;const n=document.querySelector('.ssh-more .live-every'),u=document.querySelector('.ssh-more .live-unit');u.value='1';n.value='45';n.dispatchEvent(new Event('change',{bubbles:true}));return true;});
+  await until(p,()=>window.__interval===45&&sshProbe.interval===45);
+  const refusedEvery=await p.evaluate(()=>{document.querySelector('.ssh-more').open=true;const n=document.querySelector('.ssh-more .live-every');n.value='5';n.dispatchEvent(new Event('change',{bubbles:true}));return {msg:n.validationMessage,interval:sshProbe.interval,sent:window.__interval};});
+  check(typed&&refusedEvery.msg&&refusedEvery.interval===45&&refusedEvery.sent===45,'an interval outside 15 s – 60 min is refused: '+JSON.stringify(refusedEvery));
+  await p.evaluate(()=>{document.querySelector('.ssh-more').open=true;const n=document.querySelector('.ssh-more .live-every'),u=document.querySelector('.ssh-more .live-unit');u.value='60';n.value='10';n.dispatchEvent(new Event('change',{bubbles:true}));});
+  await until(p,()=>window.__interval===600&&sshProbe.interval===600&&probePollMs()===600000);
   await p.evaluate(()=>document.querySelector('#modal').close());
   const saved=await p.evaluate(()=>window.__saved.join('\n'));
   for(const leak of ['MemTotal','/proc','history','198.51.100.7"','sshProbe'])check(!saved.includes(leak),'saved board holds '+leak);
   check(!errors.length,'page errors: '+errors.join(' | '));
  }finally{await context.close();}
 
- // The demo: frankfurt-vps is read over SSH (made up, linked by hand), with rings and a sparkline, and no ssh is asked for.
+ // The demo: frankfurt-vps is read over SSH (made up, linked by hand), as one line, and no ssh is asked for.
  const demo=async demoOpen=>open(o=>{window.webkit={messageHandlers:{assetboard:{postMessage(msg){window.__sent=(window.__sent||[]).concat(msg.action);if(msg.action==='save')setTimeout(()=>window.assetboardSaved?.(msg.sequence,true),5);}}}};
   window.__ASSETBOARD_NATIVE__={pro:{on:true,kind:'licensed',id:'K3Q7NVHM'},data:null,demo:true,demoOpen:o,cloudflareConnected:false,githubConnected:false,gmailConfigured:false,probeSources:[]};},demoOpen);
  const one=await demo({asset:'demo-s2'});
  try{
   await until(one.p,()=>!!document.querySelector('#detail-content .probe-card')&&!document.querySelector('#detail').hidden);
   const d=await one.p.evaluate(()=>{const c=document.querySelector('#detail-content .probe-card');return {name:document.querySelector('#detail-content h2').textContent,
-   src:c.querySelector('.pg-src')?.getAttribute('aria-label'),rings:c.querySelectorAll('.pc-rings .pg-ring').length,spark:c.querySelectorAll('.ps-card .ps-cpu').length,
+   src:c.querySelector('.pg-src')?.getAttribute('aria-label'),line:c.querySelector('.pc-line')?.textContent||'',
    row:!!document.querySelector('[data-probe-row="demo-s2"] .pg-src'),asked:(window.__sent||[]).filter(a=>/^ssh|^probe/.test(a))};});
-  check(d.name==='frankfurt-vps'&&d.src==='来源：SSH 直读'&&d.rings===3&&d.spark===1&&d.row,'--open-asset=demo-s2 shows the SSH card: '+JSON.stringify(d));
+  check(d.name==='frankfurt-vps'&&d.src==='来源：SSH 直读'&&/^内存 \d+%/.test(d.line)&&d.row,'--open-asset=demo-s2 shows the SSH card: '+JSON.stringify(d));
   check(!d.asked.length,'the demo runs no ssh: '+JSON.stringify(d.asked));
   check(!one.errors.length,'demo page errors: '+one.errors.join(' | '));
  }finally{await one.context.close();}
