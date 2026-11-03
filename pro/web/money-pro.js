@@ -80,6 +80,7 @@ function proFacts(a,row){
 }
 
 // ---- Projects: the sidebar group, the detail row and the form field (the views, totals and shutdown list are below).
+// A record can serve several projects (one Supabase account behind two side projects): the field takes names separated by commas.
 // Each project keeps a colour of its own (from its name), so it can be told apart when the sidebar is only icons.
 function projectHue(name){let h=0;for(const ch of String(name))h=(h*31+ch.codePointAt(0))%360;return h;}
 function proProjectNav(){
@@ -87,12 +88,12 @@ function proProjectNav(){
  const cur=currentView();
  return `<div class="nav-group nav-projects" role="group" aria-labelledby="nav-projects-title"><h2 class="nav-title" id="nav-projects-title">${tr('项目',null,'nav')}</h2>${names.map(({name,count})=>{const id='project:'+name,on=!query&&cur===id&&!(typeof panoOpen!=='undefined'&&panoOpen);return `<button class="nav-item${on?' active':''}" data-action="view" data-id="${esc(id)}"${on?' aria-current="page"':''} aria-label="${tr('项目 {name}，{n} 项',{name:esc(name),n:count})}"><span class="nav-icon project-dot" data-initial="${esc([...name][0].toUpperCase())}" style="--project-hue:${projectHue(name)}" aria-hidden="true"></span><span class="nav-label">${esc(name)}</span>${navCount(count)}</button>`;}).join('')}</div>`;
 }
-function projectFact(a,row){return a.project?row(tr('项目'),`<button class="text-button inline-button" data-action="view" data-id="${esc('project:'+cleanProject(a.project))}">${esc(a.project)}</button>`):'';}
+function projectFact(a,row){const names=projectsOf(a);return names.length?row(tr('项目'),names.map(name=>`<button class="text-button inline-button" data-action="view" data-id="${esc('project:'+name)}">${esc(name)}</button>`).join(tr('、'))):'';}
 function projectFormField(v){
- return `<label>${tr('项目')}<input name="project" maxlength="40" autocomplete="off" list="project-list" value="${esc(v.project||'')}" placeholder="${tr('例如 notes-app')}"></label>
+ return `<label>${tr('项目')}<input name="project" maxlength="${PROJECT_LIMIT*PROJECTS_PER_ASSET}" autocomplete="off" list="project-list" value="${esc(projectsOf(v).join(tr('，')))}" placeholder="${tr('例如 notes-app')}" title="${tr('几个项目共用就用逗号隔开')}"></label>
  <datalist id="project-list">${projectNames(state.assets).map(p=>`<option value="${esc(p.name)}">`).join('')}</datalist>`;
 }
-function projectFormRead(form,data){return {project:cleanProject(data.get('project'))};}
+function projectFormRead(form,data){const names=parseProjects(data.get('project'));return {project:names.length>1?names:names[0]||''};}
 
 // ---- The form (inside 更多): the promotion.
 function proFormFields(v){
@@ -121,7 +122,7 @@ function proFormRead(form,data,current){
 // ---- Projects: the totals bar and the shutdown list.
 function proProjectBar(name,list){
  const cur=totalCurrency(),t=costTotals(list,{currency:cur,rates:fx.rates}),plan=shutdownPlan(state.assets,name,{currency:cur,rates:fx.rates});
- return `<div class="project-bar"><div class="project-facts"><span>${tr('{amount} / 月',{amount:`<b>${esc(formatMoney(t.monthly,cur))}</b>`})}</span>${t.oneOffTotal?`<span>${tr('一次性 {amount}',{amount:esc(formatMoney(t.oneOffTotal,cur))})}</span>`:''}</div><button class="button" data-action="shutdown" data-id="${esc(name)}"${plan.steps.length?'':' disabled'}>${tr('关停清单')}</button></div>`;
+ return `<div class="project-bar"><div class="project-facts"><span>${tr('{amount} / 月',{amount:`<b>${esc(formatMoney(t.monthly,cur))}</b>`})}</span>${t.oneOffTotal?`<span>${tr('一次性 {amount}',{amount:esc(formatMoney(t.oneOffTotal,cur))})}</span>`:''}${plan.shared.length?`<span title="${tr('共用的按全价算进每个项目')}">${tr('{n} 项与别的项目共用',{n:plan.shared.length})}</span>`:''}</div><button class="button" data-action="shutdown" data-id="${esc(name)}"${plan.steps.length?'':' disabled'}>${tr('关停清单')}</button></div>`;
 }
 function shutdownDialog(name){
  const cur=totalCurrency(),plan=shutdownPlan(state.assets,name,{currency:cur,rates:fx.rates});
@@ -130,13 +131,14 @@ function shutdownDialog(name){
  modal(tr('关停「{name}」',{name:plan.name}),`<form id="shutdown-form" class="form" data-project="${esc(plan.name)}">
   <p class="form-note">${tr('按截止日期排好：赶在日期前处理，就不会再扣下一期。处理完勾上，Assetboard 会把它标为停用或隐藏（⌘Z 可撤销）；线上的东西要你自己去关。')}</p>
   <ol class="shutdown-list">${plan.steps.map(s=>`<li class="shutdown-step${s.done?' done':''}"><label><input type="checkbox" name="done" value="${esc(s.asset.id)}"${s.done?' checked disabled':''}><span class="shutdown-main"><strong>${esc(displayName(s.asset))}</strong><span class="shutdown-action">${esc(s.action)}</span><span class="shutdown-meta">${esc([cats[s.asset.type]?.one,when(s),s.monthly?tr('省 {amount} / 月',{amount:formatMoney(s.monthly,cur)}):''].filter(Boolean).join(' · '))}</span>${s.shared.length?`<span class="shutdown-warn">${ui('warn')}${tr('还关联着项目外的 {names}',{names:esc(s.shared.slice(0,3).join(tr('、')))+(s.shared.length>3?tr(' 等 {n} 项',{n:s.shared.length}):'')})}</span>`:''}</span></label>${safeManagementUrl(s.asset.url)?`<button type="button" class="button" data-action="external" data-id="${esc(s.asset.id)}">${tr('打开')}</button>`:''}</li>`).join('')}</ol>
+  ${plan.shared.length?`<p class="form-note">${tr('留着：{names}（还在别的项目里用）',{names:esc(plan.shared.map(x=>tr('{name} → {projects}',{name:x.asset.name,projects:x.projects.join(tr('、'))})).join(tr('；')))})}</p>`:''}
   ${plan.kept.length?`<p class="form-note">${tr('保留：{names}（卡、手机号和账号不随项目关停）',{names:esc(plan.kept.map(a=>a.name).join(tr('、')))})}</p>`:''}
   <div class="form-actions"><button class="button primary" type="submit">${tr('完成勾选的')}</button><button type="button" class="button" data-action="shutdown-copy" data-id="${esc(plan.name)}">${tr('复制清单')}</button><span class="form-note">${tr('全部关掉每月省 {amount}',{amount:esc(formatMoney(plan.monthlySaving,cur))})}</span></div>
  </form>`,'shutdown');
 }
 function shutdownText(name){
  const cur=totalCurrency(),plan=shutdownPlan(state.assets,name,{currency:cur,rates:fx.rates});
- return [tr('关停「{name}」',{name:plan.name}),...plan.steps.map((s,i)=>`${i+1}. ${s.done?'[x]':'[ ]'} ${tr('{name}：{action}',{name:s.asset.name,action:s.action})}${s.deadline?tr('（{date} 前）',{date:s.deadline}):''}${s.shared.length?tr(' ⚠ 还关联 {names}',{names:s.shared.join(tr('、'))}):''}`),...(plan.kept.length?[tr('保留：{names}',{names:plan.kept.map(a=>a.name).join(tr('、'))})]:[])].join('\n');
+ return [tr('关停「{name}」',{name:plan.name}),...plan.steps.map((s,i)=>`${i+1}. ${s.done?'[x]':'[ ]'} ${tr('{name}：{action}',{name:s.asset.name,action:s.action})}${s.deadline?tr('（{date} 前）',{date:s.deadline}):''}${s.shared.length?tr(' ⚠ 还关联 {names}',{names:s.shared.join(tr('、'))}):''}`),...(plan.shared.length?[tr('留着：{names}（还在别的项目里用）',{names:plan.shared.map(x=>tr('{name} → {projects}',{name:x.asset.name,projects:x.projects.join(tr('、'))})).join(tr('；'))})]:[]),...(plan.kept.length?[tr('保留：{names}',{names:plan.kept.map(a=>a.name).join(tr('、'))})]:[])].join('\n');
 }
 document.addEventListener('submit',e=>{
  if(e.target.id!=='shutdown-form')return;e.preventDefault();
@@ -159,7 +161,7 @@ function reviewStep(){
  while(run.index<run.ids.length&&!state.assets.some(a=>a.id===run.ids[run.index]&&!a.hiddenAt&&!a.stopped))run.index++;
  if(run.index>=run.ids.length){const done=[run.kept&&tr('保留 {n}',{n:run.kept}),run.stopped&&tr('停用 {n}',{n:run.stopped}),run.hidden&&tr('隐藏 {n}',{n:run.hidden})].filter(Boolean).join(tr('，'));reviewRun=null;$('#modal').close();toast(done?tr('清理完了：{done}',{done}):tr('清理完了'),!!done);return;}
  const a=state.assets.find(x=>x.id===run.ids[run.index]),cur=totalCurrency(),entry=reviewQueue([a],{currency:cur,rates:fx.rates})[0]||{monthly:0,idle:0},status=assetDateStatus(a),last=lastPayment(a);
- const facts=[[cats[a.type]?.name,a.provider==='平台待补充'?'':a.provider].filter(Boolean).join(' · '),entry.monthly?tr('约 {monthly} / 月（一年 {yearly}）',{monthly:formatMoney(entry.monthly,cur),yearly:formatMoney(entry.monthly*12,cur)}):'',status.level!=='none'?status.label:'',tr('{n} 天没动过',{n:entry.idle}),last?tr('上次付款 {date} · {amount}',{date:last.paidOn,amount:formatMoney(last.amount,last.currency)}):'',a.purpose&&a.purpose!==cats[a.type]?.name?tr('用途：{purpose}',{purpose:a.purpose}):'',a.reason?tr('保留原因：{reason}',{reason:a.reason}):'',a.project?tr('项目：{project}',{project:a.project}):''].filter(Boolean);
+ const facts=[[cats[a.type]?.name,a.provider==='平台待补充'?'':a.provider].filter(Boolean).join(' · '),entry.monthly?tr('约 {monthly} / 月（一年 {yearly}）',{monthly:formatMoney(entry.monthly,cur),yearly:formatMoney(entry.monthly*12,cur)}):'',status.level!=='none'?status.label:'',tr('{n} 天没动过',{n:entry.idle}),last?tr('上次付款 {date} · {amount}',{date:last.paidOn,amount:formatMoney(last.amount,last.currency)}):'',a.purpose&&a.purpose!==cats[a.type]?.name?tr('用途：{purpose}',{purpose:a.purpose}):'',a.reason?tr('保留原因：{reason}',{reason:a.reason}):'',projectsOf(a).length?tr('项目：{project}',{project:projectsOf(a).join(tr('、'))}):''].filter(Boolean);
  modal(tr('定期清理'),`<div class="review-card" data-id="${esc(a.id)}"><div class="review-progress"><span>${run.index+1} / ${run.ids.length}</span><b aria-hidden="true"><i style="width:${Math.round(run.index/run.ids.length*100)}%"></i></b></div>
   <div class="review-head">${tile(a,'lg')}<div><h3>${esc(displayName(a))}</h3><p class="form-note">${tr('还在用吗？')}</p></div></div>
   <ul class="review-facts">${facts.map(f=>`<li>${esc(f)}</li>`).join('')}</ul>
@@ -200,7 +202,7 @@ function proCostExtras(scope,cur){
  const year=new Date().getFullYear(),paid=paidTotals(scope,{from:`${year}-01-01`,to:`${year}-12-31`});
  const paidSum=paid.byCurrency.reduce((n,[c,v])=>{const x=convertMoney(v,c,cur,fx.rates);return x===null?n:n+x;},0);
  const first=todayIso().slice(0,8)+'01',f=costForecast(scope,{from:todayIso(),to:isoDay(dayNumber(addMonths(first,12))-1),currency:cur,rates:fx.rates}),max=Math.max(...f.byMonth.map(m=>m.total),1);
- const split=(key,label,name)=>{const groups=new Map();for(const a of scope){const k=key==='project'?cleanProject(a.project):a[key]||'';if(k)groups.set(k,(groups.get(k)||[]).concat(a));}if(!groups.size)return '';const rows=[...groups].map(([k,list])=>[k,costTotals(list,{currency:cur,rates:fx.rates}).monthly]).sort((x,y)=>y[1]-x[1]);return `<div class="cost-split"><h4>${label}</h4>${rows.map(([k,m])=>`<div class="cost-type"><span>${esc(name(k))}</span><i style="width:${Math.max(2,Math.round(m/(rows[0][1]||1)*100))}%"></i><b>${esc(formatMoney(m,cur))}</b></div>`).join('')}</div>`;};
+ const split=(key,label,name)=>{const groups=new Map();for(const a of scope)for(const k of key==='project'?projectsOf(a):[a[key]||''])if(k)groups.set(k,(groups.get(k)||[]).concat(a));if(!groups.size)return '';const rows=[...groups].map(([k,list])=>[k,costTotals(list,{currency:cur,rates:fx.rates}).monthly]).sort((x,y)=>y[1]-x[1]);return `<div class="cost-split"><h4>${label}</h4>${rows.map(([k,m])=>`<div class="cost-type"><span>${esc(name(k))}</span><i style="width:${Math.max(2,Math.round(m/(rows[0][1]||1)*100))}%"></i><b>${esc(formatMoney(m,cur))}</b></div>`).join('')}</div>`;};
  return `<div class="cost-totals cost-more"><div><span>${tr('{year} 年已付',{year})}</span><strong>${paid.count?esc(formatMoney(paidSum,cur)):'—'}</strong></div><div><span>${tr('预计到 {y} 年 {m} 月底',{y:f.to.slice(0,4),m:Number(f.to.slice(5,7))})}</span><strong>${esc(formatMoney(f.total,cur))}</strong></div></div>
  ${f.items.length?`<div class="forecast" role="img" aria-label="${tr('未来 12 个月每月预计支出')}">${f.byMonth.map(m=>`<span class="forecast-bar" title="${tr('{month}：{amount}',{month:esc(m.month),amount:esc(formatMoney(m.total,cur))})}"><i style="height:${Math.max(4,Math.round(m.total/max*100))}%"></i><em>${new Date(2000,Number(m.month.slice(5))-1,1).toLocaleDateString(trLocale(),{month:'short'})}</em></span>`).join('')}</div><p class="form-note">${tr('按每项的扣款日和当天价格算：优惠结束、试用转付费、到期续费都算进去；没填日期的周期费用按月平摊。')}</p>`:''}
  ${split('project',tr('按项目'),k=>k)}`;

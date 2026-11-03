@@ -361,5 +361,14 @@ Object.assign(I18N.en,{
  '最先要处理的':'Handle first',
  // Registry holds
  '注册局冻结了这个域名，解析已停止':'The registry has put this domain on hold; it no longer resolves',
- '注册商冻结了这个域名，解析已停止':'The registrar has put this domain on hold; it no longer resolves'
+ '注册商冻结了这个域名，解析已停止':'The registrar has put this domain on hold; it no longer resolves',
+ '免费项目 7 天没有请求会暂停，要去控制台恢复；暂停一年内还能恢复':'A free project pauses after 7 days without requests and has to be resumed in the dashboard; it can be restored for a year',
+ '免费服务 15 分钟没有访问就休眠，再访问要等约 1 分钟；每月 750 小时用完全部停到下个月':'A free service sleeps after 15 minutes without traffic and takes about a minute to wake; once the 750 hours a month are used, every free service stops until next month',
+ '免费实例 1 小时没有访问就休眠，再访问几秒后醒':'A free instance sleeps after an hour without traffic and wakes within seconds of the next request',
+ '免费 Space 48 小时没人用就休眠，有人打开时重新启动':'A free Space sleeps after 48 hours unused and restarts when someone opens it',
+ 'Eco dyno 30 分钟没有访问就休眠；保活会更快用完每月 1000 小时':'An Eco dyno sleeps after 30 minutes without traffic; keeping it awake uses up the 1000 hours a month sooner',
+ '12 小时没有访问就休眠，要有人打开页面点唤醒':'Sleeps after 12 hours without traffic; someone has to open the page and wake it',
+ '免费集群 30 天没有连接会暂停，要去控制台恢复；网页请求不算，要真的连上数据库':'A free cluster pauses after 30 days without connections and has to be resumed in the console; web requests do not count, only database connections',
+ '免费库 30 天没有请求会归档，要新建库再从备份恢复':'A free database is archived after 30 days without requests; you then create a new one and restore the backup',
+ '免费项目 7 天没在控制台操作会暂停，暂停 90 天后删除；定时请求不算':'A free project pauses after 7 days without console activity and is deleted after 90 days paused; scheduled requests do not count'
 });

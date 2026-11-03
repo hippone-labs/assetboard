@@ -5,7 +5,7 @@
 //   pay  = who pays: each bank card holds what it pays for.
 //   login = what you sign in with: each Apple ID or Google account holds what it logs into.
 //   project = by project: one card per project label. A project is a label on its things, not an asset, so its hubs are virtual
-//             ({id:'project:<name>', type:'project', virtual:true}) and hanging a thing on one sets its label (one project per thing).
+//             ({id:'project:<name>', type:'project', virtual:true}) and hanging a thing on one adds its label (a thing can serve several).
 (function(){
  const D=typeof module!=='undefined'&&module.exports?require('./asset-data.js'):window;
  // Top-level consts of asset-data.js are shared script bindings in the browser, not window properties.
@@ -42,17 +42,16 @@
  const UNMOUNTED_CAP=7,CARD_CAP=6;
  const toneOf=level=>level==='overdue'?'red':level==='soon'?'amber':'';
  const orderFor=(cardOrder,types)=>types.flatMap(type=>Array.isArray(cardOrder?.[type])?cardOrder[type]:[]);
- const projectOf=a=>D.cleanProject(a?.project);
  const projectHub=name=>({id:'project:'+name,type:'project',name,virtual:true});
  // Every hub of a lens, hidden ones included (real assets), or one virtual hub per project in use.
  const hubList=(lens,assets)=>lens.virtual?D.projectNames(assets).map(p=>projectHub(p.name)):assets.filter(a=>hubTypes(lens).includes(a.type));
  const findHub=(lens,assets,id)=>lens.virtual?(typeof id==='string'&&id.startsWith('project:')&&D.projectNames(assets).some(p=>'project:'+p.name===id)?projectHub(id.slice(8)):null):assets.find(a=>a.id===id)||null;
- const hubsOf=(lens,assets,asset)=>lens.virtual?(projectOf(asset)&&fits(lens,projectHub(projectOf(asset)),asset)?[projectHub(projectOf(asset))]:[]):D.linkedAssets(assets,asset).filter(h=>fits(lens,h,asset));
- const kidsOf=(lens,assets,hub)=>lens.virtual?assets.filter(a=>projectOf(a)===hub.name&&fits(lens,hub,a)):D.linkedAssets(assets,hub).filter(k=>fits(lens,hub,k));
+ const hubsOf=(lens,assets,asset)=>lens.virtual?D.projectsOf(asset).map(projectHub).filter(hub=>fits(lens,hub,asset)):D.linkedAssets(assets,asset).filter(h=>fits(lens,h,asset));
+ const kidsOf=(lens,assets,hub)=>lens.virtual?assets.filter(a=>D.inProject(a,hub.name)&&fits(lens,hub,a)):D.linkedAssets(assets,hub).filter(k=>fits(lens,hub,k));
  const allowed=(lens,kid,hub)=>lens.virtual||D.linkAllowed(kid,hub);
  // The lens's own write: a link, or for projects the label.
- function attach(lens,assets,kidId,hub){if(!lens.virtual)return D.linkRelation(assets,kidId,hub.id).ok;const a=assets.find(x=>x.id===kidId);if(!a||projectOf(a)===hub.name)return false;a.project=hub.name;return true;}
- function detach(lens,assets,kidId,hub){if(!lens.virtual)return D.unlinkAssets(assets,kidId,hub.id);const a=assets.find(x=>x.id===kidId);if(!a||projectOf(a)!==hub.name)return false;delete a.project;return true;}
+ function attach(lens,assets,kidId,hub){if(!lens.virtual)return D.linkRelation(assets,kidId,hub.id).ok;const a=assets.find(x=>x.id===kidId);if(!a||D.inProject(a,hub.name)||D.projectsOf(a).length>=D.PROJECTS_PER_ASSET)return false;D.setProjects(a,[...D.projectsOf(a),hub.name]);return true;}
+ function detach(lens,assets,kidId,hub){if(!lens.virtual)return D.unlinkAssets(assets,kidId,hub.id);const a=assets.find(x=>x.id===kidId);if(!a||!D.inProject(a,hub.name))return false;D.setProjects(a,D.projectsOf(a).filter(name=>name!==hub.name));return true;}
 
  function chipOf(lens,assets,asset,hubId,now){
   const status=D.assetDateStatus(asset,now),meta=hubId?D.linkMetaOf(asset,hubId):{standby:false,proxied:false};
@@ -105,7 +104,7 @@
   const loose=lens.loose.filter(type=>!off.has(groupOf(lens,type))).flatMap(type=>D.arrangeAssets(visible.filter(a=>a.type===type&&!placed(a)&&(!lens.wantsHub||lens.wantsHub(a))),cardOrder[type]));
   const unmounted={total:loose.length,items:loose.map(a=>chipOf(lens,assets,a,'',now))};
   // By project, a kind counts only what has a project; elsewhere it counts the whole board.
-  const count=list=>visible.filter(a=>list.includes(a.type)&&(!lens.virtual||projectOf(a))).length;
+  const count=list=>visible.filter(a=>list.includes(a.type)&&(!lens.virtual||D.projectsOf(a).length)).length;
   const all=hubTypes(lens),allHubs=hubList(lens,visible);
   const totals=[...all.map(type=>({key:type,types:[type],n:allHubs.filter(h=>h.type===type).length,off:off.has(type)})).filter(t=>t.n),...lens.groups.filter(g=>!g.types.every(t=>all.includes(t))).map(g=>({key:g.key,types:g.types,n:count(g.types),off:off.has(g.key)})).filter(t=>t.n||lens.key==='host')];
   // A thing on several visible hubs appears once per card; `shared` maps its id to those hub ids (hover rings the copies together).
@@ -166,18 +165,16 @@
  function panoramaHub(assets,id,lens='host'){return findHub(lensOf(lens),assets,id);}
  // The one write the panorama allows: re-hang a thing. `from` = the hub it was dragged out of ('' when it came from the unmounted strip), `to` = the target hub or null for the strip.
  //   default  = move here (the link to `from` goes, a link to `to` appears); keep = also here (the old link stays); to null = unlink from `from`.
- //   By project a thing has one project, so keep is ignored and a drop always moves.
  // → {ok, changed, kind:'move'|'also'|'detach'|'same'|'illegal'|'none', server}  (server = the hub involved)
  function moveMount(assets,assetId,{from='',to=null,keep=false,lens='host'}={}){
   const L=lensOf(lens),asset=assets.find(a=>a.id===assetId),target=to?findHub(L,assets,to):null,origin=from?findHub(L,assets,from):null;
-  if(L.virtual)keep=false;
   if(!asset||!L.loose.includes(asset.type)&&!Object.values(L.fits).some(list=>list.includes(asset.type)))return {ok:false,changed:false,kind:'illegal'};
   if(!to){if(!origin)return {ok:false,changed:false,kind:'none'};const changed=detach(L,assets,assetId,origin);return {ok:changed,changed,kind:'detach',server:origin};}
   if(!target||!fits(L,target,asset)||!allowed(L,asset,target))return {ok:false,changed:false,kind:'illegal'};
   if(from===to)return {ok:false,changed:false,kind:'same',server:target};
   const had=hubsOf(L,assets,asset).some(x=>x.id===to);
   let changed=false;
-  if(origin&&!keep&&!L.virtual)changed=detach(L,assets,assetId,origin)||changed;
+  if(origin&&!keep)changed=detach(L,assets,assetId,origin)||changed;
   if(!had)changed=attach(L,assets,assetId,target)||changed;
   return {ok:changed,changed,kind:keep||!origin?'also':'move',server:target};
  }
