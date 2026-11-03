@@ -245,9 +245,9 @@ import Foundation
         precondition((future?["result"] as? [String: Any])?["protocolVersion"] as? String == MCPServer.protocolVersions[0], "An unknown version gets the newest")
         precondition(MCPServer.handle(["jsonrpc": "2.0", "method": "notifications/initialized"]) == nil, "Notifications get no reply")
         let tools = ((MCPServer.handle(["jsonrpc": "2.0", "id": "t", "method": "tools/list"])?["result"] as? [String: Any])?["tools"] as? [[String: Any]]) ?? []
-        precondition(tools.count == 31 && Set(tools.compactMap { $0["name"] as? String }) == Set(MCPServer.methods.keys), "Thirty-one tools, each mapped to a call")
+        precondition(tools.count == 24 && Set(tools.compactMap { $0["name"] as? String }) == Set(MCPServer.methods.keys), "Twenty-four tools, each mapped to a call")
         precondition(Set(MCPServer.methods.values).count == MCPServer.methods.count && MCPServer.methods.values.allSatisfy { $0.count <= 40 }, "Each tool has its own call, short enough for the app")
-        // No tool asks for a credential, and none adds, changes or removes a probe source or switches SSH 直读 (those happen in the app).
+        // No tool asks for a credential, and none reads or steers 实时状态 (probe sources, SSH 直读): those stay in the app.
         let secret = try! NSRegularExpression(pattern: "password|passwd|token|secret|session|cookie|jwt|username|credential", options: [.caseInsensitive])
         for tool in tools {
             let names = ((tool["inputSchema"] as? [String: Any])?["properties"] as? [String: Any] ?? [:]).keys
@@ -255,22 +255,22 @@ import Foundation
             precondition((tool["inputSchema"] as? [String: Any])?["additionalProperties"] as? Bool == false, "\(tool["name"] ?? "?") takes only its own arguments")
         }
         let byName = Dictionary(uniqueKeysWithValues: tools.compactMap { tool in (tool["name"] as? String).map { ($0, tool) } })
-        for name in ["add_probe_source", "update_probe_source", "remove_probe_source", "set_ssh_host", "set_ssh_interval"] {
+        for name in ["add_probe_source", "update_probe_source", "remove_probe_source", "set_ssh_host", "set_ssh_interval", "list_probe_sources", "refresh_probe_sources", "list_probe_servers", "get_server_metrics", "set_probe_link", "list_ssh_hosts", "refresh_ssh"] {
             precondition(byName[name] == nil, "\(name) is not offered")
         }
-        precondition(!MCPServer.methods.values.contains { ["probeSourceAdd", "probeSourceUpdate", "probeSourceRemove", "sshSet", "sshInterval"].contains($0) }, "No call writes a probe or SSH setting")
+        precondition(!MCPServer.methods.values.contains { ["probeSourceAdd", "probeSourceUpdate", "probeSourceRemove", "sshSet", "sshInterval", "probeSources", "probeRefresh", "probeServers", "serverMetrics", "probeLink", "sshHosts", "sshRefresh"].contains($0) }, "No call reads or writes 实时状态")
         // Annotations: every tool says whether it reaches the network; writes that can overwrite or remove say destructive.
         let hints = { (name: String) in byName[name]?["annotations"] as? [String: Any] ?? [:] }
-        let destructive: Set<String> = ["update_asset", "update_assets", "renew_asset", "request_delete_assets", "delete_asset", "set_probe_link", "set_icon_site", "fetch_icons", "sync_cloudflare"]
-        let openWorld: Set<String> = ["add_assets", "update_asset", "update_assets", "refresh_probe_sources", "set_probe_link", "refresh_ssh", "fetch_icons", "sync_cloudflare"]
+        let destructive: Set<String> = ["update_asset", "update_assets", "renew_asset", "request_delete_assets", "delete_asset", "set_icon_site", "fetch_icons", "sync_cloudflare"]
+        let openWorld: Set<String> = ["add_assets", "update_asset", "update_assets", "fetch_icons", "sync_cloudflare"]
         for (name, _) in byName {
             let hint = hints(name)
             precondition(hint["openWorldHint"] as? Bool == openWorld.contains(name), "\(name): openWorldHint")
             if hint["readOnlyHint"] as? Bool == false { precondition(hint["destructiveHint"] as? Bool == destructive.contains(name), "\(name): destructiveHint") }
             else { precondition(!destructive.contains(name) && hint["destructiveHint"] == nil, "\(name) reads only") }
         }
-        precondition((byName["list_ssh_hosts"]?["annotations"] as? [String: Any])?["readOnlyHint"] as? Bool == true && (byName["fetch_icons"]?["annotations"] as? [String: Any])?["readOnlyHint"] as? Bool == false, "Read and write hints")
-        precondition((((byName["update_asset"]?["inputSchema"] as? [String: Any])?["properties"] as? [String: Any])?["fields"] as? [String: Any]).flatMap { ($0["properties"] as? [String: Any])?.keys }.map { Set($0).isSuperset(of: ["hidden", "stopped", "probeLink"]) } == true, "update_asset takes hidden, stopped and probeLink")
+        precondition((byName["list_icon_platforms"]?["annotations"] as? [String: Any])?["readOnlyHint"] as? Bool == true && (byName["fetch_icons"]?["annotations"] as? [String: Any])?["readOnlyHint"] as? Bool == false, "Read and write hints")
+        precondition((((byName["update_asset"]?["inputSchema"] as? [String: Any])?["properties"] as? [String: Any])?["fields"] as? [String: Any]).flatMap { ($0["properties"] as? [String: Any])?.keys }.map { Set($0).isSuperset(of: ["hidden", "stopped"]) && !$0.contains("probeLink") } == true, "update_asset takes hidden and stopped, not probeLink")
         precondition(parsed(["pay", "x1", "--amount", "6", "--missed"])?.1["missed"] as? Bool == true && parsed(["pay", "x1", "--amount", "six"]) == nil, "pay options")
         precondition(parsed(["renew", "x1", "--until", "2027-03-01"])?.1["until"] as? String == "2027-03-01" && parsed(["renew", "x1"]) == nil, "renew needs --until")
         precondition((parsed(["delete-many", "a", "b", "--reason", "x"])?.1["ids"] as? [String]) == ["a", "b"], "delete-many takes ids")
@@ -278,7 +278,7 @@ import Foundation
         precondition(tools.allSatisfy { JSONSerialization.isValidJSONObject($0) && ($0["inputSchema"] as? [String: Any])?["type"] as? String == "object" }, "Tool schemas are JSON objects")
         precondition((MCPServer.handle(["jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": ["name": "drop_all"]])?["error"] as? [String: Any])?["code"] as? Int == -32602, "An unknown tool is an error")
         precondition((MCPServer.handle(["jsonrpc": "2.0", "id": 4, "method": "resources/list"])?["error"] as? [String: Any])?["code"] as? Int == -32601, "An unknown method is an error")
-        print("PASS: CLI arguments, add formats, bad arguments, pay/renew/delete-many/update-many, MCP initialize and version, notifications, thirty-one tools with schemas (none asks for a credential or writes a probe or SSH setting; destructive and open-world hints), unknown tool and method")
+        print("PASS: CLI arguments, add formats, bad arguments, pay/renew/delete-many/update-many, MCP initialize and version, notifications, twenty-four tools with schemas (none asks for a credential or reaches 实时状态; destructive and open-world hints), unknown tool and method")
     }
 
     static func pretty(_ value: Any) -> String {
@@ -353,13 +353,11 @@ enum MCPServer {
             "icon": text("An icon you already have, as data:image/png, jpeg or webp;base64,… up to 256 KB; shown instead of the site icon; empty removes it"),
             "hidden": ["type": "boolean", "description": "Updates only: true hides the asset (\(zh("隐藏: "))left out of lists, totals and reminders), false shows it again"],
             "stopped": ["type": "boolean", "description": "Updates only: true marks it \(L("已停用")) (servers, domains, repositories, databases, licenses, subscriptions, AI plans, deployments, storage, phone numbers), false in use again"],
-            "probeLink": ["type": ["object", "string", "null"], "description": "Updates only, servers: {source, serverId} links the card to a probe server (see list_probe_servers), \"none\" keeps it out of matching, \"auto\" or null matches it automatically again",
-                          "properties": ["source": text("Probe source id, or ssh"), "serverId": text("Server id within that source")]]
         ]
     }
 
     /// Annotations: destructive for a write that can overwrite or remove what is there (not only add), openWorld for a tool that
-    /// can make the app reach the network (a panel, a host over ssh, a site's icon, Cloudflare); everything else stays on this Mac.
+    /// can make the app reach the network (a site's icon, Cloudflare); everything else stays on this Mac.
     static func tool(_ name: String, _ title: String, _ description: String, _ properties: [String: Any], _ required: [String], readOnly: Bool, destructive: Bool = false, openWorld: Bool = false) -> [String: Any] {
         let schema: [String: Any] = ["type": "object", "properties": properties, "required": required, "additionalProperties": false]
         var annotations: [String: Any] = ["readOnlyHint": readOnly, "openWorldHint": openWorld]
@@ -404,25 +402,14 @@ enum MCPServer {
         ] + proTools
     }
 
-    /// Probe sources, SSH 直读, site icons and the Cloudflare sync. Probe sources and SSH 直读 are read and refreshed only: adding,
-    /// changing or removing a source and switching a host happen in the app. No tool takes or returns a user name, password, token or
-    /// session: accounts and tokens are entered in the app only. Slow work (reading a panel, ssh, icons, a sync) answers at once with
-    /// a status to look up later.
+    /// Site icons and the Cloudflare sync. 实时状态 (probe sources, SSH 直读) has no tool: its readings stay in the app. No tool takes
+    /// or returns a user name, password, token or session: accounts and tokens are entered in the app only. Slow work (icons, a sync)
+    /// answers at once with a status to look up later.
     static var proTools: [[String: Any]] {
-        let id: [String: Any] = ["type": "string"]
         let text: [String: Any] = ["type": "string"]
         let reason: [String: Any] = ["type": "string", "description": "Shown to the user in the confirmation"]
-        let alias: [String: Any] = ["type": "string", "description": "A Host alias from ~/.ssh/config, as list_ssh_hosts names it"]
-        let assetId: [String: Any] = ["type": "string", "description": "A server asset's id"]
         let ids: [String: Any] = ["type": "array", "minItems": 1, "maxItems": 100, "items": ["type": "string"]]
         return [
-            tool("list_probe_sources", "List probe sources", "Monitoring panels Assetboard reads\(zh(" (探针数据源)")), added and changed in the app only (\(L("文件")) → \(L("探针数据源…")))): id, name, kind, url (masked like a host unless the person allows addresses), hasLogin, status (ok, loading, unread, needsLogin: the panel is not public and its account must be entered in the app, badLogin, humanCheck, error) with a message, how many servers were read and linked, updatedAt. Never returns user names, passwords or sessions.", [:], [], readOnly: true),
-            tool("refresh_probe_sources", "Refresh probe sources", "Read one probe source (id) or all of them again now. Returns status refreshing at once; see list_probe_sources and list_probe_servers.", ["id": id], [], readOnly: false, openWorld: true),
-            tool("list_probe_servers", "List probe servers", "Servers the probe sources (and \(ssh), source ssh) report: source, serverId, name, online, lastSeen and the server card each shows on (linkedAssetId, how: manual, ip, host or name). unmatchedOnly lists those on no card. No addresses.", ["source": text, "unmatchedOnly": ["type": "boolean"]], [], readOnly: true),
-            tool("get_server_metrics", "Get a server's live readings", "A server card's probe readings: online, lastSeen, cpu (%), memory and disk {used, total, percent} in bytes, traffic this month, network rate (\(ssh)), uptime and load, and the history's average and peak. linked false when no probe server is on it.", ["assetId": assetId], ["assetId"], readOnly: true),
-            tool("set_probe_link", "Link a server card to a probe", "Link a server card to a probe server (source + serverId from list_probe_servers), keep it out of matching (mode none), or match it automatically again (mode auto). Board data: undoable in the app with ⌘Z. Returns the card's readings.", ["assetId": assetId, "source": text, "serverId": text, "mode": ["type": "string", "enum": ["link", "none", "auto"]]], ["assetId"], readOnly: false, destructive: true, openWorld: true),
-            tool("list_ssh_hosts", "List \(ssh) hosts", "Hosts of ~/.ssh/config for \(ssh) (read-only readings over the system's ssh; switched on and off in the app only): alias, enabled, manuallyOff, inConfig, status (off, waiting, reading, ok, error), problem and message, lastReadAt, the linked server card, and the interval. Never returns HostName, addresses, user names, ports, IdentityFile or the config itself.", [:], [], readOnly: true),
-            tool("refresh_ssh", "Refresh \(ssh)", "Read one enabled host (alias) or all enabled hosts now. Returns status refreshing at once; see list_ssh_hosts and get_server_metrics.", ["alias": alias], [], readOnly: false, openWorld: true),
             tool("list_icon_platforms", "List icon platforms", "Platforms whose site icons the assets use (as in \(L("获取网站图标…"))): platform, the site icons come from (customSite when the user chose one), how many assets and asset ids, how many have an icon, fetching, lastError; autoIcons; lastFetch: the status of the last fetch_icons (fetching, done or failed, with each platform's state and how many assets were updated).", [:], [], readOnly: true),
             tool("set_icon_site", "Choose a platform's icon site", "Take a platform's icons from another site (a domain or https link; no IPs, local names or credentials), or null to go back to the platform's own. Board data: undoable with ⌘Z. Does not fetch; call fetch_icons.", ["platform": text, "site": ["type": ["string", "null"]]], ["platform"], readOnly: false, destructive: true),
             tool("fetch_icons", "Fetch site icons", "Fetch site icons for one platform, for some assets (assetIds) or for every asset without one; overwrite replaces icons already there (custom icons are never replaced). Returns status fetching and a jobId at once; the icons are applied together in one undo step when every request has answered, see lastFetch in list_icon_platforms.", ["platform": text, "assetIds": ids, "overwrite": ["type": "boolean"]], [], readOnly: false, destructive: true, openWorld: true),
@@ -436,9 +423,6 @@ enum MCPServer {
     static let methods = ["get_cost_totals": "totals", "list_asset_types": "types", "list_assets": "list", "get_asset": "get", "add_assets": "add", "update_asset": "update", "delete_asset": "delete",
                           "get_cost_forecast": "forecast", "get_cost_history": "costHistory", "list_projects": "projects", "list_unconfirmed_charges": "charges", "record_payment": "recordPayment", "renew_asset": "renew",
                           "update_assets": "updateMany", "request_delete_assets": "deleteMany", "list_pending_actions": "actions", "get_action_status": "action",
-                          "list_probe_sources": "probeSources",
-                          "refresh_probe_sources": "probeRefresh", "list_probe_servers": "probeServers", "get_server_metrics": "serverMetrics", "set_probe_link": "probeLink",
-                          "list_ssh_hosts": "sshHosts", "refresh_ssh": "sshRefresh",
                           "list_icon_platforms": "iconPlatforms", "set_icon_site": "iconSite", "fetch_icons": "iconFetch",
                           "get_cloudflare_sync_status": "cloudflareStatus", "sync_cloudflare": "cloudflareSync", "list_sync_blocklist": "syncBlocklist", "unblock_sync_item": "syncUnblock"]
 
@@ -465,7 +449,7 @@ enum MCPServer {
                 "protocolVersion": protocolVersions.contains(asked) ? asked : protocolVersions[0],
                 "capabilities": ["tools": ["listChanged": false]],
                 "serverInfo": ["name": "assetboard", "title": "Assetboard", "version": AssetboardCLI.version],
-                "instructions": "Assetboard keeps a person's domains, servers, subscriptions, bank cards (last 4 digits only), phone numbers and accounts on their Mac. Adds and edits apply at once and can be undone in the app; deletes wait for the person's confirmation. IP addresses, SSH hosts and users, phone numbers and email addresses come masked with • and bank cards and phone numbers are left out, unless the person allows them in the app's settings; search matches the real values, and a value holding • is never written back (leave the field out to keep it). Probe sources and \(ssh) can be read and refreshed; adding, changing or removing them happens in the app only. Site icons and the Cloudflare sync can be steered too: letting a sync add back a deleted item waits for confirmation as well, and slow work answers with a status to look up later. Accounts, passwords and tokens are entered in the app only and never pass through these tools. Never store passwords, verification codes or full card numbers."
+                "instructions": "Assetboard keeps a person's domains, servers, subscriptions, bank cards (last 4 digits only), phone numbers and accounts on their Mac. Adds and edits apply at once and can be undone in the app; deletes wait for the person's confirmation. IP addresses, SSH hosts and users, phone numbers and email addresses come masked with • and bank cards and phone numbers are left out, unless the person allows them in the app's settings; search matches the real values, and a value holding • is never written back (leave the field out to keep it). Live readings (probe sources, \(ssh)) are not available to these tools. Site icons and the Cloudflare sync can be steered too: letting a sync add back a deleted item waits for confirmation as well, and slow work answers with a status to look up later. Accounts, passwords and tokens are entered in the app only and never pass through these tools. Never store passwords, verification codes or full card numbers."
             ]
         case "ping":
             reply["result"] = [String: Any]()

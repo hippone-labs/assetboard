@@ -152,25 +152,7 @@ test('refusals: a wrong account, a human check, a private panel, each with short
  assert.ok(!/READ_TOKEN|JWT|完整管理权限/.test(data.PROBE_KINDS.cfsm.credential),'no token copy left');
 });
 
-test('history: rows become CPU and 内存 points, sorted, thinned, clamped; words give average and peak',()=>{
- const rows=[{timestamp:3000,cpu:150,ram_used:2048,ram_total:4096},{timestamp:1000,cpu:10,ram_used:1024,ram_total:4096},{timestamp:2000,cpu:null,ram_used:5,ram_total:0},{cpu:5}];
- const p=data.probeHistoryPoints(rows);
- assert.deepEqual(p.cpu,[{t:1000,v:10},{t:3000,v:100}]);
- assert.deepEqual(p.mem,[{t:1000,v:25},{t:3000,v:50}]);
- assert.equal(data.probeHistoryWords(p),'CPU 平均 55%，最高 100%；内存 平均 38%，最高 50%');
- const many=Array.from({length:500},(_,i)=>({timestamp:i*1000,cpu:i%100,ram_used:1,ram_total:2}));
- const thin=data.probeHistoryPoints(many);
- assert.ok(thin.cpu.length<=121&&thin.cpu.length>=100,'thinned to about 120 points: '+thin.cpu.length);
- assert.equal(thin.cpu.at(-1).t,499000,'the newest point stays');
- assert.deepEqual(data.probeHistoryPoints(null),{cpu:[],mem:[]});
- assert.equal(data.probeHistoryWords({cpu:[{t:1,v:5}],mem:[]}),'','one point says nothing');
-});
 
-test('sparkline path: time across, 0–100 % up the box, nothing for fewer than two points',()=>{
- assert.equal(data.probeSparkPath([{t:0,v:0},{t:10,v:100}],100,20),'M0.0 19.0L100.0 1.0');
- assert.equal(data.probeSparkPath([{t:0,v:50},{t:5,v:50},{t:10,v:50}],10,12),'M0.0 6.0L5.0 6.0L10.0 6.0');
- assert.equal(data.probeSparkPath([{t:0,v:5}],10,10),'');assert.equal(data.probeSparkPath([],10,10),'');
-});
 
 test('live updates lay changed fields over the last rows; the newest sample is the last report',()=>{
  const rows=[{id:'a',name:'tokyo',cpu:10,ram_used:100,last_updated:1000},{id:'b',name:'paris',cpu:5,last_updated:1000}];
@@ -195,12 +177,6 @@ test('reconnecting backs off 1 s, 2 s, 4 s … to 60 s, with jitter between half
  assert.deepEqual(data.PROBE_LIVE_GIVE_UP,[401,403,426,503]);
 });
 
-test('the demo has 24 hours of history for its servers; the offline one stops where it went quiet',()=>{
- const now=Date.UTC(2026,9,23,12),on=data.probeDemoHistory('cf1',now),off=data.probeDemoHistory('cf3',now);
- assert.equal(on.length,120);assert.ok(on.at(-1).timestamp===now&&on[0].timestamp===now-119*12*60000);
- assert.ok(off.at(-1).timestamp<=now-47*60000&&off.length<120);
- const p=data.probeHistoryPoints(on);assert.ok(p.cpu.length===120&&p.mem.length===120&&p.cpu.every(x=>x.v>0&&x.v<=100));
-});
 
 test('the panel address: https added, path and fragment dropped, nonsense refused',()=>{
  const n=data.probeNormalizeUrl;

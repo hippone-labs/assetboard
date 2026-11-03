@@ -929,4 +929,7 @@ Object.assign(I18N.en,{
  'Assetboard 自己不发请求，只生成 GitHub Actions 配置给你复制。地址最好是会读数据库的接口；公开仓库 60 天没有提交，GitHub 会停掉定时任务。':'Assetboard sends no requests itself; it writes a GitHub Actions workflow for you to copy. Pick an address that reads the database. GitHub turns off scheduled workflows in a public repository after 60 days without commits.',
  '要一个 http(s) 地址，不带账号、密钥或引号':'Use an http(s) address without a user name, key or quotes',
  '已复制，放进仓库的 .github/workflows/':'Copied. Put it in the repository under .github/workflows/',
+ '多久读一次服务器；只在窗口显示时读，连不上时自动拉长':'How often servers are read; only while the window is shown, and less often when one cannot be reached',
+ '实时状态':'Live status',
+ '打开后才读：用 SSH 和你添加的监控面板读服务器的内存、网络和负载，每条资产显示一行。这是实时读数，不是登记状态':'Reads only once turned on: memory, network and load of your servers over SSH and from monitoring panels you add, one line per asset. These are live readings, not recorded status',
 });

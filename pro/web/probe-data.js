@@ -110,6 +110,21 @@ if(typeof module!=='undefined'&&typeof tr==='undefined')globalThis.tr=require('.
   return list;
  }
 
+ // The one line a row and the detail show: memory, network, load. Network is the rate when the source reads the interfaces itself
+ // (SSH 直读), else the panel's month total; load is the 1-minute load average, else CPU. Offline: since when. tone: red offline,
+ // amber when memory is at MEM_WARN % or more. → {online, tone, parts:[{key, text, label}], text, label}
+ const MEM_WARN=90;
+ function probeLine(s,now=Date.now()){
+  const v=probeSummary(s,now),parts=[];
+  if(!v.online)return {online:false,tone:'red',parts:[],text:tr('离线 · {ago}',{ago:v.ago}),label:tr('离线，{seen}',{seen:v.seen})};
+  if(v.memPct!=null)parts.push({key:'mem',text:tr('内存 {pct}',{pct:v.mem}),label:tr('内存 {pct}，{text}',{pct:v.mem,text:v.memText})});
+  if(s.rate)parts.push({key:'net',text:`↓${probeBytes(s.rate.rx)}/s ↑${probeBytes(s.rate.tx)}/s`,label:tr('网速 ↓ {rx}/s ↑ {tx}/s',{rx:probeBytes(s.rate.rx),tx:probeBytes(s.rate.tx)})});
+  else if(v.trafficUsed)parts.push({key:'net',text:tr('本月 {traffic}',{traffic:v.traffic}),label:tr('本月流量 {traffic}',{traffic:v.traffic})});
+  if(Array.isArray(s.load)&&Number.isFinite(s.load[0]))parts.push({key:'load',text:tr('负载 {n}',{n:s.load[0].toFixed(2)}),label:tr('1 分钟负载 {n}',{n:s.load[0].toFixed(2)})});
+  else if(v.cpuPct!=null)parts.push({key:'cpu',text:`CPU ${v.cpu}`,label:`CPU ${v.cpu}`});
+  return {online:true,tone:v.memPct!=null&&v.memPct>=MEM_WARN?'amber':'',parts,text:parts.map(p=>p.text).join(' · '),label:[...parts.map(p=>p.label),v.seen].join(tr('，'))};
+ }
+
  // The demo's panel (`--demo`, `?demo`): made up, shaped like a CF-Server-Monitor answer, read through the same code. Two servers
  // match by name, one is linked by hand in demo-data.js (it is called differently on the panel) and is offline, one matches nothing.
  function probeDemoAnswer(now=Date.now()){
@@ -130,26 +145,6 @@ if(typeof module!=='undefined'&&typeof tr==='undefined')globalThis.tr=require('.
  }
  const PROBE_ERROR_WORDS={credentials:tr('用户名或密码不对'),turnstile:tr('面板开了人机验证：为 Assetboard 关掉，或把面板设为公开'),private:tr('面板不公开：请填写面板账号')};
  const PROBE_ERROR_ICONS={credentials:'key',turnstile:'shield',private:'user'};
- // History: CF-Server-Monitor's GET /api/history/all?id=&hours= (hours from a fixed list; anonymous reads stop at 24) gives about
- // 120 rows {timestamp, cpu, ram_used, ram_total, …}. The cards draw the last 24 hours of CPU and 内存.
- const PROBE_HISTORY_HOURS=24;
- function probeHistoryPoints(rows,limit=120){
-  const list=(Array.isArray(rows)?rows:[]).map(r=>({t:num(r?.timestamp),cpu:num(r?.cpu),used:num(r?.ram_used),total:num(r?.ram_total)})).filter(r=>r.t!=null).sort((a,b)=>a.t-b.t);
-  const step=Math.max(1,Math.ceil(list.length/limit)),kept=list.filter((_,i)=>i%step===0||i===list.length-1);
-  const cpu=kept.filter(r=>r.cpu!=null).map(r=>({t:r.t,v:Math.min(100,Math.max(0,r.cpu))}));
-  const mem=kept.filter(r=>r.used!=null&&r.total>0).map(r=>({t:r.t,v:Math.min(100,Math.max(0,r.used/r.total*100))}));
-  return {cpu,mem};
- }
- function probeHistoryWords(points){
-  const say=(name,list)=>{if(list.length<2)return '';const vs=list.map(p=>p.v),avg=Math.round(vs.reduce((a,b)=>a+b,0)/vs.length),max=Math.round(Math.max(...vs));return tr('{name} 平均 {avg}%，最高 {max}%',{name,avg,max});};
-  return [say('CPU',points.cpu),say(tr('内存'),points.mem)].filter(Boolean).join(tr('；'));
- }
- // A sparkline's path in a w×h box: x over the time span, y from 0 (bottom) to 100 % (top), a 1 px margin so the stroke shows.
- function probeSparkPath(points,w,h){
-  if(!points||points.length<2)return '';
-  const t0=points[0].t,span=Math.max(1,points[points.length-1].t-t0),y=v=>(h-1-(h-2)*v/100).toFixed(1);
-  return points.map((p,i)=>`${i?'L':'M'}${((p.t-t0)/span*w).toFixed(1)} ${y(p.v)}`).join('');
- }
  // Live: a batchUpdate from /api/ws carries, per server, samples whose data are the changed fields (the last one a full report).
  // They are laid over the rows read last; the time of the newest sample becomes the last report.
  function probeMergeUpdates(rows,updates){
@@ -167,14 +162,6 @@ if(typeof module!=='undefined'&&typeof tr==='undefined')globalThis.tr=require('.
  function probeBackoff(attempt,random=Math.random()){const base=Math.min(PROBE_BACKOFF_MAX,1000*2**Math.max(0,attempt));return Math.round(base/2+Math.max(0,Math.min(1,random))*base/2);}
  // Statuses after which the socket is not tried again until the next refresh by hand: refused (401/403), not offered (426/503).
  const PROBE_LIVE_GIVE_UP=[401,403,426,503];
- // The demo's 24 hours: smooth made-up curves, offline ones stop where the server went quiet.
- function probeDemoHistory(serverId,now=Date.now()){
-  const seed=[...String(serverId)].reduce((a,c)=>a+c.charCodeAt(0),0),rows=[],quiet={cf3:47}[serverId]||0;
-  for(let i=119;i>=0;i--){const t=now-i*12*60000;if(quiet&&t>now-quiet*60000)continue;const k=(119-i)/119*Math.PI*4+seed;
-   rows.push({timestamp:t,cpu:Math.max(1,18+14*Math.sin(k)+6*Math.sin(k*3.1)+(seed%7)),ram_total:4096,ram_used:Math.round(4096*(0.38+0.08*Math.sin(k/2)+(seed%5)/40))});}
-  return rows;
- }
-
  // The one kind there is, so the form never asks.
  const PROBE_KIND_DEFAULT='cfsm';
  // What the person types as the panel's address, made into its origin: https:// when no scheme is given, any path, query or
@@ -190,6 +177,6 @@ if(typeof module!=='undefined'&&typeof tr==='undefined')globalThis.tr=require('.
  // A refused first read that an account can fix (the panel is not public); a human check (Turnstile) cannot be fixed by one.
  function probeNeedsAccount(status,reason){return reason!=='turnstile'&&reason!=='credentials'&&(status===401||status===403||reason==='private');}
 
- const api={PROBE_KIND_DEFAULT,probeNormalizeUrl,probeNeedsAccount,PROBE_ONLINE_MS,PROBE_KINDS,probeErrorKind,PROBE_ERROR_WORDS,PROBE_ERROR_ICONS,PROBE_HISTORY_HOURS,probeHistoryPoints,probeHistoryWords,probeSparkPath,probeMergeUpdates,PROBE_BACKOFF_MAX,probeBackoff,PROBE_LIVE_GIVE_UP,probeDemoHistory,probeServers,matchProbeServers,probeBytes,probeAgo,probeSummary,probeGauges,probeDemoAnswer,PROBE_DEMO_SOURCE};
+ const api={PROBE_KIND_DEFAULT,probeNormalizeUrl,probeNeedsAccount,PROBE_ONLINE_MS,PROBE_KINDS,probeErrorKind,PROBE_ERROR_WORDS,PROBE_ERROR_ICONS,probeMergeUpdates,PROBE_BACKOFF_MAX,probeBackoff,PROBE_LIVE_GIVE_UP,probeServers,matchProbeServers,probeBytes,probeAgo,probeSummary,probeGauges,MEM_WARN,probeLine,probeDemoAnswer,PROBE_DEMO_SOURCE};
  if(typeof module!=='undefined'&&typeof window==='undefined')module.exports=api;else root.probeData=api;
 })(typeof window!=='undefined'?window:globalThis);

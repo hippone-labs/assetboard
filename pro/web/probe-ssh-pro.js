@@ -41,7 +41,7 @@ function sshTake(r){
   sshProbe.hosts=parseSshConfig(l.config||'').map(h=>({name:h.name,host:h.host}));
   sshProbe.enabled=Array.isArray(l.enabled)?l.enabled.map(String):[];
   sshProbe.disabled=Array.isArray(l.disabled)?l.disabled.map(String):[];
-  if(probeSshData.SSH_INTERVALS.includes(+l.interval))sshProbe.interval=+l.interval;
+  if(probeSshData.sshIntervalOk(+l.interval))sshProbe.interval=+l.interval;
   sshProbe.configError=l.error?String(l.error):'';sshProbe.listed=true;sshProbe.status='';
   for(const alias of [...sshProbe.sessions.keys()])if(!sshEnabled(alias))sshProbe.sessions.delete(alias);
   sshAuto();sshPoll();
@@ -78,7 +78,7 @@ function sshToggle(alias,on){
 // 设置: the hosts in ~/.ssh/config, each with its own switch and state; the interval; the full command.
 function sshProbeDialog(){
  if(proOff)return;
- if(!featureOn('probe')){notice(tr('探针与 SSH 直读已在设置里关闭'),{action:'prefs',id:'features',label:tr('打开设置')});return;}
+ if(!featureOn('probe')){notice(tr('实时状态已在设置里关闭'),{action:'prefs',id:'features',label:tr('打开设置')});return;}
  if(!sshOn()){toast(tr('SSH 直读仅 Mac App 可用'));return;}
  const d=probeSshData,cmd=`/usr/bin/ssh ${d.SSH_PROBE_OPTIONS.join(' ')} -- ${tr('<别名>')} "${tr('命令')}"`;
  modal(tr('SSH 直读'),`<div class="form ssh-dialog">
@@ -118,23 +118,35 @@ function sshDialogBody(){
  // The same row as a panel source in 探针数据源: name and small lines on the left, the switch on the right.
  const row=(alias,target)=>`<li class="probe-source ssh-host${sshEnabled(alias)?' on':''}" data-alias="${esc(alias)}"><div><b>${probeGlyph('ssh')}${esc(alias)}</b>${target?`<small>${esc(target)}</small>`:''}<span class="ssh-state">${sshHostLine(alias)}</span></div><span class="probe-source-actions"><label class="ssh-switch" title="${sshEnabled(alias)?tr('关闭 SSH 直读：{alias}',{alias:esc(alias)}):tr('开启 SSH 直读：{alias}',{alias:esc(alias)})}"><input type="checkbox" class="ssh-toggle" data-alias="${esc(alias)}" aria-label="${tr('SSH 直读 {alias}',{alias:esc(alias)})}"${sshEnabled(alias)?' checked':''}><i aria-hidden="true"></i></label></span></li>`;
  const list=[...known.map(h=>row(h.name,h.host&&h.host!==h.name?h.host:'')),...stale.map(a=>row(a,tr('~/.ssh/config 里已没有')))].join('');
- const every=s=>s<60?tr('{n} 秒',{n:s}):tr('{n} 分钟',{n:s/60});
  // Nothing to fill in: one quiet line, 刷新, and a small ⋯ menu that holds the interval.
  box.innerHTML=`<div class="ssh-bar"><p class="form-note platform-note ssh-note" title="${esc(SSH_NOTE)}" aria-label="${esc(SSH_NOTE)}">${ui('lock')}${tr('只读，不问密码，不装东西。')}</p>
   <span class="form-note" role="status">${esc(sshProbe.status)}</span>
   <button class="icon-button pc-act" data-action="ssh-refresh"${sshProbe.enabled.length?'':' disabled'} aria-label="${tr('刷新')}" title="${tr('刷新')}">${probeGlyph('refresh')}</button>
-  <details class="ssh-more"><summary class="icon-button pc-act" aria-label="${tr('更多：读取间隔（现为每 {every}）',{every:every(sshProbe.interval)})}" title="${tr('读取间隔：每 {every}',{every:every(sshProbe.interval)})}">${probeGlyph('more')}</summary>
-   <div class="ssh-menu" role="group" aria-label="${tr('读取间隔')}">${probeSshData.SSH_INTERVALS.map(v=>`<label><input type="radio" name="ssh-interval" class="ssh-interval" value="${v}"${v===sshProbe.interval?' checked':''}>${tr('每 {every}',{every:every(v)})}</label>`).join('')}</div></details></div>
+  <details class="ssh-more"><summary class="icon-button pc-act" aria-label="${tr('更多：读取间隔（现为每 {every}）',{every:liveEvery(sshProbe.interval)})}" title="${tr('读取间隔：每 {every}',{every:liveEvery(sshProbe.interval)})}">${probeGlyph('more')}</summary>
+   <div class="ssh-menu" role="group" aria-label="${tr('读取间隔')}">${liveIntervalField()}</div></details></div>
   ${list?`<ul class="probe-sources ssh-hosts">${list}</ul>`:`<p class="form-note">${sshProbe.listed||demoMode?esc(sshProbe.configError||tr('~/.ssh/config 里没有 Host')):tr('正在读取 ~/.ssh/config…')}</p>`}`;
 }
 
+// 读取间隔, the person's to set: a number and a unit (秒 / 分钟), any whole number of seconds from 15 seconds to an hour, with
+// the common ones offered. It is the one interval of 实时状态: SSH 直读 and the panels' polling (probePollMs) both read it.
+function liveEvery(s){return s<60||s%60?tr('{n} 秒',{n:s}):tr('{n} 分钟',{n:s/60});}
+function liveIntervalField(){
+ const s=sshProbe.interval,min=s>=60&&!(s%60),d=probeSshData;
+ return `<span class="live-interval"><input type="number" class="live-every" min="1" max="${d.SSH_INTERVAL_MAX}" step="1" inputmode="numeric" value="${min?s/60:s}" aria-label="${tr('读取间隔')}"><select class="live-unit" aria-label="${tr('单位')}"><option value="1"${min?'':' selected'}>${tr('秒')}</option><option value="60"${min?' selected':''}>${tr('分钟')}</option></select><span class="live-presets">${d.SSH_INTERVALS.map(v=>`<button type="button" class="choice" data-action="live-every" data-id="${v}" aria-pressed="${v===s}">${esc(liveEvery(v))}</button>`).join('')}</span></span>`;
+}
+function setLiveInterval(s,field){
+ if(!probeSshData.sshIntervalOk(s)){if(field){field.setCustomValidity(tr('填 15 秒到 60 分钟之间的整数'));field.reportValidity();}return false;}
+ field?.setCustomValidity('');sshProbe.interval=s;
+ if(!demoMode)sshPost({action:'sshProbeInterval',seconds:s});
+ sshDialogBody();if($('#modal')?.dataset.view==='prefs')for(const box of document.querySelectorAll('.live-interval'))box.outerHTML=liveIntervalField();
+ return true;
+}
 document.addEventListener('change',e=>{
  const t=e.target.closest?.('.ssh-toggle');if(t){sshToggle(t.dataset.alias,t.checked);return;}
- if(e.target.classList?.contains('ssh-interval')){
-  const s=+e.target.value;if(!probeSshData.SSH_INTERVALS.includes(s))return;
-  if(demoMode){sshProbe.interval=s;sshDialogBody();}else sshPost({action:'sshProbeInterval',seconds:s});
- }
+ const box=e.target.closest?.('.live-interval');
+ if(box){const n=box.querySelector('.live-every'),unit=+box.querySelector('.live-unit').value;setLiveInterval(Math.round(Number(n.value)*unit),n);}
 });
+document.addEventListener('click',e=>{const b=e.target.closest?.('[data-action="live-every"]');if(b)setLiveInterval(+b.dataset.id);});
 
 // A server card that is in ~/.ssh/config, linked to no probe and not turned on: its detail offers to turn it on (逐台开启).
 function sshAliasFor(a){
@@ -177,7 +189,7 @@ function sshStart(){
   }else{
    const s=nativeStore?.sshProbe;
    if(s&&Array.isArray(s.enabled))sshProbe.enabled=s.enabled.map(String);
-   if(probeSshData.SSH_INTERVALS.includes(+s?.interval))sshProbe.interval=+s.interval;
+   if(probeSshData.sshIntervalOk(+s?.interval))sshProbe.interval=+s.interval;
    sshPost({action:'sshProbeList'});
   }
   probeRepaint();

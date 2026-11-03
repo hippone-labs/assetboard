@@ -242,7 +242,7 @@ Object.assign(I18N.en,{
  '已关联探针':'Probe linked',
  '已恢复自动匹配':'Back to automatic matching',
  '探针数据源仅 Mac App 可用':'Probe sources are available only in the Mac app',
- '探针与 SSH 直读已在设置里关闭':'Probes and SSH readings are turned off in Settings',
+ '实时状态已在设置里关闭':'Live status is turned off in Settings',
  '探针数据源':'Probe sources',
  '添加数据源':'Add source',
  '面板地址':'Panel address',
@@ -345,5 +345,14 @@ Object.assign(I18N.en,{
  '付款账本、未来 12 个月预测和项目合计在 Pro 里。':'Payment ledger, 12-month forecast and project totals are in Pro.',
  '移除后下次启动回到免费版，数据不变。':'The free edition returns at the next launch. Your data stays.',
  '状态':'Status',
- '免费版':'Free edition'
+ '免费版':'Free edition',
+ '离线，{seen}':'Offline, {seen}',
+ '内存 {pct}':'Memory {pct}',
+ '本月 {traffic}':'{traffic} this month',
+ '负载 {n}':'Load {n}',
+ '1 分钟负载 {n}':'1-minute load {n}',
+ '单位':'Unit',
+ '秒':'s',
+ '分钟':'min',
+ '填 15 秒到 60 分钟之间的整数':'Enter a whole number between 15 seconds and 60 minutes'
 });
