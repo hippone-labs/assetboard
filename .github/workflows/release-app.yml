@@ -120,6 +120,7 @@ jobs:
         run: |
           python3 tools/publish-site-release.py --site "$SITE_DIR" \
             --archive "$RELEASE_DIR/Assetboard-macOS-arm64-$VERSION.zip" \
+            --disk-image "$RELEASE_DIR/Assetboard-macOS-arm64-$VERSION.dmg" \
             --version "$VERSION" --notes "$RUNNER_TEMP/release-notes.md"
           python3 "$SITE_DIR/tools/check_links.py" "$SITE_DIR"
 
@@ -140,7 +141,7 @@ jobs:
         run: |
           set -euo pipefail
           cd "$SITE_DIR"
-          git add index.html en/index.html downloads/index.html en/downloads/index.html downloads/latest.json "downloads/Assetboard-macOS-arm64-$VERSION.zip"
+          git add index.html en/index.html downloads/index.html en/downloads/index.html downloads/latest.json "downloads/Assetboard-macOS-arm64-$VERSION.zip" "downloads/Assetboard-macOS-arm64-$VERSION.dmg"
           git diff --cached --check
           git -c user.name=lihaosong-code -c user.email=207678397+lihaosong-code@users.noreply.github.com commit -m "Release notarized Assetboard $VERSION"
           site_commit="$(git rev-parse HEAD)"
@@ -169,6 +170,17 @@ jobs:
           const zip = await fetch(asset.url);
           assert.equal(zip.status, 200);
           assert.equal(createHash('sha256').update(Buffer.from(await zip.arrayBuffer())).digest('hex'), asset.sha256);
-          console.log(`Published ${manifest.version}: download checksum verified`);
+          // The download buttons offer the disk image, byte for byte the one this run notarized.
+          const { readFileSync } = await import('node:fs');
+          const image = `Assetboard-macOS-arm64-${manifest.version}.dmg`;
+          for (const page of ['https://assetboard.app/', 'https://assetboard.app/en/']) {
+            const html = await (await fetch(`${page}?release=${process.env.GITHUB_RUN_ID}`)).text();
+            assert.ok(html.includes(`/downloads/${image}`), `${page} links ${image}`);
+          }
+          const dmg = await fetch(`https://assetboard.app/downloads/${image}`);
+          assert.equal(dmg.status, 200);
+          const local = readFileSync(`${process.env.RELEASE_DIR}/${image}`);
+          assert.equal(createHash('sha256').update(Buffer.from(await dmg.arrayBuffer())).digest('hex'), createHash('sha256').update(local).digest('hex'));
+          console.log(`Published ${manifest.version}: update zip and disk image checksums verified`);
           JS
           echo "Published Assetboard $VERSION at https://assetboard.app/downloads/" >> "$GITHUB_STEP_SUMMARY"

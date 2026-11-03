@@ -42,16 +42,16 @@
 
 ## 下载与安装
 
-到 [assetboard.app](https://assetboard.app/) 下载最新的 `Assetboard-macOS-arm64-*.zip`，解压后打开 `Assetboard.app`。安装包只在官网发布；App 的「检查更新」每天最多读一次官网的版本文件（`/downloads/latest.json`），下载后核对校验值、签名、公证和最低系统，先让新版自检启动一次再替换；替换下来的旧版留在 `~/Library/Application Support/Assetboard/previous.app`，新版没能启动就自动换回。这台 Mac 的系统低于新版要求时，不会提供那个版本。
+到 [assetboard.app](https://assetboard.app/) 下载最新的 `Assetboard-macOS-arm64-*.dmg`，打开后把 Assetboard 拖到 Applications 文件夹。从别的位置（下载文件夹、磁盘映像）打开时，App 会问一次要不要移到「应用程序」，因为只有在那里才能自动更新。安装包只在官网发布；App 的「检查更新」每天最多读一次官网的版本文件（`/downloads/latest.json`），下载同版本的 `.zip` 后核对校验值、签名、公证和最低系统，先让新版自检启动一次再替换；替换下来的旧版留在 `~/Library/Application Support/Assetboard/previous.app`，新版没能启动就自动换回。这台 Mac 的系统低于新版要求时，不会提供那个版本。
 
 - 系统：macOS 15 或更高，仅提供 Apple Silicon（arm64）版本。
-- 安装包已签名并公证，双击即可打开。
+- 磁盘映像和里面的 App 都已签名并公证，双击即可打开。
 - 也可以不装，直接在浏览器里试：见下文“从源码构建”。
 
 想先看看效果，用演示数据启动（不读也不写你的数据）：
 
 ```sh
-open Assetboard.app --args --demo   # 在解压后的目录里执行
+open /Applications/Assetboard.app --args --demo
 ```
 
 浏览器版在地址后面加 `?demo`。

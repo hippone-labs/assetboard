@@ -28,6 +28,8 @@ class ReleaseTests(unittest.TestCase):
             (self.site / path).write_text(f'<p>{words}</p><ul class="versions">\n  <li>Previous release</li></ul>')
         (self.site / 'downloads/latest.json').write_text(json.dumps({'version': '0.6.2'}))
         self.archive = root / 'Assetboard-macOS-arm64-0.6.3.zip'
+        self.image = root / 'Assetboard-macOS-arm64-0.6.3.dmg'
+        self.image.write_bytes(b'final stapled disk image')
         self.pack({'CFBundleShortVersionString': '0.6.3', 'LSMinimumSystemVersion': '15.0'})
 
     def pack(self, info):
@@ -37,7 +39,7 @@ class ReleaseTests(unittest.TestCase):
             bundle.writestr('Assetboard.app/Contents/MacOS/Assetboard', b'final stapled archive')
 
     def test_stages_final_hash_notes_and_both_pages(self):
-        publisher.stage(self.site, self.archive, '0.6.3', 'Release notes')
+        publisher.stage(self.site, self.archive, self.image, '0.6.3', 'Release notes')
         manifest = json.loads((self.site / 'downloads/latest.json').read_text())
         self.assertEqual(manifest['version'], '0.6.3')
         self.assertEqual(manifest['notes'], 'Release notes')
@@ -46,29 +48,39 @@ class ReleaseTests(unittest.TestCase):
         self.assertEqual((self.site / 'downloads' / self.archive.name).read_bytes(), self.archive.read_bytes())
         for path in ['index.html', 'en/index.html']:
             text = (self.site / path).read_text()
-            self.assertEqual(text.count(self.archive.name), 2)
+            self.assertEqual(text.count(self.image.name), 2, 'the download buttons offer the disk image')
+            self.assertNotIn('.zip', text)
             self.assertIn('v0.6.3 · macOS 15 或更高', text)
             self.assertIn('https://buy.stripe.com/example', text)
-        digest = hashlib.sha256(self.archive.read_bytes()).hexdigest()
+        self.assertEqual((self.site / 'downloads' / self.image.name).read_bytes(), self.image.read_bytes())
+        self.assertEqual([a['name'] for a in manifest['assets']], [self.archive.name], 'the update reads the zip only')
+        digest = hashlib.sha256(self.image.read_bytes()).hexdigest()
         for path, words in [('downloads/index.html', 'macOS 15 或更高'), ('en/downloads/index.html', 'macOS 15 or later')]:
             text = (self.site / path).read_text()
             self.assertIn(words, text)
             self.assertLess(text.index('Assetboard 0.6.3'), text.index('Previous release'))
             self.assertIn(f'<code title="{digest}">{digest[:8]}…{digest[-8:]}</code>', text)
         with self.assertRaisesRegex(ValueError, 'newer'):
-            publisher.stage(self.site, self.archive, '0.6.3', 'Repeat')
+            publisher.stage(self.site, self.archive, self.image, '0.6.3', 'Repeat')
 
     def test_rejects_missing_notes_existing_archive_and_changed_layout(self):
         with self.assertRaisesRegex(ValueError, 'notes'):
-            publisher.stage(self.site, self.archive, '0.6.3', '')
+            publisher.stage(self.site, self.archive, self.image, '0.6.3', '')
         destination = self.site / 'downloads' / self.archive.name
         destination.write_bytes(b'existing')
         with self.assertRaisesRegex(ValueError, 'immutable'):
-            publisher.stage(self.site, self.archive, '0.6.3', 'Notes')
+            publisher.stage(self.site, self.archive, self.image, '0.6.3', 'Notes')
         destination.unlink()
+        image_destination = self.site / 'downloads' / self.image.name
+        image_destination.write_bytes(b'existing')
+        with self.assertRaisesRegex(ValueError, 'immutable'):
+            publisher.stage(self.site, self.archive, self.image, '0.6.3', 'Notes')
+        image_destination.unlink()
+        with self.assertRaisesRegex(ValueError, 'Disk image name'):
+            publisher.stage(self.site, self.archive, self.archive, '0.6.3', 'Notes')
         (self.site / 'index.html').write_text('unexpected layout')
         with self.assertRaisesRegex(ValueError, 'layout'):
-            publisher.stage(self.site, self.archive, '0.6.3', 'Notes')
+            publisher.stage(self.site, self.archive, self.image, '0.6.3', 'Notes')
         self.assertFalse(destination.exists())
 
     def test_minimum_system_comes_from_the_app_in_the_archive(self):
@@ -77,17 +89,17 @@ class ReleaseTests(unittest.TestCase):
                               ({'CFBundleShortVersionString': '0.6.3', 'LSMinimumSystemVersion': 'fifteen'}, 'LSMinimumSystemVersion')]:
             self.pack(info)
             with self.assertRaisesRegex(ValueError, message):
-                publisher.stage(self.site, self.archive, '0.6.3', 'Notes')
+                publisher.stage(self.site, self.archive, self.image, '0.6.3', 'Notes')
             self.assertFalse((self.site / 'downloads' / self.archive.name).exists())
         self.archive.write_bytes(b'not a zip')
         with self.assertRaisesRegex(ValueError, 'Info.plist'):
-            publisher.stage(self.site, self.archive, '0.6.3', 'Notes')
+            publisher.stage(self.site, self.archive, self.image, '0.6.3', 'Notes')
 
     def test_rejects_invalid_version_and_missing_archive(self):
         with self.assertRaisesRegex(ValueError, 'stable'):
-            publisher.stage(self.site, self.archive, '../version', 'Notes')
+            publisher.stage(self.site, self.archive, self.image, '../version', 'Notes')
         with self.assertRaisesRegex(ValueError, 'Archive name'):
-            publisher.stage(self.site, self.archive, '0.6.4', 'Notes')
+            publisher.stage(self.site, self.archive, self.image, '0.6.4', 'Notes')
 
 
 if __name__ == '__main__':
