@@ -49,7 +49,7 @@ async (page) => {
   for(const [label,fn] of Object.entries({
    capture:()=>captureDialog(''),importHub:()=>importHub(),exportDialog:()=>exportDialog(),prefsDialog:()=>prefsDialog('general'),prefsFeatures:()=>prefsDialog('features'),prefsConnections:()=>prefsDialog('connections'),prefsAbout:()=>prefsDialog('about'),prefsPro:()=>prefsDialog('pro'),themeDialog:()=>themeDialog(),
    inbox:()=>inboxDialog(),cloudflare:()=>cloudflareDialog(),github:()=>githubDialog(),ai:()=>aiDialog(),iconBatch:()=>iconBatchDialog(),network:()=>networkDialog(),
-   agent:()=>agentSetupDialog(),probe:()=>probeDialog(),ssh:()=>sshProbeDialog(),shutdown:()=>shutdownDialog?.(),
+   agent:()=>agentSetupDialog(),probe:()=>window.probeDialog?.(),ssh:()=>window.sshProbeDialog?.(),shutdown:()=>window.shutdownDialog?.(),
    settings:()=>settings('domain'),keys:()=>toggleKeysHelp(true)}))await step(label,fn);
   await p.evaluate(()=>{if(!$('#keys-help').hidden)toggleKeysHelp(false);});
   await step('panorama',()=>togglePanorama(true));

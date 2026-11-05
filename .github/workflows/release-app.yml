@@ -42,6 +42,11 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      - name: Pro modules (private checkout beside the board)
+        run: |
+          rm -rf pro
+          gh repo clone "${{ vars.PRO_REPO || 'hippone-labs/assetboard-pro' }}" pro -- --depth=1 --quiet
+          test -f pro/web/pro.js
 
       - name: Unlock the signing keychain
         if: ${{ env.SIGNING_KEYCHAIN_PASSWORD != '' }}

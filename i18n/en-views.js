@@ -302,4 +302,9 @@ Object.assign(I18N.en,{
  '上个月':'Previous month',
  '下个月':'Next month',
  '本月':'This Month',
+ // Settings, connections and payments text the board shows with or without the Pro modules.
+ '涨价':'Price rise',
+ '降价':'Price drop',
+ '未扣款':'Not charged',
+ '付款':'Payments',
 });

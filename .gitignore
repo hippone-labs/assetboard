@@ -38,3 +38,5 @@ node_modules/
 /THEME-DESIGN.md
 /UI-COLOR-RESEARCH.md
 /docs/
+# Pro modules: a private checkout (assetboard-pro) linked or copied here; never part of this repository
+/pro
