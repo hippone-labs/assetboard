@@ -1,6 +1,6 @@
 # The site's screenshots in each language, from the demo board (tools/site-screenshots.sh), put on the site. Run by hand, or by
 # pushing a branch named shots/<anything> (a workflow only becomes dispatchable once it is on main). The Mac mini takes the PNGs;
-# hans-mac, which holds the GitHub login that can push the site (as release-app.yml uses it), turns them into WebP
+# mac-build, which holds the GitHub login that can push the site (as release-app.yml uses it), turns them into WebP
 # (tools/site-screenshots-webp.js), commits them to the site repository, waits for its deployment and checks the live files.
 # Demo mode only: fictional data, nothing is saved. Both runners are attached to this public repository, so there is no
 # pull_request trigger (see release-app.yml).
@@ -48,7 +48,7 @@ jobs:
   publish:
     needs: screenshots
     if: ${{ github.event_name == 'push' || inputs.publish }}
-    runs-on: [self-hosted, macOS, ARM64, hans-mac]
+    runs-on: [self-hosted, macOS, ARM64, mac-build]
     timeout-minutes: 20
     # One push to the site at a time: a release publishes there too.
     concurrency:

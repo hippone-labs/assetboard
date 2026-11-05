@@ -7,7 +7,7 @@ async (page) => {
   await p.goto('http://127.0.0.1:4317/');
   await until(p,()=>typeof setPrivacy==='function');
   await p.evaluate(()=>{localStorage.clear();state={blocks:[],assets:[
-   {id:'d',type:'domain',name:'secret-project.dev',provider:'Cloudflare',account:'me@corp.com',source:'manual',art:'generic'},
+   {id:'d',type:'domain',name:'secret-project.dev',provider:'Cloudflare',account:'me@corp.example',source:'manual',art:'generic'},
    {id:'s',type:'server',name:'tokyo-box',provider:'Vultr',ips:['203.0.113.42'],source:'manual',art:'generic'},
    {id:'r',type:'repository',name:'acme/internal-tool',provider:'GitHub',account:'acme',source:'github',externalId:'1',art:'generic'}
   ],deletedExternalIds:[]};save=()=>{};render();});
@@ -16,7 +16,7 @@ async (page) => {
 
   await p.click('#privacy-toggle');
   const masked=await board();
-  check(!masked.includes('secret-project')&&masked.includes('s••••••.dev')&&!masked.includes('203.0.113.42')&&!masked.includes('internal-tool')&&!masked.includes('me@corp.com'),'Names, IPs and accounts are masked: '+masked.slice(0,300));
+  check(!masked.includes('secret-project')&&masked.includes('s••••••.dev')&&!masked.includes('203.0.113.42')&&!masked.includes('internal-tool')&&!masked.includes('me@corp.example'),'Names, IPs and accounts are masked: '+masked.slice(0,300));
   const leaks=await p.evaluate(()=>[...document.querySelectorAll('#board [title],#board [aria-label]')].map(n=>n.title+' / '+n.getAttribute('aria-label')).filter(t=>/secret-project|tokyo-box|203\.0\.113|internal-tool/.test(t)));check(!leaks.length,'Tooltips and labels are masked too: '+leaks.join(' | '));
   check(await p.evaluate(()=>$('#privacy-toggle').getAttribute('aria-pressed')==='true'&&JSON.parse(localStorage.getItem('assetboard-view-v1')).privacy===true),'The eye is pressed and remembered');
   await p.evaluate(()=>showDetail('s'));

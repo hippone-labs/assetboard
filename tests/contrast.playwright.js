@@ -44,7 +44,7 @@ async (page) => {
      {id:'h',type:'domain',name:'quiet.dev',provider:'Registrar',account:'个人',purpose:'旧站',hiddenAt:'2026-01-01',art:'generic',source:'manual'},
      {id:'c',type:'subscription',name:'Figma',provider:'Figma',account:'团队',purpose:'设计',date:day(20),dateKind:'renew',cycle:'monthly',art:'figma',source:'manual'},
      ...['one','two','three','four','five','six','seven','eight'].map(repo)]};
-    evidenceRows=[{id:'g1',kind:'gmail',source:'Figma <billing@figma.com>',title:'Your plan renews',body:'Your Figma plan will renew on October 6, 2099. You will be charged $15.00/month.',payload:'{}'},{id:'g2',kind:'gmail',source:'News <hi@letters.io>',title:'Weekly',body:'hello',payload:'{}'}];evidenceVersion++;
+    evidenceRows=[{id:'g1',kind:'gmail',source:'Figma <billing@figma.com>',title:'Your plan renews',body:'Your Figma plan will renew on October 6, 2099. You will be charged $15.00/month.',payload:'{}'},{id:'g2',kind:'gmail',source:'News <hi@letters.example>',title:'Weekly',body:'hello',payload:'{}'}];evidenceVersion++;
     render();
    });
    await audit(scheme+' board');

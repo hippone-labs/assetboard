@@ -15,7 +15,7 @@ async (page) => {
    const now=new Date().toISOString(),yesterday=new Date(Date.now()-86400000).toISOString();
    window.__rows=[
     {id:'1',at:now,direction:'in',service:'MCP',method:'add',host:'本机 assetboard-cli',path:'agent.sock',ok:true,received:120,ms:4},
-    {id:'2',at:now,direction:'out',service:'AI 识别',method:'POST',host:'api.anthropic.com',path:'/v1/messages',status:200,ok:true,sent:2048,received:900,ms:1800,address:'160.79.104.10',tls:'TLS 1.3'},
+    {id:'2',at:now,direction:'out',service:'AI 识别',method:'POST',host:'api.anthropic.com',path:'/v1/messages',status:200,ok:true,sent:2048,received:900,ms:1800,address:'203.0.113.10',tls:'TLS 1.3'},
     {id:'3',at:now,direction:'out',service:'Cloudflare',method:'GET',host:'api.cloudflare.com',path:'/client/v4/zones',status:403,ok:false,received:80,ms:120},
     {id:'4',at:yesterday,direction:'out',service:'GitHub',method:'GET',host:'api.github.com',path:'/user/repos',status:200,ok:true,received:40960,ms:300}
    ];
@@ -35,7 +35,7 @@ async (page) => {
   await until(p,()=>document.querySelectorAll('#modal .net-row').length===4);
   const text=await p.locator('#modal-content').innerText();
   check(text.includes('今天 3 次')&&text.includes('发出 2')&&text.includes('收到 1')&&text.includes('失败 1'),'The summary counts today, both directions and failures: '+text.slice(0,300));
-  check(text.includes('POST api.anthropic.com/v1/messages')&&text.includes('TLS 1.3')&&text.includes('160.79.104.10')&&text.includes('2.0 KB'),'A row shows method, host, path, TLS, address and size');
+  check(text.includes('POST api.anthropic.com/v1/messages')&&text.includes('TLS 1.3')&&text.includes('203.0.113.10')&&text.includes('2.0 KB'),'A row shows method, host, path, TLS, address and size');
   check(text.includes('今天')&&text.includes('昨天'),'Rows are grouped by day');
   check(await p.locator('#modal .net-row.failed').count()===1,'The 403 is marked as failed');
   check(await p.locator('#modal .net-dir.in').count()===1,'The agent call is incoming');

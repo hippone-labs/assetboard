@@ -193,7 +193,7 @@ test('prefers an AI reading over rules and keeps rule inference it cannot see',(
  assert.equal(second.name,'Photo Lab');
  assert.equal(second.date,null,'a second item does not borrow the first item\'s date');
  assert.equal(second.cost,'');
- const empty=buildCandidates([{id:'n',kind:'gmail',source:'News <hi@letters.io>',title:'Weekly',body:'Total $5',payload:{ai:{text:'{"items":[]}'}}}],{now,types})[0];
+ const empty=buildCandidates([{id:'n',kind:'gmail',source:'News <hi@letters.example>',title:'Weekly',body:'Total $5',payload:{ai:{text:'{"items":[]}'}}}],{now,types})[0];
  assert.equal(empty.weak,true);
  const unreadable=buildCandidates([{id:'u',kind:'gmail',source:'Figma <billing@figma.com>',title:'Receipt',body:'Total $15.00',payload:{ai:{text:'sorry'}}}],{now,types})[0];
  assert.equal(unreadable.ai.unreadable,true);

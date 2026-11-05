@@ -1,4 +1,4 @@
-# Signs, notarizes and publishes on the self-hosted Mac labelled hans-mac, which holds the signing keychain and the notary profile.
+# Signs, notarizes and publishes on the self-hosted Mac labelled mac-build, which holds the signing keychain and the notary profile.
 # That runner is attached to this public repository: no workflow that runs on it has a pull_request trigger, and a pull request
 # from outside must not be approved to run workflows while it stays attached. Ordinary builds and tests run on GitHub-hosted
 # runners (build.yml). Push an annotated vX.Y.Z tag on main, with the release notes as its message.
@@ -35,7 +35,7 @@ env:
 
 jobs:
   release:
-    runs-on: [self-hosted, macOS, ARM64, hans-mac]
+    runs-on: [self-hosted, macOS, ARM64, mac-build]
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4

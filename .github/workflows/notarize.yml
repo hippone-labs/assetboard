@@ -1,4 +1,4 @@
-# Signs with the Developer ID in the login keychain of the Mac labelled hans-mac, notarizes with the notary keychain profile (repository secrets, masked in the public logs),
+# Signs with the Developer ID in the login keychain of the Mac labelled mac-build, notarizes with the notary keychain profile (repository secrets, masked in the public logs),
 # staples and uploads the zip as an artifact. It never creates a release or pushes a tag; publishing stays manual.
 # Manual only (see release-app.yml).
 name: notarize
@@ -33,7 +33,7 @@ env:
 
 jobs:
   notarize:
-    runs-on: [self-hosted, macOS, ARM64, hans-mac]
+    runs-on: [self-hosted, macOS, ARM64, mac-build]
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
