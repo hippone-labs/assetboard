@@ -2168,3 +2168,8 @@ body::before,.native-app body::before{background:radial-gradient(70vw 65vh at 0%
 .live-interval{display:inline-flex;flex-wrap:wrap;align-items:center;gap:6px}
 .live-interval .live-every{width:64px}
 .live-interval .live-presets{display:inline-flex;flex-wrap:wrap;gap:4px}
+
+/* Adding a server from ~/.ssh/config: the picker above the SSH fields. */
+:root .ssh-pick{margin:0 0 6px}
+:root .ssh-pick select{width:100%;min-width:0}
+:root .ssh-pick .form-note{display:block;margin-top:4px}

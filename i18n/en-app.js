@@ -948,4 +948,9 @@ Object.assign(I18N.en,{
  '已取消关联':'Unlinked',
  '请填写数字金额，例如 89 或 10.98':'Enter the amount as a number, for example 89 or 10.98',
  '停用':'Stop',
+ // Adding a server from ~/.ssh/config.
+ '从 ~/.ssh/config 选':'Pick from ~/.ssh/config',
+ '不选，手动填':'None, fill in by hand',
+ '已有记录':'already recorded',
+ '选一台就填好名称、主机、用户和端口':'Picking one fills in the name, host, user and port',
 });

@@ -112,6 +112,12 @@ final class SSHProbeSettings {
     }
 
     @discardableResult
+    /// A host Assetboard wrote and removed again: neither on nor remembered as switched off.
+    func forget(_ alias: String) {
+        defaults.set(enabled.filter { $0.lowercased() != alias.lowercased() }, forKey: Self.hostsKey)
+        defaults.set(disabled.filter { $0.lowercased() != alias.lowercased() }, forKey: Self.disabledKey)
+    }
+
     func setInterval(_ seconds: Int) -> Bool {
         guard SSHProbe.intervalRange.contains(seconds) else { return false }
         defaults.set(seconds, forKey: Self.intervalKey)
@@ -217,28 +223,50 @@ extension AppDelegate {
         DispatchQueue.global(qos: .userInitiated).async {
             var list: [String: Any] = sshProbeSettings.summary
             do { list["config"] = try LocalCLI.readSshConfigText() } catch { list["error"] = error.localizedDescription }
+            list["managed"] = sshHosts.list().map(\.json)
+            list["managedFile"] = sshHosts.file.path.replacingOccurrences(of: FileManager.default.homeDirectoryForCurrentUser.path, with: "~")
             self.sshProbeResult(["list": list])
         }
+    }
+
+    /// The aliases ssh can resolve: the person's ~/.ssh/config and the hosts Assetboard wrote (included from it).
+    func sshKnownAliases() -> Set<String> {
+        let own = (try? LocalCLI.readSshConfigText()).map(SSHProbe.aliases(inConfig:)) ?? []
+        return own.union(sshHosts.list().map { $0.alias.lowercased() })
     }
 
     func handleSshProbe(_ action: String, _ body: [String: Any]) {
         if demoMode { return }
         switch action {
+        case "sshProbeHostSet":
+            // A record that asked for it: its block in ~/.ssh/assetboard.conf, then the alias on, then the list again.
+            let field = { (k: String) in (body[k] as? String ?? "").trimmingCharacters(in: .whitespaces) }
+            let entry = SSHHosts.Entry(id: field("id"), alias: field("alias"), host: field("host"), user: field("user"), port: field("port").isEmpty ? "22" : field("port"))
+            guard SSHHosts.valid(entry) else { sshProbeResult(["error": L("主机条目无效")]); return }
+            do { try sshHosts.set(entry) } catch { sshProbeResult(["error": error.localizedDescription]); sshProbeList(); return }
+            _ = sshProbeSettings.set(entry.alias, on: true)
+            sshProbeList()
+        case "sshProbeHostRemove":
+            let id = (body["id"] as? String ?? "").trimmingCharacters(in: .whitespaces)
+            guard SSHHosts.validId(id) else { return }
+            if let gone = sshHosts.list().first(where: { $0.id == id }) {
+                do { try sshHosts.remove(id: id) } catch { sshProbeResult(["error": error.localizedDescription]); sshProbeList(); return }
+                sshProbeSettings.forget(gone.alias)
+            }
+            sshProbeList()
         case "sshProbeList":
             sshProbeList()
         case "sshProbeSet":
             guard let alias = body["alias"] as? String, SSHProbe.validAlias(alias) else { sshProbeResult(["error": L("别名无效")]); return }
             let on = body["on"] as? Bool == true
             if on {
-                let known = (try? LocalCLI.readSshConfigText()).map(SSHProbe.aliases(inConfig:)) ?? []
-                guard known.contains(alias.lowercased()) else { sshProbeResult(["error": L("~/.ssh/config 里没有 {alias}", ["alias": alias])]); return }
+                guard sshKnownAliases().contains(alias.lowercased()) else { sshProbeResult(["error": L("~/.ssh/config 里没有 {alias}", ["alias": alias])]); return }
             }
             guard sshProbeSettings.set(alias, on: on) else { sshProbeResult(["error": L("最多开启 {n} 台", ["n": SSHProbe.limit])]); return }
             sshProbeList()
         case "sshProbeAuto":
             let asked = (body["aliases"] as? [String] ?? []).filter(SSHProbe.validAlias)
-            let known = (try? LocalCLI.readSshConfigText()).map(SSHProbe.aliases(inConfig:)) ?? []
-            sshProbeSettings.autoEnable(Array(asked.prefix(SSHProbe.limit)), known: known)
+            sshProbeSettings.autoEnable(Array(asked.prefix(SSHProbe.limit)), known: sshKnownAliases())
             sshProbeList()
         case "sshProbeInterval":
             if let seconds = body["seconds"] as? Int { sshProbeSettings.setInterval(seconds) }
@@ -246,7 +274,7 @@ extension AppDelegate {
         case "sshProbeRun":
             let asked = (body["aliases"] as? [String] ?? []).filter(SSHProbe.validAlias)
             let enabled = Set(sshProbeSettings.enabled.map { $0.lowercased() })
-            let known = (try? LocalCLI.readSshConfigText()).map(SSHProbe.aliases(inConfig:)) ?? []
+            let known = sshKnownAliases()
             // Only what the person turned on and ~/.ssh/config still lists.
             for alias in asked.prefix(SSHProbe.limit) where enabled.contains(alias.lowercased()) {
                 guard known.contains(alias.lowercased()) else {

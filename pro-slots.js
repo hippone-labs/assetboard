@@ -4,6 +4,7 @@
 //
 // Lists (each entry is a function; html ones are joined in order):
 //   facts(a, row)             extra detail facts, html          priceMarks(a)       marks after a row's cost, html
+//   serverFields(v)           fields under a server's SSH host, user and port in the form, html (read back through formRead)
 //   formFields(v)             fields inside 更多, html            formRead(form, data, current) → fields to save, or null to refuse
 //   renewFields(a, ctx)       extra fields in the 已续费 dialog   renewRead(form, a) → {amount, currency, paidOn, updateCost} or null
 //   projectBar(name, list)    the head of a project view, html  toolsNav()           sidebar tool buttons, html
@@ -31,7 +32,7 @@
 //   agentConfirms[kind] = {title(n), label(target), note, apply(target) → '' or why not}
 //                                             requests (agentRequestConfirm) the person confirms in the app before apply runs
 //   agentFields[key] = (raw, asset) => {value} | {error}   an update field the core does not know (value null removes it)
-const proSlots={facts:[],priceMarks:[],formFields:[],formRead:[],renewFields:[],renewRead:[],projectBar:[],toolsNav:[],exportCards:[],costExtras:[],
+const proSlots={facts:[],priceMarks:[],formFields:[],formRead:[],renewFields:[],renewRead:[],projectBar:[],toolsNav:[],exportCards:[],costExtras:[],serverFields:[],
  importCli:[],importSources:[],captureLinks:[],topnavActions:[],
  paymentsSection:null,chargesBand:null,captureImportLabel:null,captureAiLink:null,projectNav:null,serverProbe:null,platformProbe:null,remindersApp:null,snapshot:null,handoverPack:null,actions:{},agentMethods:{},agentConfirms:{},agentFields:{}};
 // Two switches. ?free in the address shows the free edition from a full checkout: no Pro script registers anything, like a build made

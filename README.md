@@ -73,7 +73,7 @@ open /Applications/Assetboard.app --args --demo
 | 截图 / PDF | 用 macOS 自带的文字识别在本机识别，进“待确认” | App |
 | GitHub | 用本机已登录的 `gh`，或填只读的细粒度令牌（Metadata: Read），同步仓库名称、归属、可见性和归档状态 | App |
 | Cloudflare | 只读 API 令牌，读取授权范围内的 Zone、Pages、Workers 和 R2 列表；权限不够的类别跳过 | App |
-| `~/.ssh/config` | 只读 Host、HostName、User、Port，生成服务器 | App |
+| `~/.ssh/config` | 只读 Host、HostName、User、Port，生成服务器；添加服务器时也能直接从里面选一台 | App |
 | 服务菜单、Dock | 在任何软件里选中文字，右键 → 服务 →「添加到 Assetboard」，文字会填进添加面板，点「识别」才处理。把邮件、截图、PDF、CSV、JSON 拖到 Dock 图标上，或用“打开方式”选 Assetboard：表格和 JSON 一律先进导入预览，截图和 PDF 在本机识别后进待确认。正在编辑或核对时不会打断，收到的内容在「待确认」里排队，可打开或丢弃。首次安装后若菜单里没有，注销再登录一次 | App |
 | MCP 接入 / 命令行 | 查询免费；添加、修改、删除和命令行在 Pro 里。App 内置 `assetboard-cli`：Claude Code、Claude Desktop 等 MCP 客户端或脚本可以查询、添加、修改资产，新增和修改立即生效（`⌘Z` 撤销），删除要你在 App 里确认。通道在本机，但你的 AI 工具会把读到的内容发给它的模型服务商；地址和联系方式默认遮住，银行卡和手机号默认不给。菜单「文件 → MCP 接入…」里有可复制的配置。见下 | App |
 | Inbox 文件夹（Pro） | 把 JSON 文件放进 `~/Library/Application Support/Assetboard/Inbox/`，App 打开或回到前台时读取，一律先进导入预览，确认才写入；导入或丢弃后原文件才移到 `Inbox/handled/`（保留 30 天），取消预览或退出 App 时文件留在原处。这个格式拖进窗口或 Dock 也能识别。格式见下 | App |
@@ -259,6 +259,7 @@ App 自己会连的：
 | AI 识别（配置模型后） | 你填的模型服务（Claude、OpenAI 兼容接口，或本机 Ollama）；导入的截图、PDF、邮件和粘贴的文字会自动发给它，在 AI 识别设置里可以改成只在你点“用 AI 识别”时发送 |
 | 探针（“设置 › 功能 › 实时状态”） | 你自己添加的监控面板，只读固定的几个接口，按你设的读取间隔 |
 | SSH 直读（同上，每台主机另外打开） | 你的服务器，用系统 `ssh`、你的 `~/.ssh/config` 和密钥，只跑一条固定的只读命令，按你设的读取间隔 |
+| SSH 直读写的主机条目 | 勾选「写进 ~/.ssh/assetboard.conf」的服务器记录：App 把它的 Host 写进 `~/.ssh/assetboard.conf`（并在 `~/.ssh/config` 顶部加一行 `Include assetboard.conf`），删除记录时删掉；只动这一个文件和那一行 | 本机 |
 | 平台状态（同上，在“设置 › 连接 › 平台状态”里连接） | `api.supabase.com`、`api.vercel.com`、`api.render.com`、`api.upstash.com`，只发固定的读取请求，按你给每个平台设的间隔（1 到 60 分钟）；回答在 App 里裁成名称和状态，邮箱、主机名、环境变量和数据库密码不进页面 |
 
 你点了才会连的：同步 GitHub（`api.github.com`，或本机 `gh` 命令）、第一次连 Cloudflare、“核对注册局日期”、“获取网站图标”批量补齐、“检查更新…”。打开资产的管理链接由你的浏览器完成，不经过 Assetboard。

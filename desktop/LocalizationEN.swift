@@ -155,6 +155,9 @@ let englishStrings: [String: [String]] = [
     "命令没有输出（退出码 {status}）": ["The command gave no output (exit code {status})"],
     "~/.ssh/config 里没有 {alias}": ["{alias} is not in ~/.ssh/config"],
     "最多开启 {n} 台": ["At most {n} host can be on", "At most {n} hosts can be on"],
+    "主机条目无效": ["The host entry is not valid"],
+    "别名 {alias} 已被另一条记录使用": ["The alias {alias} is already used by another record"],
+    "最多写 {n} 台": ["At most {n} host can be written", "At most {n} hosts can be written"],
     "~/.ssh/config 里已没有这个别名": ["This alias is no longer in ~/.ssh/config"],
     "SSH 直读": ["SSH readings"],
     // Files, OCR, intake

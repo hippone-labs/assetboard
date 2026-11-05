@@ -952,6 +952,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         }
     }
 
+    /// The hosts of ~/.ssh/config for the server form's picker (the page parses the text); nothing in the demo, where the page
+    /// shows its own hosts.
+    func sshConfigHosts() {
+        if demoMode { return }
+        DispatchQueue.global(qos: .userInitiated).async {
+            let text = try? LocalCLI.readSshConfigText()
+            let result: [String: Any] = text.map { ["ok": true, "text": $0] } ?? ["ok": false]
+            DispatchQueue.main.async {
+                guard let data = try? JSONSerialization.data(withJSONObject: result), let json = String(data: data, encoding: .utf8) else { return }
+                self.webView.evaluateJavaScript("window.assetboardSshHosts?.(\(json))")
+            }
+        }
+    }
+
     func importSshConfig() {
         if demoMode { demoBlocked(); return }
         DispatchQueue.global(qos: .userInitiated).async {
@@ -1147,6 +1161,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         }
         if body["action"] as? String == "sshConfigImport" {
             importSshConfig()
+            return
+        }
+        if body["action"] as? String == "sshConfigHosts" {
+            sshConfigHosts()
             return
         }
         #if !ASSETBOARD_FREE
@@ -2243,6 +2261,7 @@ if CommandLine.arguments.contains(Updater.launchCheckFlag) {
 } else if CommandLine.arguments.contains("--test-ssh-probe") {
     #if !ASSETBOARD_FREE
     testSSHProbe()
+    testSSHHosts()
     #else
     print("PASS: SSH probe is not in the free edition")
     #endif

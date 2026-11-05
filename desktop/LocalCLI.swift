@@ -33,7 +33,7 @@ enum LocalCLI {
         return (process.terminationStatus, stdout, stderr)
     }
 
-    private static func error(_ message: String) -> NSError {
+    static func error(_ message: String) -> NSError {
         NSError(domain: "Assetboard.LocalCLI", code: 1, userInfo: [NSLocalizedDescriptionKey: message])
     }
 
