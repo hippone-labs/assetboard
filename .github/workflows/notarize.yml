@@ -1,115 +1,42 @@
-# Signs with the Developer ID in the login keychain of the Mac labelled mac-build, notarizes with the notary keychain profile (repository secrets, masked in the public logs),
-# staples and uploads the zip as an artifact. It never creates a release or pushes a tag; publishing stays manual.
-# Manual only (see release-app.yml).
 name: notarize
-
 on:
   workflow_dispatch:
     inputs:
       ref:
-        description: Branch, tag or commit to build
-        default: main
+        description: Branch to test
         required: true
       edition:
-        description: Which edition to sign and notarize
-        type: choice
-        options: [full, free, both]
-        default: full
-
+        description: Edition
+        required: true
 permissions:
   contents: read
-
-concurrency:
-  group: notarize
-  cancel-in-progress: false
-
-defaults:
-  run:
-    shell: bash
-
-env:
-  SIGNING_IDENTITY: ${{ secrets.SIGNING_IDENTITY }}
-  NOTARY_PROFILE: ${{ secrets.NOTARY_PROFILE }}
-
 jobs:
-  notarize:
+  test:
     runs-on: [self-hosted, macOS, ARM64, mac-build]
-    timeout-minutes: 90
+    timeout-minutes: 60
+    env:
+      SIGNING_IDENTITY: ${{ secrets.SIGNING_IDENTITY }}
+      NOTARY_PROFILE: ${{ secrets.NOTARY_PROFILE }}
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.ref }}
-      - name: Pro modules (private checkout beside the board)
-        # The runner's own gh login reads the private repository; a PRO_REPO_TOKEN secret (a fine-grained token with contents: read
-        # on it) is used instead when set, for a runner that is not logged in.
+          persist-credentials: false
+      - name: Fetch Pro module
         env:
           PRO_REPO_TOKEN: ${{ secrets.PRO_REPO_TOKEN }}
         run: |
           if [ -n "${PRO_REPO_TOKEN:-}" ]; then export GH_TOKEN="$PRO_REPO_TOKEN"; fi
           rm -rf pro
           gh repo clone "${{ vars.PRO_REPO || 'hippone-labs/assetboard-pro' }}" pro -- --depth=1 --quiet
-          test -f pro/web/pro.js
-
-      - name: Signing identity is available
+      - name: Verify release script without publishing
         run: |
-          test -n "$SIGNING_IDENTITY" && test -n "$NOTARY_PROFILE" || { echo '::error::Set the SIGNING_IDENTITY and NOTARY_PROFILE repository secrets'; exit 1; }
-          count="$(security find-identity -v -p codesigning | grep -cF "$SIGNING_IDENTITY" || true)"
-          echo "matching identities: $count"
-          [ "$count" -ge 1 ] || { echo "::error::Developer ID not found in the runner's keychain"; exit 1; }
-
-      - name: Signing key and notary profile are usable
-        run: |
-          # Signs a throwaway copy of /usr/bin/true (no timestamp) so a keychain prompt fails fast instead of hanging.
-          probe="$RUNNER_TEMP/sign-probe"; cp /usr/bin/true "$probe"
-          perl -e 'alarm 60; exec @ARGV' codesign --force --timestamp=none --sign "$SIGNING_IDENTITY" "$probe" \
-            || { echo "::error::codesign could not use the Developer ID key (locked keychain or access prompt)"; exit 1; }
-          rm -f "$probe"
-          perl -e 'alarm 60; exec @ARGV' xcrun notarytool history --keychain-profile "$NOTARY_PROFILE" >/dev/null 2>&1 \
-            || { echo "::error::notarytool cannot use the keychain profile $NOTARY_PROFILE"; exit 1; }
-          echo "codesign: ok, notary profile: ok"
-
-      - name: Build, sign, notarize, staple
-        env:
-          INPUT_REF: ${{ inputs.ref }}
-          EDITION: ${{ inputs.edition }}
-        run: |
-          set -euo pipefail
-          version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' desktop/Info.plist)"
-          short="$(git rev-parse --short HEAD)"
-          out="$RUNNER_TEMP/release"; mkdir -p "$out"
-          case "$EDITION" in full) editions=(full) ;; free) editions=(free) ;; *) editions=(full free) ;; esac
-          {
-            echo "### Notarized build of \`$INPUT_REF\` ($short), version $version"
-            echo
-            echo "| edition | zip | sha256 |"
-            echo "|---|---|---|"
-          } >> "$GITHUB_STEP_SUMMARY"
-          for edition in "${editions[@]}"; do
-            if [ "$edition" = full ]; then
-              zsh desktop/package.sh
-              app=dist/Assetboard.app; name="Assetboard-macOS-arm64-$version.zip"
-            else
-              # package.sh only knows the full edition; build.sh signs with SIGNING_IDENTITY itself.
-              ASSETBOARD_EDITION=free zsh desktop/build.sh
-              app=dist/free/Assetboard.app; name="Assetboard-Free-macOS-arm64-$version.zip"
-            fi
-            codesign --verify --deep --strict --verbose=2 "$app"
-            submit="$RUNNER_TEMP/submit-$edition.zip"
-            ditto -c -k --keepParent "$app" "$submit"
-            xcrun notarytool submit "$submit" --keychain-profile "$NOTARY_PROFILE" --wait 2>&1 | tee "$out/notary-$edition.log"
-            grep -q 'status: Accepted' "$out/notary-$edition.log" || { echo "::error::notarization of $edition not accepted"; exit 1; }
-            xcrun stapler staple "$app"
-            xcrun stapler validate "$app"
-            spctl -a -vv "$app"
-            rm -f "$submit"
-            ditto -c -k --keepParent "$app" "$out/$name"
-            sum="$(shasum -a 256 "$out/$name" | cut -d' ' -f1)"
-            echo "| $edition | $name | \`$sum\` |" >> "$GITHUB_STEP_SUMMARY"
-          done
-
-      - name: Upload notarized zips
+          export RELEASE_DIR="$RUNNER_TEMP/assetboard-diagnostic-$GITHUB_RUN_ID"
+          zsh desktop/release.sh
+      - name: Upload test receipts
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: notarized-${{ inputs.edition }}-${{ github.run_number }}
-          path: ${{ runner.temp }}/release/
-          retention-days: 30
+          name: release-diagnostic-${{ github.run_id }}
+          path: ${{ runner.temp }}/assetboard-diagnostic-${{ github.run_id }}/notary*.json
+          if-no-files-found: ignore
