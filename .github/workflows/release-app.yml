@@ -14,8 +14,9 @@ on:
         required: true
         type: string
 
+# contents: write is for the GitHub Release at the end; checkout keeps no credentials.
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: app-production-release
@@ -194,3 +195,13 @@ jobs:
           console.log(`Published ${manifest.version}: update zip and disk image checksums verified`);
           JS
           echo "Published Assetboard $VERSION at https://assetboard.app/downloads/" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: GitHub Release
+        # The run's own token: a tag it creates (a manual run has none yet) does not start this workflow again.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          url="$(tools/github-release.sh "$VERSION" "$RUNNER_TEMP/release-notes.md" \
+            "$RELEASE_DIR/Assetboard-macOS-arm64-$VERSION.dmg" "$RELEASE_DIR/Assetboard-macOS-arm64-$VERSION.zip" | tail -1)"
+          echo "GitHub Release: $url" >> "$GITHUB_STEP_SUMMARY"
