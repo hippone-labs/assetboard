@@ -131,12 +131,10 @@ async (page) => {
   check(await p.evaluate(()=>!state.assets.find(a=>a.id==='d1').hiddenAt),'H on a hidden row restores it');
   check(await p.evaluate(()=>currentView()==='all')&&await p.locator('#sidebar .nav-item[data-id="hidden"]').count()===0,'With nothing hidden the view falls back to 全部资产');
 
-  // N opens the capture panel for the focused group; 手动填写 gives its form, ⌘Enter saves, Esc closes.
+  // N opens the form for the focused group; ⌘Enter saves, Esc closes.
   await p.focus('#board [data-asset="s1"] .item-open');
   await key('n');
-  check(await p.evaluate(()=>$('#modal').dataset.view==='capture'&&$('#modal-title').textContent==='添加服务器资产'),'N opens the capture panel for the focused group');
-  await p.click('#capture [data-action="capture-manual"]');
-  check(await p.evaluate(()=>document.querySelector('#asset-form')?.dataset.type==='server'),'手动填写 opens the form for that group');
+  check(await p.evaluate(()=>$('#modal-title').textContent==='添加服务器资产'&&document.querySelector('#asset-form')?.dataset.type==='server'),'N opens the form for the focused group');
   await p.fill('#asset-form [name="name"]','vps-new');await p.fill('#asset-form [name="host"]','bad host');
   await key(`${mod}+Enter`);
   check(await p.evaluate(()=>document.querySelector('#modal').open&&!state.assets.some(a=>a.name==='vps-new')),'Invalid host blocks saving');
@@ -149,7 +147,7 @@ async (page) => {
   await key('Escape');
   check(!(await p.evaluate(()=>document.querySelector('#modal').open)),'Esc closes the dialog');
   await p.evaluate(()=>{setView('server');document.activeElement.blur();});await key('n');
-  check(await p.evaluate(()=>$('#modal').dataset.view==='capture'&&$('#modal-title').textContent==='添加服务器资产'),'N in a category view adds to it');
+  check(await p.evaluate(()=>document.querySelector('#asset-form')?.dataset.type==='server'&&$('#modal-title').textContent==='添加服务器资产'),'N in a category view adds to it');
   await key('Escape');await p.evaluate(()=>setView('all'));
   await p.focus('#board [data-asset="s0"] .item-open');await key('e');
   check(await p.evaluate(()=>document.querySelector('#asset-form')?.dataset.id==='s0'),'E edits the focused row');

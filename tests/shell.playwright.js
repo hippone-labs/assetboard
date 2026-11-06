@@ -59,9 +59,8 @@ async (page) => {
   check(await p.evaluate(()=>currentView()==='repository'&&layoutMode==='grid'&&!!document.querySelector('#sidebar .nav-item[data-id="repository"].active')),'View and layout come back after a reload');
   await p.click('#layout-toggle [data-id="list"]');
 
-  // + in a category view opens the capture panel for that category; 手动填写 opens its form.
-  await p.click('#add-block');check(await p.evaluate(()=>$('#modal').dataset.view==='capture'&&$('#modal-title').textContent==='添加代码仓库资产'),'+ in a category view offers 识别 for that category');
-  await p.click('#capture [data-action="capture-manual"]');check(await p.evaluate(()=>document.querySelector('#asset-form')?.dataset.type==='repository'),'手动填写 opens the category form');
+  // + in a category view opens that category's form at once.
+  await p.click('#add-block');check(await p.evaluate(()=>$('#modal').dataset.view==='asset'&&$('#modal-title').textContent==='添加代码仓库资产'&&document.querySelector('#asset-form')?.dataset.type==='repository'),'+ in a category view opens the category form');
   await p.evaluate(()=>{assetFormSnapshot=null;$('#modal').close();});
   // An empty category: one line and one action; the ⋯ can remove it, but never a category that holds records.
   await p.click('#sidebar .nav-item[data-id="license"]');await settle();

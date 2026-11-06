@@ -581,6 +581,7 @@ Object.assign(I18N.en,{
  '拖入邮件、截图、PDF 或 CSV，也可以直接 ⌘V':'Drop mail, screenshots, PDFs or CSV, or press ⌘V',
  '拖入邮件或 CSV，也可以直接 ⌘V':'Drop mail or CSV, or press ⌘V',
  '识别':'Recognize',
+ '粘贴续费邮件或通知来识别…':'Paste a renewal mail or notice to recognise…',
  '手动填写':'Fill in by hand',
  '从文件、~/.ssh/config 或截图导入…':'Import from files, ~/.ssh/config or screenshots…',
  '从文件导入…':'Import from files…',

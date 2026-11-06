@@ -879,7 +879,7 @@ function markTone(src){
 function refreshMarkTones(){document.querySelectorAll('.tile.custom-art img,.site-mark').forEach(img=>{const tone=markTones.get(img.getAttribute('src'));if(tone===undefined)return;const host=img.classList.contains('site-mark')?img:img.parentElement;host.classList.toggle('mark-dark',tone==='mark-dark');host.classList.toggle('mark-light',tone==='mark-light');});}
 function closeDetail(){$('#detail').hidden=true;activeAsset=null;markSelected();if(lastFocus?.isConnected)lastFocus.focus();}
 // Dialog widths by content: short confirmations narrow, lists wide, forms in between.
-const MODAL_SIZES={prefs:'l',confirm:'s',inbox:'l','import-preview':'l',agent:'l',network:'l',cost:'l'};
+const MODAL_SIZES={add:'l',asset:'xl',prefs:'l',confirm:'s',inbox:'l','import-preview':'l',agent:'l',network:'l',cost:'l'};
 function modal(title,html,view=''){const dialog=$('#modal'),content=$('#modal-content'),scroll=dialog.open&&dialog.dataset.view===view?content.scrollTop:0;$('#modal-title').textContent=title;content.innerHTML=html;dialog.dataset.view=view;dialog.dataset.size=MODAL_SIZES[view]||'';if(!html.includes('id="asset-form"')&&!html.includes("id='asset-form'")&&!html.includes('id="dirty-save"'))assetFormSnapshot=null;if(nativeStore)content.querySelectorAll('.form-note').forEach(el=>{if(el.textContent.includes(tr('浏览器')))el.textContent=el.textContent.replaceAll(tr('当前浏览器'),tr('此 Mac')).replaceAll(tr('此浏览器'),tr('此 Mac'));});if(!dialog.open)dialog.showModal();content.scrollTop=scroll;
  // Opening puts focus on the close button, which draws a ring before anything was pressed; start in the body instead.
  if(document.activeElement===$('#close-modal')||!dialog.contains(document.activeElement))content.focus({preventScroll:true});
@@ -890,7 +890,7 @@ $('#modal-content').addEventListener('scroll',modalScrollState,{passive:true});
 $('#modal-content').addEventListener('toggle',modalScrollState,true);
 addEventListener('resize',()=>{if($('#modal').open)modalScrollState();});
 // The + adds an asset: straight into the category on screen, otherwise through the category chooser.
-function addAsset(){const v=currentView();captureDialog(cats[v]&&!query?v:'');}
+function addAsset(){const v=currentView();if(cats[v]&&!query)assetForm(v);else addDialog();}
 let importPlan=null,importKind=null,importBackup=null;
 // Where agents and scripts connect: the MCP server inside the app, set up per tool (one tab each), plus the command line.
 // The chosen tab is remembered per viewer.
@@ -1924,10 +1924,12 @@ document.addEventListener('click',e=>{
  }
 });
 function defaultCurrency(){for(const a of recentFirst(state.assets)){const parts=costParts(a.cost);if(parts)return parts.currency;}return 'CNY';}
+// The cost block as it stands in the form (values typed so far kept), for a redraw after the type changes.
+function costHtmlOf(form){const box=form.querySelector('.cost-field');if(!box)return '';for(const input of box.querySelectorAll('input'))input.setAttribute('value',input.value);return box.outerHTML;}
 function costField(v){
  const parts=costParts(v.cost),text=v.cost&&v.cost!=='未知'?String(v.cost):'',legacy=parts?'':text,suffix=parts?(/\s\/\s.+$/.exec(text)||[''])[0]:'',currency=parts?.currency||defaultCurrency();
  const codes=[...MAIN_CURRENCIES];if(!codes.includes(currency))codes.push(currency);
- return `<div class="field"><span class="field-label">${tr('费用')}</span><div class="cost-row"><input name="amount" inputmode="decimal" autocomplete="off" maxlength="12" placeholder="89" aria-label="${tr('金额')}" value="${esc(parts?.value||'')}">${chipGroup('currency',codes.map(code=>[code,currencyDisplay[code]||code]),currency,tr('币种'))}</div><input type="hidden" name="cost" value="${esc(legacy)}"><input type="hidden" name="costSuffix" value="${esc(suffix)}">${legacy?`<span class="form-note">${tr('原有费用“{cost}”会保留，填金额则替换',{cost:esc(legacy)})}</span>`:''}</div>`;
+ return `<div class="field cost-field"><span class="field-label">${tr('费用')}</span><div class="cost-row"><input name="amount" inputmode="decimal" autocomplete="off" maxlength="12" placeholder="89" aria-label="${tr('金额')}" value="${esc(parts?.value||'')}">${chipGroup('currency',codes.map(code=>[code,currencyDisplay[code]||code]),currency,tr('币种'))}</div><input type="hidden" name="cost" value="${esc(legacy)}"><input type="hidden" name="costSuffix" value="${esc(suffix)}">${legacy?`<span class="form-note">${tr('原有费用“{cost}”会保留，填金额则替换',{cost:esc(legacy)})}</span>`:''}</div>`;
 }
 function costFromForm(data,cycle){
  const raw=String(data.get('amount')??'').trim().replace(/,/g,'');
@@ -1942,9 +1944,17 @@ function setFormRegion(form,code){form.elements.region.value=code;if(form.elemen
 // The add panel: hand over whatever you have (pasted text, a file, one typed line); the form below is only the review step.
 // Opened from a category, it keeps that category for 手动填写 and for a line that names no type of its own.
 let captureType='';
+function captureLinksHtml(){return `<div class="capture-links"><button type="button" class="text-button capture-more" data-action="import-hub">${proSlots.captureImportLabel?.()||(nativeStore?tr('从文件、~/.ssh/config 或截图导入…'):tr('从文件导入…'))}</button>${!captureType||captureType==='ai'?`<button type="button" class="text-button capture-more" data-action="ai-plans">${tr('从常见 AI 套餐添加…')}</button>`:''}${slotHtml('captureLinks')}</div>`;}
+// 添加资产 (toolbar, menu, N in the overview): every category laid out to pick from; a pick opens that category's form. Pasting a
+// notice to recognise, importing files, the AI plan list and MCP stay as one row under the grid.
+function addDialog(){
+ captureType='';
+ const count=type=>state.assets.filter(a=>a.type===type&&!a.hiddenAt).length;
+ modal(tr('添加资产'),`<div class="add-panel" id="add-panel"><div class="type-grid" role="group" aria-label="${tr('类别',null,'field')}">${Object.keys(cats).map(type=>`<button type="button" class="type-choice" data-action="add-asset" data-id="${type}"><span class="type-icon">${icon(type)}</span><span class="type-name">${esc(cats[type].name)}</span>${count(type)?`<span class="type-count">${formatCount(count(type))}</span>`:''}</button>`).join('')}</div><div class="capture-links"><button type="button" class="text-button capture-more" data-action="manual-import">${tr('粘贴续费邮件或通知来识别…')}</button></div>${captureLinksHtml()}</div>`,'add');
+}
 function captureDialog(type=''){
  captureType=cats[type]?type:'';
- modal(captureType?tr('添加{name}资产',{name:zhGap(cats[captureType].name)}):tr('添加资产'),`<div class="form capture" id="capture"><textarea id="capture-text" rows="4" maxlength="20000" aria-label="${tr('粘贴或输入资产信息')}" placeholder="${tr('粘贴续费邮件、通知、域名或 IP，或直接打一行：example.com namecheap 2027-03-01 $11/年')}"></textarea><div class="capture-drop">${ui('download')}<span>${nativeStore?tr('拖入邮件、截图、PDF 或 CSV，也可以直接 ⌘V'):tr('拖入邮件或 CSV，也可以直接 ⌘V')}</span></div><div class="confirm-actions"><button class="button primary" data-action="capture-go">${tr('识别')}</button><button class="button" data-action="capture-manual">${tr('手动填写')}</button></div><div class="capture-links"><button type="button" class="text-button capture-more" data-action="import-hub">${proSlots.captureImportLabel?.()||(nativeStore?tr('从文件、~/.ssh/config 或截图导入…'):tr('从文件导入…'))}</button>${!captureType||captureType==='ai'?`<button type="button" class="text-button capture-more" data-action="ai-plans">${tr('从常见 AI 套餐添加…')}</button>`:''}${slotHtml('captureLinks')}</div><p class="form-note capture-note">${captureNote()}</p></div>`,'capture');
+ modal(captureType?tr('添加{name}资产',{name:zhGap(cats[captureType].name)}):tr('添加资产'),`<div class="form capture" id="capture"><textarea id="capture-text" rows="4" maxlength="20000" aria-label="${tr('粘贴或输入资产信息')}" placeholder="${tr('粘贴续费邮件、通知、域名或 IP，或直接打一行：example.com namecheap 2027-03-01 $11/年')}"></textarea><div class="capture-drop">${ui('download')}<span>${nativeStore?tr('拖入邮件、截图、PDF 或 CSV，也可以直接 ⌘V'):tr('拖入邮件或 CSV，也可以直接 ⌘V')}</span></div><div class="confirm-actions"><button class="button primary" data-action="capture-go">${tr('识别')}</button><button class="button" data-action="capture-manual">${tr('手动填写')}</button></div>${captureLinksHtml()}<p class="form-note capture-note">${captureNote()}</p></div>`,'capture');
  $('#capture-text').focus();
 }
 // 从常见 AI 套餐添加: tick several plans and add them at once (one checkpoint, undoable). A plan already on the board is shown
@@ -2003,11 +2013,11 @@ document.addEventListener('paste',e=>{
  const text=e.clipboardData?.getData('text/plain')||'';
  if((text.includes('\n')||text.length>120)&&!(nativeStore&&aiReady()))setTimeout(()=>captureGo(),0);
 });
-function assetForm(type,id,fill={},candidateKey='',candidateItem=null){const a=id?state.assets.find(a=>a.id===id):null,v={...(a||{}),...fill},link=safeManagementUrl(v.url),synced=PLATFORM_SOURCES.includes(a?.source),kind=dateKinds[v.dateKind]?v.dateKind:'expire';modal(a?tr('编辑资产资料'):tr('添加{name}资产',{name:zhGap(cats[type].name)}),`<form id="asset-form" class="form" data-type="${type}" data-id="${id||''}" data-candidate="${esc(candidateKey)}" data-item="${candidateItem??''}"><label>${tr('资产名称')}<input name="name" required maxlength="100" value="${esc(v.name||'')}" placeholder="${assetProfiles[type]?.name||tr('例如 my-project.dev')}"></label>${synced?'':`<div class="field"><span class="field-label">${tr('类别',null,'field')}</span>${chipGroup('type',Object.entries(cats).map(([key,c])=>[key,c.name]),type,tr('类别',null,'field'),false,true)}</div>`}<div id="profile-fields" class="profile-fields">${profileFields(type,v)}</div>${costField(v)}<details class="more-fields" ${a||candidateKey||v.purpose||v.reason||v.url||v.notes||v.project||v.promotion?'open':''}><summary>${projectsOn()?tr('更多：计费、项目、用途、链接、图标、备注'):tr('更多：计费、用途、链接、图标、备注')}</summary>${moneyFormFields(v)}<div class="field"><span class="field-label" title="${tr('可丢的照样列在清单里，只是不发通知；交接清单里关键的排在前面')}">${tr('重要程度')}</span>${chipGroup('importance',[['',tr('未设')],...Object.entries(IMPORTANCE)],IMPORTANCE[v.importance]?v.importance:'',tr('重要程度'))}</div><label>${tr('用途')}<input name="purpose" maxlength="100" value="${esc(v.purpose||'')}" placeholder="${tr('它用来做什么？')}"></label><label>${tr('保留原因')}<input name="reason" maxlength="120" value="${esc(v.reason||'')}" placeholder="${tr('为什么还留着')}"></label><label>${tr('管理链接')}<input name="url" type="url" maxlength="2000" value="${esc(link&&new URL(link).hostname!=='example.com'?link:'')}" placeholder="https://..." pattern="https?://.*"></label><label title="${tr('PNG、JPEG 或 WebP，最大 256 KB')}">${tr('自定义图标')}<input name="icon" type="file" accept="image/png,image/jpeg,image/webp"></label>${a?.iconData?`<label class="check-label"><input name="removeIcon" type="checkbox">${tr('移除当前自定义图标')}</label>`:''}<label>${tr('备注')}<textarea name="notes" rows="3" maxlength="2000">${esc(v.notes||'')}</textarea></label></details><div class="form-actions"><button class="button primary" type="submit">${a?tr('保存修改'):tr('添加资产')}</button><span class="form-note">${nativeStore?tr('仅存于此 Mac'):tr('仅存于此浏览器')}</span></div></form>`);const form=$('#asset-form');assetFormSnapshot=snapshotAssetForm(form);sshConfigHostsAsk(type);
+function assetForm(type,id,fill={},candidateKey='',candidateItem=null){const a=id?state.assets.find(a=>a.id===id):null,v={...(a||{}),...fill},link=safeManagementUrl(v.url),synced=PLATFORM_SOURCES.includes(a?.source),kind=dateKinds[v.dateKind]?v.dateKind:'expire';modal(a?tr('编辑资产资料'):tr('添加{name}资产',{name:zhGap(cats[type].name)}),`<form id="asset-form" class="form asset-form" data-type="${type}" data-id="${id||''}" data-candidate="${esc(candidateKey)}" data-item="${candidateItem??''}"><div class="form-main"><label>${tr('资产名称')}<input name="name" required maxlength="100" value="${esc(v.name||'')}" placeholder="${assetProfiles[type]?.name||tr('例如 my-project.dev')}"></label>${synced?'':`<div class="field"><span class="field-label">${tr('类别',null,'field')}</span>${chipGroup('type',Object.entries(cats).map(([key,c])=>[key,c.name]),type,tr('类别',null,'field'),false,true)}</div>`}<div id="profile-fields" class="profile-fields">${profileFields(type,v,costField(v))}</div></div><section class="more-fields form-more"><h3 class="section-title">${projectsOn()?tr('更多：计费、项目、用途、链接、图标、备注'):tr('更多：计费、用途、链接、图标、备注')}</h3>${moneyFormFields(v)}<div class="field"><span class="field-label" title="${tr('可丢的照样列在清单里，只是不发通知；交接清单里关键的排在前面')}">${tr('重要程度')}</span>${chipGroup('importance',[['',tr('未设')],...Object.entries(IMPORTANCE)],IMPORTANCE[v.importance]?v.importance:'',tr('重要程度'))}</div><label>${tr('用途')}<input name="purpose" maxlength="100" value="${esc(v.purpose||'')}" placeholder="${tr('它用来做什么？')}"></label><label>${tr('保留原因')}<input name="reason" maxlength="120" value="${esc(v.reason||'')}" placeholder="${tr('为什么还留着')}"></label><label>${tr('管理链接')}<input name="url" type="url" maxlength="2000" value="${esc(link&&new URL(link).hostname!=='example.com'?link:'')}" placeholder="https://..." pattern="https?://.*"></label><label title="${tr('PNG、JPEG 或 WebP，最大 256 KB')}">${tr('自定义图标')}<input name="icon" type="file" accept="image/png,image/jpeg,image/webp"></label>${a?.iconData?`<label class="check-label"><input name="removeIcon" type="checkbox">${tr('移除当前自定义图标')}</label>`:''}<label>${tr('备注')}<textarea name="notes" rows="3" maxlength="2000">${esc(v.notes||'')}</textarea></label></section><div class="form-actions"><button class="button primary" type="submit">${a?tr('保存修改'):tr('添加资产')}</button><span class="form-note">${nativeStore?tr('仅存于此 Mac'):tr('仅存于此浏览器')}</span></div></form>`,'asset');const form=$('#asset-form');assetFormSnapshot=snapshotAssetForm(form);sshConfigHostsAsk(type);
  if(!a)form.addEventListener('input',e=>{if(e.target.name!=='name'||form.dataset.typeTouched||!form.elements.type)return;const guess=inferTypeFromName(e.target.value);if(guess&&guess!==form.elements.type.value)setChoice(form,'type',guess);});
  form.addEventListener('change',e=>{if(e.target.name==='date'){const day=parseLooseDate(e.target.value);if(day)e.target.value=day;}});
  form.addEventListener('input',e=>{if(e.target.name!=='regionText')return;form.elements.region.value=regionCodeFromText(e.target.value);e.target.setCustomValidity('');});
- form.elements.type?.addEventListener('change',e=>{const values=Object.fromEntries(new FormData(form));if('expiry' in values)values.date=cardExpiry(values.expiry)||'';form.dataset.type=e.target.value;sshConfigHostsAsk(e.target.value);$('#profile-fields').innerHTML=profileFields(e.target.value,values);form.elements.name.placeholder=assetProfiles[e.target.value]?.name||tr('例如 my-project.dev');});
+ form.elements.type?.addEventListener('change',e=>{const values=Object.fromEntries(new FormData(form));if('expiry' in values)values.date=cardExpiry(values.expiry)||'';form.dataset.type=e.target.value;sshConfigHostsAsk(e.target.value);$('#profile-fields').innerHTML=profileFields(e.target.value,values,costHtmlOf(form)||costField(values));form.elements.name.placeholder=assetProfiles[e.target.value]?.name||tr('例如 my-project.dev');});
  form.addEventListener('input',e=>{if(e.target.name!=='phone')return;const region=form.elements.region,code=regionFromPhone(e.target.value);if(region&&code&&!region.value)setFormRegion(form,code);});
 }
 // Fields that depend on the category; rebuilt in place when the category select changes.
@@ -2059,7 +2069,8 @@ function keepFromForm(form,data,type){
  }
  return out;
 }
-function profileFields(type,v){
+const MONEY_FIRST=new Set(['subscription','ai','license','deployment','database','storage']);
+function profileFields(type,v,cost=''){
  const p=assetProfiles[type]||{},extra=p.extra||[],kind=dateKinds[v.dateKind]?v.dateKind:p.dateKind||'expire',cycle=v.cycle??p.cycle??'';
  const presets=providerPresets(type),current=v.provider==='平台待补充'?'':v.provider||'';
  // Common vendors as chips (the first few) and as suggestions while typing (all of them); any other name can still be typed.
@@ -2071,7 +2082,8 @@ function profileFields(type,v){
  const dates=type==='bankcard'?'':`<div class="field"><span class="field-label">${p.date||tr('下一日期')}</span><div class="date-row"><input name="date" autocomplete="off" inputmode="numeric" placeholder="${tr('2027-03-01 或 3/1')}" aria-label="${esc(p.date||tr('下一日期'))}" value="${esc(v.date||'')}">${[[1,tr('+1 个月')],[3,tr('+3 个月')],[12,tr('+1 年')]].map(([months,label])=>`<button type="button" class="choice quick" data-add-months="${months}">${label}</button>`).join('')}</div></div><div class="field"><span class="field-label">${tr('日期类型')}</span>${chipGroup('dateKind',Object.entries(dateKinds).map(([key,k])=>[key,k.label]),kind,tr('日期类型'))}</div><div class="field"><span class="field-label" title="${tr('日期过去后自动顺延到下一次')}">${tr('重复')}</span>${chipGroup('cycle',[['',tr('不重复')],...Object.entries(billingCycles).map(([key,c])=>[key,c.label])],cycle,tr('重复'))}</div>`;
  const actions=(ACTION_FIELDS[type]||[]).filter(([key])=>key!=='localPath'||nativeStore).map(([key,label,hint])=>`<label>${label}<input name="${key}" maxlength="${key==='localPath'?1000:253}" autocomplete="off" spellcheck="false" ${key==='sshPort'?'inputmode="numeric"':''} value="${esc(Array.isArray(v[key])?v[key].join(', '):v[key]||'')}" placeholder="${hint}"></label>`).join('');
  const server=type==='server'?[sshPickField(v),actions?`<div class="field-row action-fields">${actions}</div>`:'',slotHtml('serverFields',v)].join(''):actions?`<div class="field-row action-fields">${actions}</div>`:'';
- return provider+account+region+phone+card+dates+server+keepFields(type,v)+wakeFields(type,v)+(p.note?`<span class="form-note form-warning">${p.note}</span>`:'');
+ const plans=type==='ai'?`<div class="field-row"><button type="button" class="text-button inline-button" data-action="ai-plans">${tr('从常见 AI 套餐添加…')}</button></div>`:'';
+ return provider+plans+(MONEY_FIRST.has(type)?cost:'')+region+phone+card+dates+(MONEY_FIRST.has(type)?'':cost)+account+server+keepFields(type,v)+wakeFields(type,v)+(p.note?`<span class="form-note form-warning">${p.note}</span>`:'');
 }
 // Adding a server the way a terminal user thinks: pick one of the hosts in ~/.ssh/config (the Mac app reads the file when the form
 // opens, `sshConfigHosts`) and the name, host, user and port are filled in; the alias is kept on the record (sshAlias) so SSH 直读
@@ -2487,7 +2499,7 @@ document.addEventListener('click',e=>{const button=e.target.closest('[data-actio
  else if(action==='collapse'){if(query||currentView()!=='all'||!cats[id])return;checkpoint();ensureBlock(state,id);const b=state.blocks.find(x=>x.id===id),fold=!b.folded,targets=e.altKey?categoryIds():[id];for(const type of targets){ensureBlock(state,type);state.blocks.find(x=>x.id===type).folded=fold;}save();foldRender(targets,id);document.querySelector(`#board [data-action="collapse"][data-id="${id}"]`)?.focus();if(e.altKey)toast(fold?tr('已收起全部类别'):tr('已展开全部类别'),true);}
  else if(action==='all')setView(id);
  else if(action==='back')setView('all');
- else if(action==='add-asset')captureDialog(id);
+ else if(action==='add-asset')assetForm(id);
  else if(action==='edit-asset')assetForm(state.assets.find(a=>a.id===id).type,id);
  else if(action==='settings')settings(id);
  else if(action==='toggle-hidden')setView('hidden');
@@ -2567,7 +2579,7 @@ document.addEventListener('keydown',e=>{
  }
  if(e.shiftKey&&key!=='n')return;
  if(key==='i'){e.preventDefault();importHub();return;}
- if(key==='n'){e.preventDefault();const group=e.target.closest?.('#board .group')?.dataset.group,type=cats[group]?group:(e.target.closest?.('#detail')&&state.assets.find(a=>a.id===activeAsset)?.type)||(cats[currentView()]?currentView():null);captureDialog(type);return;}
+ if(key==='n'){e.preventDefault();const group=e.target.closest?.('#board .group')?.dataset.group,type=cats[group]?group:(e.target.closest?.('#detail')&&state.assets.find(a=>a.id===activeAsset)?.type)||(cats[currentView()]?currentView():null);if(type)assetForm(type);else addDialog();return;}
  const id=keyAsset(e),a=id&&state.assets.find(x=>x.id===id);if(!a)return;
  if(key==='e'){e.preventDefault();assetForm(a.type,id);}
  else if(key==='r'){e.preventDefault();renewDialog(id);}

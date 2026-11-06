@@ -51,7 +51,7 @@ async (page) => {
    view='project:notes-lab';render();
    const sidebar=document.querySelector('#sidebar').innerText,shown=currentView();
    showDetail('pr1');const detail=document.querySelector('#detail')?.innerText||'',projectLink=!!document.querySelector('#detail [data-id^="project:"]');
-   assetForm('domain','pr1');const form=document.querySelector('#asset-form'),field=!!form.elements.project,summary=form.querySelector('summary').textContent;
+   assetForm('domain','pr1');const form=document.querySelector('#asset-form'),field=!!form.elements.project,summary=form.querySelector('.more-fields .section-title').textContent;
    form.elements.purpose.value='site';form.requestSubmit();
    return {view:shown,sidebar,detail,projectLink,field,summary};
   });

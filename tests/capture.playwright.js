@@ -27,8 +27,8 @@ async (page) => {
  let {p,context,errors}=await open();
  try {
   const val=n=>p.locator(`#asset-form [name="${n}"]`).inputValue();
-  await p.evaluate(()=>addAsset());
-  check(await p.locator('#modal[data-view="capture"]').count()===1,'Add opens the capture panel in the overview');
+  await p.evaluate(()=>captureDialog());
+  check(await p.locator('#modal[data-view="capture"]').count()===1,'粘贴识别 opens the capture panel');
   check((await p.locator('.capture-note').innerText()).includes('不上传'),'The panel says nothing is uploaded');
   await p.fill('#capture-text','example.com namecheap 2027-03-01 $11/年');await p.press('#capture-text','Enter');await p.waitForSelector('#asset-form');
   check(await val('name')==='example.com'&&await val('type')==='domain'&&await val('provider')==='namecheap'&&await val('date')==='2027-03-01','Name, type, provider and date come from the line');
@@ -126,7 +126,7 @@ async (page) => {
  // With a model: the text is sent only on the click, and the answer goes to the review.
  ({p,context,errors}=await open({ai:true}));
  try {
-  await p.evaluate(()=>addAsset());
+  await p.evaluate(()=>captureDialog());
   await p.evaluate(()=>window.assetboardIntake([{source:'service',name:'选中的文字',text:'Notion Plus $10 monthly'}]));
   check(await p.inputValue('#capture-text')==='Notion Plus $10 monthly','Services text fills the empty add panel');
   check(!(await p.evaluate(()=>__sent.some(m=>m.action==='aiRecognize'))),'Text from the Services menu is not sent to the model by itself');
@@ -152,8 +152,8 @@ async (page) => {
   check(await p.locator('#asset-form [name="name"]').inputValue()==='still-here.dev','The form stays while the screenshot waits in 待确认');
   await p.evaluate(()=>{assetFormSnapshot=null;$('#modal').close();});
 
-  await p.evaluate(()=>addAsset());
-  await p.evaluate(()=>addAsset());
+  await p.evaluate(()=>captureDialog());
+  await p.evaluate(()=>captureDialog());
   check((await p.locator('.capture-note').innerText()).includes('api.anthropic.com'),'The panel says where the text goes');
   await p.fill('#capture-text','Notion Plus $10 monthly, renews 2099-11-01');
   check(!(await p.evaluate(()=>__sent.some(m=>m.action==='aiRecognize'))),'Typing sends nothing');

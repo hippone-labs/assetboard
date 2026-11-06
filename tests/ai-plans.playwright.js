@@ -28,10 +28,9 @@ async (page) => {
  const ratios=[];
  let {p,context,errors}=await open();
  try {
-  // The AI category's + offers the list; 手动填写 opens the form with the vendors that have plans as chips.
+  // The AI category's + opens its form, which links to the list and has the vendors that have plans as chips.
   await p.evaluate(()=>setView('ai'));await p.evaluate(()=>addAsset());
-  check(await p.locator('#capture [data-action="ai-plans"]').count()===1,'The AI add panel links to the plan list');
-  await p.click('#capture [data-action="capture-manual"]');
+  check(await p.locator('#asset-form [data-action="ai-plans"]').count()===1,'The AI form links to the plan list');
   check(await p.locator('#asset-form[data-type="ai"]').count()===1,'The form is for an AI plan');
   const vendors=await p.locator('#asset-form .provider-picks [data-provider]').evaluateAll(b=>b.map(x=>x.dataset.provider));
   check(['OpenAI','Anthropic','Gemini','Cursor','GitHub Copilot','Midjourney'].every(n=>vendors.includes(n)),'Vendors with plans are chips: '+vendors);
@@ -67,7 +66,7 @@ async (page) => {
   check(added.cost==='$288 / 年'&&added.cycle==='yearly'&&added.provider==='Midjourney'&&added.dateKind==='renew'&&added.date==='2099-03-01'&&added.url==='https://www.midjourney.com/account','Saved record: '+JSON.stringify(added));
 
   // 从常见 AI 套餐添加: several at once, one undo.
-  await p.evaluate(()=>addAsset());await p.click('#capture [data-action="ai-plans"]');
+  await p.evaluate(()=>addDialog());await p.click('#add-panel [data-action="ai-plans"]');
   check(await p.locator('#ai-plans-form').count()===1,'The plan list opens');
   check((await p.locator('#ai-plans-form .form-note').innerText()).includes('2026-11-02'),'The list names the day prices were checked');
   const claude=p.locator('#ai-plans-form .plan-row',{hasText:'Claude Pro'}).locator('input[name="plan"]');

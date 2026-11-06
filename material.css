@@ -2252,3 +2252,25 @@ body::before,.native-app body::before{background:radial-gradient(70vw 65vh at 0%
 .live-meter{display:inline-block;width:26px;height:4px;margin-right:5px;border-radius:2px;background:rgba(var(--tone-ink),.14);vertical-align:1px;position:relative;overflow:hidden}
 .live-meter::after{content:"";position:absolute;top:0;bottom:0;left:0;width:var(--v);border-radius:inherit;background:rgba(var(--tone-ink),.5)}
 .live-line.amber .live-meter::after{background:var(--dot-amber)}
+/* 添加资产 (2026-11-06, user: lay the categories out, keep the key fields first, pick instead of type): the first screen is a grid
+   of every category; the form is wide, the key fields at the left and 更多 open at the right, one column on a narrow window. */
+:root #modal[data-size="xl"]{width:920px}
+.add-panel .type-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.type-choice{display:flex;align-items:center;gap:10px;min-height:46px;padding:8px 12px;border:1px solid var(--hairline);border-radius:10px;background:var(--surface-card);color:var(--ink);font:inherit;font-size:13px;font-weight:500;text-align:left;cursor:default;transition:background-color var(--motion-fast) var(--ease),border-color var(--motion-fast) var(--ease)}
+.type-choice:hover,.type-choice:focus-visible{background:var(--hover);border-color:var(--border-strong)}
+.type-icon{display:inline-grid;place-items:center;flex:none;width:28px;height:28px;border-radius:8px;background:var(--hover)}
+.type-icon svg{width:16px;height:16px;color:var(--ink)}
+.type-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.type-count{font-family:var(--num);font-size:12px;color:var(--muted)}
+.add-panel .capture-links{margin-top:12px}
+.add-panel .capture-links+.capture-links{margin-top:4px}
+.add-panel>.capture-links:first-of-type{padding-top:14px;border-top:1px solid var(--hairline)}
+@media(max-width:600px){.add-panel .type-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+:root #asset-form.asset-form{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px 28px;align-items:start}
+:root #asset-form .form-main{display:grid;gap:15px;min-width:0}
+:root #asset-form .form-more{display:grid;gap:15px;min-width:0;padding:14px 16px 16px;border-radius:12px;background:rgba(var(--tone-ink),.035)}
+:root[data-scheme=dark] #asset-form .form-more{background:rgba(255,255,255,.045)}
+:root #asset-form .section-title{margin:0;font-size:12px;font-weight:600;color:var(--muted)}
+:root #asset-form .form-actions{grid-column:1/-1}
+:root #asset-form .profile-fields{grid-template-columns:minmax(0,1fr)}
+@media(max-width:760px){:root #asset-form.asset-form{grid-template-columns:minmax(0,1fr)}}
