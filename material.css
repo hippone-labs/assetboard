@@ -1170,7 +1170,7 @@ button.group-title:hover{background:var(--hover)}
 .r-actions{flex:none;display:flex;align-items:center;justify-content:flex-end;gap:2px;width:64px;padding-right:8px}
 .r-actions .quick-action{width:28px;height:28px;border-radius:6px}
 .r-actions .quick-action svg{width:15px;height:15px}
-@media(hover:hover){.row:not(:hover,:focus-within) .quick-action,.gcard:not(:hover,:focus-within) .quick-action{opacity:0}}
+@media(hover:hover){.row:not(:hover,:focus-within) .quick-action,.gcard:not(:hover,:focus-within) .quick-action{opacity:0}.gcard:not(:hover,:focus-within) .r-actions{background:none}}
 body.drag-active .r-actions{visibility:hidden}
 .row.is-hidden .r-actions,.gcard.is-hidden .r-actions{width:auto;gap:6px}
 .r-actions .button{height:26px;padding:0 10px;font-size:12px}
