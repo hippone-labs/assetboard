@@ -22,9 +22,11 @@ shot() { # name, then the app's arguments
 for lang in zh en; do
   shot "app-dark-$lang" --lang "$lang" --dark --open-asset=demo-d1
   shot "app-themes-light-$lang" --lang "$lang" --light --open-asset=demo-d1 --open-theme
-  # The site's feature section: what is due, what it costs, the year's dates, what runs where, live readings, free-tier sleep.
+  # The site's feature section: what is due, what it costs, a project's costs, the year's dates, what runs where, live readings,
+  # free-tier sleep.
   shot "app-upcoming-dark-$lang" --lang "$lang" --dark --open-view=upcoming --layout=list --open-asset=demo-d1
   shot "app-cost-dark-$lang" --lang "$lang" --dark --open-asset=demo-d1 --open-cost
+  shot "app-project-dark-$lang" --lang "$lang" --dark --open-view=project:notes-lab --open-asset=demo-s1
   shot "app-timeline-dark-$lang" --lang "$lang" --dark --layout=timeline --open-asset=demo-d1
   shot "app-panorama-dark-$lang" --lang "$lang" --dark --panorama
   shot "app-live-dark-$lang" --lang "$lang" --dark --open-asset=demo-s1
