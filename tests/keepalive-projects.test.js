@@ -66,3 +66,19 @@ test('the keep-alive address is masked wherever hosts are, and left out of a min
  assert.equal('keepAlive' in D.maskAsset(a,'calendar'),false);
  assert.equal(D.maskAsset(a,'present').keepAlive.url,'https://api.example.com/health','presentation masks addresses only');
 });
+
+test('renaming a project renames it on every record, merges into a name that exists, and refuses list separators',()=>{
+ const {renameProject,projectNameOk,projectsOf}=require('../asset-data.js');
+ const assets=[{id:'a',project:'studio'},{id:'b',project:['studio','notes']},{id:'c',project:'notes'},{id:'d'}];
+ assert.equal(renameProject(assets,'studio','studio-web','2026-11-06T00:00:00.000Z'),2);
+ assert.deepEqual(assets.map(projectsOf),[['studio-web'],['studio-web','notes'],['notes'],[]]);
+ assert.equal(assets[0].updatedAt,'2026-11-06T00:00:00.000Z');
+ assert.equal(assets[2].updatedAt,undefined);
+ assert.equal(renameProject(assets,'studio-web','notes'),2);
+ assert.deepEqual(assets.map(projectsOf),[['notes'],['notes'],['notes'],[]]);
+ assert.equal(assets[1].project,'notes');
+ assert.equal(renameProject(assets,'notes','a, b'),0);
+ assert.equal(renameProject(assets,'notes','  '),0);
+ assert.equal(projectNameOk('notes-app'),true);
+ assert.equal(projectNameOk('a、b'),false);
+});
