@@ -16,29 +16,47 @@ version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/
 "$app/Contents/MacOS/Assetboard" --test-license
 "$app/Contents/MacOS/Assetboard" --test-update
 codesign --verify --deep --strict --verbose=2 "$app"
+# A background runner without macOS App Management access may be unable to write inside an app bundle.
+# Check before submitting to Apple; remove the probe before verifying or stapling the signed app.
+node - "$app" <<'JS'
+const fs = require('node:fs');
+const path = require('node:path');
+const probe = path.join(process.argv[2], `.assetboard-write-probe-${process.pid}`);
+try {
+  fs.closeSync(fs.openSync(probe, 'wx', 0o600));
+  fs.unlinkSync(probe);
+} catch (error) {
+  console.error(`Cannot write inside the app bundle (${error.code || 'unknown error'}). Check the runner's macOS App Management permission.`);
+  process.exit(1);
+}
+JS
+codesign --verify --deep --strict "$app"
 notary_kc=(); [[ -n "${NOTARY_KEYCHAIN:-}" ]] && notary_kc=(--keychain "$NOTARY_KEYCHAIN")
-# The upload to the notary service has timed out from this Mac (HTTPClientError.deadlineExceeded after about 100 seconds), so a
-# submission is tried up to four times, with a growing pause between tries. A timed-out upload leaves nothing behind to resume.
+# Submit once and keep its ID before waiting. A timeout does not prove that Apple failed to receive the upload.
 notarize() {
-  local file=$1 out=$2 attempt
+  local file=$1 out=$2 attempt id submit="${2%.json}-submission.json"
+  if ! xcrun notarytool submit "$file" --keychain-profile "$NOTARY_PROFILE" "${notary_kc[@]}" --output-format json > "$submit"; then
+    echo "Notary submission did not return an ID. Check notarytool history before submitting this file again." >&2
+    return 1
+  fi
+  id="$(/usr/bin/python3 -c 'import json,sys,uuid; print(uuid.UUID(json.load(open(sys.argv[1]))["id"]))' "$submit")" || return 1
+  echo "Waiting for notary submission $id"
   for attempt in 1 2 3 4; do
-    if xcrun notarytool submit "$file" --keychain-profile "$NOTARY_PROFILE" "${notary_kc[@]}" --wait --output-format json > "$out"; then return 0; fi
-    echo "notarytool submit did not finish (attempt $attempt of 4)" >&2
+    if xcrun notarytool wait "$id" --keychain-profile "$NOTARY_PROFILE" "${notary_kc[@]}" --timeout 10m --output-format json > "$out"; then return 0; fi
+    echo "notarytool wait failed for $id (attempt $attempt of 4); retrying the same submission" >&2
     (( attempt < 4 )) && sleep $(( attempt * 30 ))
   done
   return 1
 }
-# Right after acceptance the ticket can be missing from Apple's ticket service for a while (stapler Error 73), so stapling is
-# tried up to six times, half a minute apart.
+# Stapler can fail for reasons including local permissions and ticket lookup; retain verbose diagnostics on failure.
 staple() {
   local target=$1 attempt
   for attempt in 1 2 3 4 5 6; do
     if xcrun stapler staple "$target"; then return 0; fi
-    echo "stapler could not fetch the ticket yet (attempt $attempt of 6)" >&2
+    echo "stapler failed (attempt $attempt of 6); checking again" >&2
     (( attempt < 6 )) && sleep 30
   done
-  # Error 73 for minutes means the ticket service cannot be reached: show the request and where its host resolves
-  # (a 198.18.x address is a local proxy's fake IP).
+  # Report the ticket request and connectivity without assuming the cause of Error 73.
   xcrun stapler staple -v "$target" 2>&1 | tail -40 || true
   curl -sS -o /dev/null -w 'api.apple-cloudkit.com: HTTP %{http_code} via %{remote_ip}\n' https://api.apple-cloudkit.com/ || true
   return 1
