@@ -31,8 +31,9 @@ jobs:
           gh repo clone "${{ vars.PRO_REPO || 'hippone-labs/assetboard-pro' }}" pro -- --depth=1 --quiet
       - name: Verify release script without publishing
         run: |
-          export RELEASE_DIR="$RUNNER_TEMP/assetboard-diagnostic-$GITHUB_RUN_ID"
-          zsh desktop/release.sh
+          command -v node
+          node -p 'process.execPath'
+          ps -o pid,ppid,command -p $$ -p "$PPID"
       - name: Upload test receipts
         if: always()
         uses: actions/upload-artifact@v4
