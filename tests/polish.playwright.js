@@ -13,8 +13,8 @@ async (page) => {
   // Wide list: the date and the amount are their own columns on one line, the amount right of the date (v17 calm board).
   const r=await p.evaluate(()=>{const row=document.querySelector('#board .row[data-asset="demo-s1"]'),d=row.querySelector('.r-date').getBoundingClientRect(),m=row.querySelector('.r-cost').getBoundingClientRect();return {line:Math.abs(m.top-d.top)<4,after:m.left>=d.right-1};});
   check(r.line&&r.after,'Date and amount are two columns on one line: '+JSON.stringify(r));
-  // Group heads lead the rhythm.
-  check(await p.evaluate(()=>parseFloat(getComputedStyle(document.querySelector('.group-title')).fontSize)>=15),'Group titles are larger than rows');
+  // Group heads lead the rhythm by weight, not size (安静的仪器, 2026-11-06): as large as a row name and heavier.
+  check(await p.evaluate(()=>{const t=getComputedStyle(document.querySelector('.group-title')),n=getComputedStyle(document.querySelector('#board .r-name'));return parseFloat(t.fontSize)>=parseFloat(n.fontSize)&&parseInt(t.fontWeight)>parseInt(n.fontWeight);}),'Group titles are as large as row names and heavier');
   // Sidebar entry opens the panorama in the middle column; the sidebar stays.
   await p.click('#sidebar [data-action="panorama"]');await p.waitForTimeout(250);
   const q=await p.evaluate(()=>{const pano=document.querySelector('#panorama').getBoundingClientRect(),side=document.querySelector('#sidebar').getBoundingClientRect();return {open:!document.querySelector('#panorama').hidden,left:Math.round(pano.left),side:Math.round(side.width),sideVisible:getComputedStyle(document.querySelector('#sidebar')).visibility==='visible',active:document.querySelector('#sidebar [data-action="panorama"]').classList.contains('active'),bg:getComputedStyle(document.querySelector('#panorama')).backgroundColor,tm:Math.round(document.querySelector('.pano-grid').getBoundingClientRect().right)<=Math.round(pano.right)};});
