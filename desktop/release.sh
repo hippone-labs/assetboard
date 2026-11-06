@@ -28,9 +28,20 @@ notarize() {
   done
   return 1
 }
+# Right after acceptance the ticket can be missing from Apple's ticket service for a while (stapler Error 73), so stapling is
+# tried up to six times, half a minute apart.
+staple() {
+  local target=$1 attempt
+  for attempt in 1 2 3 4 5 6; do
+    if xcrun stapler staple "$target"; then return 0; fi
+    echo "stapler could not fetch the ticket yet (attempt $attempt of 6)" >&2
+    (( attempt < 6 )) && sleep 30
+  done
+  return 1
+}
 notarize "dist/Assetboard-macOS-arm64-$version.zip" "$RELEASE_DIR/notary.json"
 /usr/bin/python3 -c 'import json,sys; assert json.load(open(sys.argv[1]))["status"] == "Accepted", "Notarization rejected"' "$RELEASE_DIR/notary.json"
-xcrun stapler staple "$app"
+staple "$app"
 xcrun stapler validate "$app"
 spctl -a -vv "$app"
 archive="$RELEASE_DIR/Assetboard-macOS-arm64-$version.zip"
@@ -50,7 +61,7 @@ dmg="$RELEASE_DIR/Assetboard-macOS-arm64-$version.dmg"
 codesign --sign "$SIGNING_IDENTITY" --timestamp "$dmg"
 notarize "$dmg" "$RELEASE_DIR/notary-dmg.json"
 /usr/bin/python3 -c 'import json,sys; assert json.load(open(sys.argv[1]))["status"] == "Accepted", "Disk image notarization rejected"' "$RELEASE_DIR/notary-dmg.json"
-xcrun stapler staple "$dmg"
+staple "$dmg"
 xcrun stapler validate "$dmg"
 spctl -a -t open --context context:primary-signature -vv "$dmg"
 shasum -a 256 "$dmg"
