@@ -43,7 +43,12 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - name: Pro modules (private checkout beside the board)
+        # The runner's own gh login reads the private repository; a PRO_REPO_TOKEN secret (a fine-grained token with contents: read
+        # on it) is used instead when set, for a runner that is not logged in.
+        env:
+          PRO_REPO_TOKEN: ${{ secrets.PRO_REPO_TOKEN }}
         run: |
+          if [ -n "${PRO_REPO_TOKEN:-}" ]; then export GH_TOKEN="$PRO_REPO_TOKEN"; fi
           rm -rf pro
           gh repo clone "${{ vars.PRO_REPO || 'hippone-labs/assetboard-pro' }}" pro -- --depth=1 --quiet
           test -f pro/web/pro.js
