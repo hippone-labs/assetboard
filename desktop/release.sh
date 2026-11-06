@@ -37,6 +37,10 @@ staple() {
     echo "stapler could not fetch the ticket yet (attempt $attempt of 6)" >&2
     (( attempt < 6 )) && sleep 30
   done
+  # Error 73 for minutes means the ticket service cannot be reached: show the request and where its host resolves
+  # (a 198.18.x address is a local proxy's fake IP).
+  xcrun stapler staple -v "$target" 2>&1 | tail -40 || true
+  curl -sS -o /dev/null -w 'api.apple-cloudkit.com: HTTP %{http_code} via %{remote_ip}\n' https://api.apple-cloudkit.com/ || true
   return 1
 }
 notarize "dist/Assetboard-macOS-arm64-$version.zip" "$RELEASE_DIR/notary.json"
