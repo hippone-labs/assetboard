@@ -1775,14 +1775,14 @@ window.assetboardSshResult=result=>{
   toast(result.error+(steps?' · '+steps:''));
   return;
  }
- const hosts=parseSshConfig(result.text||'');
- if(!hosts.length){toast(tr('~/.ssh/config 里没有 Host'));return;}
+ const hosts=parseSshConfig(result.text||''),git=sshGitHosts(result.text||'').length;
+ if(!hosts.length){toast(git?tr('~/.ssh/config 里只有代码托管的 Host（如 github.com），没有服务器'):tr('~/.ssh/config 里没有 Host'));return;}
  // Convert to planImport-compatible items via mergeSshConfig under checkpoint path similar to platform sync
  checkpoint();
  const merge=mergeSshConfig(state,hosts);
  state=merge.board;save();render();
  $('#modal')?.close();
- toast(tr('SSH：读 {read}，新增 {added}',{read:merge.read,added:merge.added}),true);
+ toast(git?tr('SSH：读 {read}，新增 {added}，跳过 {git} 个代码托管',{read:merge.read,added:merge.added,git}):tr('SSH：读 {read}，新增 {added}',{read:merge.read,added:merge.added}),true);
  syncFollowUp('SSH',merge,[]);
 };
 

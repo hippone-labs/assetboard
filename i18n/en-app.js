@@ -557,6 +557,8 @@ Object.assign(I18N.en,{
  '看板设置 {n} 项':['{n} board setting','{n} board settings'],
  '无法解析邮件':'Cannot read the email',
  'SSH：读 {read}，新增 {added}':'SSH: {read} read, {added} new',
+ 'SSH：读 {read}，新增 {added}，跳过 {git} 个代码托管':'SSH: {read} read, {added} new, {git} code-hosting entries skipped',
+ '~/.ssh/config 里只有代码托管的 Host（如 github.com），没有服务器':'~/.ssh/config only has code-hosting hosts (such as github.com), no servers',
  '网页导不进来':'A web page cannot be imported',
  '这是导出的日历，只用来阅读，导不回来':'This is an exported calendar, for reading only; it cannot be imported back',
  '这是导出的付款账本，只用来阅读，导不回来':'This is an exported payment ledger, for reading only; it cannot be imported back',

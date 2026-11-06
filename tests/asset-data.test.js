@@ -411,7 +411,7 @@ test('category quick actions are open/copy only, local folders only in the app',
 const {
   IMPORT_ROW_LIMIT,parseDelimitedText,rowsToImportItems,classifyImportPayload,planImport,applyImport,
   parseBoardBackup,planBoardBackup,applyBoardBackup,demoImportSampleCsv,csvSyncKey,isBlacklisted,
-  parseSshConfig,mergeSshConfig,parseEml,cloudflareTokenTemplateUrl
+  parseSshConfig,sshGitHosts,mergeSshConfig,parseEml,cloudflareTokenTemplateUrl
 }=require('../asset-data.js');
 
 test('parses CSV with header aliases and drops secret columns',()=>{
@@ -636,9 +636,11 @@ test('after a merge a one-sided link is settled by the side changed last',()=>{
 });
 
 
-test('parses ssh config hosts and skips globs',()=>{
- const hosts=parseSshConfig(`Host github.com\n  HostName github.com\nHost box-tokyo\n  HostName 203.0.113.10\n  User deploy\n  Port 2222\nHost *.internal\n  User skip\n`);
- assert.equal(hosts.length,2);
+test('parses ssh config hosts and skips globs and code hosting',()=>{
+ const text=`Host github.com\n  HostName github.com\nHost gh-work\n  HostName github.com\n  IdentityFile ~/.ssh/id_work\nHost forge\n  HostName git.example.org\n  User git\nHost box-tokyo\n  HostName 203.0.113.10\n  User deploy\n  Port 2222\nHost nas\n  HostName 192.0.2.20\nHost *.internal\n  User skip\n`;
+ const hosts=parseSshConfig(text);
+ assert.deepEqual(hosts.map(h=>h.name),['box-tokyo','nas']);
+ assert.deepEqual(sshGitHosts(text).map(h=>h.name),['github.com','gh-work','forge']);
  assert.equal(hosts.find(h=>h.name==='box-tokyo').host,'203.0.113.10');
  assert.equal(hosts.find(h=>h.name==='box-tokyo').sshPort,'2222');
  const board={blocks:[],assets:[],deletedExternalIds:[]};

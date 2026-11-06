@@ -70,7 +70,7 @@ The panorama has four lenses: where it runs, who pays, which login, by project. 
 | Screenshots and PDF, recognised on the Mac with macOS text recognition | App |
 | Cloudflare (read-only API token): zones, Pages, Workers, R2 | App |
 | GitHub (local `gh` or a read-only token): repositories | App |
-| `~/.ssh/config`: Host, HostName, User, Port | App |
+| `~/.ssh/config`: Host, HostName, User, Port; code hosting such as github.com (or `User git`) is not taken as a server | App |
 | An AI model you configure (Claude, OpenAI-compatible or Ollama) for screenshots, mail and text | App |
 
 Scripts can put JSON in this format into `~/Library/Application Support/Assetboard/Inbox/` (Pro) or drop it on the window; each file is confirmed in the import preview. Write it under a temporary name, then rename it to `.json`; at most 100 items and 1 MB; other fields are ignored:

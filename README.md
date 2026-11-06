@@ -70,7 +70,7 @@ Assetboard 是一个本地 App：每条资产记下一个日期（到期、自�
 | 截图和 PDF，用 macOS 的文字识别在本机识别 | App |
 | Cloudflare（只读 API 令牌）：Zone、Pages、Workers、R2 | App |
 | GitHub（本机 `gh` 或只读令牌）：仓库 | App |
-| `~/.ssh/config`：Host、HostName、User、Port | App |
+| `~/.ssh/config`：Host、HostName、User、Port；github.com 这类代码托管（或 `User git`）不当作服务器 | App |
 | 自己配置的 AI 模型（Claude、OpenAI 兼容接口或 Ollama）识别截图、邮件和文字 | App |
 
 每种导入方式的细节见[使用手册 · 导入方式](GUIDE.md#导入方式)。
