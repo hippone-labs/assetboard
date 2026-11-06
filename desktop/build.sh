@@ -12,6 +12,10 @@ swift_flags=()
 # Pro's Swift (pro/desktop/: the offline licence check) when this checkout has it; the free edition leaves it out.
 pro_swift=()
 if [[ -d "$project_dir/pro/desktop" ]] && (( ! free )); then pro_swift=("$project_dir"/pro/desktop/*.swift); swift_flags+=(-D ASSETBOARD_PRO); fi
+# ASSETBOARD_PRO_DEV=1: a developer build for this Mac that counts as licensed without a licence (pro/desktop/License.swift). Its
+# Info.plist carries AssetboardDeveloperBuild, and desktop/package.sh refuses to package it, so it is never signed or published.
+dev=0
+[[ "${ASSETBOARD_PRO_DEV:-}" == 1 && ${#pro_swift[@]} -gt 0 ]] && { dev=1; swift_flags+=(-D ASSETBOARD_PRO_DEV); }
 app_dir="$out_dir/Assetboard.app"
 # The oldest macOS the app runs on comes from LSMinimumSystemVersion. Without -target, swiftc builds for the macOS of the build
 # machine, and dyld then stops the app at launch on every older system.
@@ -26,6 +30,7 @@ if (( ! free )); then
   xcrun swiftc "${target[@]}" -parse-as-library "$project_dir/desktop/AssetboardCLI.swift" "$project_dir/desktop/Localization.swift" "$project_dir/desktop/LocalizationEN.swift" "$project_dir/desktop/AgentSocket.swift" -o "$app_dir/Contents/MacOS/assetboard-cli" -O
 fi
 cp "$project_dir/desktop/Info.plist" "$app_dir/Contents/Info.plist"
+(( dev )) && /usr/libexec/PlistBuddy -c 'Add :AssetboardDeveloperBuild bool true' "$app_dir/Contents/Info.plist"
 # Every binary must be built for exactly that system (15.0 and 15 are the same).
 version_core() { local v="$1"; while [[ "$v" == *.0 ]]; do v="${v%.0}"; done; print -r -- "$v"; }
 for bin in "$app_dir"/Contents/MacOS/*; do

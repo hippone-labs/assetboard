@@ -7,12 +7,21 @@ if [[ "${SIGNING_IDENTITY:-}" != 'Developer ID Application:'* ]]; then
 fi
 
 project_dir="${0:A:h:h}"
+# A developer build (ASSETBOARD_PRO_DEV=1, Pro without a licence) is for one Mac only and is never packaged.
+if [[ -n "${ASSETBOARD_PRO_DEV:-}" ]]; then
+  print -u2 'ASSETBOARD_PRO_DEV is set: developer builds are not packaged. Unset it and build again.'
+  exit 1
+fi
 # A signed full build must carry the production licence key: with the placeholder in pro/desktop/License.swift no licence verifies.
 if [[ "${ASSETBOARD_EDITION:-}" != free && -f "$project_dir/pro/desktop/License.swift" ]] && grep -q 'PRODUCTION_PUBLIC_KEY_PLACEHOLDER' "$project_dir/pro/desktop/License.swift"; then
   print -u2 'Put the production public key into ProLicense.publicKeyBase64 (pro/desktop/License.swift) first: node pro/worker/keygen.mjs'
   exit 1
 fi
 "$project_dir/desktop/build.sh"
+if /usr/libexec/PlistBuddy -c 'Print :AssetboardDeveloperBuild' "$project_dir/dist/Assetboard.app/Contents/Info.plist" >/dev/null 2>&1; then
+  print -u2 'dist/Assetboard.app is a developer build; it is not packaged.'
+  exit 1
+fi
 
 # ASSETBOARD_EDITION=free packages dist/free/ as Assetboard-Free-…; the in-app update picks its archive by this name
 # (Updater.assetName in desktop/Updater.swift), so the two must change together.
