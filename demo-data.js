@@ -39,6 +39,8 @@ window.assetboardDemoBoard=function(){
   '$12/月':'$12/mo',
   '$20/月':'$20/mo',
   '$14.98 / 年':'$14.98 / yr',
+  '$12 / 年':'$12 / yr',
+  '$96 / 年':'$96 / yr',
   '免费':'Free'
  }:null,t=text=>en&&Object.hasOwn(en,text)?en[text]:text;
  const pad=n=>String(n).padStart(2,'0'),day=offset=>{const d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()+offset);return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;};
@@ -52,7 +54,7 @@ window.assetboardDemoBoard=function(){
   :{...base,id:'demo-r'+i,type:'repository',name:'acme-labs/'+name,provider:'GitHub',account:'acme-labs',purpose:t('代码仓库'),source:'github',externalId:'demo-'+i,syncStatus:i%3?'私有仓库':'公开仓库',event:i%3?'私有仓库':'公开仓库',updatedAt:new Date(Date.now()-i*86400000*3).toISOString(),pushedAt:new Date(Date.now()-i*86400000*5).toISOString()};
  const assets=[
   {...base,id:'demo-d1',updatedAt:ago(3),type:'domain',name:'studio.example.com',provider:'Namecheap',purpose:t('工作室主站'),date:day(12),dateKind:'expire',cycle:'yearly'},
-  {...base,id:'demo-d2',updatedAt:ago(1),type:'domain',name:'notes.example.org',provider:'Namecheap',purpose:t('笔记站点'),date:day(160),dateKind:'expire',cycle:'yearly'},
+  {...base,id:'demo-d2',updatedAt:ago(1),type:'domain',name:'notes.example.org',provider:'Namecheap',purpose:t('笔记站点'),date:day(160),dateKind:'expire',cycle:'yearly',cost:t('$12 / 年')},
   {...base,id:'demo-d3',createdAt:ago(200),updatedAt:ago(20),type:'domain',name:'shop.example.net',provider:'Cloudflare',purpose:t('电商试验'),date:day(-2),dateKind:'expire'},
   {...base,id:'demo-d4',updatedAt:ago(40),type:'domain',name:'old-landing.example.com',provider:'Namecheap',purpose:t('旧落地页'),hiddenAt:'2026-01-01T00:00:00Z'},
   {...base,id:'demo-s1',updatedAt:ago(2),type:'server',name:'tokyo-vps',provider:'Vultr',purpose:t('API 服务'),host:'203.0.113.10',ips:['203.0.113.10','2001:db8::10'],sshUser:'deploy',date:day(26),dateKind:'renew',cycle:'monthly',cost:t('$6/月')},
@@ -61,7 +63,7 @@ window.assetboardDemoBoard=function(){
   // The full edition's demo probe calls it nas-home, so it is linked by hand (probe-data.js probeDemoAnswer).
   {...base,id:'demo-s3',updatedAt:ago(30),type:'server',name:'home-nas',provider:t('自建'),purpose:t('照片备份'),ips:['192.0.2.20'],...(free?{}:{probeLink:{source:'demo-probe',id:'cf3'}})},
   {...base,id:'demo-u1',createdAt:ago(200),updatedAt:ago(6),type:'subscription',name:'Notes Pro',provider:'Acme',purpose:t('写作'),date:day(-25),dateKind:'renew',cycle:'monthly',cost:t('$8/月')},
-  {...base,id:'demo-u2',updatedAt:ago(15),type:'subscription',name:'Design Studio',provider:'Acme',purpose:t('界面设计'),date:day(48),dateKind:'renew',cycle:'yearly'},
+  {...base,id:'demo-u2',updatedAt:ago(15),type:'subscription',name:'Design Studio',provider:'Acme',purpose:t('界面设计'),date:day(48),dateKind:'renew',cycle:'yearly',cost:t('$96 / 年')},
   {...base,id:'demo-u3',updatedAt:ago(7),type:'subscription',name:'Acme Cloud',provider:'Acme',purpose:t('云账号'),date:day(70),dateKind:'renew',cycle:'monthly',cost:t('$12/月')},
   {...base,id:'demo-a1',createdAt:ago(200),updatedAt:ago(4),type:'ai',name:'AI Pro',provider:'Acme AI',account:'someone@example.net',date:day(-21),dateKind:'renew',cycle:'monthly',cost:t('$20/月')},
   {...base,id:'demo-c1',updatedAt:ago(5),type:'bankcard',name:t('Visa 信用卡'),provider:t('示例银行'),network:'Visa',last4:'4242',region:'CN',date:day(150),dateKind:'expire'},
@@ -81,10 +83,11 @@ window.assetboardDemoBoard=function(){
  // Cards (v22): one pays the cloud account, the AI plan and a domain; the other, close to expiry, pays two tools.
  for(const id of ['demo-u3','demo-a1','demo-d3'])wire(id,'demo-c1');for(const id of ['demo-u1','demo-u2'])wire(id,'demo-c2');for(const id of ['demo-a1','demo-u1'])wire(id,'demo-g1');
  // Money (v21): projects, payments with a price rise, a promotion, a free tier; Notes Pro and AI Pro have a charge waiting.
+ // Each project gathers a domain, a repository and what it runs or pays for, so its view adds up to what the whole project costs.
  const set=(id,fields)=>Object.assign(assets.find(a=>a.id===id),fields);
  const paid=(paidOn,amount,currency,months,covers=paidOn,via='confirm')=>({id:'demo-pay-'+paidOn+amount,paidOn,amount,currency,months,covers,via,status:'paid'});
  for(const id of ['demo-d1','demo-r3','demo-u2'])set(id,{project:'studio'});
- for(const id of ['demo-d2','demo-r1','demo-db1','demo-s1'])set(id,{project:'notes-lab'});
+ for(const id of ['demo-d2','demo-r1','demo-db1','demo-s1','demo-u3'])set(id,{project:'notes-lab'});
  set('demo-s1',{payments:[paid(day(-64),5,'USD',1,day(-64)),paid(day(-34),6,'USD',1,day(-34)),paid(day(-4),6,'USD',1,day(-4))]});
  set('demo-d1',{cost:t('$14.98 / 年'),payments:[paid(day(-353),10.98,'USD',12,day(-353),'renew')]});
  set('demo-a1',{promotion:{start:day(-50),end:day(40),amount:10,regularAmount:20,currency:'USD'}});

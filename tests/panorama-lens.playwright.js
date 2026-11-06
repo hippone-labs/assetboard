@@ -17,7 +17,7 @@ async (page) => {
   const pay=await p.evaluate(()=>({cards:[...document.querySelectorAll('.pano-card')].map(c=>c.dataset.lane+'='+[...c.querySelectorAll('.pano-chip')].map(x=>x.dataset.chip).join('+')),sub:document.querySelector('.pano-card[data-lane="demo-c1"] .pl-prov')?.textContent,tone:document.querySelector('.pano-card[data-lane="demo-c2"]').classList.contains('amber'),loose:document.querySelector('.pano-loose')?.getAttribute('aria-label'),looseIds:[...document.querySelectorAll('.pano-loose .pano-chip')].map(c=>c.dataset.chip),focus:document.activeElement?.dataset.lens}));
   check(pay.cards.join()==='demo-c1=demo-a1+demo-u3+demo-d3,demo-c2=demo-u1+demo-u2','Cards hold what they pay for: '+pay.cards.join());
   check(pay.sub==='Visa •••• 4242'&&pay.tone,'Card shows network and last four; the card near expiry is amber: '+JSON.stringify(pay));
-  check(pay.loose==='没记付款卡，2 项'&&pay.looseIds.join()==='demo-d1,demo-s1'&&pay.focus==='pay','The yearly domain and the monthly server have no card; focus stays on the switch: '+JSON.stringify(pay));
+  check(pay.loose==='没记付款卡，3 项'&&pay.looseIds.join()==='demo-d1,demo-d2,demo-s1'&&pay.focus==='pay','The yearly domains and the monthly server have no card; focus stays on the switch: '+JSON.stringify(pay));
   // Remembered across opening and reloads.
   await p.keyboard.press('Escape');await p.keyboard.press('p');await p.waitForTimeout(200);
   check(await p.evaluate(()=>panoLens)==='pay','The lens is remembered when reopening');
@@ -55,7 +55,7 @@ async (page) => {
   if(projects){
   await p.click('.pano-lens [data-lens="project"]');await p.waitForTimeout(200);
   const proj=await p.evaluate(()=>({cards:[...document.querySelectorAll('.pano-card')].map(c=>c.dataset.lane+':'+c.querySelectorAll('.pano-chip').length),hub:document.querySelector('.pano-card').dataset.hub,totals:[...document.querySelectorAll('.pano-total')].map(t=>t.dataset.toggle).join()}));
-  check(proj.cards.join()==='project:notes-lab:4,project:studio:3'&&proj.hub==='project'&&proj.totals.startsWith('project,'),'A card per project, bigger first: '+JSON.stringify(proj));
+  check(proj.cards.join()==='project:notes-lab:5,project:studio:3'&&proj.hub==='project'&&proj.totals.startsWith('project,'),'A card per project, bigger first: '+JSON.stringify(proj));
   await drag('.pano-card[data-lane="project:notes-lab"] .pano-chip[data-chip="demo-d2"]','.pano-card[data-lane="project:studio"]');
   const moved=await p.evaluate(()=>({project:state.assets.find(a=>a.id==='demo-d2').project,toast:document.querySelector('#toast')?.textContent||''}));
   check(moved.project==='studio'&&/已归入 studio/.test(moved.toast),'Dropping on another project relabels it: '+JSON.stringify(moved));

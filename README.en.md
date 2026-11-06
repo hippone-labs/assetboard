@@ -46,7 +46,7 @@ Data is kept in a SQLite file on the Mac; there is no account. The interface is 
 - A server can hold up to 4 IPs and an SSH host, user and port.
 - A bank card holds only the last four digits, network and expiry; the form refuses full card numbers.
 - A link's meaning follows from the two categories: a domain points to a server or deployment, a repository deploys to a deployment, a bank card pays for a subscription, an Apple ID or Google account is used to sign in, a phone number receives verification codes.
-- An asset can belong to one or more projects.
+- An asset can belong to one or more projects, and a project's assets add up to what the whole project costs: per month, by category, over the next 12 months (Pro).
 
 ## Interface
 
