@@ -2239,3 +2239,16 @@ body::before,.native-app body::before{background:radial-gradient(70vw 65vh at 0%
 :root #detail-content .main-actions .button.primary{background:var(--cta)}
 :root .button.primary{box-shadow:none}
 :root .ov-tile.ov-live .ov-value{color:var(--ink)}
+/* 过期后 as a track: a segment per stage (amber, then red), the current one at full strength, labels under their segments. */
+:root .life-steps{display:flex;flex-direction:column;flex-wrap:nowrap;align-items:stretch;gap:5px;width:100%}
+.life-track{display:flex;gap:3px;height:4px}
+.life-seg{display:block;flex:1;border-radius:2px;background:var(--hairline)}
+.life-seg.amber{background:var(--dot-amber)}.life-seg.red{background:var(--dot-red)}.life-seg.end{background:rgba(var(--tone-ink),.25)}
+.life-steps.has-now .life-seg:not(.now){opacity:.4}
+.life-labels{display:flex;gap:3px;font-size:11px;line-height:14px;color:var(--muted)}
+:root .life-step{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+:root .life-step.end{text-align:right}
+/* A reading's share drawn as a short meter before its words (B's scales). */
+.live-meter{display:inline-block;width:26px;height:4px;margin-right:5px;border-radius:2px;background:rgba(var(--tone-ink),.14);vertical-align:1px;position:relative;overflow:hidden}
+.live-meter::after{content:"";position:absolute;top:0;bottom:0;left:0;width:var(--v);border-radius:inherit;background:rgba(var(--tone-ink),.5)}
+.live-line.amber .live-meter::after{background:var(--dot-amber)}

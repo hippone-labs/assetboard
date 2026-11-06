@@ -107,10 +107,13 @@ function extraFacts(a){
  if(promo)out.push(row(tr('优惠'),esc(promo.settledAt?tr('已于 {end} 结束，恢复 {price}',{end:promo.end,price:formatMoney(promo.regularAmount,promo.currency)}):tr('{price} 至 {end}，之后 {regular}',{price:formatMoney(promo.amount,promo.currency),end:promo.end,regular:formatMoney(promo.regularAmount,promo.currency)}))));
  const life=lifecycleRule(a);
  // 过期后 reads as a short chain under its label: each stage and its days, what can still be done in its tip, the current one marked.
- if(life){const now=lifecycleOf(a),arrow='<span class="life-arrow" aria-hidden="true">→</span>',from=i=>i?life.stages[i-1].to+1:1;
-  const steps=life.stages.map((st,i)=>`<span class="life-step${now?.stage===st?' now':''}" title="${esc(now?.stage===st?st.can+' · '+tr('还剩 {n} 天',{n:now.daysLeft+1}):st.can)}">${esc(st.label.replace(/期$/,''))} ${tr('{from}–{to} 天',{from:from(i),to:st.to})}</span>`).join(arrow);
+ // Drawn as a track (安静的仪器, 2026-11-06): one segment per stage, as long as its days, amber for the first and red after, the
+ // current one at full strength; the labels sit under their segments and the end is a short last piece.
+ if(life){const now=lifecycleOf(a),from=i=>i?life.stages[i-1].to+1:1,span=(i,st)=>Math.max(st.to-from(i)+1,1),endSpan=Math.max(Math.round(life.stages.reduce((n,st,i)=>n+span(i,st),0)/10),2);
+  const segs=life.stages.map((st,i)=>`<i class="life-seg${i?' red':' amber'}${now?.stage===st?' now':''}" style="flex:${span(i,st)}"></i>`).join('')+`<i class="life-seg end" style="flex:${endSpan}"></i>`;
+  const steps=life.stages.map((st,i)=>`<span class="life-step${now?.stage===st?' now':''}" style="flex:${span(i,st)}" title="${esc(now?.stage===st?st.can+' · '+tr('还剩 {n} 天',{n:now.daysLeft+1}):st.can)}">${esc(st.label.replace(/期$/,''))} ${tr('{from}–{to} 天',{from:from(i),to:st.to})}</span>`).join('')+`<span class="life-step end" style="flex:${endSpan}" title="${esc(life.end)}">${tr('释放')}</span>`;
   const said=life.stages.map((st,i)=>tr('{stage}第 {from} 到 {to} 天，{can}',{stage:st.label,from:from(i),to:st.to,can:st.can})).join(tr('；'))+tr('；之后{end}',{end:life.end});
-  out.push(`<div class="fact fact-block"><span>${tr('过期后')}</span><span class="life-steps" role="img" aria-label="${esc(said)}">${steps}${arrow}<span class="life-step" title="${esc(life.end)}">${tr('释放')}</span></span></div>`);}
+  out.push(`<div class="fact fact-block"><span>${tr('过期后')}</span><span class="life-steps${now?' has-now':''}" role="img" aria-label="${esc(said)}"><span class="life-track" aria-hidden="true">${segs}</span><span class="life-labels">${steps}</span></span></div>`);}
  // A hold comes first and in red: the domain does not resolve, and only the side that set it can lift it.
  const hold=registryHoldOf(a),checked=a.registryCheckedAt?' · '+tr('{date} 查询',{date:esc(String(a.registryCheckedAt).slice(0,10))}):'';
  if(hold)out.push(row(tr('注册局'),`<strong class="fact-bad">${tr('冻结')}</strong> · ${esc(rdapHoldLabels[hold])}${checked}`));
