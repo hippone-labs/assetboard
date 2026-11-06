@@ -3,7 +3,7 @@
 # (`--snapshot`, no screen-recording permission needed). Run on a Mac after ./desktop/build.sh, or through the site-screenshots
 # workflow on the Mac mini.
 #   tools/site-screenshots.sh [out-dir]      → app-dark-zh.png, app-themes-light-zh.png, one dark shot per feature the site
-#                                                explains (app-upcoming-dark-zh.png, …) and the same with -en
+#                                                explains (app-upcoming-dark-zh.png, …), 添加资产, the calendar and the grid, and the same with -en
 # Demo mode only (fictional data, temp store, never saves); the site converts the PNGs to WebP.
 set -euo pipefail
 cd "${0:A:h:h}"
@@ -29,4 +29,8 @@ for lang in zh en; do
   shot "app-panorama-dark-$lang" --lang "$lang" --dark --panorama
   shot "app-live-dark-$lang" --lang "$lang" --dark --open-asset=demo-s1
   shot "app-sleep-dark-$lang" --lang "$lang" --dark --open-asset=demo-db2
+  # Adding a record, the month calendar and the grid.
+  shot "app-add-dark-$lang" --lang "$lang" --dark --open-add
+  shot "app-calendar-dark-$lang" --lang "$lang" --dark --open-view=upcoming --layout=calendar
+  shot "app-grid-dark-$lang" --lang "$lang" --dark --layout=grid --open-asset=demo-d1
 done

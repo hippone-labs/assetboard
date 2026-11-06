@@ -1304,6 +1304,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
                    String(value).range(of: "^[a-z]{1,20}$", options: .regularExpression) != nil { open[key] = String(value) }
             }
             if CommandLine.arguments.contains("--open-cost") { open["cost"] = true }
+            // `--open-add` opens 添加资产 (the category grid).
+            if CommandLine.arguments.contains("--open-add") { open["add"] = true }
             if !open.isEmpty { initial["demoOpen"] = open }
         }
         return initial

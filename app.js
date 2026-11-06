@@ -2826,7 +2826,7 @@ syncSidebar();
 if(railForced&&(demoRail==='more'||demoRail==='tip'))setTimeout(()=>{const target=$(demoRail==='more'?'#sidebar .nav-more':'#sidebar .nav-item[data-block="domain"]');if(!target)return;if(demoRail==='more')openRailMore(target);else showRailTip(target,true);},400);
 // Screenshots of the Mac app's demo, which can be captured but not clicked: `--demo --open-asset=<id>` opens that record's detail,
 // `--demo --panorama` opens 全景, `--demo --probe-sources` the probe settings (Pro), `--open-view=`/`--layout=` pick the view and
-// layout and `--open-cost` opens 费用, once every script has run. The app passes them
+// layout, `--open-cost` opens 费用 and `--open-add` 添加资产, once every script has run. The app passes them
 // only in the demo; elsewhere nothing reads them.
 // After a language switch the page comes back with 设置 open, where the switch was made.
 window.addEventListener('DOMContentLoaded',()=>{let again=nativeStore?.reopen==='prefs';try{again||=sessionStorage.getItem('assetboard-reopen')==='prefs';sessionStorage.removeItem('assetboard-reopen');}catch{}if(again)prefsDialog();});
@@ -2836,6 +2836,7 @@ if(demoMode&&nativeStore?.demoOpen)window.addEventListener('DOMContentLoaded',()
  if(typeof open.layout==='string')setLayout(open.layout);
  if(typeof open.asset==='string'&&state.assets.some(a=>a.id===open.asset))showDetail(open.asset);
  if(open.cost===true)costDialog();
+ if(open.add===true)addDialog();
  if(open.panorama===true&&typeof panoramaOpen==='function')panoramaOpen(true);
  if(open.probeSources===true&&typeof window.probeDialog==='function')window.probeDialog({add:true});
  if(open.theme===true)themeDialog();
