@@ -30,6 +30,7 @@ defaults:
 env:
   SIGNING_IDENTITY: ${{ secrets.SIGNING_IDENTITY }}
   NOTARY_PROFILE: ${{ secrets.NOTARY_PROFILE }}
+  SIGNING_KEYCHAIN_PASSWORD: ${{ secrets.SIGNING_KEYCHAIN_PASSWORD }}
 
 jobs:
   notarize:
@@ -50,6 +51,18 @@ jobs:
           gh repo clone "${{ vars.PRO_REPO || 'hippone-labs/assetboard-pro' }}" pro -- --depth=1 --quiet
           test -f pro/web/pro.js
 
+      - name: Unlock the signing keychain
+        # A dedicated keychain (release-app.yml says which) lets a runner that is a background service sign without a prompt.
+        if: ${{ env.SIGNING_KEYCHAIN_PASSWORD != '' }}
+        run: |
+          set -euo pipefail
+          kc="$HOME/Library/Keychains/assetboard-signing.keychain-db"
+          test -f "$kc" || { echo "::error::$kc not found"; exit 1; }
+          security unlock-keychain -p "$SIGNING_KEYCHAIN_PASSWORD" "$kc"
+          security set-keychain-settings -lut 7200 "$kc"
+          security list-keychains -d user | xargs | grep -qF "$kc" || security list-keychains -d user -s "$kc" $(security list-keychains -d user | xargs)
+          echo "NOTARY_KEYCHAIN=$kc" >> "$GITHUB_ENV"
+
       - name: Signing identity is available
         run: |
           test -n "$SIGNING_IDENTITY" && test -n "$NOTARY_PROFILE" || { echo '::error::Set the SIGNING_IDENTITY and NOTARY_PROFILE repository secrets'; exit 1; }
@@ -64,7 +77,7 @@ jobs:
           perl -e 'alarm 60; exec @ARGV' codesign --force --timestamp=none --sign "$SIGNING_IDENTITY" "$probe" \
             || { echo "::error::codesign could not use the Developer ID key (locked keychain or access prompt)"; exit 1; }
           rm -f "$probe"
-          perl -e 'alarm 60; exec @ARGV' xcrun notarytool history --keychain-profile "$NOTARY_PROFILE" >/dev/null 2>&1 \
+          perl -e 'alarm 60; exec @ARGV' xcrun notarytool history --keychain-profile "$NOTARY_PROFILE" ${NOTARY_KEYCHAIN:+--keychain "$NOTARY_KEYCHAIN"} >/dev/null 2>&1 \
             || { echo "::error::notarytool cannot use the keychain profile $NOTARY_PROFILE"; exit 1; }
           echo "codesign: ok, notary profile: ok"
 
@@ -96,7 +109,7 @@ jobs:
             codesign --verify --deep --strict --verbose=2 "$app"
             submit="$RUNNER_TEMP/submit-$edition.zip"
             ditto -c -k --keepParent "$app" "$submit"
-            xcrun notarytool submit "$submit" --keychain-profile "$NOTARY_PROFILE" --wait 2>&1 | tee "$out/notary-$edition.log"
+            xcrun notarytool submit "$submit" --keychain-profile "$NOTARY_PROFILE" ${NOTARY_KEYCHAIN:+--keychain "$NOTARY_KEYCHAIN"} --wait 2>&1 | tee "$out/notary-$edition.log"
             grep -q 'status: Accepted' "$out/notary-$edition.log" || { echo "::error::notarization of $edition not accepted"; exit 1; }
             xcrun stapler staple "$app"
             xcrun stapler validate "$app"
@@ -106,6 +119,10 @@ jobs:
             sum="$(shasum -a 256 "$out/$name" | cut -d' ' -f1)"
             echo "| $edition | $name | \`$sum\` |" >> "$GITHUB_STEP_SUMMARY"
           done
+
+      - name: Lock the signing keychain
+        if: ${{ always() && env.SIGNING_KEYCHAIN_PASSWORD != '' }}
+        run: security lock-keychain "$HOME/Library/Keychains/assetboard-signing.keychain-db" || true
 
       - name: Upload notarized zips
         uses: actions/upload-artifact@v4
