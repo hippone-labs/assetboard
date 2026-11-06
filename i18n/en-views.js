@@ -7,7 +7,7 @@ Object.assign(I18N.en,{
  '外部工具接入（MCP）':'External tools (MCP)',
  '让 Claude、ChatGPT、Cursor 等工具或脚本通过 assetboard-cli 查询和修改资产；关掉后它们的调用一律被拒绝':'Lets Claude, ChatGPT, Cursor and other tools or scripts query and change assets through assetboard-cli; when off, every call is refused',
  // theme.js
- '青松':'Pine',
+ '墨蓝':'Ink','青松':'Pine',
  '晴蓝':'Sky',
  '靛紫':'Indigo',
  '梅子':'Plum',

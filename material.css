@@ -2173,3 +2173,69 @@ body::before,.native-app body::before{background:radial-gradient(70vw 65vh at 0%
 :root .ssh-pick{margin:0 0 6px}
 :root .ssh-pick select{width:100%;min-width:0}
 :root .ssh-pick .form-note{display:block;margin-top:4px}
+
+/* v24 · 安静的仪器 (2026-11-06, user-confirmed: ~/projects/assetboard-notes/research/2026-11-06-ui-aesthetic.md; direction A as the
+   base, C's floating sidebar in the Mac app, B's scales). A grey base with colour only for meaning; structure from lightness steps,
+   hairlines and space, no shadow on a surface; the sidebar steps back; type leads: one display number per screen, every number in
+   a monospace numeral face (§九 rule 14 amended), a pill only on a due date; concentric radii and capsule buttons, one black CTA
+   per screen; the greys lean warm in both schemes (theme.js). */
+:root{--num:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;--cta:#1c1b18;--on-cta:#fff;--cta-ring:rgba(28,27,24,.18);--glass:rgba(var(--tone-card),.62);--hairline:rgba(var(--tone-ink),.085);--selected-nav:rgba(var(--tone-ink),.065);--sidebar-fill:transparent;--canvas-glow:rgba(var(--tone-primary),.05);--card-shadow:0 0 0 1px var(--hairline);--shell-radius:16px}
+:root[data-scheme=dark]{--cta:rgb(var(--tone-ink));--on-cta:rgb(var(--tone-canvas));--cta-ring:rgba(255,255,255,.2);--glass:rgba(var(--tone-card),.55);--hairline:rgba(255,255,255,.08);--selected-nav:rgba(255,255,255,.075);--card-shadow:0 0 0 1px rgba(255,255,255,.075)}
+/* numbers */
+.nav-count,.g-count,.g-cost,.r-date,.r-cost,.ov-value,.g-hero b,.view-meta,.live-line,.cal-total,.cal-n,.cal-amt,.cal-when,.tl-head,.tl-label{font-family:var(--num)}
+/* the sidebar steps back: quiet labels, the chosen one in ink on a grey tint, its icon in the accent */
+:root #sidebar .nav-item{color:var(--muted)}
+:root #sidebar .nav-item:hover{color:var(--ink)}
+:root #sidebar .nav-item.active{background:var(--selected-nav);color:var(--ink);font-weight:600}
+:root #sidebar .nav-title{font-weight:500;color:var(--muted)}
+:root #sidebar .nav-count{font-size:11.5px}
+:root .topnav .search{border-radius:999px}
+/* the bar: a display title, a capsule for the display mode, the add button as the one filled control */
+:root #view-title{font-size:20px;line-height:24px;letter-spacing:-.02em}
+:root .view-meta{font-size:12.5px}
+:root .layout-toggle{padding:3px;border-radius:999px}
+:root .seg-button{width:34px;border-radius:999px}
+:root .topnav-actions .button.icon-only,:root #main .toolbar .button.icon-only{border-radius:999px}
+:root #add-block{background:var(--cta);border-color:transparent;color:var(--on-cta)}
+:root #add-block:hover{background:var(--cta);box-shadow:0 0 0 3px var(--cta-ring)}
+/* the overview: five figures with no box, a hairline under the row; 实时 shows its servers as cells */
+:root .overview{gap:20px;margin:8px -4px 2px;padding:10px 0 16px;border:0;border-radius:0;background:none;box-shadow:0 1px 0 var(--hairline);overflow:visible}
+:root .ov-tile{gap:0;padding:4px 4px 2px;border-radius:8px;background:none}
+:root .ov-tile:hover{background:var(--hover)}
+:root .ov-value{margin-top:3px;font-family:var(--num);font-size:27px;line-height:34px;font-weight:600;letter-spacing:-.02em}
+:root .ov-note{margin-top:1px}
+.ov-cells{display:flex;gap:4px;margin:7px 0 3px}
+.ov-cells i{width:9px;height:9px;border-radius:2px;background:rgba(var(--tone-ink),.16)}
+.ov-cells i.on{background:rgba(var(--tone-ink),.5)}.ov-cells i.tight{background:var(--dot-amber)}.ov-cells i.off{background:var(--dot-red)}
+/* groups and rows: a 13px head, plain source text, a pill only on a due date, the rise as plain red */
+:root .group-title{font-size:13px;font-weight:600}
+:root .g-icon svg{width:16px;height:16px}
+:root .g-count,:root .g-cost{font-size:12px}
+:root .r-sub .account-tag{max-width:14em;padding:0;background:none;color:var(--muted);font-size:12px}
+:root .r-date,:root .r-cost{font-size:12px}
+:root .r-date.warn,:root .r-date.overdue{padding:2px 9px 2px 8px;border-radius:999px;font-weight:500}
+:root .r-date.warn{background:var(--soon-soft)}:root .r-date.overdue{background:var(--overdue-soft)}
+:root .r-date.warn .dot,:root .r-date.overdue .dot{width:5px;height:5px}
+:root .price-mark{padding:0;background:none;font-size:11px}
+:root .gcard{border-color:var(--hairline);box-shadow:none}
+:root .gcard:hover{border-color:var(--border-strong);box-shadow:none}
+:root .gcard.selected{box-shadow:0 0 0 1px rgb(var(--tone-primary))}
+:root .g-hero b{font-size:28px;line-height:30px;letter-spacing:-.025em}
+/* capsules: every button, the choice chips, the inspector's actions; the primary is the black CTA */
+:root .button,:root .choice,:root .r-actions .button{border-radius:999px}
+:root .button.primary,:root .button.primary:hover{background:var(--cta);border-color:transparent;color:var(--on-cta);filter:none}
+:root .button.primary:hover{box-shadow:0 0 0 3px var(--cta-ring)}
+:root #detail-content h2{font-size:22px;line-height:28px;letter-spacing:-.02em}
+:root #detail-content .main-actions .detail-more,:root #detail-content .quick-row .button{border-radius:999px}
+:root #detail-content .fact span:last-child{font-variant-numeric:tabular-nums}
+/* the Mac app: the sidebar floats as a glass pane beside the sheet (macOS 26); the browser keeps the sidebar on the canvas */
+@media(min-width:761px){
+ html.native-app{--shell-radius:18px}
+ html.native-app #sidebar{top:var(--topnav-h);left:var(--shell-gap);bottom:var(--shell-gap);width:var(--sidebar-w);padding:8px 10px 16px;border-radius:var(--shell-radius);background:var(--glass);box-shadow:var(--card-shadow);backdrop-filter:blur(24px) saturate(1.4);-webkit-backdrop-filter:blur(24px) saturate(1.4)}
+ html.native-app #main,html.native-app .panorama{left:calc(var(--sidebar-w) + var(--shell-gap) * 2)}
+ html.native-app .panorama.show{inset:0}
+}
+:root #sidebar .nav-item.active .nav-count{color:var(--ink)}
+:root #detail-content .main-actions .button.primary{background:var(--cta)}
+:root .button.primary{box-shadow:none}
+:root .ov-tile.ov-live .ov-value{color:var(--ink)}

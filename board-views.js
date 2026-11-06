@@ -13,7 +13,9 @@ function overviewHtml(scope){
  const levels=dueLevels(scope),next=upcomingEvents(scope,new Date(),SOON_DAYS).find(e=>e.status.days>=0);
  const read=scope.filter(a=>!a.stopped&&probeState(a)),lives=read.map(probeState),down=lives.filter(l=>!l.online).length,tight=lives.filter(l=>l.online&&l.tone==='amber').length,attention=levels.overdue+down;
  if(!totals.items.length&&!month.items.length&&!next&&!attention)return '';
- const tile=(cls,action,id,label,value,note)=>`<button type="button" class="ov-tile${cls?' '+cls:''}" data-action="${action}"${id?` data-id="${id}"`:''}><span class="ov-label">${label}</span><strong class="ov-value">${value}</strong><span class="ov-note">${note}</span></button>`;
+ const tile=(cls,action,id,label,value,note,extra='')=>`<button type="button" class="ov-tile${cls?' '+cls:''}" data-action="${action}"${id?` data-id="${id}"`:''}><span class="ov-label">${label}</span><strong class="ov-value">${value}</strong>${extra}<span class="ov-note">${note}</span></button>`;
+ // 实时 as a row of cells, one per read server (up to 12): answering, memory tight, offline.
+ const cells=lives.length?`<span class="ov-cells" aria-hidden="true">${lives.slice(0,12).map(l=>`<i class="${!l.online?'off':l.tone==='amber'?'tight':'on'}"></i>`).join('')}</span>`:'';
  const parts=[levels.overdue&&tr('{n} 过期',{n:formatCount(levels.overdue)}),down&&tr('{n} 离线',{n:formatCount(down)})].filter(Boolean).join(' · ');
  return `<div class="overview${lives.length?' five':''}" role="group" aria-label="${tr('概览')}">${[
   tile('','cost-panel','',tr('本月还要付'),esc(formatMoney(month.total,cur)),month.items.length?tr('{n} 笔',{n:formatCount(month.items.length)}):tr('没有扣款')),
@@ -21,7 +23,7 @@ function overviewHtml(scope){
   tile(attention?'overdue':'','view','upcoming',tr('需要处理'),formatCount(attention),parts||tr('没有')),
   tile('','cost-panel','',tr('每年合计'),esc(formatMoney(totals.yearly,cur)),tr('约 {money} / 月',{money:esc(formatMoney(totals.monthly,cur))})),
   // 实时: only once 实时状态 reads something. How many of the read servers answer, and what is wrong with the others.
-  lives.length?tile('ov-live'+(down?' overdue':tight?' soon':''),'view',read.every(a=>a.type==='server')?'server':'all',tr('实时'),`${formatCount(lives.length-down)} / ${formatCount(lives.length)}`,[down&&tr('{n} 离线',{n:formatCount(down)}),tight&&tr('{n} 内存紧张',{n:formatCount(tight)})].filter(Boolean).join(' · ')||tr('都有读数')):''
+  lives.length?tile('ov-live'+(down?' overdue':tight?' soon':''),'view',read.every(a=>a.type==='server')?'server':'all',tr('实时'),`${formatCount(lives.length-down)} / ${formatCount(lives.length)}`,[down&&tr('{n} 离线',{n:formatCount(down)}),tight&&tr('{n} 内存紧张',{n:formatCount(tight)})].filter(Boolean).join(' · ')||tr('都有读数'),cells):''
  ].join('')}</div>`;
 }
 // A group's recurring cost a month, beside its title; nothing when no record in it has a readable cycle.

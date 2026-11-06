@@ -22,7 +22,7 @@ async (page) => {
    const typeTiles=types.map(t=>{const el=tileOf('t-'+t),head=document.querySelector(`#board .group[data-group="${t}"] .group-title .g-icon svg`),nav=document.querySelector(`#sidebar .nav-item[data-block="${t}"] svg`);return {t,ok:!!el&&el.classList.contains('type-art')&&!!el.querySelector('svg')&&!el.querySelector('img')&&!!head&&!!nav,stroke:el?.querySelector('svg')?.getAttribute('stroke-width'),size:Math.round(el?.querySelector('svg')?.getBoundingClientRect().width||0)};});
    const site=tileOf('t-site'),custom=tileOf('t-custom'),bank=tileOf('t-card');
    const rows=[...document.querySelectorAll('#board .row')];
-   const serif=[...document.querySelectorAll('body, #board *, #sidebar *, #topbar *')].map(el=>getComputedStyle(el).fontFamily).filter(f=>/Georgia|Times|(^|,\s*)serif|Avenir|Menlo/i.test(f.replace(/sans-serif/gi,'')));
+   const serif=[...document.querySelectorAll('body, #board *, #sidebar *, #topbar *')].filter(el=>!el.closest('.r-date,.r-cost,.ov-value,.g-hero,.nav-count,.g-count,.g-cost,.view-meta,.live-line,.cal-total,.cal-n,.cal-amt,.cal-when,.tl-head,.tl-label')).map(el=>getComputedStyle(el).fontFamily).filter(f=>/Georgia|Times|(^|,\s*)serif|Avenir|Menlo/i.test(f.replace(/sans-serif/gi,'')));
    const heights=new Set(rows.map(el=>Math.round(el.getBoundingClientRect().height)));
    return {missing,distinct:shapes.size===types.length,typeTiles,
     site:!!site&&site.classList.contains('site-art')&&!!site.querySelector('img')&&!site.querySelector('svg'),

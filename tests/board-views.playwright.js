@@ -26,9 +26,9 @@ async (page) => {
   check((await tiles.nth(2).locator('.ov-value').innerText())==='1'&&(await tiles.nth(2).getAttribute('class')).includes('overdue'),'One overdue record needs attention');
   check(/\$/.test(await tiles.nth(3).locator('.ov-value').innerText()),'The yearly total is money');
   check(!(await p.locator('#view-meta .meta-flag.soon,#view-meta .meta-flag.overdue').count()),'The header leaves the due flags to the strip');
-  // Dates are text: no pill behind them, colour only when due.
-  const pill=await p.evaluate(()=>{const d=document.querySelector('[data-asset="soon"] .r-date');const cs=getComputedStyle(d);return {bg:cs.backgroundColor,pad:cs.paddingLeft,warn:d.classList.contains('warn')};});
-  check(pill.warn&&(pill.bg==='rgba(0, 0, 0, 0)'||pill.bg==='transparent')&&pill.pad==='0px','A soon date has no pill: '+JSON.stringify(pill));
+  // A due date is a pill (2026-11-06, user decision); an ordinary date is plain text.
+  const pill=await p.evaluate(()=>{const d=document.querySelector('[data-asset="soon"] .r-date'),f=document.querySelector('[data-asset="far"] .r-date');const cs=getComputedStyle(d),fs=getComputedStyle(f);return {bg:cs.backgroundColor,pad:cs.paddingLeft,warn:d.classList.contains('warn'),farBg:fs.backgroundColor,farPad:fs.paddingLeft};});
+  check(pill.warn&&pill.bg!=='rgba(0, 0, 0, 0)'&&pill.pad!=='0px'&&(pill.farBg==='rgba(0, 0, 0, 0)'||pill.farBg==='transparent')&&pill.farPad==='0px','A soon date is a pill, a far one is text: '+JSON.stringify(pill));
   // Five aligned columns: date and cost sit side by side on one line in the wide list.
   const cols=await p.evaluate(()=>{const r=document.querySelector('[data-asset="soon"]');const d=r.querySelector('.r-date').getBoundingClientRect(),c=r.querySelector('.r-cost').getBoundingClientRect();return {same:Math.abs(d.top-c.top)<4,order:c.left>d.right};});
   check(cols.same&&cols.order,'Date and cost are two columns: '+JSON.stringify(cols));

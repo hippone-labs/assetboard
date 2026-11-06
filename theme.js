@@ -4,9 +4,10 @@
 // light and dark whatever the input. The accent keeps its hue and as much chroma as fits. Status colours (overdue red, due amber,
 // material.css) are fixed; an accent within STATUS_GAP of their hue is muted, so a red or amber flag never reads as decoration.
 // The choice is a per-viewer preference (localStorage; the Mac app also keeps it in its defaults), never part of the board.
-const THEME_DEFAULT='pine',THEME_KEY='assetboard-theme-v1',STATUS_GAP=25,STATUS_MUTED_CHROMA=.05,AA=4.6;
+const THEME_DEFAULT='ink',THEME_KEY='assetboard-theme-v1',STATUS_GAP=25,STATUS_MUTED_CHROMA=.05,AA=4.6;
 // [id, name, accent, tint, temperament]. Spread round the wheel and from vivid to quiet; none sits on the status hues (~30°, ~65°).
 const themePresets=[
+ ['ink',tr('墨蓝'),'#3b63c4',.3,tr('冷 · 适中')],
  ['pine',tr('青松'),'#127a6a',.55,tr('冷 · 适中')],
  ['blue',tr('晴蓝'),'#0a6fe8',.45,tr('冷 · 饱和')],
  ['indigo',tr('靛紫'),'#6a4fd8',.6,tr('冷 · 饱和')],
@@ -71,9 +72,12 @@ function themePalette(theme,scheme='light'){
  const src=themeOklch(scheme==='dark'&&t.accentDark||t.accent),h=src.h;
  let c=Math.min(src.c,.17);if(nearStatus(h))c=Math.min(c,STATUS_MUTED_CHROMA);
  const s=Math.min(src.c,.10)*t.tint*2,rgb=(l,ch)=>oklchRgb(l,ch,h);
+ // Neutrals: the accent's hue at a whisper of chroma. When the tint is too faint to read as a hue, the greys lean warm (hue 80°)
+ // instead of dead or cool, so the canvas reads as paper and the dark canvas as warm black rather than an inverted page.
+ const grey=(l,ch,floor=.006)=>ch>=floor?rgb(l,ch):oklchRgb(l,floor,80);
  const base=scheme==='dark'
-  ?{canvas:rgb(.175,s*.06),category:rgb(.205,s*.07),card:rgb(.245,s*.07),ink:rgb(.94,s*.03),muted:rgb(.74,s*.05)}
-  :{canvas:rgb(.962,s*.035),category:rgb(.976,s*.025),card:rgb(.997,s*.015),ink:rgb(.22,s*.10),muted:rgb(.46,s*.10)};
+  ?{canvas:grey(.175,s*.06),category:grey(.205,s*.07),card:grey(.245,s*.07),ink:grey(.94,s*.03,.004),muted:grey(.74,s*.05,.004)}
+  :{canvas:grey(.955,s*.035),category:grey(.976,s*.025),card:grey(.997,s*.015,.003),ink:grey(.22,s*.10),muted:grey(.46,s*.10)};
  // The accent's lightness: light mode takes the lightest that still holds white button text and accent text on every
  // surface; dark mode the darkest that holds dark button text (the canvas) and accent text on cards.
  // Accent text also sits on accent-tinted rows (selected, current: up to 20% in material.css), so those count too.
