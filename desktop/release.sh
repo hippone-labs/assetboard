@@ -17,8 +17,18 @@ version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/
 "$app/Contents/MacOS/Assetboard" --test-update
 codesign --verify --deep --strict --verbose=2 "$app"
 notary_kc=(); [[ -n "${NOTARY_KEYCHAIN:-}" ]] && notary_kc=(--keychain "$NOTARY_KEYCHAIN")
-xcrun notarytool submit "dist/Assetboard-macOS-arm64-$version.zip" \
-  --keychain-profile "$NOTARY_PROFILE" "${notary_kc[@]}" --wait --output-format json > "$RELEASE_DIR/notary.json"
+# The upload to the notary service has timed out from this Mac (HTTPClientError.deadlineExceeded after about 100 seconds), so a
+# submission is tried up to four times, with a growing pause between tries. A timed-out upload leaves nothing behind to resume.
+notarize() {
+  local file=$1 out=$2 attempt
+  for attempt in 1 2 3 4; do
+    if xcrun notarytool submit "$file" --keychain-profile "$NOTARY_PROFILE" "${notary_kc[@]}" --wait --output-format json > "$out"; then return 0; fi
+    echo "notarytool submit did not finish (attempt $attempt of 4)" >&2
+    (( attempt < 4 )) && sleep $(( attempt * 30 ))
+  done
+  return 1
+}
+notarize "dist/Assetboard-macOS-arm64-$version.zip" "$RELEASE_DIR/notary.json"
 /usr/bin/python3 -c 'import json,sys; assert json.load(open(sys.argv[1]))["status"] == "Accepted", "Notarization rejected"' "$RELEASE_DIR/notary.json"
 xcrun stapler staple "$app"
 xcrun stapler validate "$app"
@@ -38,7 +48,7 @@ shasum -a 256 "$archive"
 dmg="$RELEASE_DIR/Assetboard-macOS-arm64-$version.dmg"
 ./desktop/dmg.sh "$app" "$dmg"
 codesign --sign "$SIGNING_IDENTITY" --timestamp "$dmg"
-xcrun notarytool submit "$dmg" --keychain-profile "$NOTARY_PROFILE" "${notary_kc[@]}" --wait --output-format json > "$RELEASE_DIR/notary-dmg.json"
+notarize "$dmg" "$RELEASE_DIR/notary-dmg.json"
 /usr/bin/python3 -c 'import json,sys; assert json.load(open(sys.argv[1]))["status"] == "Accepted", "Disk image notarization rejected"' "$RELEASE_DIR/notary-dmg.json"
 xcrun stapler staple "$dmg"
 xcrun stapler validate "$dmg"
