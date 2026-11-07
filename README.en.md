@@ -105,7 +105,7 @@ The free edition has no time or record limit. Pro is a US$10 one-time licence, v
 | Asset board, Upcoming, local reminders | Payment ledger, 12-month forecast, price changes |
 | Links, risk chains, panorama | Weekly automatic registry check |
 | Renewal confirmations, hold alerts, manual registry check | Cloudflare sync every 12 hours |
-| Every local import (CSV, backup, .eml, screenshots, ssh config), manual Cloudflare and GitHub sync, AI plan picker | Project totals, shutdown list, periodic review |
+| Every local import (CSV, backup, .eml, screenshots, ssh config, pasted domains), manual Cloudflare, GitHub, Namecheap and Porkbun sync, AI plan picker | Project totals, shutdown list, periodic review |
 | AI recognition with your own key | Live status (SSH read, monitoring panels) |
 | Cost totals, currencies, JSON backup, .ics export, basic handover list | MCP write tools (add, edit, delete), `assetboard-cli`, Inbox folder |
 | Privacy mode, network log, read-only MCP tools | Planned: Reminders, encrypted snapshots, a handover pack |
@@ -116,7 +116,7 @@ This repository is the whole code of the free edition; building it gives the fre
 
 - Data is in `~/Library/Application Support/Assetboard/`: `assetboard.sqlite`, with a JSON mirror `board.json`. No cloud sync or telemetry.
 - Tokens and API keys are stored in the macOS Keychain.
-- Hosts the app contacts on its own: update checks (assetboard.app), site icons of known providers, exchange rates (api.frankfurter.dev), and Cloudflare once connected. Other connections (RDAP, AI, live status, GitHub) happen only after you turn them on or click.
+- Hosts the app contacts on its own: update checks (assetboard.app), site icons of known providers, exchange rates (api.frankfurter.dev), and Cloudflare once connected. Other connections (RDAP, AI, live status, GitHub, Namecheap, Porkbun) happen only after you turn them on or click.
 - The page itself is barred from the network by its Content-Security-Policy; every request goes through the Swift side and is recorded in the network log.
 - Data given to external AI tools has IPs, hosts, phone numbers and emails masked by default and leaves out bank card and phone records.
 

@@ -257,7 +257,7 @@ function rdapFormHtml(v){
  if(v.id)return '';
  if(demoMode)return `<p class="form-note rdap-fill-note">${tr('演示模式不向注册局查询')}</p>`;
  if(!nativeStore)return `<p class="form-note rdap-fill-note">${ui('lock')}${tr('到期日和注册商可以向注册局（RDAP）查询，但查询要由 Mac App 发出并记在网络记录里；浏览器版不查询，请照注册商后台填写。')}</p>`;
- return `<div class="field rdap-fill"><button type="button" class="text-button inline-button" data-action="rdap-fill" title="${tr('把域名发给它的注册局（公开 RDAP）查一次，记在网络记录里；只填空着的到期日和注册商')}">${tr('从注册局填写到期日和注册商')}</button><span class="form-note" id="rdap-fill-status" role="status"></span></div>`;
+ return `<div class="field-row rdap-fill"><button type="button" class="text-button inline-button" data-action="rdap-fill" title="${tr('把域名发给它的注册局（公开 RDAP）查一次，记在网络记录里；只填空着的到期日和注册商')}">${tr('从注册局填写到期日和注册商')}</button><span class="form-note" id="rdap-fill-status" role="status"></span></div>`;
 }
 function rdapFormFill(auto=false){
  const form=$('#asset-form'),say=text=>{const el=$('#rdap-fill-status');if(el)el.textContent=text;};
