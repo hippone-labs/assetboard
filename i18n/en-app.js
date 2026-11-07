@@ -589,6 +589,7 @@ Object.assign(I18N.en,{
  '合并':'Merge',
  '没有时间':'no time',
  '自定义图标站点 {n} 个':['{n} custom icon site','{n} custom icon sites'],
+ '项目收入 {n} 个':['Revenue of {n} project','Revenue of {n} projects'],
  '待确认扣款从 {day} 算起':'Charges to confirm count from {day}',
  '本地 {local} · 备份 {backup}':'Here {local} · Backup {backup}',
  '备份于 {when}':'Backed up {when}',

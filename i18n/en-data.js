@@ -386,5 +386,12 @@ Object.assign(I18N.en,{
  '12 小时没有访问就休眠，要有人打开页面点唤醒':'Sleeps after 12 hours without traffic; someone has to open the page and wake it',
  '免费集群 30 天没有连接会暂停，要去控制台恢复；网页请求不算，要真的连上数据库':'A free cluster pauses after 30 days without connections and has to be resumed in the console; web requests do not count, only database connections',
  '免费库 30 天没有请求会归档，要新建库再从备份恢复':'A free database is archived after 30 days without requests; you then create a new one and restore the backup',
- '免费项目 7 天没在控制台操作会暂停，暂停 90 天后删除；定时请求不算':'A free project pauses after 7 days without console activity and is deleted after 90 days paused; scheduled requests do not count'
+ '免费项目 7 天没在控制台操作会暂停，暂停 90 天后删除；定时请求不算':'A free project pauses after 7 days without console activity and is deleted after 90 days paused; scheduled requests do not count',
+ '项目名无效':'Not a valid project name',
+ '收入要写成不小于 0 的金额和三位币种代码':'Revenue needs an amount of 0 or more and a three-letter currency code',
+ '份额要写成「项目: 百分比」':'Shares are written as project: percent',
+ '只在一个项目里，不用分摊':'It is in one project only; there is nothing to split',
+ '每个项目都要有一个份额':'Every project needs a share',
+ '份额是 0 到 100 之间的数':'A share is a number from 0 to 100',
+ '份额加起来要等于 100%，现在是 {sum}%':'Shares must add up to 100%; they add up to {sum}%',
 });

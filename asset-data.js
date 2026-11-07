@@ -1987,21 +1987,30 @@ function noteCostChange(asset,before,source='edit',now=new Date()){
 // Recurring cost of a set of records in one currency, as of `now` (a running promotion counts at its price). Hidden and stopped
 // records are not paid for, so they stay out. Free records, one-off costs (summed apart), amounts without a cycle, unreadable
 // text and currencies without a rate are listed instead of guessed.
+// One record's part in the recurring totals on `today`: kind monthly (monthly = one month in `currency`), free, oneOff (value = the
+// amount converted, null without a rate or an amount), noCycle, unreadable, noRate, or none (no cost written, or 未知).
+function costKind(asset,{currency='CNY',rates,today=localDay()}={}){
+ const type=billingTypeOf(asset);
+ if(type==='free')return {kind:'free'};
+ if(!asset.cost||asset.cost==='未知')return {kind:type==='one_off'?'oneOff':'none',value:null};
+ const money=moneyOn(asset,today);
+ if(!money||!(money.value>=0)||(money.basis==='cost'&&!(money.value>0)))return {kind:'unreadable'};
+ if(type==='one_off')return {kind:'oneOff',value:convertMoney(money.value,money.currency,currency,rates),money};
+ if(!money.months)return {kind:'noCycle',money};
+ const monthly=convertMoney(money.value/money.months,money.currency,currency,rates);
+ return monthly===null?{kind:'noRate',money}:{kind:'monthly',monthly,money};
+}
 function costTotals(assets,{currency='CNY',rates,now=new Date()}={}){
  const items=[],unreadable=[],oneOff=[],noCycle=[],noRate=[],free=[],byType=new Map(),today=localDay(now);let monthly=0,oneOffTotal=0;
  for(const asset of assets||[]){
   if(asset.hiddenAt||asset.stopped)continue;
-  const type=billingTypeOf(asset);
-  if(type==='free'){free.push(asset);continue;}
-  if(!asset.cost||asset.cost==='未知'){if(type==='one_off')oneOff.push(asset);continue;}
-  const money=moneyOn(asset,today);
-  if(!money||!(money.value>=0)||(money.basis==='cost'&&!(money.value>0))){unreadable.push(asset);continue;}
-  if(type==='one_off'){oneOff.push(asset);const v=convertMoney(money.value,money.currency,currency,rates);if(v===null)noRate.push(asset);else oneOffTotal+=v;continue;}
-  if(!money.months){noCycle.push(asset);continue;}
-  const converted=convertMoney(money.value/money.months,money.currency,currency,rates);
-  if(converted===null){noRate.push(asset);continue;}
-  monthly+=converted;items.push({asset,monthly:converted,money});
-  byType.set(asset.type,(byType.get(asset.type)||0)+converted);
+  const c=costKind(asset,{currency,rates,today});
+  if(c.kind==='free')free.push(asset);
+  else if(c.kind==='unreadable')unreadable.push(asset);
+  else if(c.kind==='oneOff'){oneOff.push(asset);if(c.money){if(c.value===null)noRate.push(asset);else oneOffTotal+=c.value;}}
+  else if(c.kind==='noCycle')noCycle.push(asset);
+  else if(c.kind==='noRate')noRate.push(asset);
+  else if(c.kind==='monthly'){monthly+=c.monthly;items.push({asset,monthly:c.monthly,money:c.money});byType.set(asset.type,(byType.get(asset.type)||0)+c.monthly);}
  }
  items.sort((left,right)=>right.monthly-left.monthly);
  return {currency,monthly,yearly:monthly*12,items,unreadable,oneOff,oneOffTotal,noCycle,noRate,free,byType:[...byType].sort((left,right)=>right[1]-left[1])};
@@ -2207,9 +2216,11 @@ const BOARD_SETTINGS={
  rdapAuto:{valid:v=>v===true},
  rdapAsked:{valid:v=>v===true},
  iconSites:{valid:v=>!!v&&typeof v==='object'&&!Array.isArray(v)&&Object.values(v).every(x=>typeof x==='string'),merge:(local,backup)=>({...backup,...local})},
- paymentsSince:{valid:v=>typeof v==='string'&&dayNumber(v)!==null,merge:(local,backup)=>dayNumber(backup)<dayNumber(local)?backup:local}
+ paymentsSince:{valid:v=>typeof v==='string'&&dayNumber(v)!==null,merge:(local,backup)=>dayNumber(backup)<dayNumber(local)?backup:local},
+ // Each project's revenue: a merge adds the projects the local board has nothing for and keeps the local ones.
+ projects:{valid:v=>Object.keys(cleanProjectMeta(v)).length>0,clean:cleanProjectMeta,merge:(local,backup)=>({...cleanProjectMeta(backup),...cleanProjectMeta(local)})}
 };
-function backupSettings(value){const out={};for(const [key,rule] of Object.entries(BOARD_SETTINGS))if(value&&rule.valid(value[key]))out[key]=value[key];return out;}
+function backupSettings(value){const out={};for(const [key,rule] of Object.entries(BOARD_SETTINGS))if(value&&rule.valid(value[key]))out[key]=rule.clean?rule.clean(value[key]):value[key];return out;}
 function stableValue(value){return Array.isArray(value)?value.map(stableValue):value&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().filter(key=>value[key]!==undefined).map(key=>[key,stableValue(value[key])])):value;}
 function sameValue(left,right){return JSON.stringify(stableValue(left))===JSON.stringify(stableValue(right));}
 // The settings a merge changes: {key: new value}.
@@ -2506,12 +2517,26 @@ const PROJECT_LIMIT=40,PROJECTS_PER_ASSET=8;
 function cleanProject(value){return String(value??'').replace(/\s+/g,' ').trim().slice(0,PROJECT_LIMIT);}
 function projectsOf(asset){const raw=asset?.project,list=Array.isArray(raw)?raw:[raw];return [...new Set(list.map(cleanProject).filter(Boolean))].slice(0,PROJECTS_PER_ASSET);}
 function parseProjects(value){return [...new Set((Array.isArray(value)?value:String(value??'').split(/[,，、;；\n]/)).map(cleanProject).filter(Boolean))].slice(0,PROJECTS_PER_ASSET);}
-function setProjects(asset,list){const names=parseProjects(list);if(!asset)return names;if(!names.length)delete asset.project;else asset.project=names.length===1?names[0]:names;return names;}
+function setProjects(asset,list){const names=parseProjects(list);if(!asset)return names;if(!names.length)delete asset.project;else asset.project=names.length===1?names[0]:names;pruneProjectShares(asset);return names;}
 // Renaming a project renames it on every record; a name another project has merges the two. A name holds no list separator.
+// With `projects` (state.projects) the project's own facts move too: into an empty name, or added to the same currency's revenue;
+// a revenue in another currency stays under the old name rather than being dropped.
 function projectNameOk(name){const n=cleanProject(name);return !!n&&!/[,，、;；]/.test(n);}
-function renameProject(assets,from,to,now=new Date()){
+function renameProject(assets,from,to,now=new Date(),projects=null){
  const old=cleanProject(from),next=cleanProject(to);if(!old||!projectNameOk(next)||old===next)return 0;
- let n=0;for(const a of assets||[]){const names=projectsOf(a);if(!names.includes(old))continue;setProjects(a,names.map(x=>x===old?next:x));touchAsset(a,now);n++;}
+ let n=0;
+ for(const a of assets||[]){
+  const names=projectsOf(a);if(!names.includes(old))continue;
+  const shares=a.projectShares&&typeof a.projectShares==='object'?Object.entries(a.projectShares).reduce((out,[k,v])=>{const key=cleanProject(k)===old?next:cleanProject(k);out[key]=(out[key]||0)+Number(v);return out;},{}):null;
+  setProjects(a,names.map(x=>x===old?next:x));if(shares&&projectsOf(a).length>1){a.projectShares=shares;pruneProjectShares(a);}
+  touchAsset(a,now);n++;
+ }
+ if(projects&&typeof projects==='object'&&Object.hasOwn(projects,old)){
+  const mine=cleanProjectMeta({[old]:projects[old]})[old],theirs=cleanProjectMeta({[next]:projects[next]})[next];
+  if(mine&&theirs&&mine.revenue.currency!==theirs.revenue.currency)return n;
+  if(mine)projects[next]=theirs?{...theirs,revenue:{amount:roundMoney(theirs.revenue.amount+mine.revenue.amount),currency:theirs.revenue.currency}}:mine;
+  delete projects[old];
+ }
  return n;
 }
 function inProject(asset,name){const want=cleanProject(name);return !!want&&projectsOf(asset).includes(want);}
@@ -2540,6 +2565,73 @@ function shutdownPlan(assets,name,{now=new Date(),currency='CNY',rates}={}){
  }
  steps.sort((left,right)=>(left.deadline?0:1)-(right.deadline?0:1)||(left.days??0)-(right.days??0)||String(left.asset.name).localeCompare(String(right.asset.name)));
  return {name:cleanProject(name),steps,kept,shared:staying,monthlySaving:steps.reduce((sum,step)=>sum+(step.asset.stopped?0:step.monthly||0),0)};
+}
+
+// A project's own facts sit beside the records in state.projects: {name: {revenue: {amount, currency}}}, revenue per month. Sparse:
+// a project with nothing set has no entry, and an entry stays while no record carries the name, so the label coming back finds it.
+const PROJECT_META_LIMIT=200;
+function cleanRevenue(value){
+ if(!value||typeof value!=='object'||value.amount===null||typeof value.amount==='boolean'||typeof value.amount==='string'&&!value.amount.trim())return null;
+ const amount=Number(value.amount),currency=String(value.currency||'').trim().toUpperCase();
+ return Number.isFinite(amount)&&amount>=0&&amount<1e12&&/^[A-Z]{3}$/.test(currency)?{amount:roundMoney(amount),currency}:null;
+}
+function cleanProjectMeta(value){
+ const out={};if(!value||typeof value!=='object'||Array.isArray(value))return out;
+ for(const [key,meta] of Object.entries(value)){const name=cleanProject(key),revenue=projectNameOk(name)&&meta&&typeof meta==='object'?cleanRevenue(meta.revenue):null;if(revenue&&Object.keys(out).length<PROJECT_META_LIMIT)out[name]={revenue};}
+ return out;
+}
+// The board's projects map with one project's monthly revenue set; null or '' clears it. {ok, projects} or {ok:false, error}.
+function setProjectRevenue(projects,name,value){
+ const n=cleanProject(name);if(!projectNameOk(n))return {ok:false,error:tr('项目名无效')};
+ const next=cleanProjectMeta(projects);
+ if(value===null||value===undefined||value===''){delete next[n];return {ok:true,projects:next};}
+ const revenue=cleanRevenue(value);if(!revenue)return {ok:false,error:tr('收入要写成不小于 0 的金额和三位币种代码')};
+ next[n]={...next[n],revenue};return {ok:true,projects:next};
+}
+// A record in several projects splits its cost equally, or by asset.projectShares {project: percent}: one entry for each of its
+// projects, each 0–100, adding up to 100. Shares that no longer fit (a project was added or removed) fall back to equal and say so.
+function checkProjectShares(names,shares){
+ const list=parseProjects(names);
+ if(shares===null||shares===undefined)return {ok:true,shares:null};
+ if(typeof shares!=='object'||Array.isArray(shares))return {ok:false,error:tr('份额要写成「项目: 百分比」')};
+ if(list.length<2)return {ok:false,error:tr('只在一个项目里，不用分摊')};
+ const given=new Map(Object.entries(shares).map(([key,value])=>[cleanProject(key),value]));
+ if(given.size!==list.length||!list.every(name=>given.has(name)))return {ok:false,error:tr('每个项目都要有一个份额')};
+ const out={};
+ for(const name of list){const raw=given.get(name),value=typeof raw==='string'&&raw.trim()?Number(raw):typeof raw==='number'?raw:NaN;if(!Number.isFinite(value)||value<0||value>100)return {ok:false,error:tr('份额是 0 到 100 之间的数')};out[name]=value;}
+ const sum=Object.values(out).reduce((total,value)=>total+value,0);
+ if(Math.abs(sum-100)>0.01)return {ok:false,error:tr('份额加起来要等于 100%，现在是 {sum}%',{sum:roundMoney(sum)})};
+ return {ok:true,shares:out};
+}
+function setProjectShares(asset,shares){const check=checkProjectShares(projectsOf(asset),shares);if(!check.ok)return check;if(check.shares)asset.projectShares=check.shares;else delete asset.projectShares;return check;}
+function pruneProjectShares(asset){if(asset&&'projectShares' in asset&&!checkProjectShares(projectsOf(asset),asset.projectShares).ok)delete asset.projectShares;}
+// {split:'equal'|'custom', shares:{project: fraction}, invalid}: how one record's cost is divided among its projects.
+function projectSharesOf(asset){
+ const names=projectsOf(asset),check=asset?.projectShares!=null&&names.length>1?checkProjectShares(names,asset.projectShares):null;
+ if(check?.ok)return {split:'custom',shares:Object.fromEntries(names.map(name=>[name,check.shares[name]/100])),invalid:false};
+ return {split:'equal',shares:Object.fromEntries(names.map(name=>[name,1/names.length])),invalid:!!check};
+}
+// What each project costs a month with shared records split (projectSharesOf), what it earns (state.projects) and the difference, in
+// one currency. A yearly or quarterly cost counts per month; free records, one-off costs, records with no cost, unreadable text, a
+// missing cycle or rate are listed in notCounted instead of counting as 0, and `complete` is false while any cost is unknown.
+// net is null without a revenue (or a rate for it). `name` narrows to one project.
+function projectEconomics(assets,projects,{currency='CNY',rates,now=new Date(),name=''}={}){
+ const today=localDay(now),meta=cleanProjectMeta(projects),want=cleanProject(name);
+ const list=projectNames(assets).filter(p=>!want||p.name===want);
+ return {currency,projects:list.map(({name,count})=>{
+  const rows=[],notCounted={free:[],oneOff:[],none:[],noCycle:[],unreadable:[],noRate:[],stopped:[]},invalidShares=[];let monthlyCost=0,oneOffTotal=0;
+  for(const asset of projectAssets(assets,name)){
+   const split=projectSharesOf(asset),share=split.shares[name];if(split.invalid)invalidShares.push(asset.id);
+   const c=asset.stopped?{kind:'stopped'}:costKind(asset,{currency,rates,today}),monthly=c.kind==='monthly'?c.monthly:null;
+   if(monthly!==null)monthlyCost+=monthly*share;else notCounted[c.kind].push(asset.id);
+   if(c.kind==='oneOff'&&c.value!==null&&c.value!==undefined)oneOffTotal+=c.value*share;
+   rows.push({id:asset.id,name:asset.name,type:asset.type,share,split:split.split,shared:projectsOf(asset).length>1,kind:c.kind,monthly,cost:monthly===null?null:monthly*share});
+  }
+  rows.sort((left,right)=>(right.cost??-1)-(left.cost??-1)||String(left.name).localeCompare(String(right.name)));
+  const revenue=meta[name]?.revenue||null,revenueMonthly=revenue?convertMoney(revenue.amount,revenue.currency,currency,rates):null;
+  const unknown=notCounted.none.length+notCounted.noCycle.length+notCounted.unreadable.length+notCounted.noRate.length;
+  return {name,count,revenue,revenueMonthly,monthlyCost,oneOffTotal,net:revenueMonthly===null?null:revenueMonthly-monthlyCost,complete:!unknown&&(!revenue||revenueMonthly!==null),assets:rows,notCounted,invalidShares};
+ })};
 }
 
 // 定期清理: records that cost money or keep a date, most expensive and longest untouched first. The clock starts at the last
@@ -2717,4 +2809,4 @@ function dueLevel(asset,{now=new Date(),since=''}={}){
  return assetDateStatus(asset,now).level;
 }
 
-if(typeof module!=='undefined')module.exports={touchAsset,editedTime,TOMBSTONE_LIMIT,addTombstone,cleanTombstones,BOARD_SETTINGS,backupSettings,mergeBoardSettings,settleLinks,backupCounts,LEGACY_WORDS,LEGACY_STATES,MFA_KINDS,RECOVERY_TYPES,RECOVERY_FIELDS,BACKUP_KINDS,BACKUP_TYPES,IMPORTANCE,looksLikeSecret,recoveryText,recoveryGap,backupText,mailHost,mailDependents,selfRecovery,mailStake,PHONE_STATUSES,phoneTrouble,carrierNote,cardPaysPhone,setCardPays,CREDIT_RULES,creditRule,settleCreditExpiry,PLATFORM_SOURCES,missedReminders,reminderDays,STALE_SYNC_DAYS,staleSyncs,AUTO_RENEW_WORDS,CARD_STATUSES,cardTrouble,sourceTrouble,IMPACT_WORDS,verifyNumbers,phoneReach,phoneStake,syncedLabel,BILLING_TYPES,billingLabels,isFreeCost,billingTypeOf,validPromotion,moneyOn,settlePromotions,noteCostChange,costForecast,PAYMENT_LIMIT,CONFIRM_DAYS,paymentList,paidPayments,lastPayment,recordPayment,removePayment,occurrencesBetween,pendingCharges,pendingRenewals,confirmRenewal,cardOutlook,runsOut,needsConfirm,confirmWords,LIFECYCLE_RULES,lifecycleRule,lifecycleOf,AFTER_DUE_DAYS,monthsBetween,renewBase,canRenew,renewOptions,costFromPayment,renewAsset,confirmCharge,priceChange,paidTotals,ledgerRows,csvCell,ledgerCsv,SLEEP_CHECKED,SLEEP_RULES,KEEPALIVE_TYPES,KEEPALIVE_EVERY,sleepRuleOf,cleanKeepAlive,keepAliveCron,keepAliveWorkflow,cleanProject,PROJECTS_PER_ASSET,projectsOf,projectNameOk,renameProject,parseProjects,setProjects,inProject,projectNames,projectAssets,shutdownPlan,REVIEW_QUIET_DAYS,reviewQueue,icsFold,calendarIcs,escHtml,handoverHtml,rdapFacts,rdapCompare,rdapPhaseLabels,registryPhaseOf,RDAP_HOLDS,rdapHoldLabels,RDAP_MISSING_TLDS,rdapMissing,rdapNameservers,registryHoldOf,registryChangeOf,rdapRemember,registryAlerts,dueLevel,renewalGrace,RENEWAL_GRACE_DAYS,maskName,PROVIDER_PRESETS,providerPresets,MAIN_CURRENCIES,FALLBACK_RATES,costAmount,syncMoney,convertMoney,formatMoney,costTotals,MOUNT_TYPES,relationKind,linkAllowed,LINK_KINDS,LINK_KIND_ORDER,linkKind,linkRisks,linkImpact,serverChain,serverChainCount,linkRelation,linkMetaOf,setLinkMeta,serverTone,peekSet,dropLinkMeta,IP_LIMIT,normalizeIp,parseIps,assetIps,primaryIp,maskIp,validIpList,ACTION_FIELDS,QUICK_LIMIT,validActionField,sshCommand,cloneUrl,quickActions,recencyTime,recentFirst,arrangeAssets,touchedPrefix,bringToFront,DISPLAY_LIMITS,formatCount,ensureBlock,iconHost,iconVendor,iconVendors,vendorForHost,iconPlan,iconSiteHost,iconSiteFor,iconPlatformOf,iconRows,guessAssetType,regionList,regionName,regionFlag,phoneParts,regionFromPhone,maskPhone,maskEmail,cardExpiry,expiryText,looksLikeCardNumber,linkAssets,unlinkAssets,linkedAssets,removeLinksTo,assetFingerprint,removeUntouchedDemo,orderAssets,moveAsset,dateKinds,billingCycles,dayNumber,localDay,isoDay,addMonths,nextOccurrence,assetDateStatus,upcomingEvents,REMINDER_LIMIT,reminderLeads,reminderPlan,syncKey,assetSyncKey,isBlacklisted,findByExternal,findNameCollision,mergeCloudflare,mergeGitHub,NEW_BRANCH_DAYS,BRANCH_LIMIT,REPO_DETAIL_FIELDS,CI_STATES,CI_BAD,cleanCiRun,repoDetailFields,newBranches,applyRepoDetails,applyCollision,parseSender,registrableDomain,cleanMerchant,findAmounts,findDates,findDomains,evidenceFacts,inferCycle,formatCost,matchAsset,buildCandidates,evidencePayload,parseAiItems,applyAiItem,IMPORT_ROW_LIMIT,parseLooseDate,shiftDate,costParts,formatCostParts,inferTypeFromName,parseRepoUrl,parseQuickLine,AGENT_FIELDS,isAgentImport,parseAgentImport,parseDelimitedText,importHeaderField,rowsToImportItems,isCfsmBackup,parseCfsmBackup,classifyImportPayload,planImport,applyImport,parseBoardBackup,planBoardBackup,applyBoardBackup,demoImportSampleCsv,csvSyncKey,VENDOR_CSV_PRESETS,cloudflareTokenTemplateUrl,githubTokenTemplateUrl,CLOUDFLARE_TOKEN_PERMISSIONS,parseSshConfig,sshGitHosts,mergeSshConfig,parseEml,delimitedRecords,splitDelimitedLine,resolvePresetValue,SECRET_KINDS,secretKinds,rowSecrets,looksLikeEnv,screenText,PASSWORD_EXPORTS,passwordExportOf,importFileKind,importGate,screenBackup,AI_PLANS,AI_PLANS_CHECKED,aiPlanProviders,aiPlansFor,findAiPlan,aiPlanFields,icsRepeat,MASK_MARK,MASK_SETS,maskValue,maskAsset,maskMail,hasMask};
+if(typeof module!=='undefined')module.exports={costKind,cleanRevenue,cleanProjectMeta,setProjectRevenue,checkProjectShares,setProjectShares,pruneProjectShares,projectSharesOf,projectEconomics,PROJECT_META_LIMIT,touchAsset,editedTime,TOMBSTONE_LIMIT,addTombstone,cleanTombstones,BOARD_SETTINGS,backupSettings,mergeBoardSettings,settleLinks,backupCounts,LEGACY_WORDS,LEGACY_STATES,MFA_KINDS,RECOVERY_TYPES,RECOVERY_FIELDS,BACKUP_KINDS,BACKUP_TYPES,IMPORTANCE,looksLikeSecret,recoveryText,recoveryGap,backupText,mailHost,mailDependents,selfRecovery,mailStake,PHONE_STATUSES,phoneTrouble,carrierNote,cardPaysPhone,setCardPays,CREDIT_RULES,creditRule,settleCreditExpiry,PLATFORM_SOURCES,missedReminders,reminderDays,STALE_SYNC_DAYS,staleSyncs,AUTO_RENEW_WORDS,CARD_STATUSES,cardTrouble,sourceTrouble,IMPACT_WORDS,verifyNumbers,phoneReach,phoneStake,syncedLabel,BILLING_TYPES,billingLabels,isFreeCost,billingTypeOf,validPromotion,moneyOn,settlePromotions,noteCostChange,costForecast,PAYMENT_LIMIT,CONFIRM_DAYS,paymentList,paidPayments,lastPayment,recordPayment,removePayment,occurrencesBetween,pendingCharges,pendingRenewals,confirmRenewal,cardOutlook,runsOut,needsConfirm,confirmWords,LIFECYCLE_RULES,lifecycleRule,lifecycleOf,AFTER_DUE_DAYS,monthsBetween,renewBase,canRenew,renewOptions,costFromPayment,renewAsset,confirmCharge,priceChange,paidTotals,ledgerRows,csvCell,ledgerCsv,SLEEP_CHECKED,SLEEP_RULES,KEEPALIVE_TYPES,KEEPALIVE_EVERY,sleepRuleOf,cleanKeepAlive,keepAliveCron,keepAliveWorkflow,cleanProject,PROJECTS_PER_ASSET,projectsOf,projectNameOk,renameProject,parseProjects,setProjects,inProject,projectNames,projectAssets,shutdownPlan,REVIEW_QUIET_DAYS,reviewQueue,icsFold,calendarIcs,escHtml,handoverHtml,rdapFacts,rdapCompare,rdapPhaseLabels,registryPhaseOf,RDAP_HOLDS,rdapHoldLabels,RDAP_MISSING_TLDS,rdapMissing,rdapNameservers,registryHoldOf,registryChangeOf,rdapRemember,registryAlerts,dueLevel,renewalGrace,RENEWAL_GRACE_DAYS,maskName,PROVIDER_PRESETS,providerPresets,MAIN_CURRENCIES,FALLBACK_RATES,costAmount,syncMoney,convertMoney,formatMoney,costTotals,MOUNT_TYPES,relationKind,linkAllowed,LINK_KINDS,LINK_KIND_ORDER,linkKind,linkRisks,linkImpact,serverChain,serverChainCount,linkRelation,linkMetaOf,setLinkMeta,serverTone,peekSet,dropLinkMeta,IP_LIMIT,normalizeIp,parseIps,assetIps,primaryIp,maskIp,validIpList,ACTION_FIELDS,QUICK_LIMIT,validActionField,sshCommand,cloneUrl,quickActions,recencyTime,recentFirst,arrangeAssets,touchedPrefix,bringToFront,DISPLAY_LIMITS,formatCount,ensureBlock,iconHost,iconVendor,iconVendors,vendorForHost,iconPlan,iconSiteHost,iconSiteFor,iconPlatformOf,iconRows,guessAssetType,regionList,regionName,regionFlag,phoneParts,regionFromPhone,maskPhone,maskEmail,cardExpiry,expiryText,looksLikeCardNumber,linkAssets,unlinkAssets,linkedAssets,removeLinksTo,assetFingerprint,removeUntouchedDemo,orderAssets,moveAsset,dateKinds,billingCycles,dayNumber,localDay,isoDay,addMonths,nextOccurrence,assetDateStatus,upcomingEvents,REMINDER_LIMIT,reminderLeads,reminderPlan,syncKey,assetSyncKey,isBlacklisted,findByExternal,findNameCollision,mergeCloudflare,mergeGitHub,NEW_BRANCH_DAYS,BRANCH_LIMIT,REPO_DETAIL_FIELDS,CI_STATES,CI_BAD,cleanCiRun,repoDetailFields,newBranches,applyRepoDetails,applyCollision,parseSender,registrableDomain,cleanMerchant,findAmounts,findDates,findDomains,evidenceFacts,inferCycle,formatCost,matchAsset,buildCandidates,evidencePayload,parseAiItems,applyAiItem,IMPORT_ROW_LIMIT,parseLooseDate,shiftDate,costParts,formatCostParts,inferTypeFromName,parseRepoUrl,parseQuickLine,AGENT_FIELDS,isAgentImport,parseAgentImport,parseDelimitedText,importHeaderField,rowsToImportItems,isCfsmBackup,parseCfsmBackup,classifyImportPayload,planImport,applyImport,parseBoardBackup,planBoardBackup,applyBoardBackup,demoImportSampleCsv,csvSyncKey,VENDOR_CSV_PRESETS,cloudflareTokenTemplateUrl,githubTokenTemplateUrl,CLOUDFLARE_TOKEN_PERMISSIONS,parseSshConfig,sshGitHosts,mergeSshConfig,parseEml,delimitedRecords,splitDelimitedLine,resolvePresetValue,SECRET_KINDS,secretKinds,rowSecrets,looksLikeEnv,screenText,PASSWORD_EXPORTS,passwordExportOf,importFileKind,importGate,screenBackup,AI_PLANS,AI_PLANS_CHECKED,aiPlanProviders,aiPlansFor,findAiPlan,aiPlanFields,icsRepeat,MASK_MARK,MASK_SETS,maskValue,maskAsset,maskMail,hasMask};

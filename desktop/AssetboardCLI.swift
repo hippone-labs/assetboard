@@ -24,7 +24,7 @@ import Foundation
       charges                              已到扣款日、还没确认的自动扣款
       forecast [--from 日期] [--to 日期] [--currency CNY] [--project P]
       history [<id>]                       价格变化历史（带 id 时含付款记录）
-      projects                             项目及每月费用
+      projects [--currency CNY]            项目：每月费用（共用的按份额分摊）、收入和盈亏
       mcp                                  以 MCP 服务器运行（stdio）
     结果以 JSON 输出；出错时退出码为 1。
     """
@@ -47,7 +47,7 @@ import Foundation
       charges                              Automatic charges whose day has come and that are not confirmed yet
       forecast [--from DATE] [--to DATE] [--currency CNY] [--project P]
       history [<id>]                       Price history (with an id, also its payments)
-      projects                             Projects and their monthly cost
+      projects [--currency CNY]            Projects: monthly cost (shared assets split by share), revenue and net
       mcp                                  Run as an MCP server (stdio)
     Results are printed as JSON; the exit code is 1 on an error.
     """
@@ -165,7 +165,7 @@ import Foundation
             params["id"] = id
             return ("renew", params)
         case "charges": return ("charges", [:])
-        case "projects": return ("projects", [:])
+        case "projects": return ("projects", option("--currency").map { ["currency": $0] } ?? [:])
         case "forecast":
             var params: [String: Any] = [:]
             for (flagName, key) in [("--from", "from"), ("--to", "to"), ("--currency", "currency"), ("--project", "project"), ("--type", "type")] { if let value = option(flagName) { params[key] = value } }
@@ -271,6 +271,8 @@ import Foundation
         }
         precondition((byName["list_icon_platforms"]?["annotations"] as? [String: Any])?["readOnlyHint"] as? Bool == true && (byName["fetch_icons"]?["annotations"] as? [String: Any])?["readOnlyHint"] as? Bool == false, "Read and write hints")
         precondition((((byName["update_asset"]?["inputSchema"] as? [String: Any])?["properties"] as? [String: Any])?["fields"] as? [String: Any]).flatMap { ($0["properties"] as? [String: Any])?.keys }.map { Set($0).isSuperset(of: ["hidden", "stopped", "visibility"]) && !$0.contains("probeLink") } == true, "update_asset takes hidden, stopped and visibility, not probeLink")
+        precondition(parsed(["projects", "--currency", "USD"])?.1["currency"] as? String == "USD" && parsed(["projects"])?.1.isEmpty == true, "projects takes a currency")
+        precondition(((byName["list_projects"]?["inputSchema"] as? [String: Any])?["properties"] as? [String: Any])?.keys.sorted() == ["currency"] && (byName["list_projects"]?["description"] as? String)?.contains("net") == true, "list_projects gives revenue and net in a currency")
         precondition(parsed(["pay", "x1", "--amount", "6", "--missed"])?.1["missed"] as? Bool == true && parsed(["pay", "x1", "--amount", "six"]) == nil, "pay options")
         precondition(parsed(["renew", "x1", "--until", "2027-03-01"])?.1["until"] as? String == "2027-03-01" && parsed(["renew", "x1"]) == nil, "renew needs --until")
         precondition((parsed(["delete-many", "a", "b", "--reason", "x"])?.1["ids"] as? [String]) == ["a", "b"], "delete-many takes ids")
@@ -388,7 +390,7 @@ enum MCPServer {
             tool("get_cost_totals", "Recurring cost totals", "Monthly and yearly recurring cost in one currency (assets keep their own; converted with the day's ECB rates; a running promotion counts at its promo price), by category and largest first. oneOffTotal sums one-off costs apart. notCounted lists free, oneOff, noCycle (amount without a cycle), unreadable and noRate ids. Filter by type or project; groupBy splits the totals. Hidden and stopped assets are left out.", ["currency": ["type": "string", "enum": ["CNY", "USD", "EUR", "GBP", "HKD", "JPY"]], "type": type, "project": text, "groupBy": ["type": "string", "enum": ["project", "type"]]], [], readOnly: true),
             tool("get_cost_forecast", "Spending forecast", "Expected spending between from and to (default: the next 12 months, at most 5 years): every charge date of every asset priced on that day — promotions and their end, trials turning into charges, manual renewals at today's price, one-off costs on their date; recurring costs without a date are spread per month (basis \"spread\"). Returns total, byMonth, items and what could not be counted.", ["from": date, "to": date, "months": ["type": "integer", "minimum": 1, "maximum": 60], "currency": currency, "type": type, "project": text], [], readOnly: true),
             tool("get_cost_history", "Price history", "Every change of an asset's cost (from, to, amountFrom, amountTo, currencies, at, source: edit, agent, renew, payment, promotion-end, import), newest first; with id, also that asset's payments.", ["id": id, "from": date, "limit": ["type": "integer", "minimum": 1, "maximum": 1000]], [], readOnly: true),
-            tool("list_projects", "List projects", "Projects (the project labels in use) with how many assets each has and their monthly and yearly recurring cost.", [:], [], readOnly: true),
+            tool("list_projects", "List projects", "Projects (the project labels in use), each with: count; monthly and yearly (recurring cost, a shared asset at full price in every project); monthlyCost (a shared asset split equally among its projects, or by the asset's projectShares percentages); revenue ({amount, currency} per month, or null), revenueMonthly and net (revenueMonthly minus monthlyCost; null without revenue) in currency; complete (false while some cost is unknown); assets [{id, name, share (percent), split (equal|custom), monthly, cost, notCounted (free, oneOff, none, noCycle, unreadable, noRate or stopped)}]; invalidShares (ids whose shares no longer fit, split equally). Read-only: no tool writes revenue or shares.", ["currency": currency], [], readOnly: true),
             tool("list_unconfirmed_charges", "Unconfirmed automatic charges", "Automatic charges (dateKind renew with a cycle) whose day has come in the last 45 days and that nobody has confirmed. Answer them with record_payment (covers = the due date).", [:], [], readOnly: true),
             tool("record_payment", "Record a payment", "Write down what was actually paid for an asset (or, with missed: true, that an expected charge did not happen). amount and currency default to the price on that day; covers is the due date it pays for. Undoable in the app. Returns the payment and the asset.", ["id": id, "paidOn": date, "amount": ["type": "number"], "currency": currency, "covers": date, "months": ["type": "integer"], "note": text, "missed": ["type": "boolean"]], ["id"], readOnly: false),
             tool("renew_asset", "Mark an asset renewed", "Move an asset's date to until (renewal counted from the current due date), record what was paid, and by default update the price when the payment covers exactly one cycle. Returns the asset, the payment and the date it renewed from.", ["id": id, "until": date, "amount": ["type": "number"], "currency": currency, "paidOn": date, "updateCost": ["type": "boolean"]], ["id", "until"], readOnly: false, destructive: true),

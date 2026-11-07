@@ -114,7 +114,7 @@ Agent / 脚本的 JSON 格式（先写成临时名，写完再改名为 `.json`�
 
 侧边栏底部“导出”：
 
-- 资产备份（.json）： 全部资料、关联和付款记录，连同看板设置（自动获取图标、每周核对注册局等）、导出时间和删除过的手动记录（最近 500 条）。只有它能导回来：用“从备份恢复…”或拖进窗口，总会先出预览。合并时每条记录列出本地和备份的修改时间，默认留较新的那份，可逐条改选；备份之后删掉的记录保持删除。“整体替换”先列出会被删掉的本地记录。`⌘Z` 可撤销。下面三种是只读副本，导入时会提示改用备份。
+- 资产备份（.json）： 全部资料、关联和付款记录，连同看板设置（自动获取图标、每周核对注册局、项目收入等）、导出时间和删除过的手动记录（最近 500 条）。只有它能导回来：用“从备份恢复…”或拖进窗口，总会先出预览。合并时每条记录列出本地和备份的修改时间，默认留较新的那份，可逐条改选；备份之后删掉的记录保持删除。“整体替换”先列出会被删掉的本地记录。`⌘Z` 可撤销。下面三种是只读副本，导入时会提示改用备份。
 - 日历（.ics）： 每个到期和扣款日，按周期重复，提前提醒的天数和 App 一样（早上 9 点）；月底的日期在短的月份落在当月最后一天，不漏月。勾选“只写类别和天数”时，每个事件只写类别和还剩几天，不写名称、平台、账号、费用、项目和链接。iCloud 日历不做端到端加密。导入日历软件后，日期改了要重新导出。
 - 付款账本（.csv）： 按年份或全部，每一笔续费和确认过的扣款，附一列按当前计价币种的折算。用 Excel / Numbers 直接打开。
 - 交接清单（.html）： 一页能离开 App 独立阅读的清单：有什么、在哪个账号、多少钱、什么时候到期、谁付款、管理链接。可以选择遮住名称、账号（连同邮箱域名）、IP、SSH 主机和用户、备注和管理链接。不含任何密码。
@@ -191,7 +191,7 @@ MCP 工具：`list_asset_types`、`list_assets`、`get_asset`、`get_cost_totals
 - 代码仓库： 手动记的仓库可写 `visibility`（`public` / `private` / `archived`），从 GitHub 同步的以 GitHub 为准；`get_asset` / `list_assets` 返回 `repository`：`visibility`、`defaultBranch`，打开仓库分支和 Actions 后还有 `branches`（`count`、`more`、`new`）、`actions`（`state`、`workflow`、`branch`、`at`、`url`，没有运行记录为 `null`）和 `unread`（令牌缺的权限）。
 
 - 计费： `billingType` 为 `recurring` / `one_off` / `free` / `unknown`（留空自动判断），`amount: 0` 即免费；`promotion` 为 `{start, end, amount, regularAmount, currency}`，`null` 删除。查询结果带 `billingType`、`currentPrice`（含 `basis`：promotion / regular / free / cost）、`priceChange`、`unconfirmedCharges`、`payments`、`costHistory`。
-- 项目： `project`（也接受 `projectId`）；`list_assets`、`get_cost_totals` 和 `get_cost_forecast` 可按项目筛选，`get_cost_totals` 的 `groupBy` 可按项目或类别拆分。
+- 项目： `project`（也接受 `projectId`）；`list_assets`、`get_cost_totals` 和 `get_cost_forecast` 可按项目筛选，`get_cost_totals` 的 `groupBy` 可按项目或类别拆分。`list_projects`（命令行 `projects [--currency CNY]`）按一种币种给出每个项目的 `monthly` / `yearly`（共用的资产在每个项目里按全价算）、`monthlyCost`（共用的资产按份额分摊：默认平分，或按记录的 `projectShares` 百分比，合计 100）、`revenue`（每月收入 `{amount, currency}`，没有为 `null`）、`revenueMonthly`、`net`（收入减 `monthlyCost`，没有收入为 `null`）、`complete`（有费用未知时为 `false`），`assets` 列出每项的 `share`（百分比）、`split`（`equal` / `custom`）、`monthly`、`cost`，没算进去的写 `notCounted`（`free`、`oneOff`、`none`、`noCycle`、`unreadable`、`noRate`、`stopped`），份额和项目对不上的记录列在 `invalidShares`，按平分算。收入和份额只读，外部工具不能改。
 - 批量： `update_assets` 一次最多 100 项，先逐项检查，合格的一起写入、一次撤销，返回每项成功或失败原因；`request_delete_assets` 一次提交多项删除，在 App 的一个列表里统一勾选确认。
 - 确认请求： 删除请求都会返回 `actionId`；`list_pending_actions`、`get_action_status` 查看状态：`pending`、`done`（至少删了一项）、`cancelled`（全部保留）、`failed`，每项写明 `deleted` / `kept` / `failed`。请求到达时 App 会弹出确认列表；正在编辑时窗口顶部出现提示条，点“查看”直接打开，Dock 图标也会跳一下。这些状态不受 `⌘Z` 影响。
 

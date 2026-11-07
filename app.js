@@ -68,6 +68,8 @@ let migratedLegacyData=false;
 try{const saved=demoMode?window.assetboardDemoBoard():nativeStore?nativeStore.data:JSON.parse(localStorage.getItem(key));if(saved&&Array.isArray(saved.blocks)&&Array.isArray(saved.assets)&&saved.blocks.every(b=>cats[b.id])){const migration=removeUntouchedDemo(saved);state=migration.board;migratedLegacyData=!!(migration.removed||migration.removedBlocks);}}catch{} if(!Array.isArray(state.deletedExternalIds))state.deletedExternalIds=[];
 // A block is its category id and whether its group is folded; nothing else is kept.
 state.blocks=state.blocks.map(b=>({id:b.id,folded:!!b.folded}));delete state.featuredRepositoryIds;
+// Each project's own facts (revenue), keyed by project name; nothing set, no field.
+{const projects=cleanProjectMeta(state.projects);if(Object.keys(projects).length)state.projects=projects;else delete state.projects;}
 // Payments start counting the day this version first opens the board, so older charges are not asked about.
 if(!demoMode&&!state.paymentsSince)state.paymentsSince=isoDay(localDay());
 let saveSequence=0;
@@ -1069,6 +1071,7 @@ function backupSettingText(key,value){
  if(key==='rdapAuto')return `${tr('每周核对域名到期日')}${tr('：')}${value?tr('开'):tr('关')}`;
  if(key==='iconSites')return tr('自定义图标站点 {n} 个',{n:Object.keys(value||{}).length});
  if(key==='paymentsSince')return value?tr('待确认扣款从 {day} 算起',{day:value}):'';
+ if(key==='projects')return tr('项目收入 {n} 个',{n:Object.keys(value||{}).length});
  return '';
 }
 function backupPreviewHtml(plan,meta={}){
@@ -1636,9 +1639,17 @@ const agentMethods={
   rows.sort((x,y)=>Date.parse(y.at)-Date.parse(x.at));
   return {total:rows.length,history:rows.slice(0,Math.min(Math.max(Number(limit)||200,1),1000)),...(id?{payments:paymentList(agentFind(id))}:{})};
  },
- projects:()=>{
-  const cur=totalCurrency(),round=n=>Math.round(n*100)/100;
-  return {currency:cur,projects:projectsOn()?projectNames(state.assets.filter(agentSees)).map(({name,count})=>{const t=costTotals(projectAssets(state.assets.filter(agentSees),name),{currency:cur,rates:fx.rates});return {name,count,monthly:round(t.monthly),yearly:round(t.yearly)};}):[]};
+ // monthly / yearly count a shared record at full price in each project; monthlyCost splits it (equal or projectShares), and
+ // revenue (state.projects) less monthlyCost is net. Read-only: agents do not set revenue or shares.
+ projects:({currency=''}={})=>{
+  const cur=agentCurrency(currency),round=n=>n===null?null:Math.round(n*100)/100,seen=state.assets.filter(agentSees);
+  if(!projectsOn())return {currency:cur,projects:[]};
+  return {currency:cur,projects:projectEconomics(seen,state.projects,{currency:cur,rates:fx.rates}).projects.map(p=>{
+   const t=costTotals(projectAssets(seen,p.name),{currency:cur,rates:fx.rates});
+   return {name:p.name,count:p.count,monthly:round(t.monthly),yearly:round(t.yearly),revenue:p.revenue,revenueMonthly:round(p.revenueMonthly),monthlyCost:round(p.monthlyCost),net:round(p.net),complete:p.complete,
+    assets:p.assets.map(x=>({id:x.id,name:agentShown(seen.find(a=>a.id===x.id)).name,share:round(x.share*100),split:x.split,monthly:round(x.monthly),cost:round(x.cost),...(x.monthly===null?{notCounted:x.kind}:{})})),
+    ...(p.invalidShares.length?{invalidShares:p.invalidShares}:{})};
+  })};
  }
 };
 function agentCurrency(currency){const cur=currency?String(currency).toUpperCase():totalCurrency();if(!(cur in FALLBACK_RATES.rates))throw new Error(`currency 需要是 ${Object.keys(FALLBACK_RATES.rates).join('、')} 之一`);return cur;}
@@ -1662,6 +1673,7 @@ function agentPrepareUpdate(id,input){
  if(!Object.keys(checked.fields).length&&!Object.keys(icon).length&&!linkTo.length&&!unlinkFrom.length&&type===a.type)throw new Error(checked.ignored.length?`没有可修改的字段（已忽略：${checked.ignored.join('、')}）`:'没有要修改的字段');
  return {apply(){
   Object.assign(a,checked.fields);clearEmptyFields(a);agentApplyIcon(a,icon);for(const fn of checked.after)fn(a);
+  if('project' in checked.fields)pruneProjectShares(a);
   if(!synced){a.type=type;ensureBlock(state,type);}
   for(const id of unlinkFrom)unlinkAssets(state.assets,a.id,id);
   const replaced=linkTo.flatMap(id=>linkRelation(state.assets,a.id,id).replaced);
