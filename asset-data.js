@@ -2053,6 +2053,8 @@ function inferTypeFromName(name){
  const ips=parseIps(text);
  if(ips.ips.length&&!ips.invalid.length)return 'server';
  if(/^(?:[a-z0-9-]+\.)+[a-z]{2,}$/i.test(text))return 'domain';
+ // A web address of a site (not a repository, which is caught above) is read as its domain.
+ if(/^https?:\/\//i.test(text)&&domainFromText(text))return 'domain';
  const guess=guessAssetType(text,[]);
  return guess==='subscription'?'':guess;
 }
@@ -2081,6 +2083,7 @@ function parseQuickLine(text,now=new Date()){
  const found=tokens.findIndex(item=>inferTypeFromName(item)),index=found>=0?found:0;
  fill.name=tokens.splice(index,1)[0].slice(0,100);
  const type=inferTypeFromName(fill.name)||inferTypeFromName(rest);
+ if(type==='domain')fill.name=domainFromText(fill.name)||fill.name;
  if(type)fill.type=type;
  if(tokens.length)fill.provider=tokens.join(' ').slice(0,80);
  return fill;
@@ -2102,6 +2105,8 @@ function classifyImportPayload({text='',filename='',mime=''}={}){
  if(/^[\[{]/.test(trimmed)){
   try{const value=JSON.parse(trimmed);if(isAgentImport(value))return {kind:'agent',filename,text:trimmed};if(isCfsmBackup(value))return {kind:'cfsm',filename,text:trimmed};if(value&&typeof value==='object'&&(Array.isArray(value.assets)||Array.isArray(value.blocks)))return {kind:'json',filename,text:trimmed};}catch{}
  }
+ // Nothing but domains or web addresses, two or more: a domain record each (checked before tables, since "a.example,b.example" splits too).
+ const list=domainListText(trimmed);if(list)return {kind:'domains',filename,...list};
  if((trimmed.includes('\n')&&(/,|\t|;/.test(trimmed.split(/\n/,1)[0])))||(trimmed.includes('\t')&&trimmed.includes('\n'))){
   const parsed=parseDelimitedText(trimmed);
   if(parsed.ok)return {kind:'csv',filename,text:trimmed,parsed};
@@ -2717,4 +2722,54 @@ function dueLevel(asset,{now=new Date(),since=''}={}){
  return assetDateStatus(asset,now).level;
 }
 
-if(typeof module!=='undefined')module.exports={touchAsset,editedTime,TOMBSTONE_LIMIT,addTombstone,cleanTombstones,BOARD_SETTINGS,backupSettings,mergeBoardSettings,settleLinks,backupCounts,LEGACY_WORDS,LEGACY_STATES,MFA_KINDS,RECOVERY_TYPES,RECOVERY_FIELDS,BACKUP_KINDS,BACKUP_TYPES,IMPORTANCE,looksLikeSecret,recoveryText,recoveryGap,backupText,mailHost,mailDependents,selfRecovery,mailStake,PHONE_STATUSES,phoneTrouble,carrierNote,cardPaysPhone,setCardPays,CREDIT_RULES,creditRule,settleCreditExpiry,PLATFORM_SOURCES,missedReminders,reminderDays,STALE_SYNC_DAYS,staleSyncs,AUTO_RENEW_WORDS,CARD_STATUSES,cardTrouble,sourceTrouble,IMPACT_WORDS,verifyNumbers,phoneReach,phoneStake,syncedLabel,BILLING_TYPES,billingLabels,isFreeCost,billingTypeOf,validPromotion,moneyOn,settlePromotions,noteCostChange,costForecast,PAYMENT_LIMIT,CONFIRM_DAYS,paymentList,paidPayments,lastPayment,recordPayment,removePayment,occurrencesBetween,pendingCharges,pendingRenewals,confirmRenewal,cardOutlook,runsOut,needsConfirm,confirmWords,LIFECYCLE_RULES,lifecycleRule,lifecycleOf,AFTER_DUE_DAYS,monthsBetween,renewBase,canRenew,renewOptions,costFromPayment,renewAsset,confirmCharge,priceChange,paidTotals,ledgerRows,csvCell,ledgerCsv,SLEEP_CHECKED,SLEEP_RULES,KEEPALIVE_TYPES,KEEPALIVE_EVERY,sleepRuleOf,cleanKeepAlive,keepAliveCron,keepAliveWorkflow,cleanProject,PROJECTS_PER_ASSET,projectsOf,projectNameOk,renameProject,parseProjects,setProjects,inProject,projectNames,projectAssets,shutdownPlan,REVIEW_QUIET_DAYS,reviewQueue,icsFold,calendarIcs,escHtml,handoverHtml,rdapFacts,rdapCompare,rdapPhaseLabels,registryPhaseOf,RDAP_HOLDS,rdapHoldLabels,RDAP_MISSING_TLDS,rdapMissing,rdapNameservers,registryHoldOf,registryChangeOf,rdapRemember,registryAlerts,dueLevel,renewalGrace,RENEWAL_GRACE_DAYS,maskName,PROVIDER_PRESETS,providerPresets,MAIN_CURRENCIES,FALLBACK_RATES,costAmount,syncMoney,convertMoney,formatMoney,costTotals,MOUNT_TYPES,relationKind,linkAllowed,LINK_KINDS,LINK_KIND_ORDER,linkKind,linkRisks,linkImpact,serverChain,serverChainCount,linkRelation,linkMetaOf,setLinkMeta,serverTone,peekSet,dropLinkMeta,IP_LIMIT,normalizeIp,parseIps,assetIps,primaryIp,maskIp,validIpList,ACTION_FIELDS,QUICK_LIMIT,validActionField,sshCommand,cloneUrl,quickActions,recencyTime,recentFirst,arrangeAssets,touchedPrefix,bringToFront,DISPLAY_LIMITS,formatCount,ensureBlock,iconHost,iconVendor,iconVendors,vendorForHost,iconPlan,iconSiteHost,iconSiteFor,iconPlatformOf,iconRows,guessAssetType,regionList,regionName,regionFlag,phoneParts,regionFromPhone,maskPhone,maskEmail,cardExpiry,expiryText,looksLikeCardNumber,linkAssets,unlinkAssets,linkedAssets,removeLinksTo,assetFingerprint,removeUntouchedDemo,orderAssets,moveAsset,dateKinds,billingCycles,dayNumber,localDay,isoDay,addMonths,nextOccurrence,assetDateStatus,upcomingEvents,REMINDER_LIMIT,reminderLeads,reminderPlan,syncKey,assetSyncKey,isBlacklisted,findByExternal,findNameCollision,mergeCloudflare,mergeGitHub,NEW_BRANCH_DAYS,BRANCH_LIMIT,REPO_DETAIL_FIELDS,CI_STATES,CI_BAD,cleanCiRun,repoDetailFields,newBranches,applyRepoDetails,applyCollision,parseSender,registrableDomain,cleanMerchant,findAmounts,findDates,findDomains,evidenceFacts,inferCycle,formatCost,matchAsset,buildCandidates,evidencePayload,parseAiItems,applyAiItem,IMPORT_ROW_LIMIT,parseLooseDate,shiftDate,costParts,formatCostParts,inferTypeFromName,parseRepoUrl,parseQuickLine,AGENT_FIELDS,isAgentImport,parseAgentImport,parseDelimitedText,importHeaderField,rowsToImportItems,isCfsmBackup,parseCfsmBackup,classifyImportPayload,planImport,applyImport,parseBoardBackup,planBoardBackup,applyBoardBackup,demoImportSampleCsv,csvSyncKey,VENDOR_CSV_PRESETS,cloudflareTokenTemplateUrl,githubTokenTemplateUrl,CLOUDFLARE_TOKEN_PERMISSIONS,parseSshConfig,sshGitHosts,mergeSshConfig,parseEml,delimitedRecords,splitDelimitedLine,resolvePresetValue,SECRET_KINDS,secretKinds,rowSecrets,looksLikeEnv,screenText,PASSWORD_EXPORTS,passwordExportOf,importFileKind,importGate,screenBackup,AI_PLANS,AI_PLANS_CHECKED,aiPlanProviders,aiPlansFor,findAiPlan,aiPlanFields,icsRepeat,MASK_MARK,MASK_SETS,maskValue,maskAsset,maskMail,hasMask};
+// A domain from what was pasted or typed: a bare name (kept as typed, lowercased, without www.) or a web address (scheme, www., port,
+// path and query dropped, cut to the registrable domain a registrar renews); '' for anything else (IP addresses, mail addresses,
+// repository addresses, one label).
+// Non-ASCII names come back in their punycode form, which is what RDAP and the registrars' APIs take.
+const DOMAIN_NAME=/^(?=.{4,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+(?:[a-z]{2,63}|xn--[a-z0-9-]{1,59})$/;
+function domainFromText(text){
+ const value=String(text||'').trim().replace(/^<|>$/g,'');
+ if(!value||value.length>2000||/\s/.test(value)||parseRepoUrl(value))return '';
+ const web=/^https?:\/\//i.test(value);
+ if(!web&&(/^[a-z][a-z0-9+.-]*:/i.test(value)&&!/^[^:]+:\d+(?:[/?#]|$)/.test(value)||value.includes('@')))return '';
+ let host;try{const url=new URL(web?value:'http://'+value);if(url.username||url.password)return '';host=url.hostname;}catch{return '';}
+ host=host.toLowerCase().replace(/\.$/,'').replace(/^www\./,'');
+ return DOMAIN_NAME.test(host)?web?registrableDomain(host):host:'';
+}
+// A pasted list of domains (one per line, or separated by commas, semicolons or 、; list bullets allowed): the distinct domains in order,
+// or null unless there are at least two pieces and every piece is a domain. At most IMPORT_ROW_LIMIT are kept.
+function domainListText(text){
+ const pieces=String(text||'').split(/[\n\r,;，；、]+/).map(piece=>piece.trim().replace(/^(?:[-*•·]|\d{1,3}[.)])\s*/,'')).filter(Boolean);
+ if(pieces.length<2||pieces.length>2000)return null;
+ const domains=[];
+ for(const piece of pieces){const domain=domainFromText(piece);if(!domain)return null;if(!domains.includes(domain))domains.push(domain);}
+ return {domains:domains.slice(0,IMPORT_ROW_LIMIT),truncated:domains.length>IMPORT_ROW_LIMIT,total:domains.length};
+}
+// Import items for such a list: a domain record each, with nothing known yet but the name (importedFrom is stored as is and
+// translated where it is shown).
+function domainListItems(domains){return (domains||[]).map(name=>({name,type:'domain',provider:'',account:'',date:'',dateKind:'expire',cycle:'',cost:'',url:'',notes:'',purpose:'',source:'csv',externalId:`domain:${name}`,importedFrom:'粘贴的域名'}));}
+// The registrar as RDAP names it ("NameCheap, Inc.", "GoDaddy.com, LLC") → the name the form's registrar chips use when it is one of
+// them, else the name without its company suffix.
+const REGISTRAR_ALIASES={alibaba:'阿里云',aliyun:'阿里云',hichina:'阿里云',tencent:'腾讯云',dnspod:'DNSPod',west263:'西部数码',xinnet:'新网',squarespace:'Squarespace'};
+function registrarProvider(name){
+ const text=String(name||'').replace(/\s+/g,' ').trim().slice(0,80);if(!/[\p{L}\p{N}]/u.test(text))return '';
+ const flat=text.toLowerCase().replace(/[^a-z0-9]/g,'');
+ const preset=PROVIDER_PRESETS.domain.find(item=>{const key=item.toLowerCase().replace(/[^a-z0-9]/g,'');return key.length>=4&&flat.startsWith(key);});
+ if(preset)return preset;
+ const alias=Object.keys(REGISTRAR_ALIASES).find(key=>flat.startsWith(key));if(alias)return REGISTRAR_ALIASES[alias];
+ let previous,value=text;
+ do{previous=value;value=value.replace(/[\s,.]*\b(?:inc|llc|ltd|limited|corp|corporation|co|gmbh|sas|sarl|s\.?a|b\.?v|pty|plc|ag|ab|oy|kk)\.?$/i,'').replace(/[\s,]+$/,'');}while(value!==previous&&value);
+ return value||text;
+}
+// What an RDAP answer adds to a record being filled in: the expiry date when none is typed, the registrar when none is named. A typed
+// date is never replaced; when the registry's differs it is only reported (`differs`).
+function rdapFormFields(current,facts){
+ const fill={},date=String(current?.date||'').trim(),provider=String(current?.provider||'').trim(),registry=facts?.expires||'';
+ // Past expiry the registry's date is no renewal (see rdapCompare), so a domain in a lifecycle phase fills no date.
+ if(registry&&!date&&!facts.phase)Object.assign(fill,{date:registry,dateKind:'expire'});
+ const registrar=registrarProvider(facts?.registrar);
+ if(registrar&&!provider)fill.provider=registrar;
+ return {fill,registry,registrar,differs:!!(registry&&date&&date!==registry)};
+}
+
+if(typeof module!=='undefined')module.exports={touchAsset,editedTime,TOMBSTONE_LIMIT,addTombstone,cleanTombstones,BOARD_SETTINGS,backupSettings,mergeBoardSettings,settleLinks,backupCounts,LEGACY_WORDS,LEGACY_STATES,MFA_KINDS,RECOVERY_TYPES,RECOVERY_FIELDS,BACKUP_KINDS,BACKUP_TYPES,IMPORTANCE,looksLikeSecret,recoveryText,recoveryGap,backupText,mailHost,mailDependents,selfRecovery,mailStake,PHONE_STATUSES,phoneTrouble,carrierNote,cardPaysPhone,setCardPays,CREDIT_RULES,creditRule,settleCreditExpiry,PLATFORM_SOURCES,missedReminders,reminderDays,STALE_SYNC_DAYS,staleSyncs,AUTO_RENEW_WORDS,CARD_STATUSES,cardTrouble,sourceTrouble,IMPACT_WORDS,verifyNumbers,phoneReach,phoneStake,syncedLabel,BILLING_TYPES,billingLabels,isFreeCost,billingTypeOf,validPromotion,moneyOn,settlePromotions,noteCostChange,costForecast,PAYMENT_LIMIT,CONFIRM_DAYS,paymentList,paidPayments,lastPayment,recordPayment,removePayment,occurrencesBetween,pendingCharges,pendingRenewals,confirmRenewal,cardOutlook,runsOut,needsConfirm,confirmWords,LIFECYCLE_RULES,lifecycleRule,lifecycleOf,AFTER_DUE_DAYS,monthsBetween,renewBase,canRenew,renewOptions,costFromPayment,renewAsset,confirmCharge,priceChange,paidTotals,ledgerRows,csvCell,ledgerCsv,SLEEP_CHECKED,SLEEP_RULES,KEEPALIVE_TYPES,KEEPALIVE_EVERY,sleepRuleOf,cleanKeepAlive,keepAliveCron,keepAliveWorkflow,cleanProject,PROJECTS_PER_ASSET,projectsOf,projectNameOk,renameProject,parseProjects,setProjects,inProject,projectNames,projectAssets,shutdownPlan,REVIEW_QUIET_DAYS,reviewQueue,icsFold,calendarIcs,escHtml,handoverHtml,rdapFacts,rdapCompare,rdapPhaseLabels,registryPhaseOf,RDAP_HOLDS,rdapHoldLabels,RDAP_MISSING_TLDS,rdapMissing,rdapNameservers,registryHoldOf,registryChangeOf,rdapRemember,registryAlerts,dueLevel,DOMAIN_NAME,domainFromText,domainListText,domainListItems,REGISTRAR_ALIASES,registrarProvider,rdapFormFields,renewalGrace,RENEWAL_GRACE_DAYS,maskName,PROVIDER_PRESETS,providerPresets,MAIN_CURRENCIES,FALLBACK_RATES,costAmount,syncMoney,convertMoney,formatMoney,costTotals,MOUNT_TYPES,relationKind,linkAllowed,LINK_KINDS,LINK_KIND_ORDER,linkKind,linkRisks,linkImpact,serverChain,serverChainCount,linkRelation,linkMetaOf,setLinkMeta,serverTone,peekSet,dropLinkMeta,IP_LIMIT,normalizeIp,parseIps,assetIps,primaryIp,maskIp,validIpList,ACTION_FIELDS,QUICK_LIMIT,validActionField,sshCommand,cloneUrl,quickActions,recencyTime,recentFirst,arrangeAssets,touchedPrefix,bringToFront,DISPLAY_LIMITS,formatCount,ensureBlock,iconHost,iconVendor,iconVendors,vendorForHost,iconPlan,iconSiteHost,iconSiteFor,iconPlatformOf,iconRows,guessAssetType,regionList,regionName,regionFlag,phoneParts,regionFromPhone,maskPhone,maskEmail,cardExpiry,expiryText,looksLikeCardNumber,linkAssets,unlinkAssets,linkedAssets,removeLinksTo,assetFingerprint,removeUntouchedDemo,orderAssets,moveAsset,dateKinds,billingCycles,dayNumber,localDay,isoDay,addMonths,nextOccurrence,assetDateStatus,upcomingEvents,REMINDER_LIMIT,reminderLeads,reminderPlan,syncKey,assetSyncKey,isBlacklisted,findByExternal,findNameCollision,mergeCloudflare,mergeGitHub,NEW_BRANCH_DAYS,BRANCH_LIMIT,REPO_DETAIL_FIELDS,CI_STATES,CI_BAD,cleanCiRun,repoDetailFields,newBranches,applyRepoDetails,applyCollision,parseSender,registrableDomain,cleanMerchant,findAmounts,findDates,findDomains,evidenceFacts,inferCycle,formatCost,matchAsset,buildCandidates,evidencePayload,parseAiItems,applyAiItem,IMPORT_ROW_LIMIT,parseLooseDate,shiftDate,costParts,formatCostParts,inferTypeFromName,parseRepoUrl,parseQuickLine,AGENT_FIELDS,isAgentImport,parseAgentImport,parseDelimitedText,importHeaderField,rowsToImportItems,isCfsmBackup,parseCfsmBackup,classifyImportPayload,planImport,applyImport,parseBoardBackup,planBoardBackup,applyBoardBackup,demoImportSampleCsv,csvSyncKey,VENDOR_CSV_PRESETS,cloudflareTokenTemplateUrl,githubTokenTemplateUrl,CLOUDFLARE_TOKEN_PERMISSIONS,parseSshConfig,sshGitHosts,mergeSshConfig,parseEml,delimitedRecords,splitDelimitedLine,resolvePresetValue,SECRET_KINDS,secretKinds,rowSecrets,looksLikeEnv,screenText,PASSWORD_EXPORTS,passwordExportOf,importFileKind,importGate,screenBackup,AI_PLANS,AI_PLANS_CHECKED,aiPlanProviders,aiPlansFor,findAiPlan,aiPlanFields,icsRepeat,MASK_MARK,MASK_SETS,maskValue,maskAsset,maskMail,hasMask};

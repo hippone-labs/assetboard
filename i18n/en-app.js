@@ -743,6 +743,8 @@ Object.assign(I18N.en,{
  '{title} 已识别，在待确认里':'{title} recognized, in To review',
  '截图/PDF':'Screenshot/PDF',
  '粘贴的文字':'Pasted text',
+ '粘贴的域名':'pasted domains',
+ '到期日要在 Mac App 里向注册局查询':'expiry dates are read from the registry in the Mac app',
  'OpenAI 兼容接口（OpenAI、通义千问、Kimi、本机 Ollama 等）':'OpenAI-compatible API (OpenAI, Qwen, Kimi, local Ollama and others)',
  'AI 识别仅 Mac App 可用':'AI recognition works only in the Mac app',
  'AI 识别':'AI recognition',

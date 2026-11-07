@@ -88,7 +88,7 @@ Scripts can put JSON in this format into `~/Library/Application Support/Assetboa
 - System notifications: 30, 7 and 1 days before an expiry; 3 and 1 days before a monthly charge, trial end or cancel-by date.
 - An auto-renewal on its charge day waits in Upcoming until you confirm whether it was charged.
 - Renewal records, payment records and price changes.
-- RDAP checks of a domain's expiry date and status at the registry.
+- RDAP checks of a domain's expiry date and status at the registry; pasting a domain, a web address or a list of domains makes the records and fills their expiry dates and registrars from the registry.
 - Exports: JSON backup (can be imported again), calendar .ics, payment ledger .csv, handover list .html.
 - Privacy mode: masks names, accounts and IPs.
 - Network log: lists every request the app makes.
