@@ -1803,6 +1803,8 @@ body::before,.native-app body::before{background:radial-gradient(70vw 65vh at 0%
 .row .r-probe{grid-column:2/4;grid-row:2;margin:-8px 0 6px}
 #board[data-size=m] .row .r-probe,#board[data-size=s] .row .r-probe{grid-column:auto;grid-row:auto;margin:0}
 .row.probe-down,.gcard.probe-down{background:var(--danger-soft)}
+.row.probe-down:is(:hover,:focus-within){background:rgba(180,35,24,.12)}.row.probe-down.selected{background:rgba(180,35,24,.16)}
+:root[data-scheme=dark] .row.probe-down:is(:hover,:focus-within){background:rgba(255,139,125,.17)}:root[data-scheme=dark] .row.probe-down.selected{background:rgba(255,139,125,.22)}
 /* 全景: the same mini gauges, wrapping on narrow cards. */
 .pano-probe{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;padding:7px 0 2px;min-width:0}
 .pano-card.probe-down,.pano-hero.probe-down{box-shadow:inset 0 0 0 1.5px var(--dot-red),var(--shadow-card);background:color-mix(in oklab,var(--danger-soft) 100%,rgb(var(--tone-card)))}
