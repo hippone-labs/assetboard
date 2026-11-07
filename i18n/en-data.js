@@ -152,6 +152,7 @@ Object.assign(I18N.en,{
  '待批准':'Awaiting approval',
  '已跳过':'Skipped',
  '已完成':'Completed',
+ '运行中':'Running',
  '成功@ci':'passed',
  '失败@ci':'failed',
  '超时@ci':'timed out',
