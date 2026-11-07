@@ -17,7 +17,7 @@ async (page) => {
     repo('web',{branches:['main'],denied:['actions']})]}).board;render();});
   const row=await p.evaluate(()=>[...document.querySelectorAll('[data-asset]')].map(r=>({id:r.dataset.asset,text:r.textContent.replace(/\s+/g,' '),bad:!!r.querySelector('.r-date.overdue,.overdue')})));
   const api=row.find(r=>r.id==='github-repo-api'),web=row.find(r=>r.id==='github-repo-web');
-  check(api&&/Actions 失败 · 3 小时前/.test(api.text)&&api.bad,'a failed run leads the row, in red: '+JSON.stringify(api));
+  check(api&&/Actions 失败/.test(api.text)&&!/小时前/.test(api.text)&&api.bad,'a failed run leads the row, in red: '+JSON.stringify(api));
   check(web&&/推送于/.test(web.text)&&!web.bad,'a repository without a run reads its push: '+JSON.stringify(web));
   const facts=await p.evaluate(()=>{showDetail('github-repo-api');return [...document.querySelectorAll('#detail .fact')].map(f=>f.textContent.replace(/\s+/g,' ').trim());});
   check(facts.includes('默认分支main')&&facts.some(f=>/^分支2 · 新：feat-x$/.test(f))&&facts.some(f=>/^Actions失败 · CI · feat-x · 3 小时前 查看运行$/.test(f)),'the inspector names branch, new branches and the run: '+JSON.stringify(facts));

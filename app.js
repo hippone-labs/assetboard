@@ -602,7 +602,8 @@ function repoDetailsOn(a){return a?.type==='repository'&&a.source==='github'&&fe
 function ciRunOf(a){const run=repoDetailsOn(a)&&a.ciRun;return run&&CI_STATES[run.state]&&cleanCiRun({...run,status:'completed',conclusion:'success'})?run:null;}
 // Runs are hours apart, so the time says hours within a day.
 function runAge(iso){const minutes=Math.floor((Date.now()-Date.parse(iso))/60000);return minutes<1?tr('刚刚'):minutes<60?tr('{n} 分钟前',{n:minutes}):minutes<1440?tr('{n} 小时前',{n:Math.floor(minutes/60)}):ageText(iso);}
-function ciLine(ci){return tr('Actions {state} · {when}',{state:CI_STATES[ci.state],when:runAge(ci.at)});}
+// The row's date column holds about a dozen characters: the state only, the time is in the inspector.
+function ciLine(ci){return tr('Actions {state}',{state:CI_STATES[ci.state]});}
 function repoFacts(a){
  if(!repoDetailsOn(a))return '';
  const denied=Array.isArray(a.repoDenied)?a.repoDenied:[],fact=(k,html)=>`<div class="fact"><span>${k}</span><span>${html}</span></div>`,fresh=newBranches(a),ci=ciRunOf(a);

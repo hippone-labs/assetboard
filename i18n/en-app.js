@@ -104,7 +104,7 @@ Object.assign(I18N.en,{
  '刚刚':'just now',
  '{n} 分钟前':['{n} minute ago','{n} minutes ago'],
  '{n} 小时前':['{n} hour ago','{n} hours ago'],
- 'Actions {state} · {when}':'Actions {state} · {when}',
+ 'Actions {state}':'Actions {state}',
  '新：{names}':'new: {names}',
  '查看运行':'View run',
  '没有运行记录':'No runs',
