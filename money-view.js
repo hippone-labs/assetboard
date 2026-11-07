@@ -144,7 +144,7 @@ function paymentsSection(a){
 
 // ---- The form: billing type (inside 更多); Pro adds the project, promotion, owner and person in charge.
 function moneyFormFields(v){
- return `<div class="field"><span class="field-label" title="${tr('自动：金额为 0 算免费，有周期算周期付费')}">${tr('计费方式')}</span>${chipGroup('billingType',[['',tr('自动')],['recurring',billingLabels.recurring],['one_off',billingLabels.one_off],['free',billingLabels.free]],BILLING_TYPES.includes(v.billingType)&&v.billingType!=='unknown'?v.billingType:'',tr('计费方式'))}</div>${slotHtml('formFields',v)}`;
+ return `<div class="field billing-field"><span class="field-label" title="${tr('自动：金额为 0 算免费，有周期算周期付费')}">${tr('计费方式')}</span>${chipGroup('billingType',[['',tr('自动')],['recurring',billingLabels.recurring],['one_off',billingLabels.one_off],['free',billingLabels.free]],BILLING_TYPES.includes(v.billingType)&&v.billingType!=='unknown'?v.billingType:'',tr('计费方式'))}</div>${slotHtml('formFields',v)}`;
 }
 // Reads those fields back; null (after pointing at the field) when something cannot be saved. Fields without a form field here are
 // left out, so what the Pro edition wrote (a project, a promotion, an owner) stays as it was.

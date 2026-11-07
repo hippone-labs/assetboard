@@ -809,6 +809,14 @@ test('form entry: loose dates, cost parts and type guessed from the name',()=>{
  assert.deepEqual(['example.com','203.0.113.10','github.com/me/repo','Vultr 服务器','Figma',''].map(inferTypeFromName),['domain','server','repository','server','','']);
 });
 
+test('repository address: https, bare, .git, sub-pages and git@ become owner, name, platform and a clean link',()=>{
+ const {parseRepoUrl,inferTypeFromName}=require('../asset-data.js'),want={provider:'GitHub',owner:'acme-labs',name:'notes-api',url:'https://github.com/acme-labs/notes-api'};
+ for(const text of ['https://github.com/acme-labs/notes-api','github.com/acme-labs/notes-api.git','https://www.github.com/acme-labs/notes-api/tree/main/src','https://github.com/acme-labs/notes-api/actions','git@github.com:acme-labs/notes-api.git','https://github.com/acme-labs/notes-api?tab=readme'])assert.deepEqual(parseRepoUrl(text),want,text);
+ assert.deepEqual(parseRepoUrl('https://gitlab.com/me/site'),{provider:'GitLab',owner:'me',name:'site',url:'https://gitlab.com/me/site'});
+ for(const text of ['https://gitlab.com/group/sub/project','https://example.com/me/repo','github.com/me','notes-api',''])assert.equal(parseRepoUrl(text),null,text);
+ assert.equal(inferTypeFromName('gitee.com/me/tool'),'repository');
+});
+
 test('quick line: one typed line becomes form fields, unknown parts are left out',()=>{
  const {parseQuickLine}=require('../asset-data.js');
  const now=new Date(2026,9,20);
