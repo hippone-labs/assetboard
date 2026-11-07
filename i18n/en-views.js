@@ -5,6 +5,8 @@ Object.assign(I18N.en,{
  '探针与 SSH 直读':'Probes and SSH readings',
  '从你的监控面板或 SSH 读取服务器的在线状态、CPU、内存和磁盘。这是实时读数，不是登记状态':'Reads servers\' online state, CPU, memory and disk from your monitoring panel or over SSH. These are live readings, not recorded state',
  '外部工具接入（MCP）':'External tools (MCP)',
+ '仓库分支和 Actions':'Repository branches and Actions',
+ '同步 GitHub 时，每个仓库多读两次：分支列表和最近一次 Actions 运行。细粒度令牌要加 Contents 和 Actions 的只读权限（Contents 也能读代码）':'Each GitHub sync reads two more things per repository: its branches and its latest Actions run. A fine-grained token needs read access to Contents and Actions (Contents can also read the code)',
  '让 Claude、ChatGPT、Cursor 等工具或脚本通过 assetboard-cli 查询和修改资产；关掉后它们的调用一律被拒绝':'Lets Claude, ChatGPT, Cursor and other tools or scripts query and change assets through assetboard-cli; when off, every call is refused',
  // theme.js
  '墨蓝':'Ink','青松':'Pine',

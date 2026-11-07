@@ -2279,3 +2279,6 @@ body::before,.native-app body::before{background:radial-gradient(70vw 65vh at 0%
 /* 项目改名: the field that takes a project's place in the sidebar while it is renamed (pro/web/money-pro.js). */
 :root #sidebar .nav-item.nav-renaming{cursor:text;color:var(--ink)}
 :root #sidebar .nav-rename{flex:1;min-width:0;height:24px;margin:-3px 0;padding:0 6px;border:1px solid rgb(var(--tone-primary));border-radius:var(--radius-sm);background:var(--surface-content);color:var(--ink);font:inherit;outline:none}
+/* 仓库分支和 Actions: a failed run reads in the danger colour in the inspector; counts use the numeric face. */
+.fact .ci-bad{color:var(--danger);font-weight:600}
+.fact .num{font-family:var(--num)}

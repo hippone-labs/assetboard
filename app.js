@@ -124,8 +124,8 @@ function isPrivateRepo(a){return a.type==='repository'&&(a.event==='私有仓库
 function ageText(iso){const t=Date.parse(iso);if(!t)return '';const days=Math.floor((Date.now()-t)/86400000);return days<=0?tr('今天'):days<31?tr('{n} 天前',{n:days}):days<365?tr('{n} 个月前',{n:Math.floor(days/30)}):tr('{n} 年前',{n:Math.floor(days/365)});}
 // The last push says how alive a repository is (research R1); GitHub's updated_at also moves on stars and settings, and a hand-made
 // record's updatedAt is only its last edit, so that one says nothing until a sync brings pushed_at.
-function quietEvent(a){const e=a.event||'';if(a.type==='repository'&&(e==='公开仓库'||e==='私有仓库'||!e))return a.pushedAt?tr('推送于 {when}',{when:ageText(a.pushedAt)}):a.source==='github'?ageText(a.updatedAt):'';return e==='日期待补充'?'':tr(e);}
-function eventInfo(a){if(a.syncMissing)return {text:tr('本次未返回'),cls:'warn'};if(a.stopped&&a.type==='phone'&&linkImpact(state.assets,a).length)return {text:tr('已停用，仍有账号靠它验证'),cls:'warn overdue'};if(a.stopped){const s=assetDateStatus(a);return {text:s.level==='none'?'':s.label,cls:''};}const trouble=cardTrouble(a)||phoneTrouble(a);if(trouble)return {text:trouble.label,cls:'warn overdue'};if(registryHoldOf(a))return {text:tr('冻结'),cls:'warn overdue'};const renewal=pendingRenewals([a],{since:state.paymentsSince})[0];if(renewal)return renewal.overdue?{text:tr('可能已过期 · {ask}？',{ask:confirmWords[renewal.kind].ask}),cls:'warn overdue'}:{text:tr('{ask}？{date} {due}',{ask:confirmWords[renewal.kind].ask,date:renewal.due,due:confirmWords[renewal.kind].due}),cls:'warn'};const life=lifecycleOf(a);if(life)return {text:life.label,cls:'warn overdue'};const phase=registryPhaseOf(a);if(phase)return {text:tr('注册局：{phase}',{phase:rdapPhaseLabels[phase]}),cls:'warn overdue'};const status=assetDateStatus(a);if(status.level==='none')return {text:assetProfiles[a.type]?'':quietEvent(a),cls:''};if(a.type==='bankcard'&&status.level==='upcoming')return {text:tr('有效期 {date}',{date:expiryText(a.date)}),cls:''};return {text:a.creditExpiry?tr('额度{status}',{status:status.label}):status.label,cls:status.level==='overdue'?'warn overdue':status.level==='soon'?'warn':''};}
+function quietEvent(a){const e=a.event||'';if(a.type==='repository'&&(e==='公开仓库'||e==='私有仓库'||!e)){const fresh=repoDetailsOn(a)?newBranches(a):[];if(fresh.length)return fresh.length===1?tr('新分支 {name}',{name:fresh[0]}):tr('{n} 个新分支',{n:fresh.length});return a.pushedAt?tr('推送于 {when}',{when:ageText(a.pushedAt)}):a.source==='github'?ageText(a.updatedAt):'';}return e==='日期待补充'?'':tr(e);}
+function eventInfo(a){if(a.syncMissing)return {text:tr('本次未返回'),cls:'warn'};if(a.stopped&&a.type==='phone'&&linkImpact(state.assets,a).length)return {text:tr('已停用，仍有账号靠它验证'),cls:'warn overdue'};if(a.stopped){const s=assetDateStatus(a);return {text:s.level==='none'?'':s.label,cls:''};}const trouble=cardTrouble(a)||phoneTrouble(a);if(trouble)return {text:trouble.label,cls:'warn overdue'};if(registryHoldOf(a))return {text:tr('冻结'),cls:'warn overdue'};const renewal=pendingRenewals([a],{since:state.paymentsSince})[0];if(renewal)return renewal.overdue?{text:tr('可能已过期 · {ask}？',{ask:confirmWords[renewal.kind].ask}),cls:'warn overdue'}:{text:tr('{ask}？{date} {due}',{ask:confirmWords[renewal.kind].ask,date:renewal.due,due:confirmWords[renewal.kind].due}),cls:'warn'};const life=lifecycleOf(a);if(life)return {text:life.label,cls:'warn overdue'};const phase=registryPhaseOf(a);if(phase)return {text:tr('注册局：{phase}',{phase:rdapPhaseLabels[phase]}),cls:'warn overdue'};const status=assetDateStatus(a);const ci=ciRunOf(a);if(status.level==='none'&&ci&&(CI_BAD.includes(ci.state)||ci.state==='running'))return {text:ciLine(ci),cls:CI_BAD.includes(ci.state)?'warn overdue':''};if(status.level==='none')return {text:assetProfiles[a.type]?'':quietEvent(a),cls:''};if(a.type==='bankcard'&&status.level==='upcoming')return {text:tr('有效期 {date}',{date:expiryText(a.date)}),cls:''};return {text:a.creditExpiry?tr('额度{status}',{status:status.label}):status.label,cls:status.level==='overdue'?'warn overdue':status.level==='soon'?'warn':''};}
 function lockMark(a){return isPrivateRepo(a)?`<span class="lock-mark" role="img" aria-label="${tr('私有仓库')}" title="${tr('私有仓库')}">${ui('lock')}</span>`:'';}
 // The board itself lives on this Mac only (research Q6): 文件 › 导出资产备份 is the way to keep a copy elsewhere. The Mac app reports
 // each export (assetboardExported, a per-viewer note in localStorage, never in state), and 即将到来 says so once the last copy is a
@@ -597,10 +597,23 @@ function showDetail(id,{focus}={}){
 // Masked values reveal on request; the full value never appears in the list.
 function secret(full,masked){return full&&masked&&masked!==full?`<span class="secret" data-full="${esc(full)}" data-masked="${esc(masked)}">${esc(masked)}</span><button class="text-button reveal" data-action="reveal" aria-pressed="false">${tr('显示')}</button>`:esc(full||'');}
 const DATE_FACTS=['下一日期','下次扣款','保号','有效期'].map(k=>tr(k));
+// 仓库分支和 Actions (设置 › 功能): what the last GitHub sync read; a permission it lacked is named instead of a blank.
+function repoDetailsOn(a){return a?.type==='repository'&&a.source==='github'&&featureOn('repoDetails');}
+function ciRunOf(a){const run=repoDetailsOn(a)&&a.ciRun;return run&&CI_STATES[run.state]&&cleanCiRun({...run,status:'completed',conclusion:'success'})?run:null;}
+// Runs are hours apart, so the time says hours within a day.
+function runAge(iso){const minutes=Math.floor((Date.now()-Date.parse(iso))/60000);return minutes<1?tr('刚刚'):minutes<60?tr('{n} 分钟前',{n:minutes}):minutes<1440?tr('{n} 小时前',{n:Math.floor(minutes/60)}):ageText(iso);}
+function ciLine(ci){return tr('Actions {state} · {when}',{state:CI_STATES[ci.state],when:runAge(ci.at)});}
+function repoFacts(a){
+ if(!repoDetailsOn(a))return '';
+ const denied=Array.isArray(a.repoDenied)?a.repoDenied:[],fact=(k,html)=>`<div class="fact"><span>${k}</span><span>${html}</span></div>`,fresh=newBranches(a),ci=ciRunOf(a);
+ const branches=Array.isArray(a.branches)?`<span class="num">${a.branches.length}${a.branchesMore?'+':''}</span>${fresh.length?` · ${tr('新：{names}',{names:fresh.slice(0,3).map(esc).join(tr('、'))+(fresh.length>3?' …':'')})}`:''}`:'';
+ const run=ci?`<span class="${CI_BAD.includes(ci.state)?'ci-bad':''}">${esc(CI_STATES[ci.state])}</span> · ${esc([ci.name,ci.branch].filter(Boolean).join(' · '))} · ${esc(runAge(ci.at))} <button class="text-button inline-button" data-action="open-ci" data-id="${esc(a.id)}">${tr('查看运行')}</button>`:a.ciRun===null?tr('没有运行记录'):'';
+ return [[tr('默认分支'),esc(a.defaultBranch||'')],[tr('分支'),branches||(denied.includes('branches')?tr('令牌没有 Contents 读权限'):'')],['Actions',run||(denied.includes('actions')?tr('令牌没有 Actions 读权限'):'')]].filter(([,html])=>html).map(([k,html])=>fact(k,html)).join('');
+}
 function detailFacts(a,lastSync){
  // A date row stays on one line; when the inspector is too narrow its end is cut and the whole text is the tip.
  const row=([k,html])=>DATE_FACTS.includes(k)?`<div class="fact fact-date"><span>${k}</span><span title="${esc(html.replace(/<[^>]*>/g,''))}">${html}</span></div>`:`<div class="fact"><span>${k}</span><span>${html}</span></div>`,text=value=>esc(value||'');
- if(!assetProfiles[a.type]){const list=assetIps(a),net=list.length?`<div class="fact"><span>${tr('网络')}</span><span class="ip-pills">${list.map(x=>`<button class="ip-pill" data-action="copy-ip" data-ip="${esc(x.ip)}" title="${tr('复制 IP')}" aria-label="${tr('复制 IP {ip}',{ip:esc(veilIp(x.ip))})}">${x.inner?`<em>${tr('内')}</em>`:''}${esc(veilIp(x.ip))}</button>`).join('')}</span></div>`:'';return [[tr('保留原因'),a.reason],[tr('费用'),costText(a)],[tr('下一日期'),a.date?dateText(a):''],[tr('自动续费'),AUTO_RENEW_WORDS[a.autoRenew]&&a.source!=='manual'?AUTO_RENEW_WORDS[a.autoRenew]:''],['SSH',a.type==='server'&&(a.host||a.sshAlias)?`${a.host?`${a.sshUser?a.sshUser+'@':''}${veilHost(a.host)}${a.sshPort?':'+a.sshPort:''}`:''}${a.sshAlias?`${a.host?' · ':''}ssh ${esc(a.sshAlias)}`:''}`:''],[tr('本机目录'),a.type==='repository'?a.localPath:''],[tr('DNS 托管'),a.type==='domain'?a.dnsHost:''],[tr('备案'),a.type==='domain'&&a.icp?a.icp+(a.stopped||a.hiddenAt||['overdue'].includes(assetDateStatus(a).level)?' · '+tr('不用了先注销备案'):''):''],[tr('来源'),shownSource(a)],...(lastSync?[[syncedLabel(a),lastSync]]:[])].filter(([,v])=>v).map(([k,v])=>row([k,esc(v)])).join('')+net+wakeFact(a);}
+ if(!assetProfiles[a.type]){const list=assetIps(a),net=list.length?`<div class="fact"><span>${tr('网络')}</span><span class="ip-pills">${list.map(x=>`<button class="ip-pill" data-action="copy-ip" data-ip="${esc(x.ip)}" title="${tr('复制 IP')}" aria-label="${tr('复制 IP {ip}',{ip:esc(veilIp(x.ip))})}">${x.inner?`<em>${tr('内')}</em>`:''}${esc(veilIp(x.ip))}</button>`).join('')}</span></div>`:'';return [[tr('保留原因'),a.reason],[tr('费用'),costText(a)],[tr('下一日期'),a.date?dateText(a):''],[tr('自动续费'),AUTO_RENEW_WORDS[a.autoRenew]&&a.source!=='manual'?AUTO_RENEW_WORDS[a.autoRenew]:''],['SSH',a.type==='server'&&(a.host||a.sshAlias)?`${a.host?`${a.sshUser?a.sshUser+'@':''}${veilHost(a.host)}${a.sshPort?':'+a.sshPort:''}`:''}${a.sshAlias?`${a.host?' · ':''}ssh ${esc(a.sshAlias)}`:''}`:''],[tr('本机目录'),a.type==='repository'?a.localPath:''],[tr('DNS 托管'),a.type==='domain'?a.dnsHost:''],[tr('备案'),a.type==='domain'&&a.icp?a.icp+(a.stopped||a.hiddenAt||['overdue'].includes(assetDateStatus(a).level)?' · '+tr('不用了先注销备案'):''):''],[tr('来源'),shownSource(a)],...(lastSync?[[syncedLabel(a),lastSync]]:[])].filter(([,v])=>v).map(([k,v])=>row([k,esc(v)])).join('')+net+repoFacts(a)+wakeFact(a);}
  const region=a.region?`${regionFlag(a.region)} ${regionName(a.region)}`:'',when=a.date?dateText(a):'',count=['appleid','google'].includes(a.type)?verifyNumbers(state.assets,a).length:0,numbers=count===1?tr('1 个（唯一）'):count?tr('{n} 个',{n:count}):'';
  const rows={
   bankcard:[[tr('地区'),text(region)],[tr('状态'),text(CARD_STATUSES[a.cardStatus])],[tr('费用'),text(costText(a))],[tr('有效期'),a.date?esc(`${expiryText(a.date)} · ${assetDateStatus(a).label}`):text('')],[tr('发卡行'),text(a.provider)],[tr('账户备注'),text(veilAccount(a.account))]],
@@ -1330,12 +1343,19 @@ function agentRiskText(r){return agentSees(r.source)&&(!r.via||agentSees(r.via))
 const AGENT_TEXT_FIELDS={name:100,provider:80,account:100,purpose:100,reason:120,cost:80,notes:2000,project:40};
 // Records as agents see them: no image data (it can run to tens of KB per record), only whether there is an icon and where it came from.
 // Links come with their meaning from this record's side, and payment or verification at risk is spelled out.
+// A repository's visibility and what the last GitHub sync read (仓库分支和 Actions), as one summary instead of the stored fields.
+const REPO_VISIBILITY={public:'公开仓库',private:'私有仓库',archived:'已归档'};
+function agentRepository(a){
+ if(a.type!=='repository')return {};
+ const visibility=Object.keys(REPO_VISIBILITY).find(key=>REPO_VISIBILITY[key]===a.event||REPO_VISIBILITY[key]===a.syncStatus)||'',on=repoDetailsOn(a),ci=ciRunOf(a);
+ return {repository:{visibility,...(a.defaultBranch?{defaultBranch:a.defaultBranch}:{}),...(on&&Array.isArray(a.branches)?{branches:{count:a.branches.length,more:!!a.branchesMore,new:newBranches(a)}}:{}),...(on&&(ci||a.ciRun===null)?{actions:ci?{state:ci.state,workflow:ci.name,branch:ci.branch,at:ci.at,url:ci.url}:null}:{}),...(on&&a.repoDenied?.length?{unread:a.repoDenied}:{})}};
+}
 function agentAsset(a){
- const {iconData,siteIcon,links,linkMeta,...rest}=agentShown(a),status=agentIconStatus.get(a.id),risks=linkRisks(state.assets,a);
+ const {iconData,siteIcon,links,linkMeta,branches,branchesMore,branchSeen,branchesFrom,ciRun,repoDenied,...rest}=agentShown(a),status=agentIconStatus.get(a.id),risks=linkRisks(state.assets,a);
  const masked=Object.keys(rest).filter(key=>JSON.stringify(rest[key])!==JSON.stringify(a[key]));
  const relations=linkedAssets(state.assets,a).map(x=>{const k=linkKind(a,x),meta=k.kind==='mount'?(x.type==='server'?linkMetaOf(a,x.id):linkMetaOf(x,a.id)):null;return {...(agentSees(x)?{id:x.id,name:agentShown(x).name}:{withheld:true}),type:x.type,relation:k.kind,label:k.label,...(meta?.standby?{standby:true}:{}),...(meta?.proxied?{proxied:true}:{})};});
  const money=moneyOn(a,localDay()),change=priceChange(a),charges=pendingChargesAsked([a]);
- return {...rest,typeName:cats[a.type]?.name||a.type,billingType:billingTypeOf(a),billingTypeSet:BILLING_TYPES.includes(a.billingType),...(money?{currentPrice:{amount:money.value,currency:money.currency,months:money.months,basis:money.basis}}:{}),...(change?{priceChange:change}:{}),...(charges.length?{unconfirmedCharges:charges.map(c=>c.due)}:{}),hidden:isHidden(a),hasCustomIcon:!!customIconSrc(a),hasSiteIcon:!!siteIconSrc(a),relations,...(risks.length?{risks:risks.map(agentRiskText)}:{}),...(masked.length?{masked}:{}),...(status?{iconStatus:status}:{})};
+ return {...rest,...agentRepository(a),typeName:cats[a.type]?.name||a.type,billingType:billingTypeOf(a),billingTypeSet:BILLING_TYPES.includes(a.billingType),...(money?{currentPrice:{amount:money.value,currency:money.currency,months:money.months,basis:money.basis}}:{}),...(change?{priceChange:change}:{}),...(charges.length?{unconfirmedCharges:charges.map(c=>c.due)}:{}),hidden:isHidden(a),hasCustomIcon:!!customIconSrc(a),hasSiteIcon:!!siteIconSrc(a),relations,...(risks.length?{risks:risks.map(agentRiskText)}:{}),...(masked.length?{masked}:{}),...(status?{iconStatus:status}:{})};
 }
 // linkTo / unlinkFrom: ids of records to link or unlink, under the same rules as the picker (legal pairs, one account per server).
 function agentLinkIds(input,key){
@@ -1392,7 +1412,7 @@ function agentApplyIcon(a,icon){
  if('icon' in icon){if(icon.icon)a.iconData=icon.icon;else delete a.iconData;}
  if('iconHost' in icon&&!icon.iconHost){delete a.siteIcon;delete a.siteIconHost;agentIconStatus.delete(a.id);}
 }
-function agentEvent(fields){return fields.date?`${fields.date} ${dateKinds[fields.dateKind||'expire'].future}`:'日期待补充';}
+function agentEvent(fields){if(fields.type==='repository'&&Object.values(REPO_VISIBILITY).includes(fields.event))return fields.event;return fields.date?`${fields.date} ${dateKinds[fields.dateKind||'expire'].future}`:'日期待补充';}
 // Checks fields sent from outside for one asset of the given type: the fields to write, or the first problem found.
 function agentFields(input,type,base=null){
  if(!input||typeof input!=='object'||Array.isArray(input))return {error:'字段需要是对象'};
@@ -1412,6 +1432,7 @@ function agentFields(input,type,base=null){
   // A project name, several separated by commas, or a list: a record can serve more than one project.
   if(key==='project'||key==='projectId'&&!('project' in input)){if(raw!=null&&typeof raw!=='string'&&!(Array.isArray(raw)&&raw.every(x=>typeof x==='string')))return {error:`${key} 需要是文字或文字列表`};const names=parseProjects(raw);fields.project=names.length>1?names:names[0]||'';continue;}
   if(key==='projectId')continue;
+  if(key==='visibility'){if(type!=='repository')return {error:'visibility 只用于代码仓库'};if(base&&PLATFORM_SOURCES.includes(base.source))return {error:'这个仓库从 GitHub 同步，可见性以 GitHub 为准'};const text=raw==null?'':String(raw).trim();if(text&&!REPO_VISIBILITY[text])return {error:'visibility 只能是 public、private、archived 或留空'};fields.event=REPO_VISIBILITY[text]||'';continue;}
   if(key==='billingType'){const text=raw==null?'':String(raw).trim();if(text&&!BILLING_TYPES.includes(text))return {error:`billingType 只能是 ${BILLING_TYPES.join('、')} 或留空`};fields.billingType=text;continue;}
   const value=raw===null||raw===undefined?'':typeof raw==='number'?String(raw):key==='ips'&&Array.isArray(raw)?raw.join(', '):raw;
   if(typeof value!=='string')return {error:`${key} 需要是文字`};
@@ -1528,7 +1549,7 @@ const agentMethods={
    if(profile.fixedProvider)fields.provider=profile.fixedProvider;
    else if(!fields.provider&&!assetProfiles[type])fields.provider='平台待补充';
    if(!fields.cost)fields.cost='未知';
-   const record={id:'asset-'+crypto.randomUUID(),type,...fields,source:'agent',event:agentEvent(fields),art:'generic',createdAt:now};clearEmptyFields(record);
+   const record={id:'asset-'+crypto.randomUUID(),type,...fields,source:'agent',event:agentEvent({...fields,type}),art:'generic',createdAt:now};clearEmptyFields(record);
    agentApplyIcon(record,icon);if(icon.iconHost)iconHosts.set(record.id,icon.iconHost);
    if(linkTo.length)linkPlans.push({index,record,linkTo});
    planned.push(record);
@@ -2178,9 +2199,9 @@ function githubDialog(){
  const accounts=cli.ghAccounts||[];
  const tags=accounts.map(n=>`<span class="account-tag">${esc(n)}</span>`).join('');
  const status=connected?tr('已连接'):cli.gh===false?tr('未检测到 gh'):tr('未连接');
- modal('GitHub',`<div class="form"><div class="platform-bar"><span id="github-status" class="chip ${connected?'ok':''}">${status}</span><button class="button" data-action="setup-github-token" title="${tr('打开 GitHub 细粒度令牌页：Metadata → Read')}">${tr('建令牌 ↗')}</button></div><button id="github-local-sync" class="button primary" data-action="github-local-sync" title="${tr('只调用 gh 命令，不读它的凭据文件；多个账号的仓库显示在同一区块')}">${ui('github')}${tr('用本机 gh')}${tags}</button><label>${connected?tr('更换令牌'):tr('或填写令牌')}<input id="github-token" type="password" autocomplete="off" spellcheck="false" placeholder="${connected?tr('留空使用已保存的令牌'):tr('粘贴只读令牌')}"></label><div class="confirm-actions"><button id="github-sync" class="button">${connected?tr('用已保存的令牌同步'):tr('验证并同步')}</button>${connected?`<button id="github-disconnect" class="button" title="${tr('删除 Assetboard 保存的令牌，已同步资产保留')}">${tr('断开')}</button>`:''}</div><p class="form-note platform-note">${ui('lock')}${tr('只读；令牌存入 macOS 钥匙串')}</p></div>`);
+ modal('GitHub',`<div class="form"><div class="platform-bar"><span id="github-status" class="chip ${connected?'ok':''}">${status}</span><button class="button" data-action="setup-github-token" title="${featureOn('repoDetails')?tr('打开 GitHub 细粒度令牌页：Metadata、Contents、Actions → Read'):tr('打开 GitHub 细粒度令牌页：Metadata → Read')}">${tr('建令牌 ↗')}</button></div><button id="github-local-sync" class="button primary" data-action="github-local-sync" title="${tr('只调用 gh 命令，不读它的凭据文件；多个账号的仓库显示在同一区块')}">${ui('github')}${tr('用本机 gh')}${tags}</button><label>${connected?tr('更换令牌'):tr('或填写令牌')}<input id="github-token" type="password" autocomplete="off" spellcheck="false" placeholder="${connected?tr('留空使用已保存的令牌'):tr('粘贴只读令牌')}"></label><div class="confirm-actions"><button id="github-sync" class="button">${connected?tr('用已保存的令牌同步'):tr('验证并同步')}</button>${connected?`<button id="github-disconnect" class="button" title="${tr('删除 Assetboard 保存的令牌，已同步资产保留')}">${tr('断开')}</button>`:''}</div><p class="form-note platform-note">${ui('lock')}${tr('只读；令牌存入 macOS 钥匙串')}</p></div>`);
  if(!cli.gh&&cli.gh!==false)requestLocalCliDetect();
- $('#github-sync').onclick=()=>{const token=$('#github-token').value;$('#github-token').value='';$('#github-sync').disabled=true;$('#github-status').textContent=tr('验证中…');window.webkit.messageHandlers.assetboard.postMessage({action:'githubSync',token});};
+ $('#github-sync').onclick=()=>{const token=$('#github-token').value;$('#github-token').value='';$('#github-sync').disabled=true;$('#github-status').textContent=tr('验证中…');window.webkit.messageHandlers.assetboard.postMessage({action:'githubSync',token,details:featureOn('repoDetails')});};
  if(connected)$('#github-disconnect').onclick=()=>window.webkit.messageHandlers.assetboard.postMessage({action:'githubDisconnect'});
 }
 window.assetboardGitHubResult=result=>{
@@ -2520,8 +2541,9 @@ document.addEventListener('click',e=>{const button=e.target.closest('[data-actio
   if(!nativeStore)return;
   const btn=button;btn.disabled=true;
   const status=$('#github-status');if(status)status.textContent=tr('正在用本机 gh 读取各账号仓库…');
-  window.webkit.messageHandlers.assetboard.postMessage({action:'githubSyncLocal'});
+  window.webkit.messageHandlers.assetboard.postMessage({action:'githubSyncLocal',details:featureOn('repoDetails')});
  }
+ else if(action==='open-ci'){if(demoMode){window.assetboardDemoBlocked();return;}const ci=ciRunOf(state.assets.find(a=>a.id===id));if(ci&&nativeStore)window.webkit.messageHandlers.assetboard.postMessage({action:'openExternal',url:ci.url});else if(ci)window.open(ci.url,'_blank','noopener,noreferrer');}
  else if(action==='external'){const a=state.assets.find(a=>a.id===id),url=safeManagementUrl(a?.url);if(!url||new URL(url).hostname==='example.com'){toast(tr('先在资料里填管理链接'));return;}if(nativeStore)window.webkit.messageHandlers.assetboard.postMessage({action:'openExternal',url});else window.open(url,'_blank','noopener,noreferrer');}
  else if(action==='collapse'){if(query||currentView()!=='all'||!cats[id])return;checkpoint();ensureBlock(state,id);const b=state.blocks.find(x=>x.id===id),fold=!b.folded,targets=e.altKey?categoryIds():[id];for(const type of targets){ensureBlock(state,type);state.blocks.find(x=>x.id===type).folded=fold;}save();foldRender(targets,id);document.querySelector(`#board [data-action="collapse"][data-id="${id}"]`)?.focus();if(e.altKey)toast(fold?tr('已收起全部类别'):tr('已展开全部类别'),true);}
  else if(action==='all')setView(id);

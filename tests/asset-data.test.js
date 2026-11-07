@@ -1146,3 +1146,25 @@ test('names Assetboard\'s read-only exports when they are imported, and keeps th
  assert.deepEqual(backup.board.blocks,[{id:'domain',folded:true}]);
  assert.ok(!('featuredRepositoryIds' in backup.board));
 });
+
+test('GitHub details: the first read is the baseline, later branches are new for 14 days, runs are validated, off drops it all',()=>{
+ const {mergeGitHub,newBranches,cleanCiRun,REPO_DETAIL_FIELDS}=require('../asset-data.js');
+ const run={status:'completed',conclusion:'failure',name:'CI',branch:'main',event:'push',at:'2026-11-01T10:00:00Z',url:'https://github.com/me/a/actions/runs/42'};
+ const repo=details=>({id:'1',name:'me/a',owner:'me',url:'https://github.com/me/a',defaultBranch:'main',pushedAt:'2026-11-01T09:00:00Z',...(details===undefined?{}:{details})});
+ let board={blocks:[],assets:[],deletedExternalIds:[]};
+ board=mergeGitHub(board,{repositories:[repo({branches:['main','dev'],run})]},'2026-11-01T12:00:00.000Z').board;
+ let a=board.assets[0];
+ assert.equal(a.defaultBranch,'main');assert.equal(a.pushedAt,'2026-11-01T09:00:00Z','a new record keeps its push time');
+ assert.deepEqual(a.branches,['dev','main']);assert.equal(a.ciRun.state,'failure');assert.deepEqual(newBranches(a,Date.parse('2026-11-02')),[],'the first read is not news');
+ board=mergeGitHub(board,{repositories:[repo({branches:['main','dev','feat-x'],run:{...run,status:'in_progress',conclusion:null}})]},'2026-11-03T12:00:00.000Z').board;a=board.assets[0];
+ assert.deepEqual(newBranches(a,Date.parse('2026-11-04')),['feat-x']);assert.equal(a.ciRun.state,'running');
+ assert.deepEqual(newBranches(a,Date.parse('2026-11-20')),[],'news fades after 14 days');
+ board=mergeGitHub(board,{repositories:[repo({denied:['branches','actions']})]},'2026-11-05T12:00:00.000Z').board;a=board.assets[0];
+ assert.deepEqual(a.repoDenied,['branches','actions']);assert.equal(a.branches.length,3,'a denied read keeps the last list');assert.equal(a.ciRun.state,'running');
+ board=mergeGitHub(board,{repositories:[repo({skipped:true})]}).board;assert.equal(board.assets[0].branches.length,3);
+ board=mergeGitHub(board,{repositories:[repo({branches:['main'],run:null})]}).board;assert.equal(board.assets[0].ciRun,null,'no runs at all');
+ board=mergeGitHub(board,{repositories:[repo()]}).board;a=board.assets[0];
+ for(const key of REPO_DETAIL_FIELDS)assert.ok(!(key in a),key+' dropped when details are off');assert.equal(a.defaultBranch,'main');
+ for(const bad of [{...run,url:'https://example.com/me/a/actions/runs/1'},{...run,url:'https://github.com/me/a/actions/runs/1?x=1'},{...run,at:'yesterday'},null,'x'])assert.equal(cleanCiRun(bad),null);
+ assert.equal(cleanCiRun({...run,conclusion:'weird'}).state,'neutral');
+});

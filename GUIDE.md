@@ -65,7 +65,7 @@ open /Applications/Assetboard.app --args --demo
 | 邮件（.eml） | 拖入后识别账单和续费信息，核对后新建或补充到已有资产 | App、浏览器 |
 | 粘贴续费通知 | 本地规则识别商户、金额、周期和日期，核对后新建或补充到已有资产 | App、浏览器 |
 | 截图 / PDF | 用 macOS 自带的文字识别在本机识别，进“待确认” | App |
-| GitHub | 用本机已登录的 `gh`，或填只读的细粒度令牌（Metadata: Read），同步仓库名称、归属、可见性和归档状态 | App |
+| GitHub | 用本机已登录的 `gh`，或填只读的细粒度令牌（Metadata: Read），同步仓库名称、归属、可见性、归档状态、默认分支和最近推送。打开“设置 › 功能 › 仓库分支和 Actions”后，每个仓库多读分支列表和最近一次 Actions 运行（令牌另加 Contents 和 Actions 的只读权限；Contents 也能读代码）：失败或运行中的 Actions 显示在这一行，首次读取之后新出现的分支 14 天内标为新分支；归档的仓库和第 60 个以后的不读 | App |
 | Cloudflare | 只读 API 令牌，读取授权范围内的 Zone、Pages、Workers 和 R2 列表；权限不够的类别跳过 | App |
 | `~/.ssh/config` | 只读 Host、HostName、User、Port，生成服务器；添加服务器时也能直接从里面选一台。github.com、gitlab.com 这类代码托管（以及 `User git` 的 Host）不当作服务器，仓库从 GitHub 连接来 | App |
 | 服务菜单、Dock | 在任何软件里选中文字，右键 → 服务 →「添加到 Assetboard」，文字会填进添加面板，点「识别」才处理。把邮件、截图、PDF、CSV、JSON 拖到 Dock 图标上，或用“打开方式”选 Assetboard：表格和 JSON 一律先进导入预览，截图和 PDF 在本机识别后进待确认。正在编辑或核对时不会打断，收到的内容在「待确认」里排队，可打开或丢弃。首次安装后若菜单里没有，注销再登录一次 | App |
@@ -136,7 +136,7 @@ Mac App 在菜单栏有一个小日历图标：显示 7 天内到期和待确认
 菜单“Assetboard → 设置…”（`⌘,`）或侧边栏底部“设置”，一处管所有开关。左边是分区，右边是选中分区的设置：
 
 - 通用： 语言（简体中文或 English，默认跟随系统；切换后当场生效，菜单也一起换）、计价币种、隐私模式、在菜单栏显示、系统通知状态。
-- 功能： 全景、实时状态（默认关闭；打开后可调读取间隔，15 秒到 60 分钟）、外部工具接入（MCP，关掉后一律拒绝调用；下面两个开关默认关：把地址和联系方式交给 AI 工具、把银行卡和手机号交给 AI 工具）、自动获取网站图标、每周核对域名到期日。功能开关按此设备记住，不进资产数据，不随备份走。
+- 功能： 全景、实时状态（默认关闭；打开后可调读取间隔，15 秒到 60 分钟）、仓库分支和 Actions（默认关闭，Mac App）、外部工具接入（MCP，关掉后一律拒绝调用；下面两个开关默认关：把地址和联系方式交给 AI 工具、把银行卡和手机号交给 AI 工具）、自动获取网站图标、每周核对域名到期日。功能开关按此设备记住，不进资产数据，不随备份走。
 - 连接： Cloudflare、GitHub、AI 识别、MCP 接入、探针数据源，各自显示是否已连接，点“设置…”打开对应面板。
 - 关于： 当前版本、检查更新、自动检查更新。
 
@@ -188,6 +188,7 @@ MCP 工具：`list_asset_types`、`list_assets`、`get_asset`、`get_cost_totals
 - 要你确认的： 删除资产和 `unblock_sync_item` 都返回 `pending` 和 `actionId`，在 App 里勾选允许才生效。
 - 工具标注： 会覆盖或删除已有内容的写工具标 `destructiveHint: true`；会让 App 联网的工具（取图标、Cloudflare 同步，以及新增、修改资产：认出平台时自动取图标）标 `openWorldHint: true`，其余只动这台 Mac 上的数据，标 `false`。
 - 撤销： 看板上的改动（`set_icon_site`、获取到的图标、允许后的解除跳过）可以 `⌘Z`。`update_asset` / `update_assets` 另外接受 `hidden`、`stopped`（true / false）。
+- 代码仓库： 手动记的仓库可写 `visibility`（`public` / `private` / `archived`），从 GitHub 同步的以 GitHub 为准；`get_asset` / `list_assets` 返回 `repository`：`visibility`、`defaultBranch`，打开仓库分支和 Actions 后还有 `branches`（`count`、`more`、`new`）、`actions`（`state`、`workflow`、`branch`、`at`、`url`，没有运行记录为 `null`）和 `unread`（令牌缺的权限）。
 
 - 计费： `billingType` 为 `recurring` / `one_off` / `free` / `unknown`（留空自动判断），`amount: 0` 即免费；`promotion` 为 `{start, end, amount, regularAmount, currency}`，`null` 删除。查询结果带 `billingType`、`currentPrice`（含 `basis`：promotion / regular / free / cost）、`priceChange`、`unconfirmedCharges`、`payments`、`costHistory`。
 - 项目： `project`（也接受 `projectId`）；`list_assets`、`get_cost_totals` 和 `get_cost_forecast` 可按项目筛选，`get_cost_totals` 的 `groupBy` 可按项目或类别拆分。

@@ -8,6 +8,7 @@ const FEATURES_KEY='assetboard-features-v1';
 const FEATURES={
  panorama:{name:tr('全景'),note:tr('按 P 打开：每台服务器、每张卡、每个账号上挂着什么'),on:true},
  probe:{name:tr('实时状态'),note:tr('打开后才读：用 SSH 和你添加的监控面板读服务器的内存、网络和负载，每条资产显示一行。这是实时读数，不是登记状态'),on:false,mac:true,full:true,pro:true},
+ repoDetails:{name:tr('仓库分支和 Actions'),note:tr('同步 GitHub 时，每个仓库多读两次：分支列表和最近一次 Actions 运行。细粒度令牌要加 Contents 和 Actions 的只读权限（Contents 也能读代码）'),on:false,mac:true,full:true},
  agent:{name:tr('外部工具接入（MCP）'),note:tr('让 Claude、ChatGPT、Cursor 等工具或脚本通过 assetboard-cli 查询和修改资产；关掉后它们的调用一律被拒绝'),on:true,mac:true,full:true},
  // Under 外部工具接入, shown while it is on. Off until switched, in a demo too: they decide what leaves the Mac.
  agentAddresses:{name:tr('把地址和联系方式交给 AI 工具'),note:tr('关着时，AI 工具读到的 IP、SSH 主机和用户、手机号和邮箱都是遮住的；搜索仍按真实值匹配'),on:false,mac:true,full:true,under:'agent'},

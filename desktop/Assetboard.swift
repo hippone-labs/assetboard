@@ -139,6 +139,7 @@ final class GitHubConnector {
                                 "description": repository["description"] as? String ?? "",
                                 "updatedAt": repository["updated_at"] as? String ?? "",
                                 "pushedAt": repository["pushed_at"] as? String ?? "",
+                                "defaultBranch": repository["default_branch"] as? String ?? "",
                                 "private": repository["private"] as? Bool ?? false,
                                 "archived": repository["archived"] as? Bool ?? false])
                 }
@@ -149,6 +150,81 @@ final class GitHubConnector {
             }.resume()
         }
         page(1)
+    }
+
+    /// 仓库分支和 Actions (设置 › 功能): for each listed repository, its branch names and its latest Actions run, as `details`.
+    /// Archived repositories and those past `detailLimit` (the list comes most recently updated first) get `skipped` and keep what the
+    /// board had. A 403 or 404 names the permission the token lacks for that part only; other failures leave the part out.
+    static let detailLimit = 60
+    func addDetails(token: String, to repositories: [[String: Any]], completion: @escaping ([[String: Any]]) -> Void) {
+        var found: [Int: [String: Any]] = [:]
+        let lock = NSLock(), group = DispatchGroup(), gate = DispatchSemaphore(value: 4)
+        for (index, repository) in repositories.enumerated() {
+            guard index < Self.detailLimit, repository["archived"] as? Bool != true, let name = repository["name"] as? String else { continue }
+            group.enter()
+            DispatchQueue.global(qos: .userInitiated).async {
+                gate.wait()
+                self.repositoryDetails(token: token, fullName: name) { details in
+                    lock.lock(); found[index] = details; lock.unlock()
+                    gate.signal(); group.leave()
+                }
+            }
+        }
+        group.notify(queue: .global(qos: .userInitiated)) {
+            completion(repositories.enumerated().map { pair in
+                var next = pair.element
+                next["details"] = found[pair.offset] ?? ["skipped": true]
+                return next
+            })
+        }
+    }
+
+    private func get(_ path: String, query: [URLQueryItem], token: String, completion: @escaping (Int?, Any?) -> Void) {
+        var components = URLComponents()
+        components.scheme = "https"; components.host = "api.github.com"; components.path = path; components.queryItems = query
+        guard let url = components.url else { completion(nil, nil); return }
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        request.setValue("2026-03-10", forHTTPHeaderField: "X-GitHub-Api-Version")
+        request.timeoutInterval = 20
+        session.dataTask(with: request) { data, response, _ in
+            let status = (response as? HTTPURLResponse)?.statusCode
+            completion(status, data.flatMap { try? JSONSerialization.jsonObject(with: $0) })
+        }.resume()
+    }
+
+    func repositoryDetails(token: String, fullName: String, completion: @escaping ([String: Any]) -> Void) {
+        var details: [String: Any] = [:]
+        var denied: [String] = []
+        let lock = NSLock(), group = DispatchGroup()
+        group.enter()
+        get("/repos/\(fullName)/branches", query: [URLQueryItem(name: "per_page", value: "100")], token: token) { status, body in
+            lock.lock(); defer { lock.unlock(); group.leave() }
+            if status == 403 || status == 404 { denied.append("branches"); return }
+            guard status == 200, let list = body as? [[String: Any]] else { return }
+            let names = list.compactMap { $0["name"] as? String }.filter { !$0.isEmpty && $0.count <= 255 }
+            details["branches"] = names
+            details["more"] = list.count == 100
+        }
+        group.enter()
+        get("/repos/\(fullName)/actions/runs", query: [URLQueryItem(name: "per_page", value: "1"), URLQueryItem(name: "exclude_pull_requests", value: "true")], token: token) { status, body in
+            lock.lock(); defer { lock.unlock(); group.leave() }
+            if status == 403 || status == 404 { denied.append("actions"); return }
+            guard status == 200, let runs = (body as? [String: Any])?["workflow_runs"] as? [[String: Any]] else { return }
+            guard let run = runs.first else { details["run"] = NSNull(); return }
+            // Only a link to this repository's own run page is passed on.
+            guard let raw = run["html_url"] as? String, let url = URL(string: raw), url.scheme == "https", url.host == "github.com",
+                  url.path.hasPrefix("/\(fullName)/actions/runs/"), url.query == nil, url.user == nil else { return }
+            details["run"] = ["status": run["status"] as? String ?? "", "conclusion": run["conclusion"] as? String ?? "",
+                              "name": run["name"] as? String ?? "", "branch": run["head_branch"] as? String ?? "",
+                              "event": run["event"] as? String ?? "", "at": run["updated_at"] as? String ?? "", "url": raw]
+        }
+        group.notify(queue: .global(qos: .userInitiated)) {
+            details["denied"] = denied.sorted()
+            completion(details)
+        }
     }
 }
 
@@ -874,7 +950,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         }
     }
 
-    func syncGitHubWithLocalCLI(users: [String]? = nil) {
+    func syncGitHubWithLocalCLI(users: [String]? = nil, details: Bool = false) {
         DispatchQueue.global(qos: .userInitiated).async {
             guard let path = LocalCLI.ghPath() else {
                 self.githubResult([
@@ -909,12 +985,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
                     do {
                         let token = try LocalCLI.ghToken(path: path, user: user.isEmpty ? nil : user)
                         self.github.listRepositories(token: token) { repositories, error in
-                            defer { group.leave() }
                             if let error {
                                 lock.lock(); warnings.append(L("{name}：{error}", ["name": user.isEmpty ? L("当前账号") : user, "error": error])); lock.unlock()
-                                return
+                                group.leave(); return
                             }
-                            lock.lock(); all.append(contentsOf: repositories ?? []); lock.unlock()
+                            // Each account's repositories are read with that account's own token.
+                            guard details else { lock.lock(); all.append(contentsOf: repositories ?? []); lock.unlock(); group.leave(); return }
+                            self.github.addDetails(token: token, to: repositories ?? []) { withDetails in
+                                lock.lock(); all.append(contentsOf: withDetails); lock.unlock(); group.leave()
+                            }
                         }
                     } catch {
                         warnings.append(error.localizedDescription)
@@ -1151,7 +1230,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         }
         if body["action"] as? String == "githubSyncLocal" {
             let users = body["users"] as? [String]
-            syncGitHubWithLocalCLI(users: users)
+            syncGitHubWithLocalCLI(users: users, details: body["details"] as? Bool == true)
             return
         }
         #endif
@@ -1221,12 +1300,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
             guard let token = supplied.isEmpty ? github.token() : supplied else {
                 githubResult(["ok": false, "error": L("请填写 GitHub 细粒度只读令牌。")]) ; return
             }
+            let details = body["details"] as? Bool == true
             github.listRepositories(token: token) { repositories, error in
                 if let error { self.githubResult(["ok": false, "error": error]); return }
                 if !supplied.isEmpty && !self.github.saveToken(supplied) {
                     self.githubResult(["ok": false, "error": L("无法将令牌保存到 macOS 钥匙串，同步未写入资产板。")]) ; return
                 }
-                self.githubResult(["ok": true, "repositories": repositories ?? [], "connected": true])
+                guard details else { self.githubResult(["ok": true, "repositories": repositories ?? [], "connected": true]); return }
+                self.github.addDetails(token: token, to: repositories ?? []) { withDetails in
+                    self.githubResult(["ok": true, "repositories": withDetails, "connected": true])
+                }
             }
             return
         }
@@ -1884,7 +1967,44 @@ func testGitHub() {
     precondition(partial.0 == nil && partial.1 != nil)
     let empty = run { _ in (200, [[String: Any]]()) }
     precondition(empty.0?.isEmpty == true && empty.1 == nil)
-    print("PASS: GitHub GET-only auth header, pagination, denial, invalid URL, partial response, empty result")
+    // 仓库分支和 Actions: branches and the latest run per repository; a 403 names the part; archived and foreign links are not read.
+    MockCloudflareProtocol.reply = { request in
+        precondition(request.httpMethod == "GET" && request.url?.host == "api.github.com")
+        precondition(request.value(forHTTPHeaderField: "Authorization") == "Bearer test-token")
+        switch request.url!.path {
+        case "/repos/owner/repo-1/branches":
+            precondition(URLComponents(url: request.url!, resolvingAgainstBaseURL: false)!.queryItems!.contains { $0.name == "per_page" && $0.value == "100" })
+            return (200, [["name": "main"], ["name": "dev"]])
+        case "/repos/owner/repo-1/actions/runs":
+            return (200, ["total_count": 1, "workflow_runs": [["status": "completed", "conclusion": "failure", "name": "CI", "head_branch": "main", "event": "push",
+                                                               "updated_at": "2026-11-01T10:00:00Z", "html_url": "https://github.com/owner/repo-1/actions/runs/7"]]])
+        case "/repos/owner/repo-2/branches", "/repos/owner/repo-2/actions/runs":
+            return (403, ["message": "Resource not accessible by personal access token"])
+        case "/repos/owner/repo-4/branches":
+            return (200, [[String: Any]]())
+        case "/repos/owner/repo-4/actions/runs":
+            return (200, ["total_count": 1, "workflow_runs": [["status": "completed", "conclusion": "success", "html_url": "https://evil.example/owner/repo-4/actions/runs/1"]]])
+        case "/repos/owner/repo-5/branches":
+            return (200, [[String: Any]]())
+        case "/repos/owner/repo-5/actions/runs":
+            return (200, ["total_count": 0, "workflow_runs": [[String: Any]]()])
+        default:
+            preconditionFailure("unexpected request \(request.url!.path)")
+        }
+    }
+    let listed: [[String: Any]] = [1, 2, 3, 4, 5].map { ["id": String($0), "name": "owner/repo-\($0)", "archived": $0 == 3] }
+    let done = DispatchSemaphore(value: 0)
+    var detailed: [[String: Any]] = []
+    connector.addDetails(token: "test-token", to: listed) { result in detailed = result; done.signal() }
+    precondition(done.wait(timeout: .now() + 5) == .success && detailed.count == 5)
+    let first = detailed[0]["details"] as! [String: Any], run = first["run"] as! [String: Any]
+    precondition(first["branches"] as? [String] == ["main", "dev"] && first["more"] as? Bool == false && (first["denied"] as? [String])?.isEmpty == true)
+    precondition(run["conclusion"] as? String == "failure" && run["url"] as? String == "https://github.com/owner/repo-1/actions/runs/7" && run["at"] as? String == "2026-11-01T10:00:00Z")
+    precondition((detailed[1]["details"] as! [String: Any])["denied"] as? [String] == ["actions", "branches"])
+    precondition((detailed[2]["details"] as! [String: Any])["skipped"] as? Bool == true)
+    precondition((detailed[3]["details"] as! [String: Any])["run"] == nil, "a run link to another host is dropped")
+    precondition((detailed[4]["details"] as! [String: Any])["run"] is NSNull, "no runs at all")
+    print("PASS: GitHub GET-only auth header, pagination, denial, invalid URL, partial response, empty result, branches and Actions details")
 }
 
 func testCloudflareInventory() {
