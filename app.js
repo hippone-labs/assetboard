@@ -568,7 +568,7 @@ document.addEventListener('contextmenu',e=>{
 addEventListener('scroll',()=>closeMenu(false),{passive:true});
 // 手动录入 is the default and says nothing, so the detail names a source only for what came from elsewhere.
 function shownSource(a){return !a.source||a.source==='manual'?'':sourceLabel(a);}
-function sourceLabel(a){if(a.syncMissing)return tr('{source} 本次未返回',{source:a.source==='github'?'GitHub':'Cloudflare'});if(a.source==='github')return tr('GitHub 仓库 · {status}',{status:a.syncStatus?tr(a.syncStatus):tr('状态未知')});if(a.source==='cloudflare')return `Cloudflare ${a.resourceKind||'Zone'} · ${a.syncStatus?tr(a.syncStatus):tr('状态未知')}`;return {manual:tr('手动录入'),agent:tr('外部工具添加'),demo:tr('演示资产'),ssh:'~/.ssh/config',csv:a.importedFrom?tr('{file} 导入',{file:tr(a.importedFrom)}):tr('表格导入')}[a.source]||tr('导入');}
+function sourceLabel(a){if(a.syncMissing)return tr('{source} 本次未返回',{source:SYNC_SOURCE_NAMES[a.source]||a.source});if(Object.hasOwn(REGISTRARS,a.source||''))return `${REGISTRARS[a.source].name} · ${a.syncStatus?tr(a.syncStatus):tr('状态未知')}`;if(a.source==='github')return tr('GitHub 仓库 · {status}',{status:a.syncStatus?tr(a.syncStatus):tr('状态未知')});if(a.source==='cloudflare')return `Cloudflare ${a.resourceKind||'Zone'} · ${a.syncStatus?tr(a.syncStatus):tr('状态未知')}`;return {manual:tr('手动录入'),agent:tr('外部工具添加'),demo:tr('演示资产'),ssh:'~/.ssh/config',csv:a.importedFrom?tr('{file} 导入',{file:tr(a.importedFrom)}):tr('表格导入')}[a.source]||tr('导入');}
 function dateText(a){const status=assetDateStatus(a);if(status.level==='none')return a.date||tr('待补充');return [status.label.startsWith(status.date)?status.label:`${status.date} · ${status.label}`,billingCycles[a.cycle]?billingCycles[a.cycle].label:''].filter(Boolean).join(' · ');}
 // Manual display order from the inspector menu: bring one record to the front of its category, or go back to recency order.
 function manualOrder(type){return !!state.cardOrder?.[type]?.length;}
@@ -587,7 +587,7 @@ function showDetail(id,{focus}={}){
  const primary=a.hiddenAt?`<button class="button primary" data-action="restore-asset" data-id="${esc(id)}">${tr('恢复显示')}</button>`:realLink?`<button class="button primary" data-action="external" data-id="${esc(id)}" title="${tr('打开管理页')}">${ui('external')}${tr('打开')}</button>`:'';
  const renew=renewable(a)?`<button class="button" data-action="renew" data-id="${esc(id)}" title="${tr('{action}（R）',{action:renewWord(a)})}">${renewWord(a)}</button>`:'';
  const actions=`<div class="detail-actions main-actions">${primary}<button class="button${primary?'':' primary'}" data-action="edit-asset" data-id="${esc(id)}">${tr('编辑')}</button>${renew}<button class="button icon-only detail-more" data-action="asset-menu" data-id="${esc(id)}" aria-haspopup="menu" aria-expanded="false" aria-label="${tr('更多操作')}" title="${tr('更多操作')}">${ui('more')}</button></div>`;
- const source={cloudflare:nativeStore&&!proOff?tr('同步自 Cloudflare。账号和状态下次同步按平台值更新，你改过的名称会保留；Cloudflare 上新增的域名在「文件 → 同步 Cloudflare…」重新同步后出现。'):tr('同步自 Cloudflare。账号和状态下次同步按平台值更新，你改过的名称会保留。'),github:tr('同步自 GitHub，名称和账号下次同步会按平台值更新。'),ssh:tr('来自 ~/.ssh/config，名称和主机下次导入会按配置更新。'),csv:tr('从{file}导入；再导入同一份文件时，同名默认跳过。',{file:a.importedFrom?tr(a.importedFrom):tr('表格')}),manual:'',demo:tr('演示数据，不代表实际账户。')}[a.source]??'';
+ const source={cloudflare:nativeStore&&!proOff?tr('同步自 Cloudflare。账号和状态下次同步按平台值更新，你改过的名称会保留；Cloudflare 上新增的域名在「文件 → 同步 Cloudflare…」重新同步后出现。'):tr('同步自 Cloudflare。账号和状态下次同步按平台值更新，你改过的名称会保留。'),github:tr('同步自 GitHub，名称和账号下次同步会按平台值更新。'),...Object.fromEntries(Object.entries(REGISTRARS).map(([id,r])=>[id,tr('从 {name} 读取。到期日和自动续费下次同步按注册商的值更新，你改过的名称会保留；在「导入 › 注册商」重新同步。',{name:r.name})])),ssh:tr('来自 ~/.ssh/config，名称和主机下次导入会按配置更新。'),csv:tr('从{file}导入；再导入同一份文件时，同名默认跳过。',{file:a.importedFrom?tr(a.importedFrom):tr('表格')}),manual:'',demo:tr('演示数据，不代表实际账户。')}[a.source]??'';
  const notes=a.notes||source?`<details><summary>${a.notes?tr('备注'):tr('来源')}${a.notes&&source?' · '+tr('来源'):''}</summary>${a.notes?`<p>${esc(a.notes)}</p>`:''}${source?`<p>${source}</p>`:''}</details>`:'';
  const iconButton=nativeStore&&!demoMode&&!a.hiddenAt&&!hasRealIcon(a)?(iconFetching.has(id)?`<button class="text-button detail-icon-fetch" disabled>${tr('获取中…')}</button>`:`<button class="text-button detail-icon-fetch" data-action="icon-fetch" data-id="${esc(id)}" title="${esc(iconHost(a)?tr('从 {site} 获取网站图标',{site:iconSiteFor(iconSites(),iconHost(a))}):tr('填写网站域名获取图标'))}">${tr('获取图标')}</button>`):'';
  $('#detail-content').innerHTML=`<div class="detail-head">${tile(a,'lg')}<span class="eyebrow">${esc(cats[a.type].one)}${a.stopped?' · '+tr('已停用'):''}${a.hiddenAt?' · '+tr('已隐藏'):''}</span>${iconButton}</div><h2>${esc(veil(a.name))}</h2>${sub?`<p class="detail-sub">${esc(sub)}</p>`:''}${a.purpose?`<span class="detail-badge">${esc(a.purpose)}</span>`:''}${actions}${a.hiddenAt?'':quickRow(a)}<div class="facts">${detailFacts(a,lastSync)}${extraFacts(a)}${keepFacts(a)}</div>${paymentsSection(a)}${linkSection(a)}${notes}`;
@@ -1019,6 +1019,7 @@ function importHub(){
    ${source('import-pick-file','file',tr('文件'),tr('选择文件'))}
    ${source('manual-import','plus',tr('手动'))}
    ${source('inbox','mail',tr('通知'),tr('粘贴续费通知'))}
+   ${native&&!proFree?source('registrar-import','cloud',tr('注册商'),tr('从 Namecheap、Porkbun 读取域名和到期日')):''}
    ${slotHtml('importSources',ctx)}
    ${native?source('ocr-import','image',tr('截图'),tr('选择截图或 PDF')):''}
    ${demoMode?`<button class="button primary" data-action="import-demo-sample">${tr('试用示例')}</button>`:''}
@@ -1661,7 +1662,7 @@ function agentPrepareUpdate(id,input){
  const a=agentFind(id),synced=PLATFORM_SOURCES.includes(a.source);
  const type=input?.type?String(input.type):a.type;
  if(!cats[type])throw new Error(`未知类别 ${type}`);
- if(synced&&(type!==a.type||('name' in (input||{})&&String(input.name).trim()!==a.name)))throw new Error('这条记录由 Cloudflare 或 GitHub 同步，名称和类别以同步为准，不能改');
+ if(synced&&(type!==a.type||('name' in (input||{})&&String(input.name).trim()!==a.name)))throw new Error(`这条记录由 ${SYNC_SOURCE_NAMES[a.source]||a.source} 同步，名称和类别以同步为准，不能改`);
  const checked=agentFields(input,type,a),icon=agentIconFields(input||{}),linkTo=agentLinkIds(input||{},'linkTo'),unlinkFrom=agentLinkIds(input||{},'unlinkFrom');
  if(checked.error||icon.error)throw new Error(checked.error||icon.error);
  const linkProblem=[...linkTo.map(id=>agentLinkProblem({...a,type},id,true)),...unlinkFrom.map(id=>agentLinkProblem(a,id,false))].find(Boolean);
@@ -2243,6 +2244,45 @@ function syncFollowUp(source,merge,warnings){
  const collisionHtml=pendingCollisions.length?`<p class="form-note">${tr('与本地记录同名，无法确认是同一项。勾选的会被同步结果覆盖，不影响线上资源。')}</p><div class="collision-list">${pendingCollisions.map((item,index)=>`<label class="check-label"><input type="checkbox" name="collision" value="${index}">${esc(item.name)}</label>`).join('')}</div><div class="confirm-actions"><button class="button primary" data-action="apply-collisions">${tr('覆盖所选')}</button><button class="button" data-action="close-modal">${tr('保留本地记录')}</button></div>`:'';
  modal(pendingCollisions.length?`${source} · ${tr('同名记录')}`:`${source} · ${tr('部分未读取')}`,warningHtml+collisionHtml);
 }
+// ---- 从注册商导入 (Namecheap, Porkbun; Mac app, read-only). The person pastes the API credentials once; Swift reads the domain list with
+// them (GET only, recorded in 网络记录), keeps them in the Keychain when the read worked and answers with the domains, which
+// mergeRegistrar puts on the board like a Cloudflare sync (collisions asked in syncFollowUp). 重新同步 reads again with the kept ones.
+let registrarPick='namecheap';
+function registrarConnected(source){return !!nativeStore?.registrars?.[source];}
+function lastRegistrarSync(source){return Math.max(0,...state.assets.filter(a=>a.source===source).map(a=>Date.parse(a.syncedAt)||0));}
+const REGISTRAR_NOTES={namecheap:()=>tr('Namecheap 只接受白名单 IP 发来的请求：在 Namecheap 的 Profile › Tools › API Access 打开 API，把这台 Mac 上网用的公网 IPv4 加进 Whitelisted IPs，再把同一个地址填在这里。换了网络（IP 变了）要重新加。它的 API Key 能管理整个账号（包括购买和改 DNS），Assetboard 只调用读取域名列表的接口。'),
+ porkbun:()=>tr('在 Porkbun 的 Account › API Access 建一对 key，权限只勾 Read 即可。Assetboard 只调用读取域名列表的接口。')};
+function registrarDialog(source=registrarPick){
+ if(!nativeStore){toast(tr('从注册商导入只在 Mac App 里可用'));return;}
+ if(demoMode){toast(tr('演示模式下不可用'));return;}
+ registrarPick=Object.hasOwn(REGISTRARS,source)?source:'namecheap';
+ const key=registrarPick,r=REGISTRARS[key],connected=registrarConnected(key),last=lastRegistrarSync(key);
+ const picks=Object.entries(REGISTRARS).map(([id,v])=>`<button type="button" class="choice" role="radio" aria-checked="${id===key}" data-action="registrar-pick" data-id="${id}">${esc(v.name)}</button>`).join('');
+ const fields=r.fields.map(f=>`<label>${tr(f.label)}<input name="${f.key}" type="${f.secret?'password':'text'}" autocomplete="off" spellcheck="false" maxlength="140" placeholder="${connected?tr('留空使用已保存的'):f.key==='clientIp'?'203.0.113.10':''}"></label>`).join('');
+ modal(tr('从注册商导入'),`<div class="form registrar-form" id="registrar-form" data-source="${key}"><div class="chip-group" role="radiogroup" aria-label="${tr('注册商')}">${picks}</div><div class="platform-bar"><span id="registrar-status" class="chip ${connected?'ok':''}" role="status">${connected?tr('已连接'):tr('未连接')}</span><button class="button" data-action="registrar-key" data-id="${key}" title="${tr('打开 {name} 建 API Key 的页面',{name:r.name})}">${tr('建 API Key ↗')}</button></div><p class="form-note registrar-note">${REGISTRAR_NOTES[key]()}</p>${fields}<div class="confirm-actions"><button id="registrar-sync" class="button primary">${connected?tr('重新同步'):tr('验证并同步')}</button>${connected?`<button id="registrar-disconnect" class="button" title="${tr('删除本机保存的凭据；注册商后台的 key 需自行删除，已同步资产保留')}">${tr('断开')}</button>`:''}</div>${connected&&last?`<p class="form-note">${tr('上次同步 {when}。',{when:esc(new Date(last).toLocaleString(trLocale()))})}</p>`:''}<p class="form-note platform-note">${ui('lock')}${tr('只读：只读取域名、到期日和自动续费；凭据存入 macOS 钥匙串')}</p></div>`,'registrar');
+ $('#registrar-sync').onclick=()=>{
+  const inputs=[...$('#registrar-form').querySelectorAll('input[name]')],values=Object.fromEntries(inputs.map(i=>[i.name,i.value.trim()])),typed=Object.values(values).some(Boolean),status=$('#registrar-status');
+  const problem=typed||!connected?registrarCredentialProblem(key,values):'';
+  if(problem){status.textContent=problem;status.classList.add('bad');status.classList.remove('ok');return;}
+  inputs.forEach(i=>{i.value='';});$('#registrar-sync').disabled=true;status.classList.remove('bad');status.textContent=tr('验证中…');
+  window.webkit.messageHandlers.assetboard.postMessage({action:'registrarSync',source:key,credentials:typed?values:null});
+ };
+ if(connected)$('#registrar-disconnect').onclick=()=>window.webkit.messageHandlers.assetboard.postMessage({action:'registrarDisconnect',source:key});
+}
+window.assetboardRegistrarResult=result=>{
+ const source=result?.source;if(!Object.hasOwn(REGISTRARS,source))return;
+ const name=REGISTRARS[source].name,open=$('#registrar-form')?.dataset.source===source,status=open&&$('#registrar-status');
+ if(!result.ok){
+  const error=String(result.error||tr('同步失败')).slice(0,300);
+  if(status){status.textContent=error;status.classList.add('bad');status.classList.remove('ok');const button=$('#registrar-sync');if(button)button.disabled=false;}else notice(`${name}${tr('：')}${error}`);
+  return;
+ }
+ nativeStore.registrars={...nativeStore.registrars||{},[source]:!result.disconnected};
+ if(result.disconnected){if(open)registrarDialog(source);toast(tr('已删除凭据'));return;}
+ checkpoint();const merge=mergeRegistrar(state,result);state=merge.board;save();render();if(open)$('#modal').close();
+ toast(name+tr('：读 {read}，新增 {added}',{read:merge.read,added:merge.added}),true);
+ syncFollowUp(name,merge,[...(result.warnings||[]).map(String),...(merge.skipped?[tr('{n} 项不是有效的域名，没有读入',{n:merge.skipped})]:[])]);
+};
 window.assetboardOCRResult=result=>{
  if(!result.ok){toast(result.error||tr('本地识别失败'));return;}
  requestEvidence(()=>{
@@ -2399,6 +2439,7 @@ function prefsDialog(section){
  const full=mac&&proBuilt();
  const connections=mac?[full?link('Cloudflare',!!nativeStore.cloudflareConnected,'cloudflare-import',proOff?tr('只读 API 令牌，点同步时读取；每 12 小时自动同步在 Pro 里'):tr('只读 API 令牌，每 12 小时同步')):'',
   full?link('GitHub',!!nativeStore.githubConnected,'github-import',tr('本机 gh 或只读令牌')):'',
+  ...(proFree?[]:Object.entries(REGISTRARS).map(([id,r])=>link(r.name,registrarConnected(id),'registrar-import',tr('只读 API Key，读取域名和到期日')).replace('data-action="registrar-import"',`data-action="registrar-import" data-id="${id}"`))),
   full?link(tr('AI 识别'),!!nativeStore.ai?.model,'ai-settings',tr('你自己的模型和 API key，只在你点识别时发送')):'',
   full&&featureOn('agent')?link(tr('MCP 接入'),null,'agent-setup',tr('给外部工具的配置')):'',
   full&&typeof probeOn==='function'&&probeOn()?link(tr('探针数据源'),null,'probe-sources',tr('监控面板的地址和账号')):'',
@@ -2540,6 +2581,9 @@ document.addEventListener('click',e=>{const button=e.target.closest('[data-actio
  else if(action==='capture-manual')captureGo(true);
  else if(action==='github-import')githubDialog();
  else if(action==='cloudflare-import')cloudflareDialog();
+ else if(action==='registrar-import')registrarDialog(button.dataset.id||registrarPick);
+ else if(action==='registrar-pick')registrarDialog(button.dataset.id);
+ else if(action==='registrar-key'){const r=REGISTRARS[button.dataset.id];if(r&&nativeStore)window.webkit.messageHandlers.assetboard.postMessage({action:'openExternal',url:r.keyUrl});}
  else if(action==='ocr-import'){if(demoMode){window.assetboardDemoBlocked();return;}if(nativeStore)window.webkit.messageHandlers.assetboard.postMessage({action:'ocrImport'});}
  else if(action==='setup-github-token'){const url=githubTokenTemplateUrl();if(nativeStore)window.webkit.messageHandlers.assetboard.postMessage({action:'openExternal',url});}
  else if(action==='setup-cloudflare'){const url=button.dataset.url||cloudflareTokenTemplateUrl();if(nativeStore)window.webkit.messageHandlers.assetboard.postMessage({action:'openExternal',url});}

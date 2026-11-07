@@ -79,7 +79,7 @@ async (page) => {
   check(projects.restored==='notes-lab|restored','a backup restore dropped the project: '+projects.restored);
   check(projects.handover,'the handover export lost the project');
  } finally { await p.close(); }
- // The import window as the free Mac app shows it (native, gh detected): no GitHub, MCP, Cloudflare or Gmail entry.
+ // The import window as the free Mac app shows it (native, gh detected): no GitHub, MCP, Cloudflare, registrar or Gmail entry.
  const context=await page.context().browser().newContext(),m=await context.newPage();
  try {
   await m.addInitScript(()=>{
@@ -95,7 +95,7 @@ async (page) => {
    return [...document.querySelectorAll('#modal[data-view="import"] [data-action]')].map(el=>el.dataset.action);});
   let actions=await hub();
   await m.waitForTimeout(40);actions=[...actions,...await hub()];
-  const pro=['agent-setup','cloudflare-import','gmail-import','github-local-sync','github-import'].filter(a=>actions.includes(a));
+  const pro=['agent-setup','cloudflare-import','gmail-import','github-local-sync','github-import','registrar-import'].filter(a=>actions.includes(a));
   check(!pro.length,'the free import window offers Pro entries: '+pro.join(', '));
   check(!await m.evaluate(()=>/\bgh\b|alice/.test(document.querySelector('#modal .import-cli')?.textContent||'')),'the free import window names gh');
   check(actions.includes('ssh-import')&&actions.includes('ocr-import'),'the free import window lost ~/.ssh/config or 截图: '+actions.join(', '));
