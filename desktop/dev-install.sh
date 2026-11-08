@@ -16,6 +16,9 @@ quit_wait="${ASSETBOARD_QUIT_WAIT:-60}"
 fail() { print -u2 "dev-install: $*"; exit 1; }
 plist() { /usr/libexec/PlistBuddy -c "Print :$2" "$1/Contents/Info.plist" 2>/dev/null; }
 running() { /usr/bin/pgrep -f "^$dest/Contents/MacOS/Assetboard( |$)" >/dev/null; }
+# open hands its environment to the app. A clean one leaves out the job's variables, RUNNER_TRACKING_ID among them, by which the
+# Actions runner finds and terminates the processes a job leaves running when it ends.
+launch() { /usr/bin/env -i HOME="$HOME" USER="${USER:-$(id -un)}" PATH=/usr/bin:/bin:/usr/sbin:/sbin TMPDIR="${TMPDIR:-/tmp}" LANG="${LANG:-en_US.UTF-8}" /usr/bin/open "$1"; }
 
 # Without Pro, build.sh quietly builds the free board without the developer flag.
 [[ -n "$(print -l pro/desktop/*.swift(N))" && -f pro/web/pro.js ]] || fail "the private Pro checkout is missing at pro/ (pro/desktop/*.swift, pro/web/pro.js)"
@@ -60,12 +63,12 @@ restore() {
   print -u2 "dev-install: $1; putting the previous app back"
   rm -rf "$dest"
   [[ -e "$backup" ]] && mv "$backup" "$dest"
-  (( was_running )) && [[ -e "$dest" ]] && /usr/bin/open "$dest"
+  (( was_running )) && [[ -e "$dest" ]] && launch "$dest"
   exit 1
 }
 mv "$staged" "$dest" || restore "could not move the new app into place"
 if (( was_running )); then
-  /usr/bin/open "$dest" || restore "the new app did not open"
+  launch "$dest" || restore "the new app did not open"
   i=0
   until running; do (( ++i > 100 )) && restore "the new app did not start"; sleep 0.1; done
   sleep 3
