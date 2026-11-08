@@ -244,6 +244,7 @@ let englishStrings: [String: [String]] = [
     "不是有效的 JSON": ["Not valid JSON"],
     "缺少 id": ["Missing id"],
     "用法：update <id> <JSON | ->": ["Usage: update <id> <JSON | ->"],
+    "用法：update-project <项目> <JSON | ->": ["Usage: update-project <name> <JSON | ->"],
     "字段需要是 JSON 对象": ["The fields must be a JSON object"],
     "需要 [{\"id\":…,\"fields\":{…}}] 数组": ["Expected an array [{\"id\":…,\"fields\":{…}}]"],
     "缺少 actionId": ["Missing actionId"],

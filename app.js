@@ -289,11 +289,12 @@ function costDialog(){
 }
 function costMeta(v){
  const scope=costScope(v);if(!scope)return '';
- const cur=totalCurrency(),t=costTotals(scope,{currency:cur,rates:fx.rates});if(!t.items.length)return '';
+ // A project view counts a shared record at its share and in USD, as the project's own figures do.
+ const project=!query&&projectViewName(v),cur=project?PROJECT_CURRENCY:totalCurrency(),t=costTotals(scope,{currency:cur,rates:fx.rates});if(!t.items.length)return '';
  askRates();
- // A project view counts a shared record at its share, as the project's own figures do.
- const project=!query&&projectViewName(v),monthly=project?projectEconomics(state.assets,state.projects,{currency:cur,rates:fx.rates,name:project}).projects[0]?.monthlyCost??t.monthly:t.monthly;
- return `<button type="button" class="meta-cost" data-action="cost-panel" title="${tr('周期费用合计，按 {cur} 换算；点开看明细、换币种',{cur})}">${tr('{money} / 月',{money:esc(formatMoney(monthly,cur))})}</button>`;
+ const monthly=project?projectEconomics(state.assets,state.projects,{currency:cur,rates:fx.rates,name:project}).projects[0]?.monthlyCost??t.monthly:t.monthly;
+ const title=project?tr('项目按 {cur} 计，共用的按份额分摊；点开看明细',{cur}):tr('周期费用合计，按 {cur} 换算；点开看明细、换币种',{cur});
+ return `<button type="button" class="meta-cost" data-action="cost-panel" title="${title}">${tr('{money} / 月',{money:esc(formatMoney(monthly,cur))})}</button>`;
 }
 // A record's own cost in the chosen currency, as a hint on its row; the record is never changed.
 // The cost's tip: the amount in the total's currency when it differs, and for a longer cycle what it comes to a month.
@@ -1652,18 +1653,54 @@ const agentMethods={
   return {total:rows.length,history:rows.slice(0,Math.min(Math.max(Number(limit)||200,1),1000)),...(id?{payments:paymentList(agentFind(id))}:{})};
  },
  // monthly / yearly count a shared record at full price in each project; monthlyCost splits it (equal or projectShares), and
- // revenue (state.projects) less monthlyCost is net. Read-only: agents do not set revenue or shares.
+ // revenue (state.projects) less monthlyCost is net; all in USD unless a currency is asked for.
  projects:({currency=''}={})=>{
-  const cur=agentCurrency(currency),round=n=>n===null?null:Math.round(n*100)/100,seen=state.assets.filter(agentSees);
-  if(!projectsOn())return {currency:cur,projects:[]};
-  return {currency:cur,projects:projectEconomics(seen,state.projects,{currency:cur,rates:fx.rates}).projects.map(p=>{
-   const t=costTotals(projectAssets(seen,p.name),{currency:cur,rates:fx.rates});
-   return {name:p.name,count:p.count,monthly:round(t.monthly),yearly:round(t.yearly),revenue:p.revenue,revenueMonthly:round(p.revenueMonthly),monthlyCost:round(p.monthlyCost),net:round(p.net),complete:p.complete,
-    assets:p.assets.map(x=>({id:x.id,name:agentShown(seen.find(a=>a.id===x.id)).name,share:round(x.share*100),split:x.split,monthly:round(x.monthly),cost:round(x.cost),...(x.monthly===null?{notCounted:x.kind}:{})})),
-    ...(p.invalidShares.length?{invalidShares:p.invalidShares}:{})};
-  })};
+  const cur=agentCurrency(currency||PROJECT_CURRENCY);
+  return {currency:cur,projects:projectsOn()?agentProjectFigures(cur):[]};
+ },
+ // One project's revenue and the shares of its shared records, written together as one undo step once everything is checked.
+ // revenue null or '' clears it; a share entry's shares null goes back to an equal split. Returns the project as projects lists it.
+ updateProject:({name,revenue,shares,currency=''}={})=>{
+  const want=cleanProject(name),cur=agentCurrency(currency||PROJECT_CURRENCY);
+  if(!want)throw new Error('name 需要是项目名');
+  if(!projectsOn()||!projectNames(state.assets.filter(agentSees)).some(p=>p.name===want))throw new Error(`找不到项目 ${want}；项目要先有资产在用（update_asset 的 project）`);
+  if(revenue===undefined&&shares===undefined)throw new Error('没有要修改的内容：给 revenue 或 shares');
+  let projects=null;
+  if(revenue!==undefined){
+   if(revenue&&typeof revenue==='object'&&!(String(revenue.currency||'').toUpperCase() in FALLBACK_RATES.rates))throw new Error(`revenue.currency 需要是 ${Object.keys(FALLBACK_RATES.rates).join('、')} 之一`);
+   const r=setProjectRevenue(state.projects,want,revenue);if(!r.ok)throw new Error(`revenue：${r.error}`);projects=r.projects;
+  }
+  const splits=[];
+  if(shares!==undefined){
+   if(!Array.isArray(shares)||!shares.length)throw new Error('shares 需要是 [{id, shares}] 数组');
+   if(shares.length>AGENT_LIMIT)throw new Error(`一次最多 ${AGENT_LIMIT} 项`);
+   for(const item of shares){
+    const a=agentFind(item?.id);
+    if(splits.some(s=>s.asset===a))throw new Error(`资产 ${a.id} 写了两次`);
+    if(!inProject(a,want))throw new Error(`资产 ${a.id} 不在项目 ${want} 里`);
+    if(!item||!('shares' in item))throw new Error(`资产 ${a.id}：缺少 shares（null 表示平分）`);
+    const check=checkProjectShares(projectsOf(a),item.shares);if(!check.ok)throw new Error(`资产 ${a.id}：${check.error}`);
+    splits.push({asset:a,shares:check.shares});
+   }
+  }
+  checkpoint();
+  if(projects){if(Object.keys(projects).length)state.projects=projects;else delete state.projects;}
+  for(const {asset,shares} of splits){if(shares)asset.projectShares=shares;else delete asset.projectShares;touchAsset(asset);}
+  save();render();if(activeAsset&&splits.some(s=>s.asset.id===activeAsset))showDetail(activeAsset,{focus:false});
+  toast(tr('外部工具更新了项目「{name}」',{name:want}),true);
+  return {currency:cur,...agentProjectFigures(cur,want)[0]};
  }
 };
+// Each project's figures for agents, in `cur` (only `name` with a name); records agents may not see are left out.
+function agentProjectFigures(cur,name=''){
+ const round=n=>n===null?null:Math.round(n*100)/100,seen=state.assets.filter(agentSees);
+ return projectEconomics(seen,state.projects,{currency:cur,rates:fx.rates,name}).projects.map(p=>{
+  const t=costTotals(projectAssets(seen,p.name),{currency:cur,rates:fx.rates});
+  return {name:p.name,count:p.count,monthly:round(t.monthly),yearly:round(t.yearly),revenue:p.revenue,revenueMonthly:round(p.revenueMonthly),monthlyCost:round(p.monthlyCost),net:round(p.net),complete:p.complete,
+   assets:p.assets.map(x=>({id:x.id,name:agentShown(seen.find(a=>a.id===x.id)).name,share:round(x.share*100),split:x.split,monthly:round(x.monthly),cost:round(x.cost),...(x.monthly===null?{notCounted:x.kind}:{})})),
+   ...(p.invalidShares.length?{invalidShares:p.invalidShares}:{})};
+ });
+}
 function agentCurrency(currency){const cur=currency?String(currency).toUpperCase():totalCurrency();if(!(cur in FALLBACK_RATES.rates))throw new Error(`currency 需要是 ${Object.keys(FALLBACK_RATES.rates).join('、')} 之一`);return cur;}
 // Live records agents are given (with all: every record), narrowed by category or project (both optional).
 function agentScope({type='',project='',includeHidden=false}={},all=false){
@@ -1786,7 +1823,7 @@ document.addEventListener('submit',e=>{
 });
 // Without Pro an external tool gets the read-only MCP tools; the command line, every write and Pro's own readings wait for a licence.
 // The app passes which client called (via: 'mcp' from the MCP server, otherwise the command line).
-const AGENT_PRO_METHODS=['add','update','updateMany','delete','deleteMany','recordPayment','renew','forecast','costHistory'];
+const AGENT_PRO_METHODS=['add','update','updateMany','updateProject','delete','deleteMany','recordPayment','renew','forecast','costHistory'];
 function agentProRefusal(call){
  if(!proOff)return '';
  if(call?.via!=='mcp')return tr('命令行在 Assetboard Pro 里；MCP 的查询工具免费');

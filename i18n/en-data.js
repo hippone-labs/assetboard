@@ -395,4 +395,5 @@ Object.assign(I18N.en,{
  '每个项目都要有一个份额':'Every project needs a share',
  '份额是 0 到 100 之间的数':'A share is a number from 0 to 100',
  '份额加起来要等于 100%，现在是 {sum}%':'Shares must add up to 100%; they add up to {sum}%',
+ '份额最多两位小数':'A share has at most two decimals',
 });

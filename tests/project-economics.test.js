@@ -30,7 +30,21 @@ test('custom shares split by percent and must name every project and add up to 1
  assert.deepEqual(D.checkProjectShares(['web','blog'],{web:'60',blog:'40'}),{ok:true,shares:{web:60,blog:40}},'numbers as text');
  assert.deepEqual(D.checkProjectShares(['web','blog'],{web:33.33,blog:66.67}).ok,true,'two decimals');
  assert.deepEqual(D.checkProjectShares(['web','blog','api'],{web:0,blog:50,api:50}).ok,true,'0 is a share');
+ // Decimals: at most two; numbers given as text are read the same way.
+ for(const shares of [{web:12.5,blog:87.5},{web:12.55,blog:87.45},{web:'12.55',blog:'87.45'},{web:'12.50',blog:'87.5'},{web:0,blog:100},{web:'0',blog:'100'}])
+  assert.equal(D.checkProjectShares(['web','blog'],shares).ok,true,JSON.stringify(shares));
+ assert.deepEqual(D.checkProjectShares(['web','blog'],{web:'12.55',blog:'87.45'}).shares,{web:12.55,blog:87.45});
+ for(const shares of [{web:12.555,blog:87.445},{web:'12.555',blog:'87.445'},{web:33.333,blog:66.667}]){
+  const r=D.checkProjectShares(['web','blog'],shares);assert.equal(r.ok,false,JSON.stringify(shares));assert.equal(r.error,'份额最多两位小数');
+ }
+ assert.equal(D.checkProjectShares(['web','blog','api'],{web:33.33,blog:33.33,api:33.33}).ok,true,'99.99 is within 0.01 of 100');
+ assert.equal(D.checkProjectShares(['web','blog','api'],{web:33.33,blog:33.33,api:33.32}).ok,false,'99.98 is not');
  D.setProjectShares(a,null);assert.equal('projectShares' in a,false,'null clears');
+});
+
+test('equal percents to two decimals add up to 100, the last taking the rest',()=>{
+ assert.deepEqual(D.evenShares(2),[50,50]);assert.deepEqual(D.evenShares(3),[33.33,33.33,33.34]);assert.deepEqual(D.evenShares(1),[100]);assert.deepEqual(D.evenShares(0),[]);
+ for(let n=2;n<=8;n++){const list=D.evenShares(n),names=list.map((_,i)=>'p'+i);assert.equal(D.checkProjectShares(names,Object.fromEntries(names.map((k,i)=>[k,list[i]]))).ok,true,'n='+n);}
 });
 
 test('invalid shares are refused, and shares that no longer fit fall back to equal and are listed',()=>{
@@ -123,7 +137,7 @@ test('revenue is validated, stored sparsely and cleared with null',()=>{
  assert.equal(Object.keys(D.cleanProjectMeta(Object.fromEntries(Array.from({length:300},(_,i)=>['p'+i,{revenue:{amount:1,currency:'USD'}}])))).length,D.PROJECT_META_LIMIT);
 });
 
-test('renaming a project keeps its revenue and shares; a merge adds the same currency and keeps another apart',()=>{
+test('renaming a project keeps its revenue and shares; a merge adds the same currency, converts two into one USD sum',()=>{
  const assets=[{id:'db',type:'database',name:'db',cost:'$20 / 月',project:['old','blog'],projectShares:{old:70,blog:30}}];
  const projects={old:{revenue:{amount:40,currency:'USD'}}};
  assert.equal(D.renameProject(assets,'old','new',now,projects),1);
@@ -138,10 +152,18 @@ test('renaming a project keeps its revenue and shares; a merge adds the same cur
  // Three projects, two merged: their shares add up.
  const three=[{id:'s',type:'server',name:'s',cost:'$30 / 月',project:['a','b','c'],projectShares:{a:20,b:30,c:50}}];
  D.renameProject(three,'a','b',now);assert.deepEqual(three[0].project,['b','c']);assert.deepEqual(three[0].projectShares,{b:50,c:50});
- // Different currencies are not added: the old entry stays under its name rather than being lost.
- const apart={x:{revenue:{amount:5,currency:'EUR'}},y:{revenue:{amount:9,currency:'USD'}}};
- D.renameProject([{id:'r',type:'repository',name:'r',project:'x'}],'x','y',now,apart);
- assert.deepEqual(apart,{x:{revenue:{amount:5,currency:'EUR'}},y:{revenue:{amount:9,currency:'USD'}}});
+ // Different currencies: both are converted with the rates and stored as one sum in USD (5 EUR = 10 USD, 70 CNY = 10 USD).
+ const apart={x:{revenue:{amount:5,currency:'EUR'}},y:{revenue:{amount:70,currency:'CNY'}}};
+ D.renameProject([{id:'r',type:'repository',name:'r',project:'x'}],'x','y',now,apart,rates);
+ assert.deepEqual(apart,{y:{revenue:{amount:20,currency:'USD'}}});
+ // Without rates the app's built-in ones are used.
+ const builtIn={x:{revenue:{amount:6.678,currency:'CNY'}},y:{revenue:{amount:1,currency:'USD'}}};
+ D.renameProject([{id:'r',type:'repository',name:'r',project:'x'}],'x','y',now,builtIn);
+ assert.deepEqual(builtIn,{y:{revenue:{amount:2,currency:'USD'}}});
+ // A currency without a rate is not added: the old entry stays under its name rather than being lost.
+ const noRate={x:{revenue:{amount:5,currency:'XAU'}},y:{revenue:{amount:9,currency:'USD'}}};
+ D.renameProject([{id:'r',type:'repository',name:'r',project:'x'}],'x','y',now,noRate,rates);
+ assert.deepEqual(noRate,{x:{revenue:{amount:5,currency:'XAU'}},y:{revenue:{amount:9,currency:'USD'}}});
  // Without the map (or with no entry) only the records change.
  const plain=[{id:'r',type:'repository',name:'r',project:'x'}];assert.equal(D.renameProject(plain,'x','z',now),1);assert.equal(plain[0].project,'z');
  const none={};D.renameProject([{id:'r',type:'repository',name:'r',project:'x'}],'x','z',now,none);assert.deepEqual(none,{});
@@ -177,4 +199,5 @@ test('one project can be asked for by name; projects with no visible record are 
  assert.deepEqual(D.projectEconomics(assets,null,{currency:'USD',rates,now,name:' p '}).projects.map(p=>p.name),['p']);
  assert.deepEqual(D.projectEconomics(assets,null,{currency:'USD',rates,now,name:'zz'}).projects,[]);
  assert.deepEqual(D.projectEconomics(null,null).projects,[]);
+ assert.equal(D.PROJECT_CURRENCY,'USD');assert.equal(D.projectEconomics(assets,null).currency,'USD','USD is the base currency');
 });

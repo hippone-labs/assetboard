@@ -107,7 +107,7 @@ Agent / 脚本的 JSON 格式（先写成临时名，写完再改名为 `.json`�
 
 ### 项目
 
-资料里填“项目”，侧边栏就多出“项目”一组。点进去是这个项目的所有资产，上面是它每月的成本；点“收入”填上这个项目每月挣多少（任意币种），最大的数字就换成每月净额，亏了是红色。下面两条细条用同一把尺子：上面是收入，下面是成本，每一段是一项资产，悬停看名字和金额，超出收入的部分标红；费用读不懂、没写周期或没有汇率的资产画成虚线格，旁边写几项未计入。几个项目共用的资产按份额算：默认平分，斜纹那一段点一下（或在资料的“项目”下面）可以改成按比例，填一个百分比，最后一个项目自动补足到 100%。“关停清单”按截止日期列出每一项该做什么（取消订阅、关掉自动续费、备份后删除实例、归档仓库），提示哪些还关联着项目外的东西，勾上完成的会被标为停用或隐藏。卡、手机号和账号不随项目关停。
+资料里填“项目”，侧边栏就多出“项目”一组。点进去是这个项目的所有资产，上面是它每月的成本；点“收入”填上这个项目每月挣多少（任意币种，新填默认 USD），最大的数字就换成每月净额，亏了是红色。项目的收入、成本和净额都按 USD 计；收入用别的币种填时，旁边保留原来的金额，例如“¥200 ≈ $29.95”。每个项目只有一个每月收入：有几处来源（订阅、广告、赞助……）就加起来填一个数。下面两条细条用同一把尺子：上面是收入，下面是成本，每一段是一项资产，悬停看名字和金额，超出收入的部分标红；费用读不懂、没写周期或没有汇率的资产画成虚线格，旁边写几项未计入。几个项目共用的资产按份额算：默认平分，斜纹那一段点一下（或在资料的“项目”下面）可以改成按比例，填一个百分比（可以是 0，最多两位小数），最后一个项目自动补足到 100%，例如三个项目平分是 33.33 / 33.33 / 33.34。两个收入币种不同的项目合并时，按汇率都换成 USD 再相加。“关停清单”按截止日期列出每一项该做什么（取消订阅、关掉自动续费、备份后删除实例、归档仓库），提示哪些还关联着项目外的东西，勾上完成的会被标为停用或隐藏。卡、手机号和账号不随项目关停。
 
 ### 定期清理
 
@@ -180,7 +180,7 @@ assetboard-cli delete <id> --reason "已转出"            # 返回 pending，�
 assetboard-cli totals --currency CNY                   # 周期费用合计；新增和修改也可以直接传 amount + currency
 ```
 
-MCP 工具：`list_asset_types`、`list_assets`、`get_asset`、`get_cost_totals`、`get_cost_forecast`、`get_cost_history`、`list_projects`、`add_assets`、`update_asset`、`update_assets`、`renew_asset`、`record_payment`、`list_unconfirmed_charges`、`delete_asset`、`request_delete_assets`、`list_pending_actions`、`get_action_status`。
+MCP 工具：`list_asset_types`、`list_assets`、`get_asset`、`get_cost_totals`、`get_cost_forecast`、`get_cost_history`、`list_projects`、`update_project`、`add_assets`、`update_asset`、`update_assets`、`renew_asset`、`record_payment`、`list_unconfirmed_charges`、`delete_asset`、`request_delete_assets`、`list_pending_actions`、`get_action_status`。
 
 图标与同步的 MCP 工具：`list_icon_platforms`、`set_icon_site`、`fetch_icons`、`get_cloudflare_sync_status`、`sync_cloudflare`、`list_sync_blocklist`、`unblock_sync_item`。
 
@@ -194,11 +194,11 @@ MCP 工具：`list_asset_types`、`list_assets`、`get_asset`、`get_cost_totals
 - 代码仓库： 手动记的仓库可写 `visibility`（`public` / `private` / `archived`），从 GitHub 同步的以 GitHub 为准；`get_asset` / `list_assets` 返回 `repository`：`visibility`、`defaultBranch`，打开仓库分支和 Actions 后还有 `branches`（`count`、`more`、`new`）、`actions`（`state`、`workflow`、`branch`、`at`、`url`，没有运行记录为 `null`）和 `unread`（令牌缺的权限）。
 
 - 计费： `billingType` 为 `recurring` / `one_off` / `free` / `unknown`（留空自动判断），`amount: 0` 即免费；`promotion` 为 `{start, end, amount, regularAmount, currency}`，`null` 删除。查询结果带 `billingType`、`currentPrice`（含 `basis`：promotion / regular / free / cost）、`priceChange`、`unconfirmedCharges`、`payments`、`costHistory`。
-- 项目： `project`（也接受 `projectId`）；`list_assets`、`get_cost_totals` 和 `get_cost_forecast` 可按项目筛选，`get_cost_totals` 的 `groupBy` 可按项目或类别拆分。`list_projects`（命令行 `projects [--currency CNY]`）按一种币种给出每个项目的 `monthly` / `yearly`（共用的资产在每个项目里按全价算）、`monthlyCost`（共用的资产按份额分摊：默认平分，或按记录的 `projectShares` 百分比，合计 100）、`revenue`（每月收入 `{amount, currency}`，没有为 `null`）、`revenueMonthly`、`net`（收入减 `monthlyCost`，没有收入为 `null`）、`complete`（有费用未知时为 `false`），`assets` 列出每项的 `share`（百分比）、`split`（`equal` / `custom`）、`monthly`、`cost`，没算进去的写 `notCounted`（`free`、`oneOff`、`none`、`noCycle`、`unreadable`、`noRate`、`stopped`），份额和项目对不上的记录列在 `invalidShares`，按平分算。收入和份额只读，外部工具不能改。
+- 项目： `project`（也接受 `projectId`）；`list_assets`、`get_cost_totals` 和 `get_cost_forecast` 可按项目筛选，`get_cost_totals` 的 `groupBy` 可按项目或类别拆分。`list_projects`（命令行 `projects [--currency USD]`）按一种币种（默认 USD）给出每个项目的 `monthly` / `yearly`（共用的资产在每个项目里按全价算）、`monthlyCost`（共用的资产按份额分摊：默认平分，或按记录的 `projectShares` 百分比，合计 100）、`revenue`（每月收入 `{amount, currency}`，没有为 `null`）、`revenueMonthly`、`net`（收入减 `monthlyCost`，没有收入为 `null`）、`complete`（有费用未知时为 `false`），`assets` 列出每项的 `share`（百分比）、`split`（`equal` / `custom`）、`monthly`、`cost`，没算进去的写 `notCounted`（`free`、`oneOff`、`none`、`noCycle`、`unreadable`、`noRate`、`stopped`），份额和项目对不上的记录列在 `invalidShares`，按平分算。`update_project`（命令行 `update-project <项目> '{"revenue":{"amount":30,"currency":"USD"}}'`）改一个已有项目的每月收入和共用资产的份额：`revenue` 是 `{amount, currency}`（几处来源加起来写一个数），`null` 或 `""` 清除；`shares` 是 `[{id, shares}]`，`shares` 写这项资产每个项目的百分比（0–100，最多两位小数，合计 100），`null` 改回平分。先全部检查，有一处不对就什么都不改并说明原因；合格的一起写入，`⌘Z` 一次撤销，返回和 `list_projects` 一样的这个项目（默认 USD）。
 - 批量： `update_assets` 一次最多 100 项，先逐项检查，合格的一起写入、一次撤销，返回每项成功或失败原因；`request_delete_assets` 一次提交多项删除，在 App 的一个列表里统一勾选确认。
 - 确认请求： 删除请求都会返回 `actionId`；`list_pending_actions`、`get_action_status` 查看状态：`pending`、`done`（至少删了一项）、`cancelled`（全部保留）、`failed`，每项写明 `deleted` / `kept` / `failed`。请求到达时 App 会弹出确认列表；正在编辑时窗口顶部出现提示条，点“查看”直接打开，Dock 图标也会跳一下。这些状态不受 `⌘Z` 影响。
 
-命令行对应：`update-many`、`delete-many`、`actions`、`action`、`pay`、`renew`、`charges`、`forecast`、`history`、`projects`（`assetboard-cli --help` 查看参数）。
+命令行对应：`update-many`、`delete-many`、`actions`、`action`、`pay`、`renew`、`charges`、`forecast`、`history`、`projects`、`update-project`（`assetboard-cli --help` 查看参数）。
 
 字段与上面的 Inbox 格式相同，另有 `reason`、`region`、`last4`、`network`、`phone`，服务器的 `host`、`ips`、`sshUser`、`sshPort`，仓库的 `localPath`。关联用 `linkTo` / `unlinkFrom`（资产 id 数组），规则与手动关联一致；查询结果的 `relations` 列出每项关联及其含义，`risks` 列出到期的付款卡或手机号。检查和表单一致：日期、链接、类别不对会被拒绝，完整卡号会被拒绝；同类别同名的新增会跳过并返回已有的 id。图标：`iconHost` 填域名（如 `wise.com`），App 自己去拉网站图标（同「获取网站图标」，记在网络记录里），结果见记录的 `iconStatus`；`icon` 直接给 PNG/JPEG/WebP 的 data URL（最大 256 KB），作为自定义图标；传空字符串清除。查询返回完整记录，图标只给 `hasCustomIcon`、`hasSiteIcon`、`siteIconHost`，不含图片数据。Agent 一次请求删除多项时，App 用一个可勾选的列表统一确认。
 

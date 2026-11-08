@@ -2714,9 +2714,10 @@ function parseProjects(value){return [...new Set((Array.isArray(value)?value:Str
 function setProjects(asset,list){const names=parseProjects(list);if(!asset)return names;if(!names.length)delete asset.project;else asset.project=names.length===1?names[0]:names;pruneProjectShares(asset);return names;}
 // Renaming a project renames it on every record; a name another project has merges the two. A name holds no list separator.
 // With `projects` (state.projects) the project's own facts move too: into an empty name, or added to the same currency's revenue;
-// a revenue in another currency stays under the old name rather than being dropped.
+// two currencies are both converted with `rates` and stored as one sum in PROJECT_CURRENCY; without a rate for one of them the
+// moved revenue stays under the old name rather than being dropped.
 function projectNameOk(name){const n=cleanProject(name);return !!n&&!/[,，、;；]/.test(n);}
-function renameProject(assets,from,to,now=new Date(),projects=null){
+function renameProject(assets,from,to,now=new Date(),projects=null,rates=undefined){
  const old=cleanProject(from),next=cleanProject(to);if(!old||!projectNameOk(next)||old===next)return 0;
  let n=0;
  for(const a of assets||[]){
@@ -2727,8 +2728,12 @@ function renameProject(assets,from,to,now=new Date(),projects=null){
  }
  if(projects&&typeof projects==='object'&&Object.hasOwn(projects,old)){
   const mine=cleanProjectMeta({[old]:projects[old]})[old],theirs=cleanProjectMeta({[next]:projects[next]})[next];
-  if(mine&&theirs&&mine.revenue.currency!==theirs.revenue.currency)return n;
-  if(mine)projects[next]=theirs?{...theirs,revenue:{amount:roundMoney(theirs.revenue.amount+mine.revenue.amount),currency:theirs.revenue.currency}}:mine;
+  if(mine&&theirs&&mine.revenue.currency!==theirs.revenue.currency){
+   const sum=[mine,theirs].map(m=>convertMoney(m.revenue.amount,m.revenue.currency,PROJECT_CURRENCY,rates));
+   if(sum.includes(null))return n;
+   projects[next]={...theirs,revenue:{amount:roundMoney(sum[0]+sum[1]),currency:PROJECT_CURRENCY}};
+  }
+  else if(mine)projects[next]=theirs?{...theirs,revenue:{amount:roundMoney(theirs.revenue.amount+mine.revenue.amount),currency:theirs.revenue.currency}}:mine;
   delete projects[old];
  }
  return n;
@@ -2763,7 +2768,9 @@ function shutdownPlan(assets,name,{now=new Date(),currency='CNY',rates}={}){
 
 // A project's own facts sit beside the records in state.projects: {name: {revenue: {amount, currency}}}, revenue per month. Sparse:
 // a project with nothing set has no entry, and an entry stays while no record carries the name, so the label coming back finds it.
-const PROJECT_META_LIMIT=200;
+// One revenue per project: a project that earns from several sources keeps their sum. Revenue keeps the currency it was written in;
+// a project's figures (revenue, split cost, net) are added up and shown in PROJECT_CURRENCY.
+const PROJECT_META_LIMIT=200,PROJECT_CURRENCY='USD';
 function cleanRevenue(value){
  if(!value||typeof value!=='object'||value.amount===null||typeof value.amount==='boolean'||typeof value.amount==='string'&&!value.amount.trim())return null;
  const amount=Number(value.amount),currency=String(value.currency||'').trim().toUpperCase();
@@ -2783,7 +2790,9 @@ function setProjectRevenue(projects,name,value){
  next[n]={...next[n],revenue};return {ok:true,projects:next};
 }
 // A record in several projects splits its cost equally, or by asset.projectShares {project: percent}: one entry for each of its
-// projects, each 0–100, adding up to 100. Shares that no longer fit (a project was added or removed) fall back to equal and say so.
+// projects, each 0–100 with at most two decimals, adding up to 100 (±0.01). Shares that no longer fit (a project was added or
+// removed) fall back to equal and say so.
+function shareDecimalsOk(value){return Math.abs(value*100-Math.round(value*100))<1e-6;}
 function checkProjectShares(names,shares){
  const list=parseProjects(names);
  if(shares===null||shares===undefined)return {ok:true,shares:null};
@@ -2792,11 +2801,13 @@ function checkProjectShares(names,shares){
  const given=new Map(Object.entries(shares).map(([key,value])=>[cleanProject(key),value]));
  if(given.size!==list.length||!list.every(name=>given.has(name)))return {ok:false,error:tr('每个项目都要有一个份额')};
  const out={};
- for(const name of list){const raw=given.get(name),value=typeof raw==='string'&&raw.trim()?Number(raw):typeof raw==='number'?raw:NaN;if(!Number.isFinite(value)||value<0||value>100)return {ok:false,error:tr('份额是 0 到 100 之间的数')};out[name]=value;}
+ for(const name of list){const raw=given.get(name),value=typeof raw==='string'&&raw.trim()?Number(raw):typeof raw==='number'?raw:NaN;if(!Number.isFinite(value)||value<0||value>100)return {ok:false,error:tr('份额是 0 到 100 之间的数')};if(!shareDecimalsOk(value))return {ok:false,error:tr('份额最多两位小数')};out[name]=value;}
  const sum=Object.values(out).reduce((total,value)=>total+value,0);
- if(Math.abs(sum-100)>0.01)return {ok:false,error:tr('份额加起来要等于 100%，现在是 {sum}%',{sum:roundMoney(sum)})};
+ if(Math.abs(sum-100)>0.01+1e-9)return {ok:false,error:tr('份额加起来要等于 100%，现在是 {sum}%',{sum:roundMoney(sum)})};
  return {ok:true,shares:out};
 }
+// Equal percents for n projects to two decimals, the last taking what is left so they add up to 100 (3 → 33.33, 33.33, 33.34).
+function evenShares(n){if(!(n>0))return [];const each=Math.round(10000/n)/100;return Array.from({length:n},(_,i)=>i<n-1?each:roundMoney(100-each*(n-1)));}
 function setProjectShares(asset,shares){const check=checkProjectShares(projectsOf(asset),shares);if(!check.ok)return check;if(check.shares)asset.projectShares=check.shares;else delete asset.projectShares;return check;}
 function pruneProjectShares(asset){if(asset&&'projectShares' in asset&&!checkProjectShares(projectsOf(asset),asset.projectShares).ok)delete asset.projectShares;}
 // {split:'equal'|'custom', shares:{project: fraction}, invalid}: how one record's cost is divided among its projects.
@@ -2809,7 +2820,7 @@ function projectSharesOf(asset){
 // one currency. A yearly or quarterly cost counts per month; free records, one-off costs, records with no cost, unreadable text, a
 // missing cycle or rate are listed in notCounted instead of counting as 0, and `complete` is false while any cost is unknown.
 // net is null without a revenue (or a rate for it). `name` narrows to one project.
-function projectEconomics(assets,projects,{currency='CNY',rates,now=new Date(),name=''}={}){
+function projectEconomics(assets,projects,{currency=PROJECT_CURRENCY,rates,now=new Date(),name=''}={}){
  const today=localDay(now),meta=cleanProjectMeta(projects),want=cleanProject(name);
  const list=projectNames(assets).filter(p=>!want||p.name===want);
  return {currency,projects:list.map(({name,count})=>{
@@ -3053,4 +3064,4 @@ function rdapFormFields(current,facts){
  return {fill,registry,registrar,differs:!!(registry&&date&&date!==registry)};
 }
 
-if(typeof module!=='undefined')module.exports={costKind,cleanRevenue,cleanProjectMeta,setProjectRevenue,checkProjectShares,setProjectShares,pruneProjectShares,projectSharesOf,projectEconomics,PROJECT_META_LIMIT,touchAsset,editedTime,TOMBSTONE_LIMIT,addTombstone,cleanTombstones,BOARD_SETTINGS,backupSettings,mergeBoardSettings,settleLinks,backupCounts,LEGACY_WORDS,LEGACY_STATES,MFA_KINDS,RECOVERY_TYPES,RECOVERY_FIELDS,BACKUP_KINDS,BACKUP_TYPES,IMPORTANCE,looksLikeSecret,recoveryText,recoveryGap,backupText,mailHost,mailDependents,selfRecovery,mailStake,PHONE_STATUSES,phoneTrouble,carrierNote,cardPaysPhone,setCardPays,CREDIT_RULES,creditRule,settleCreditExpiry,PLATFORM_SOURCES,missedReminders,reminderDays,STALE_SYNC_DAYS,staleSyncs,AUTO_RENEW_WORDS,CARD_STATUSES,cardTrouble,sourceTrouble,IMPACT_WORDS,verifyNumbers,phoneReach,phoneStake,syncedLabel,BILLING_TYPES,billingLabels,isFreeCost,billingTypeOf,validPromotion,moneyOn,settlePromotions,noteCostChange,costForecast,PAYMENT_LIMIT,CONFIRM_DAYS,paymentList,paidPayments,lastPayment,recordPayment,removePayment,occurrencesBetween,pendingCharges,pendingRenewals,confirmRenewal,cardOutlook,runsOut,needsConfirm,confirmWords,LIFECYCLE_RULES,lifecycleRule,lifecycleOf,AFTER_DUE_DAYS,monthsBetween,renewBase,canRenew,renewOptions,costFromPayment,renewAsset,confirmCharge,priceChange,paidTotals,ledgerRows,csvCell,ledgerCsv,SLEEP_CHECKED,SLEEP_RULES,KEEPALIVE_TYPES,KEEPALIVE_EVERY,sleepRuleOf,cleanKeepAlive,keepAliveCron,keepAliveWorkflow,cleanProject,PROJECTS_PER_ASSET,projectsOf,projectNameOk,renameProject,parseProjects,setProjects,inProject,projectNames,projectAssets,shutdownPlan,REVIEW_QUIET_DAYS,reviewQueue,icsFold,calendarIcs,escHtml,handoverHtml,rdapFacts,rdapCompare,rdapPhaseLabels,registryPhaseOf,RDAP_HOLDS,rdapHoldLabels,RDAP_MISSING_TLDS,rdapMissing,rdapNameservers,registryHoldOf,registryChangeOf,rdapRemember,registryAlerts,dueLevel,DOMAIN_NAME,domainFromText,domainListText,domainListItems,REGISTRAR_ALIASES,registrarProvider,rdapFormFields,renewalGrace,RENEWAL_GRACE_DAYS,maskName,PROVIDER_PRESETS,providerPresets,MAIN_CURRENCIES,FALLBACK_RATES,costAmount,syncMoney,convertMoney,formatMoney,costTotals,MOUNT_TYPES,relationKind,linkAllowed,LINK_KINDS,LINK_KIND_ORDER,linkKind,linkRisks,linkImpact,serverChain,serverChainCount,linkRelation,linkMetaOf,setLinkMeta,serverTone,peekSet,dropLinkMeta,IP_LIMIT,normalizeIp,parseIps,assetIps,primaryIp,maskIp,validIpList,ACTION_FIELDS,QUICK_LIMIT,validActionField,sshCommand,cloneUrl,quickActions,recencyTime,recentFirst,arrangeAssets,touchedPrefix,bringToFront,DISPLAY_LIMITS,formatCount,ensureBlock,iconHost,iconVendor,iconVendors,vendorForHost,iconPlan,iconSiteHost,iconSiteFor,iconPlatformOf,iconRows,guessAssetType,regionList,regionName,regionFlag,phoneParts,regionFromPhone,maskPhone,maskEmail,cardExpiry,expiryText,looksLikeCardNumber,linkAssets,unlinkAssets,linkedAssets,removeLinksTo,assetFingerprint,removeUntouchedDemo,orderAssets,moveAsset,dateKinds,billingCycles,dayNumber,localDay,isoDay,addMonths,nextOccurrence,assetDateStatus,upcomingEvents,REMINDER_LIMIT,reminderLeads,reminderPlan,syncKey,assetSyncKey,isBlacklisted,findByExternal,findNameCollision,mergeCloudflare,mergeGitHub,REGISTRARS,registrarDate,registrarFlag,REGISTRAR_LIMIT,cleanRegistrarDomains,mergeRegistrar,registrarCredentialProblem,CLOUD_IMPORTS,CLOUD_LIMIT,cleanCloudResources,cloudCredentialProblem,mergeCloudImport,NEW_BRANCH_DAYS,BRANCH_LIMIT,REPO_DETAIL_FIELDS,CI_STATES,CI_BAD,cleanCiRun,repoDetailFields,newBranches,applyRepoDetails,applyCollision,parseSender,registrableDomain,cleanMerchant,findAmounts,findDates,findDomains,evidenceFacts,inferCycle,formatCost,matchAsset,buildCandidates,evidencePayload,parseAiItems,applyAiItem,IMPORT_ROW_LIMIT,parseLooseDate,shiftDate,costParts,formatCostParts,inferTypeFromName,parseRepoUrl,parseQuickLine,AGENT_FIELDS,isAgentImport,parseAgentImport,parseDelimitedText,importHeaderField,rowsToImportItems,isCfsmBackup,parseCfsmBackup,classifyImportPayload,planImport,applyImport,parseBoardBackup,planBoardBackup,applyBoardBackup,demoImportSampleCsv,csvSyncKey,VENDOR_CSV_PRESETS,cloudflareTokenTemplateUrl,githubTokenTemplateUrl,CLOUDFLARE_TOKEN_PERMISSIONS,parseSshConfig,sshGitHosts,mergeSshConfig,parseEml,delimitedRecords,splitDelimitedLine,resolvePresetValue,SECRET_KINDS,secretKinds,rowSecrets,looksLikeEnv,screenText,PASSWORD_EXPORTS,passwordExportOf,importFileKind,importGate,screenBackup,AI_PLANS,AI_PLANS_CHECKED,aiPlanProviders,aiPlansFor,findAiPlan,aiPlanFields,icsRepeat,MASK_MARK,MASK_SETS,maskValue,maskAsset,maskMail,hasMask};
+if(typeof module!=='undefined')module.exports={PROJECT_CURRENCY,evenShares,costKind,cleanRevenue,cleanProjectMeta,setProjectRevenue,checkProjectShares,setProjectShares,pruneProjectShares,projectSharesOf,projectEconomics,PROJECT_META_LIMIT,touchAsset,editedTime,TOMBSTONE_LIMIT,addTombstone,cleanTombstones,BOARD_SETTINGS,backupSettings,mergeBoardSettings,settleLinks,backupCounts,LEGACY_WORDS,LEGACY_STATES,MFA_KINDS,RECOVERY_TYPES,RECOVERY_FIELDS,BACKUP_KINDS,BACKUP_TYPES,IMPORTANCE,looksLikeSecret,recoveryText,recoveryGap,backupText,mailHost,mailDependents,selfRecovery,mailStake,PHONE_STATUSES,phoneTrouble,carrierNote,cardPaysPhone,setCardPays,CREDIT_RULES,creditRule,settleCreditExpiry,PLATFORM_SOURCES,missedReminders,reminderDays,STALE_SYNC_DAYS,staleSyncs,AUTO_RENEW_WORDS,CARD_STATUSES,cardTrouble,sourceTrouble,IMPACT_WORDS,verifyNumbers,phoneReach,phoneStake,syncedLabel,BILLING_TYPES,billingLabels,isFreeCost,billingTypeOf,validPromotion,moneyOn,settlePromotions,noteCostChange,costForecast,PAYMENT_LIMIT,CONFIRM_DAYS,paymentList,paidPayments,lastPayment,recordPayment,removePayment,occurrencesBetween,pendingCharges,pendingRenewals,confirmRenewal,cardOutlook,runsOut,needsConfirm,confirmWords,LIFECYCLE_RULES,lifecycleRule,lifecycleOf,AFTER_DUE_DAYS,monthsBetween,renewBase,canRenew,renewOptions,costFromPayment,renewAsset,confirmCharge,priceChange,paidTotals,ledgerRows,csvCell,ledgerCsv,SLEEP_CHECKED,SLEEP_RULES,KEEPALIVE_TYPES,KEEPALIVE_EVERY,sleepRuleOf,cleanKeepAlive,keepAliveCron,keepAliveWorkflow,cleanProject,PROJECTS_PER_ASSET,projectsOf,projectNameOk,renameProject,parseProjects,setProjects,inProject,projectNames,projectAssets,shutdownPlan,REVIEW_QUIET_DAYS,reviewQueue,icsFold,calendarIcs,escHtml,handoverHtml,rdapFacts,rdapCompare,rdapPhaseLabels,registryPhaseOf,RDAP_HOLDS,rdapHoldLabels,RDAP_MISSING_TLDS,rdapMissing,rdapNameservers,registryHoldOf,registryChangeOf,rdapRemember,registryAlerts,dueLevel,DOMAIN_NAME,domainFromText,domainListText,domainListItems,REGISTRAR_ALIASES,registrarProvider,rdapFormFields,renewalGrace,RENEWAL_GRACE_DAYS,maskName,PROVIDER_PRESETS,providerPresets,MAIN_CURRENCIES,FALLBACK_RATES,costAmount,syncMoney,convertMoney,formatMoney,costTotals,MOUNT_TYPES,relationKind,linkAllowed,LINK_KINDS,LINK_KIND_ORDER,linkKind,linkRisks,linkImpact,serverChain,serverChainCount,linkRelation,linkMetaOf,setLinkMeta,serverTone,peekSet,dropLinkMeta,IP_LIMIT,normalizeIp,parseIps,assetIps,primaryIp,maskIp,validIpList,ACTION_FIELDS,QUICK_LIMIT,validActionField,sshCommand,cloneUrl,quickActions,recencyTime,recentFirst,arrangeAssets,touchedPrefix,bringToFront,DISPLAY_LIMITS,formatCount,ensureBlock,iconHost,iconVendor,iconVendors,vendorForHost,iconPlan,iconSiteHost,iconSiteFor,iconPlatformOf,iconRows,guessAssetType,regionList,regionName,regionFlag,phoneParts,regionFromPhone,maskPhone,maskEmail,cardExpiry,expiryText,looksLikeCardNumber,linkAssets,unlinkAssets,linkedAssets,removeLinksTo,assetFingerprint,removeUntouchedDemo,orderAssets,moveAsset,dateKinds,billingCycles,dayNumber,localDay,isoDay,addMonths,nextOccurrence,assetDateStatus,upcomingEvents,REMINDER_LIMIT,reminderLeads,reminderPlan,syncKey,assetSyncKey,isBlacklisted,findByExternal,findNameCollision,mergeCloudflare,mergeGitHub,REGISTRARS,registrarDate,registrarFlag,REGISTRAR_LIMIT,cleanRegistrarDomains,mergeRegistrar,registrarCredentialProblem,CLOUD_IMPORTS,CLOUD_LIMIT,cleanCloudResources,cloudCredentialProblem,mergeCloudImport,NEW_BRANCH_DAYS,BRANCH_LIMIT,REPO_DETAIL_FIELDS,CI_STATES,CI_BAD,cleanCiRun,repoDetailFields,newBranches,applyRepoDetails,applyCollision,parseSender,registrableDomain,cleanMerchant,findAmounts,findDates,findDomains,evidenceFacts,inferCycle,formatCost,matchAsset,buildCandidates,evidencePayload,parseAiItems,applyAiItem,IMPORT_ROW_LIMIT,parseLooseDate,shiftDate,costParts,formatCostParts,inferTypeFromName,parseRepoUrl,parseQuickLine,AGENT_FIELDS,isAgentImport,parseAgentImport,parseDelimitedText,importHeaderField,rowsToImportItems,isCfsmBackup,parseCfsmBackup,classifyImportPayload,planImport,applyImport,parseBoardBackup,planBoardBackup,applyBoardBackup,demoImportSampleCsv,csvSyncKey,VENDOR_CSV_PRESETS,cloudflareTokenTemplateUrl,githubTokenTemplateUrl,CLOUDFLARE_TOKEN_PERMISSIONS,parseSshConfig,sshGitHosts,mergeSshConfig,parseEml,delimitedRecords,splitDelimitedLine,resolvePresetValue,SECRET_KINDS,secretKinds,rowSecrets,looksLikeEnv,screenText,PASSWORD_EXPORTS,passwordExportOf,importFileKind,importGate,screenBackup,AI_PLANS,AI_PLANS_CHECKED,aiPlanProviders,aiPlansFor,findAiPlan,aiPlanFields,icsRepeat,MASK_MARK,MASK_SETS,maskValue,maskAsset,maskMail,hasMask};

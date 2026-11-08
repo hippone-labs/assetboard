@@ -1,6 +1,7 @@
-// Project revenue (state.projects) and the per-project figures: cleaned at load, read by agents (list_projects) with shared records
-// split, kept by ⌘Z and a rename, carried by the backup and listed in its restore preview. Pro draws the project page; here its
-// project slot is faked so projects count as shown. Saves go to a fake host and never to disk.
+// Project revenue (state.projects) and the per-project figures: cleaned at load, read by agents (list_projects, USD by default)
+// with shared records split, written by agents (update_project: checked first, one ⌘Z step, refused without Pro), kept by ⌘Z and a
+// rename, carried by the backup and listed in its restore preview. Pro draws the project page; here its project slot is faked so
+// projects count as shown. Saves go to a fake host and never to disk.
 async (page) => {
  const check=(ok,message)=>{if(!ok)throw new Error(message);};
  // Polls from the test side: the page's CSP forbids the eval that page.waitForFunction relies on.
@@ -22,9 +23,12 @@ async (page) => {
   await until(p,()=>typeof assetboardAgent==='function'&&typeof routeImportText==='function'&&state.assets.length===4);
   check(await p.evaluate(()=>JSON.stringify(state.projects))==='{"web":{"revenue":{"amount":30,"currency":"USD"}}}','Load keeps only valid revenue');
 
+  const call=(method,params={})=>p.evaluate(([method,params])=>assetboardAgent({requestId:'t',via:'mcp',method,params}),[method,params]);
+  // The free edition refuses the write like any other, and nothing changes.
+  const refused=await call('updateProject',{name:'web',revenue:{amount:40,currency:'USD'}});
+  check(refused.ok===false&&/Pro/.test(refused.error)&&await p.evaluate(()=>state.projects.web.revenue.amount)===30,'The free edition refuses update_project: '+JSON.stringify(refused));
   // Agents: nothing while projects are not shown (free edition), then the figures once Pro's project slot is there.
   await p.evaluate(()=>{proEnable();proSlots.projectNav=null;});
-  const call=(method,params={})=>p.evaluate(([method,params])=>assetboardAgent({requestId:'t',via:'mcp',method,params}),[method,params]);
   let reply=await call('projects',{currency:'USD'});
   check(reply.ok&&reply.result.projects.length===0,'No projects without the project slot: '+JSON.stringify(reply));
   await p.evaluate(()=>{proSlots.projectNav=()=>'';render();});
@@ -44,12 +48,54 @@ async (page) => {
   check(webCustom.monthlyCost===17&&webCustom.assets.find(x=>x.id==='vps').split==='custom'&&webCustom.assets.find(x=>x.id==='vps').share===75,'Custom shares: '+JSON.stringify(webCustom));
   const asset=(await call('get',{id:'vps'})).result;
   check(JSON.stringify(asset?.projectShares)==='{"web":75,"blog":25}','get_asset shows the shares');
-  // Agents cannot write shares: the field is ignored, nothing changes.
+  // update_asset does not take shares (update_project does): the field is ignored, nothing changes.
   const upd=await call('update',{id:'vps',fields:{projectShares:{web:10,blog:90}}});
   check(await p.evaluate(()=>JSON.stringify(state.assets.find(a=>a.id==='vps').projectShares))==='{"web":75,"blog":25}','An agent does not change shares: '+JSON.stringify(upd));
   // An agent moving the record into a third project drops the shares that no longer fit.
   check((await call('update',{id:'vps',fields:{project:['web','blog','api']}})).ok,'project update');
   check(await p.evaluate(()=>!('projectShares' in state.assets.find(a=>a.id==='vps'))),'Shares that no longer fit are dropped');
+  check((await call('projects')).result?.currency==='USD','list_projects counts in USD by default');
+
+  // update_project: revenue in its own currency and the shares (numbers as text, two decimals) in one call, one undo step.
+  const before=await p.evaluate(()=>({saves:window.__saves.length,history:history.length}));
+  reply=await call('updateProject',{name:'web',revenue:{amount:200,currency:'cny'},shares:[{id:'vps',shares:{web:'12.55',blog:50,api:37.45}}]});
+  const usd=await p.evaluate(()=>Math.round(convertMoney(200,'CNY','USD',fx.rates)*100)/100);
+  const r=reply.result||{};
+  check(reply.ok&&r.currency==='USD'&&r.name==='web'&&JSON.stringify(r.revenue)==='{"amount":200,"currency":"CNY"}'&&r.revenueMonthly===usd,'update_project answers with the project in USD: '+JSON.stringify(reply));
+  check(r.monthlyCost===9.51&&r.net===Math.round((usd-9.506)*100)/100&&r.assets.find(x=>x.id==='vps')?.share===12.55&&r.assets.find(x=>x.id==='vps')?.split==='custom','the figures follow the write: '+JSON.stringify(r));
+  const written=await p.evaluate(()=>({projects:JSON.stringify(state.projects),shares:JSON.stringify(state.assets.find(a=>a.id==='vps').projectShares),saves:window.__saves.length,history:history.length,toast:$('#toast').textContent,saved:JSON.stringify(window.__saves.at(-1).projects)}));
+  check(written.projects==='{"web":{"revenue":{"amount":200,"currency":"CNY"}}}'&&written.shares==='{"web":12.55,"blog":50,"api":37.45}','the revenue and shares are stored: '+JSON.stringify(written));
+  check(written.saves>before.saves&&written.saved===written.projects&&written.history===before.history+1&&written.toast.includes('外部工具更新了项目「web」'),'saved once with one checkpoint and a toast: '+JSON.stringify(written));
+  // Clearing: revenue null and shares null (equal split) in the same call.
+  reply=await call('updateProject',{name:'web',revenue:null,shares:[{id:'vps',shares:null}]});
+  check(reply.ok&&reply.result.revenue===null&&reply.result.net===null&&await p.evaluate(()=>!('projects' in state)&&!('projectShares' in state.assets.find(a=>a.id==='vps'))),'null clears the revenue and the split: '+JSON.stringify(reply));
+  // Each write is one ⌘Z step.
+  check(await p.evaluate(()=>{undo();return JSON.stringify(state.projects)+'|'+JSON.stringify(state.assets.find(a=>a.id==='vps').projectShares);})==='{"web":{"revenue":{"amount":200,"currency":"CNY"}}}|{"web":12.55,"blog":50,"api":37.45}','undo takes back the clearing');
+  check(await p.evaluate(()=>{undo();return JSON.stringify(state.projects)+'|'+('projectShares' in state.assets.find(a=>a.id==='vps'));})==='{"web":{"revenue":{"amount":30,"currency":"USD"}}}|false','a second undo takes back the first write whole');
+
+  // Validation: anything wrong refuses the whole call, nothing is written or saved.
+  const quiet=await p.evaluate(()=>({saves:window.__saves.length,history:history.length,projects:JSON.stringify(state.projects)}));
+  for(const [params,want] of [
+   [{name:'nope',revenue:{amount:1,currency:'USD'}},/找不到项目/],
+   [{name:'web'},/没有要修改的内容/],
+   [{name:'web',revenue:{amount:-5,currency:'USD'}},/revenue/],
+   [{name:'web',revenue:{amount:5,currency:'XYZ'}},/currency/],
+   [{name:'web',revenue:'5 USD'},/revenue/],
+   [{name:'web',revenue:{amount:40,currency:'USD'},shares:[{id:'vps',shares:{web:12.555,blog:50,api:37.445}}]},/两位小数/],
+   [{name:'web',shares:[{id:'vps',shares:{web:50,blog:40,api:0}}]},/100%/],
+   [{name:'web',shares:[{id:'vps',shares:{web:50,blog:50}}]},/每个项目/],
+   [{name:'web',shares:[{id:'vps',shares:{web:-1,blog:51,api:50}}]},/0 到 100/],
+   [{name:'web',shares:[{id:'free',shares:null}]},/不在项目/],
+   [{name:'web',shares:[{id:'missing',shares:null}]},/找不到资产/],
+   [{name:'web',shares:[{id:'vps',shares:null},{id:'vps',shares:null}]},/两次/],
+   [{name:'web',shares:[{id:'vps'}]},/缺少 shares/],
+   [{name:'web',shares:[]},/shares/],
+   [{name:'web',revenue:{amount:1,currency:'USD'},currency:'XYZ'},/currency/]
+  ]){
+   const bad=await call('updateProject',params);
+   check(bad.ok===false&&want.test(bad.error),'refused with a reason: '+JSON.stringify(params)+' → '+JSON.stringify(bad));
+  }
+  check(JSON.stringify(await p.evaluate(()=>({saves:window.__saves.length,history:history.length,projects:JSON.stringify(state.projects)})))===JSON.stringify(quiet),'a refused call changes and saves nothing');
 
   // ⌘Z: a revenue change and a rename (which carries the revenue) both undo.
   const undone=await p.evaluate(()=>{
@@ -77,5 +123,5 @@ async (page) => {
   check(await p.evaluate(()=>JSON.stringify(window.__saves.at(-1).projects))==='{"web":{"revenue":{"amount":30,"currency":"USD"}}}','and saves it');
   check(!errors.length,'Page errors: '+errors.join(' | '));
  }finally{await context.close();}
- return 'PASS: revenue cleaned at load, agent figures with equal and custom shares, shares read-only and pruned, undo and rename keep revenue, backup carries and restores it';
+ return 'PASS: revenue cleaned at load, agent figures in USD with equal and custom shares, update_project writes revenue and shares in one undo step, refuses bad input whole and without Pro, update_asset leaves shares alone and prunes them, undo and rename keep revenue, backup carries and restores it';
 }
