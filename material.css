@@ -668,6 +668,7 @@ body.import-drag::after{content:'松开以导入';position:fixed;inset:12px;bord
 
 .platform-bar{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .platform-bar .button{margin:0}
+.platform-bar .platform-chips{display:flex;align-items:center;gap:6px}
 .chip.ok{color:var(--ink);border-color:rgba(var(--tone-primary),.5)}
 .chip.bad{color:var(--danger);border-color:var(--danger-border)}
 .platform-note{display:flex;align-items:flex-start;gap:6px}
@@ -2282,3 +2283,10 @@ body::before,.native-app body::before{background:radial-gradient(70vw 65vh at 0%
 /* 仓库分支和 Actions: a failed run reads in the danger colour in the inspector; counts use the numeric face. */
 .fact .ci-bad{color:var(--danger);font-weight:600}
 .fact .num{font-family:var(--num)}
+/* 全部资产 as a ledger: the date and the amount are what a row is read for, so in the wide list they take the text colour and sit
+   together at the right (the date right-aligned against the amount); the source stays grey; a due date's pill hugs its words. */
+#board[data-size=l] .row .item-open{grid-template-columns:20px minmax(0,1fr) minmax(0,13em) 12em 7.5em;column-gap:16px}
+#board[data-size=l] .row .r-date{justify-self:end;max-width:100%}
+:root .r-date.dated{color:var(--ink)}
+#board[data-size=l] .row .r-cost,:root .r-cost{color:var(--ink);font-weight:500}
+#board[data-size=l] .row .r-cost{font-size:13px}

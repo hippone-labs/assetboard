@@ -201,7 +201,7 @@ function costExtrasHtml(scope,cur){return slotHtml('costExtras',scope,cur);}
 
 // ---- 核对注册局日期: RDAP through the Mac app (recorded in 网络记录); the answer can correct the stored expiry.
 const rdapRequests=new Map();let rdapSequence=0;
-function rdapDomain(a){const name=String(a?.name||'').trim().toLowerCase().replace(/^https?:\/\//,'').replace(/\/.*$/,'');return /^(?:[a-z0-9-]+\.)+[a-z]{2,}$/.test(name)?registrableDomain(name)||name:'';}
+function rdapDomain(a){const name=domainFromText(a?.name);return name?registrableDomain(name)||name:'';}
 function rdapCheck(id){
  const a=state.assets.find(x=>x.id===id),domain=rdapDomain(a);
  if(!domain){toast(tr('名称不是域名，无法核对'));return;}
@@ -213,6 +213,8 @@ function rdapCheck(id){
 }
 window.assetboardRdap=async result=>{
  const ask=rdapRequests.get(result?.requestId);if(!ask)return;rdapRequests.delete(result.requestId);
+ if(ask.form){rdapFormAnswer(ask,result);return;}
+ if(ask.fill){rdapFillAnswer(ask,result);return;}
  const id=ask.id,a=state.assets.find(x=>x.id===id);if(!a){if(ask.auto)rdapAutoNext();return;}
  if(ask.auto){rdapAutoAnswer(a,result);rdapAutoNext();return;}
  if(!result.ok){toast(tr('没有查到：{error}',{error:String(result.error||tr('注册局不支持')).slice(0,100)}));return;}
@@ -244,6 +246,77 @@ window.assetboardRdap=async result=>{
 function rdapApply(a,date){
  checkpoint();a.date=date;a.dateKind=a.dateKind==='renew'?'renew':'expire';a.event=`${a.date} ${dateKinds[a.dateKind].future}`;a.registryCheckedAt=new Date().toISOString();touchAsset(a,a.registryCheckedAt);delete a.registryPhase;delete a.registryExpires;
  afterMoneyChange(a.id,tr('到期日改为 {date}',{date}));
+}
+// ---- 添加域名: a pasted or typed domain gets its expiry date and registrar from the registry, the same RDAP request as above. In the
+// form (new records) it runs by itself when a pasted line was a domain and by 从注册局填写 otherwise; a pasted list of domains is
+// checked one after another once it is imported. Only empty fields are filled, and what the check read stays on the saved record
+// (rdapRemember, registryCheckedAt) like a check from the ⋯ menu. The browser has no way to ask: it says so in the form.
+let rdapFormAsk=null,rdapFillQueue=[],rdapFillBusy=false,rdapFillDone=0,rdapFillGapMs=1500;
+function rdapFormDomain(form){const name=domainFromText(form?.elements.name?.value);return name?registrableDomain(name)||name:'';}
+function rdapFormHtml(v){
+ if(v.id)return '';
+ if(demoMode)return `<p class="form-note rdap-fill-note">${tr('演示模式不向注册局查询')}</p>`;
+ if(!nativeStore)return `<p class="form-note rdap-fill-note">${ui('lock')}${tr('到期日和注册商可以向注册局（RDAP）查询，但查询要由 Mac App 发出并记在网络记录里；浏览器版不查询，请照注册商后台填写。')}</p>`;
+ return `<div class="field-row rdap-fill"><button type="button" class="text-button inline-button" data-action="rdap-fill" title="${tr('把域名发给它的注册局（公开 RDAP）查一次，记在网络记录里；只填空着的到期日和注册商')}">${tr('从注册局填写到期日和注册商')}</button><span class="form-note" id="rdap-fill-status" role="status"></span></div>`;
+}
+function rdapFormFill(auto=false){
+ const form=$('#asset-form'),say=text=>{const el=$('#rdap-fill-status');if(el)el.textContent=text;};
+ if(!form||form.dataset.id||(form.elements.type?.value||form.dataset.type)!=='domain'||!nativeStore||demoMode)return;
+ const domain=rdapFormDomain(form);
+ if(!domain){if(!auto)say(tr('名称不是域名，无法查询'));return;}
+ if(rdapMissing(domain)){say(tr('这个后缀的注册局没有提供 RDAP，到期日只能在注册商后台看'));return;}
+ const requestId=++rdapSequence;rdapRequests.set(requestId,{form:true,domain});rdapFormAsk={requestId,domain,form};
+ window.webkit.messageHandlers.assetboard.postMessage({action:'rdap',requestId,domain});
+ say(tr('正在向 {domain} 的注册局查询…',{domain}));
+ setTimeout(()=>{if(rdapRequests.delete(requestId)&&rdapFormAsk?.requestId===requestId)say(tr('注册局没有回应，稍后再试'));},20000);
+}
+function rdapFormAnswer(ask,result){
+ const form=$('#asset-form'),say=text=>{const el=$('#rdap-fill-status');if(el)el.textContent=text;};
+ if(!form||rdapFormAsk?.requestId!==result.requestId||rdapFormAsk.form!==form||rdapFormDomain(form)!==ask.domain)return;
+ if(!result.ok){say(tr('没有查到：{error}',{error:String(result.error||tr('注册局不支持')).slice(0,100)}));return;}
+ const facts=rdapFacts(result.json),{fill,registry,registrar,differs}=rdapFormFields({date:form.elements.date?.value,provider:form.elements.provider?.value},facts);
+ if(fill.date&&form.elements.date){form.elements.date.value=fill.date;setChoice(form,'dateKind','expire');}
+ if(fill.provider&&form.elements.provider){form.elements.provider.value=fill.provider;markProviderPick(form);}
+ rdapFormAsk={...rdapFormAsk,facts,at:new Date().toISOString()};
+ say([registry?tr('注册局记录 {date} 到期',{date:registry}):tr('注册局没有给出到期日'),registrar,facts.hold?tr('冻结'):'',facts.phase?rdapPhaseLabels[facts.phase]:'',differs?tr('和填写的日期不同'):''].filter(Boolean).join(' · '));
+}
+// The submit of a new record calls this with what it is about to save.
+function rdapFormKeep(asset,form){
+ const ask=rdapFormAsk;if(ask?.form!==form)return;rdapFormAsk=null;
+ if(!ask.facts||asset?.type!=='domain'||rdapDomain(asset)!==ask.domain)return;
+ rdapRemember(asset,ask.facts,new Date(ask.at));asset.registryCheckedAt=ask.at;
+ if(ask.facts.phase)asset.registryPhase=ask.facts.phase;
+ const cmp=rdapCompare(asset,ask.facts);if(['differs','missing'].includes(cmp.dates||cmp.state))asset.registryExpires=cmp.registry;
+}
+function rdapFillStart(ids){
+ if(!nativeStore||demoMode)return;
+ const fresh=ids.filter(id=>{const a=state.assets.find(x=>x.id===id);return a?.type==='domain'&&rdapDomain(a)&&!rdapMissing(rdapDomain(a))&&!rdapFillQueue.includes(id);});
+ if(!fresh.length)return;rdapFillQueue.push(...fresh);if(!rdapFillBusy){rdapFillDone=0;rdapFillNext();}
+}
+function rdapFillNext(){
+ rdapFillBusy=false;
+ const id=rdapFillQueue.shift();
+ if(!id){if(rdapFillDone)toast(tr('已从注册局填好 {n} 个域名的到期日',{n:rdapFillDone}));rdapFillDone=0;return;}
+ const a=state.assets.find(x=>x.id===id),domain=rdapDomain(a);if(!domain){rdapFillNext();return;}
+ rdapFillBusy=true;
+ setTimeout(()=>{
+  const requestId=++rdapSequence;rdapRequests.set(requestId,{id,fill:true});
+  window.webkit.messageHandlers.assetboard.postMessage({action:'rdap',requestId,domain});
+  setTimeout(()=>{if(rdapRequests.delete(requestId)){a.registryTriedAt=new Date().toISOString();save();rdapFillNext();}},20000);
+ },rdapFillGapMs);
+}
+function rdapFillAnswer(ask,result){
+ const a=state.assets.find(x=>x.id===ask.id),now=new Date().toISOString();
+ if(a&&!result.ok){a.registryTriedAt=now;save();}
+ if(a&&result.ok){
+  const facts=rdapFacts(result.json),{fill}=rdapFormFields({date:a.date,provider:a.provider==='平台待补充'?'':a.provider},facts);
+  if(fill.date){Object.assign(a,{date:fill.date,dateKind:'expire',event:`${fill.date} ${dateKinds.expire.future}`});rdapFillDone++;}
+  if(fill.provider)a.provider=fill.provider;
+  rdapRemember(a,facts,new Date(now));a.registryCheckedAt=now;delete a.registryTriedAt;
+  if(facts.phase)a.registryPhase=facts.phase;else delete a.registryPhase;
+  save();render();if(activeAsset===a.id&&!$('#detail').hidden)showDetail(a.id,{focus:false});
+ }
+ rdapFillNext();
 }
 // ---- 每周核对注册局 (research #3, U5): off until turned on in the domain category's settings (state.rdapAuto), because it reaches
 // public registries. Then every domain is checked once every RDAP_REFRESH_DAYS, one at a time, rdapGapMs apart, on opening and every
@@ -307,6 +380,7 @@ document.addEventListener('click',e=>{
   'export':()=>exportDialog(),
   'export-ics':()=>exportRun('ics'),'restore-backup':()=>$('#backup-file')?.click(),'export-handover':()=>exportRun('handover'),
   'rdap':()=>rdapCheck(id),
+  'rdap-fill':()=>rdapFormFill(false),
   'rdap-none':()=>toast(tr('这个后缀的注册局没有提供 RDAP，到期日只能在注册商后台看')),
   'rdap-seen':()=>{const a=state.assets.find(x=>x.id===id);if(!a?.registryChange)return;delete a.registryChange;save();render();if(activeAsset===id)showDetail(id,{focus:false});},
   'rdap-ask-on':()=>{hideToast();state.rdapAuto=true;save();toast(tr('已打开：每周向注册局核对'));rdapAutoRun();},

@@ -88,7 +88,7 @@ Scripts can put JSON in this format into `~/Library/Application Support/Assetboa
 - System notifications: 30, 7 and 1 days before an expiry; 3 and 1 days before a monthly charge, trial end or cancel-by date.
 - An auto-renewal on its charge day waits in Upcoming until you confirm whether it was charged.
 - Renewal records, payment records and price changes.
-- RDAP checks of a domain's expiry date and status at the registry.
+- RDAP checks of a domain's expiry date and status at the registry; pasting a domain, a web address or a list of domains makes the records and fills their expiry dates and registrars from the registry.
 - Exports: JSON backup (can be imported again), calendar .ics, payment ledger .csv, handover list .html.
 - Privacy mode: masks names, accounts and IPs.
 - Network log: lists every request the app makes.
@@ -105,7 +105,7 @@ The free edition has no time or record limit. Pro is a US$10 one-time licence, v
 | Asset board, Upcoming, local reminders | Payment ledger, 12-month forecast, price changes |
 | Links, risk chains, panorama | Weekly automatic registry check |
 | Renewal confirmations, hold alerts, manual registry check | Cloudflare sync every 12 hours |
-| Every local import (CSV, backup, .eml, screenshots, ssh config), manual Cloudflare and GitHub sync, AI plan picker | Project totals, shutdown list, periodic review |
+| Every local import (CSV, backup, .eml, screenshots, ssh config, pasted domains), manual Cloudflare, GitHub, Namecheap, Porkbun, Hetzner, DigitalOcean and Vercel sync, AI plan picker | Project totals, shutdown list, periodic review |
 | AI recognition with your own key | Live status (SSH read, monitoring panels) |
 | Cost totals, currencies, JSON backup, .ics export, basic handover list | MCP write tools (add, edit, delete), `assetboard-cli`, Inbox folder |
 | Privacy mode, network log, read-only MCP tools | Planned: Reminders, encrypted snapshots, a handover pack |
@@ -116,7 +116,7 @@ This repository is the whole code of the free edition; building it gives the fre
 
 - Data is in `~/Library/Application Support/Assetboard/`: `assetboard.sqlite`, with a JSON mirror `board.json`. No cloud sync or telemetry.
 - Tokens and API keys are stored in the macOS Keychain.
-- Hosts the app contacts on its own: update checks (assetboard.app), site icons of known providers, exchange rates (api.frankfurter.dev), and Cloudflare once connected. Other connections (RDAP, AI, live status, GitHub) happen only after you turn them on or click.
+- Hosts the app contacts on its own: update checks (assetboard.app), site icons of known providers, exchange rates (api.frankfurter.dev), and Cloudflare once connected. Other connections (RDAP, AI, live status, GitHub, Namecheap, Porkbun, Hetzner, DigitalOcean, Vercel) happen only after you turn them on or click.
 - The page itself is barred from the network by its Content-Security-Policy; every request goes through the Swift side and is recorded in the network log.
 - Data given to external AI tools has IPs, hosts, phone numbers and emails masked by default and leaves out bank card and phone records.
 

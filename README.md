@@ -90,7 +90,7 @@ Assetboard 是一个本地 App：每条资产记下一个日期（到期、自�
 - 系统通知：到期前 30、7、1 天；按月扣款、试用结束和取消截止前 3、1 天。
 - 自动续费到了扣款日，在即将到来里等你确认是否扣款。
 - 续费记录、付款记录和价格变动。
-- 通过 RDAP 核对域名在注册局的到期日和状态。
+- 通过 RDAP 核对域名在注册局的到期日和状态；粘贴一个域名、网址或一串域名就新建记录，到期日和注册商从注册局填。
 - 导出：JSON 备份（可以导回）、日历 .ics、付款账本 .csv、交接清单 .html。
 - 隐私模式：遮住名称、账号和 IP。
 - 网络记录：列出 App 发出的每个请求。
@@ -107,7 +107,7 @@ Assetboard 是一个本地 App：每条资产记下一个日期（到期、自�
 | 资产板、即将到来、本机提醒 | 付款账本、未来 12 个月预测、价格变动 |
 | 关联、风险连锁、全景 | 每周自动核对注册局 |
 | 待确认续费、冻结提示、手动核对注册局 | Cloudflare 每 12 小时自动同步 |
-| 全部本机导入（CSV、备份、.eml、截图、ssh config）、接 Cloudflare 和 GitHub 后手动同步、AI 套餐点选 | 项目合计、关停清单、定期清理 |
+| 全部本机导入（CSV、备份、.eml、截图、ssh config、粘贴域名）、接 Cloudflare、GitHub、Namecheap、Porkbun、Hetzner、DigitalOcean、Vercel 后手动同步、AI 套餐点选 | 项目合计、关停清单、定期清理 |
 | 自配 key 的 AI 识别 | 实时状态（SSH 直读、监控面板） |
 | 费用合计、币种、JSON 备份、.ics 导出、基础交接清单 | MCP 写入工具（添加、修改、删除）、命令行 `assetboard-cli`、Inbox 文件夹 |
 | 隐私模式、网络记录、MCP 只读工具 | 即将推出：写进「提醒事项」、加密快照、「如果我出事」接手包 |
@@ -118,7 +118,7 @@ Assetboard 是一个本地 App：每条资产记下一个日期（到期、自�
 
 - 数据在 `~/Library/Application Support/Assetboard/`：`assetboard.sqlite`，另有 JSON 镜像 `board.json`。没有云同步和遥测。
 - 令牌和 API key 存在 macOS 钥匙串。
-- App 自己会连的主机：检查更新（assetboard.app）、已知平台的网站图标、汇率（api.frankfurter.dev）、连上之后的 Cloudflare。其余连接（RDAP、AI、实时状态、GitHub）在你打开或点击之后才发生。
+- App 自己会连的主机：检查更新（assetboard.app）、已知平台的网站图标、汇率（api.frankfurter.dev）、连上之后的 Cloudflare。其余连接（RDAP、AI、实时状态、GitHub、Namecheap、Porkbun、Hetzner、DigitalOcean、Vercel）在你打开或点击之后才发生。
 - 网页本身由 Content-Security-Policy 禁止联网，所有请求经过 Swift 一侧，记在网络记录里。
 - 交给外部 AI 工具的数据默认遮住 IP、主机、手机号和邮箱，不含银行卡和手机号两类记录。
 
