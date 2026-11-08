@@ -291,7 +291,9 @@ function costMeta(v){
  const scope=costScope(v);if(!scope)return '';
  const cur=totalCurrency(),t=costTotals(scope,{currency:cur,rates:fx.rates});if(!t.items.length)return '';
  askRates();
- return `<button type="button" class="meta-cost" data-action="cost-panel" title="${tr('周期费用合计，按 {cur} 换算；点开看明细、换币种',{cur})}">${tr('{money} / 月',{money:esc(formatMoney(t.monthly,cur))})}</button>`;
+ // A project view counts a shared record at its share, as the project's own figures do.
+ const project=!query&&projectViewName(v),monthly=project?projectEconomics(state.assets,state.projects,{currency:cur,rates:fx.rates,name:project}).projects[0]?.monthlyCost??t.monthly:t.monthly;
+ return `<button type="button" class="meta-cost" data-action="cost-panel" title="${tr('周期费用合计，按 {cur} 换算；点开看明细、换币种',{cur})}">${tr('{money} / 月',{money:esc(formatMoney(monthly,cur))})}</button>`;
 }
 // A record's own cost in the chosen currency, as a hint on its row; the record is never changed.
 // The cost's tip: the amount in the total's currency when it differs, and for a longer cycle what it comes to a month.
@@ -1684,7 +1686,7 @@ function agentPrepareUpdate(id,input){
  }};
 }
 // Optional fields set to nothing are removed rather than stored empty.
-function clearEmptyFields(a){for(const key of ['promotion','billingType','ownerType','project','responsiblePerson','hiddenAt','stopped','probeLink','importance','mfa','mfaWhere','recoveryCodes','vault','legacy','backup','backupNote','restoreTestedOn','dnsHost','keepAlive'])if(a[key]===null||a[key]==='')delete a[key];return a;}
+function clearEmptyFields(a){for(const key of ['promotion','billingType','ownerType','project','projectShares','responsiblePerson','hiddenAt','stopped','probeLink','importance','mfa','mfaWhere','recoveryCodes','vault','legacy','backup','backupNote','restoreTestedOn','dnsHost','keepAlive'])if(a[key]===null||a[key]==='')delete a[key];return a;}
 // Agent requests that wait for the person (deletes). They live on the board, outside undo, so an agent can look them up later:
 // pending → done (every record answered, at least one deleted), cancelled (all kept) or failed (none could be deleted).
 const AGENT_ACTION_LIMIT=200;
