@@ -205,3 +205,13 @@ jobs:
           url="$(tools/github-release.sh "$VERSION" "$RUNNER_TEMP/release-notes.md" \
             "$RELEASE_DIR/Assetboard-macOS-arm64-$VERSION.dmg" "$RELEASE_DIR/Assetboard-macOS-arm64-$VERSION.zip" | tail -1)"
           echo "GitHub Release: $url" >> "$GITHUB_STEP_SUMMARY"
+
+  # The Mac mini's own developer build follows each release; its own workflow, so it can also run by hand (mini-dev.yml).
+  mini-dev:
+    name: Update Mini dev build
+    needs: release
+    uses: ./.github/workflows/mini-dev.yml
+    with:
+      ref: ${{ github.sha }}
+    secrets:
+      PRO_REPO_TOKEN: ${{ secrets.PRO_REPO_TOKEN }}
