@@ -24,7 +24,8 @@ import Foundation
       charges                              已到扣款日、还没确认的自动扣款
       forecast [--from 日期] [--to 日期] [--currency CNY] [--project P]
       history [<id>]                       价格变化历史（带 id 时含付款记录）
-      projects [--currency CNY]            项目：每月费用（共用的按份额分摊）、收入和盈亏
+      projects [--currency USD]            项目：每月费用（共用的按份额分摊）、收入和盈亏，默认按 USD
+      update-project <项目> <JSON | ->     改项目的每月收入和共用资产的份额，例如 {"revenue":{"amount":30,"currency":"USD"}}
       mcp                                  以 MCP 服务器运行（stdio）
     结果以 JSON 输出；出错时退出码为 1。
     """
@@ -47,7 +48,8 @@ import Foundation
       charges                              Automatic charges whose day has come and that are not confirmed yet
       forecast [--from DATE] [--to DATE] [--currency CNY] [--project P]
       history [<id>]                       Price history (with an id, also its payments)
-      projects [--currency CNY]            Projects: monthly cost (shared assets split by share), revenue and net
+      projects [--currency USD]            Projects: monthly cost (shared assets split by share), revenue and net, in USD by default
+      update-project <name> <JSON | ->     Set a project's monthly revenue and its shared assets' shares, e.g. {"revenue":{"amount":30,"currency":"USD"}}
       mcp                                  Run as an MCP server (stdio)
     Results are printed as JSON; the exit code is 1 on an error.
     """
@@ -166,6 +168,11 @@ import Foundation
             return ("renew", params)
         case "charges": return ("charges", [:])
         case "projects": return ("projects", option("--currency").map { ["currency": $0] } ?? [:])
+        case "update-project":
+            guard rest.count >= 2 else { throw UsageError(text: L("用法：update-project <项目> <JSON | ->")) }
+            guard var params = try json(rest[1]) as? [String: Any] else { throw UsageError(text: L("字段需要是 JSON 对象")) }
+            params["name"] = rest[0]
+            return ("updateProject", params)
         case "forecast":
             var params: [String: Any] = [:]
             for (flagName, key) in [("--from", "from"), ("--to", "to"), ("--currency", "currency"), ("--project", "project"), ("--type", "type")] { if let value = option(flagName) { params[key] = value } }
@@ -245,7 +252,7 @@ import Foundation
         precondition((future?["result"] as? [String: Any])?["protocolVersion"] as? String == MCPServer.protocolVersions[0], "An unknown version gets the newest")
         precondition(MCPServer.handle(["jsonrpc": "2.0", "method": "notifications/initialized"]) == nil, "Notifications get no reply")
         let tools = ((MCPServer.handle(["jsonrpc": "2.0", "id": "t", "method": "tools/list"])?["result"] as? [String: Any])?["tools"] as? [[String: Any]]) ?? []
-        precondition(tools.count == 24 && Set(tools.compactMap { $0["name"] as? String }) == Set(MCPServer.methods.keys), "Twenty-four tools, each mapped to a call")
+        precondition(tools.count == 25 && Set(tools.compactMap { $0["name"] as? String }) == Set(MCPServer.methods.keys), "Twenty-five tools, each mapped to a call")
         precondition(Set(MCPServer.methods.values).count == MCPServer.methods.count && MCPServer.methods.values.allSatisfy { $0.count <= 40 }, "Each tool has its own call, short enough for the app")
         // No tool asks for a credential, and none reads or steers 实时状态 (probe sources, SSH 直读): those stay in the app.
         let secret = try! NSRegularExpression(pattern: "password|passwd|token|secret|session|cookie|jwt|username|credential", options: [.caseInsensitive])
@@ -261,7 +268,7 @@ import Foundation
         precondition(!MCPServer.methods.values.contains { ["probeSourceAdd", "probeSourceUpdate", "probeSourceRemove", "sshSet", "sshInterval", "probeSources", "probeRefresh", "probeServers", "serverMetrics", "probeLink", "sshHosts", "sshRefresh"].contains($0) }, "No call reads or writes 实时状态")
         // Annotations: every tool says whether it reaches the network; writes that can overwrite or remove say destructive.
         let hints = { (name: String) in byName[name]?["annotations"] as? [String: Any] ?? [:] }
-        let destructive: Set<String> = ["update_asset", "update_assets", "renew_asset", "request_delete_assets", "delete_asset", "set_icon_site", "fetch_icons", "sync_cloudflare"]
+        let destructive: Set<String> = ["update_asset", "update_assets", "update_project", "renew_asset", "request_delete_assets", "delete_asset", "set_icon_site", "fetch_icons", "sync_cloudflare"]
         let openWorld: Set<String> = ["add_assets", "update_asset", "update_assets", "fetch_icons", "sync_cloudflare"]
         for (name, _) in byName {
             let hint = hints(name)
@@ -273,6 +280,9 @@ import Foundation
         precondition((((byName["update_asset"]?["inputSchema"] as? [String: Any])?["properties"] as? [String: Any])?["fields"] as? [String: Any]).flatMap { ($0["properties"] as? [String: Any])?.keys }.map { Set($0).isSuperset(of: ["hidden", "stopped", "visibility"]) && !$0.contains("probeLink") } == true, "update_asset takes hidden, stopped and visibility, not probeLink")
         precondition(parsed(["projects", "--currency", "USD"])?.1["currency"] as? String == "USD" && parsed(["projects"])?.1.isEmpty == true, "projects takes a currency")
         precondition(((byName["list_projects"]?["inputSchema"] as? [String: Any])?["properties"] as? [String: Any])?.keys.sorted() == ["currency"] && (byName["list_projects"]?["description"] as? String)?.contains("net") == true, "list_projects gives revenue and net in a currency")
+        let project = parsed(["update-project", "web", "{\"revenue\":{\"amount\":30,\"currency\":\"USD\"}}"])
+        precondition(project?.0 == "updateProject" && project?.1["name"] as? String == "web" && project?.1["revenue"] is [String: Any] && parsed(["update-project", "web"]) == nil && parsed(["update-project", "web", "[1]"]) == nil, "update-project takes a name and an object")
+        precondition(((byName["update_project"]?["inputSchema"] as? [String: Any])?["properties"] as? [String: Any])?.keys.sorted() == ["currency", "name", "revenue", "shares"] && (byName["update_project"]?["inputSchema"] as? [String: Any])?["required"] as? [String] == ["name"], "update_project takes name, revenue, shares and currency")
         precondition(parsed(["pay", "x1", "--amount", "6", "--missed"])?.1["missed"] as? Bool == true && parsed(["pay", "x1", "--amount", "six"]) == nil, "pay options")
         precondition(parsed(["renew", "x1", "--until", "2027-03-01"])?.1["until"] as? String == "2027-03-01" && parsed(["renew", "x1"]) == nil, "renew needs --until")
         precondition((parsed(["delete-many", "a", "b", "--reason", "x"])?.1["ids"] as? [String]) == ["a", "b"], "delete-many takes ids")
@@ -280,7 +290,7 @@ import Foundation
         precondition(tools.allSatisfy { JSONSerialization.isValidJSONObject($0) && ($0["inputSchema"] as? [String: Any])?["type"] as? String == "object" }, "Tool schemas are JSON objects")
         precondition((MCPServer.handle(["jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": ["name": "drop_all"]])?["error"] as? [String: Any])?["code"] as? Int == -32602, "An unknown tool is an error")
         precondition((MCPServer.handle(["jsonrpc": "2.0", "id": 4, "method": "resources/list"])?["error"] as? [String: Any])?["code"] as? Int == -32601, "An unknown method is an error")
-        print("PASS: CLI arguments, add formats, bad arguments, pay/renew/delete-many/update-many, MCP initialize and version, notifications, twenty-four tools with schemas (none asks for a credential or reaches 实时状态; destructive and open-world hints), unknown tool and method")
+        print("PASS: CLI arguments, add formats, bad arguments, pay/renew/delete-many/update-many/update-project, MCP initialize and version, notifications, twenty-five tools with schemas (none asks for a credential or reaches 实时状态; destructive and open-world hints), unknown tool and method")
     }
 
     static func pretty(_ value: Any) -> String {
@@ -384,13 +394,17 @@ enum MCPServer {
         let listProperties: [String: Any] = ["type": type, "query": ["type": "string"], "includeHidden": ["type": "boolean"], "limit": limit, "offset": offset, "project": text, "billingType": billingType]
         let update: [String: Any] = ["type": "object", "properties": ["id": id, "fields": fields], "required": ["id", "fields"]]
         let ids: [String: Any] = ["type": "array", "minItems": 1, "maxItems": 100, "items": ["type": "string"]]
+        let revenue: [String: Any] = ["type": ["object", "null", "string"], "properties": ["amount": ["type": "number"], "currency": currency]]
+        let percents: [String: Any] = ["type": ["object", "null"], "additionalProperties": ["type": ["number", "string"]]]
+        let share: [String: Any] = ["type": "object", "properties": ["id": id, "shares": percents], "required": ["id", "shares"]]
         return [
             tool("list_asset_types", "List categories", "List Assetboard's asset categories (id, Chinese name, hint) with common vendors for each (providers). Use one of those names as provider when it fits, so the record matches the app's presets and gets the vendor's site icon; any other name is accepted too.", [:], [], readOnly: true),
             tool("list_assets", "List or search assets", "List assets, optionally filtered by category and a search text (name, provider, account, purpose, notes, region, IP, host); the search matches the real values. Hidden assets are left out unless includeHidden is true. IPs, SSH hosts and users, phone numbers and email addresses come masked with • (listed in masked) and bank cards and phone numbers are left out (counted in withheld) unless the person allows them in the app's settings. Returns {total, offset, assets, withheld}.", listProperties, [], readOnly: true),
             tool("get_cost_totals", "Recurring cost totals", "Monthly and yearly recurring cost in one currency (assets keep their own; converted with the day's ECB rates; a running promotion counts at its promo price), by category and largest first. oneOffTotal sums one-off costs apart. notCounted lists free, oneOff, noCycle (amount without a cycle), unreadable and noRate ids. Filter by type or project; groupBy splits the totals. Hidden and stopped assets are left out.", ["currency": ["type": "string", "enum": ["CNY", "USD", "EUR", "GBP", "HKD", "JPY"]], "type": type, "project": text, "groupBy": ["type": "string", "enum": ["project", "type"]]], [], readOnly: true),
             tool("get_cost_forecast", "Spending forecast", "Expected spending between from and to (default: the next 12 months, at most 5 years): every charge date of every asset priced on that day — promotions and their end, trials turning into charges, manual renewals at today's price, one-off costs on their date; recurring costs without a date are spread per month (basis \"spread\"). Returns total, byMonth, items and what could not be counted.", ["from": date, "to": date, "months": ["type": "integer", "minimum": 1, "maximum": 60], "currency": currency, "type": type, "project": text], [], readOnly: true),
             tool("get_cost_history", "Price history", "Every change of an asset's cost (from, to, amountFrom, amountTo, currencies, at, source: edit, agent, renew, payment, promotion-end, import), newest first; with id, also that asset's payments.", ["id": id, "from": date, "limit": ["type": "integer", "minimum": 1, "maximum": 1000]], [], readOnly: true),
-            tool("list_projects", "List projects", "Projects (the project labels in use), each with: count; monthly and yearly (recurring cost, a shared asset at full price in every project); monthlyCost (a shared asset split equally among its projects, or by the asset's projectShares percentages); revenue ({amount, currency} per month, or null), revenueMonthly and net (revenueMonthly minus monthlyCost; null without revenue) in currency; complete (false while some cost is unknown); assets [{id, name, share (percent), split (equal|custom), monthly, cost, notCounted (free, oneOff, none, noCycle, unreadable, noRate or stopped)}]; invalidShares (ids whose shares no longer fit, split equally). Read-only: no tool writes revenue or shares.", ["currency": currency], [], readOnly: true),
+            tool("list_projects", "List projects", "Projects (the project labels in use), each with: count; monthly and yearly (recurring cost, a shared asset at full price in every project); monthlyCost (a shared asset split equally among its projects, or by the asset's projectShares percentages); revenue ({amount, currency} per month, or null), revenueMonthly and net (revenueMonthly minus monthlyCost; null without revenue) in currency; complete (false while some cost is unknown); assets [{id, name, share (percent), split (equal|custom), monthly, cost, notCounted (free, oneOff, none, noCycle, unreadable, noRate or stopped)}]; invalidShares (ids whose shares no longer fit, split equally). currency defaults to USD. A project has one monthly revenue: one that earns from several sources keeps their sum. update_project sets revenue and shares.", ["currency": currency], [], readOnly: true),
+            tool("update_project", "Set a project's revenue and shares", "Set one project's monthly revenue and how its shared assets split their cost; the project must already be on some asset (update_asset project). revenue {amount, currency} is the project's whole monthly revenue (add several sources up into one amount); null or \"\" clears it. shares [{id, shares}] up to 100: for an asset in this project and others, shares {project: percent} names each of its projects, 0–100 with at most 2 decimals, adding up to 100; shares null goes back to an equal split. Everything is checked first, then written as one undo step in the app. Returns the project as list_projects gives it (in currency, default USD).", ["name": text, "revenue": revenue, "shares": ["type": "array", "minItems": 1, "maxItems": 100, "items": share], "currency": currency], ["name"], readOnly: false, destructive: true),
             tool("list_unconfirmed_charges", "Unconfirmed automatic charges", "Automatic charges (dateKind renew with a cycle) whose day has come in the last 45 days and that nobody has confirmed. Answer them with record_payment (covers = the due date).", [:], [], readOnly: true),
             tool("record_payment", "Record a payment", "Write down what was actually paid for an asset (or, with missed: true, that an expected charge did not happen). amount and currency default to the price on that day; covers is the due date it pays for. Undoable in the app. Returns the payment and the asset.", ["id": id, "paidOn": date, "amount": ["type": "number"], "currency": currency, "covers": date, "months": ["type": "integer"], "note": text, "missed": ["type": "boolean"]], ["id"], readOnly: false),
             tool("renew_asset", "Mark an asset renewed", "Move an asset's date to until (renewal counted from the current due date), record what was paid, and by default update the price when the payment covers exactly one cycle. Returns the asset, the payment and the date it renewed from.", ["id": id, "until": date, "amount": ["type": "number"], "currency": currency, "paidOn": date, "updateCost": ["type": "boolean"]], ["id", "until"], readOnly: false, destructive: true),
@@ -424,7 +438,7 @@ enum MCPServer {
     }
 
     static let methods = ["get_cost_totals": "totals", "list_asset_types": "types", "list_assets": "list", "get_asset": "get", "add_assets": "add", "update_asset": "update", "delete_asset": "delete",
-                          "get_cost_forecast": "forecast", "get_cost_history": "costHistory", "list_projects": "projects", "list_unconfirmed_charges": "charges", "record_payment": "recordPayment", "renew_asset": "renew",
+                          "get_cost_forecast": "forecast", "get_cost_history": "costHistory", "list_projects": "projects", "update_project": "updateProject", "list_unconfirmed_charges": "charges", "record_payment": "recordPayment", "renew_asset": "renew",
                           "update_assets": "updateMany", "request_delete_assets": "deleteMany", "list_pending_actions": "actions", "get_action_status": "action",
                           "list_icon_platforms": "iconPlatforms", "set_icon_site": "iconSite", "fetch_icons": "iconFetch",
                           "get_cloudflare_sync_status": "cloudflareStatus", "sync_cloudflare": "cloudflareSync", "list_sync_blocklist": "syncBlocklist", "unblock_sync_item": "syncUnblock"]
