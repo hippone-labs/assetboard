@@ -668,6 +668,7 @@ body.import-drag::after{content:'松开以导入';position:fixed;inset:12px;bord
 
 .platform-bar{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .platform-bar .button{margin:0}
+.platform-bar .platform-chips{display:flex;align-items:center;gap:6px}
 .chip.ok{color:var(--ink);border-color:rgba(var(--tone-primary),.5)}
 .chip.bad{color:var(--danger);border-color:var(--danger-border)}
 .platform-note{display:flex;align-items:flex-start;gap:6px}

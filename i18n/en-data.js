@@ -270,6 +270,7 @@ Object.assign(I18N.en,{
  '阿根廷':'Argentina',
  '德国':'Germany',
  '法国':'France',
+ '芬兰':'Finland',
  '荷兰':'Netherlands',
  '爱尔兰':'Ireland',
  '西班牙':'Spain',

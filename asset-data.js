@@ -360,6 +360,7 @@ function syncKey(source,externalId,kind){
  if(source==='github')return `github:${id}`;
  if(source==='ssh')return `ssh:${id}`;
  if(source==='csv')return `csv:${id}`;
+ if(Object.hasOwn(CLOUD_IMPORTS,source||''))return `${source}:${kind}:${id}`;
  return `${source}:${id}`;
 }
 
@@ -371,8 +372,22 @@ const REGISTRARS={
  porkbun:{name:'Porkbun',keyUrl:'https://porkbun.com/account/api',manage:'https://porkbun.com/account/domainsSpeedy',
   fields:[{key:'apiKey',label:'API Key',secret:true},{key:'secretKey',label:'Secret Key',secret:true}]}
 };
+// Cloud platforms whose servers, deployments, databases and domains the Mac app reads (从云平台导入, read-only), per kind: the record
+// type and what `purpose` says on a new record. `wide`: the platform has no read-only token, so the dialog asks for a confirmation
+// before one is kept. Credentials stay in the Keychain on the Swift side; the page only names the fields.
+const CLOUD_IMPORTS={
+ hetzner:{name:'Hetzner',keyUrl:'https://console.hetzner.com/projects',manage:'https://console.hetzner.com/projects',host:'hetzner.com',
+  kinds:{server:{type:'server',purpose:'Cloud Server'}},
+  fields:[{key:'token',label:'API 令牌',secret:true},{key:'project',label:'项目名（可选）',secret:false,optional:true}]},
+ digitalocean:{name:'DigitalOcean',keyUrl:'https://cloud.digitalocean.com/account/api/tokens',manage:'https://cloud.digitalocean.com/',host:'digitalocean.com',
+  kinds:{droplet:{type:'server',purpose:'Droplet'},app:{type:'deployment',purpose:'App Platform'},database:{type:'database',purpose:'Managed Database'}},
+  fields:[{key:'token',label:'API 令牌',secret:true}]},
+ vercel:{name:'Vercel',keyUrl:'https://vercel.com/account/tokens',manage:'https://vercel.com/dashboard',host:'vercel.com',wide:true,
+  kinds:{project:{type:'deployment',purpose:'Vercel 项目'},domain:{type:'domain',purpose:''}},
+  fields:[{key:'token',label:'API 令牌',secret:true},{key:'team',label:'团队 ID 或 slug（可选）',secret:false,optional:true}]}
+};
 // Sources whose records belong to a platform: the form keeps their source, and they cannot be dragged into another category.
-const PLATFORM_SOURCES=['cloudflare','github',...Object.keys(REGISTRARS)];
+const PLATFORM_SOURCES=['cloudflare','github',...Object.keys(REGISTRARS),...Object.keys(CLOUD_IMPORTS)];
 function assetSyncKey(asset){
  if(!asset)return null;
  return syncKey(asset.source,asset.externalId,asset.resourceKind)||([...PLATFORM_SOURCES,'ssh'].includes(asset.source)?asset.id:null);
@@ -382,7 +397,7 @@ function isBlacklisted(board,key){return !!key&&Array.isArray(board.deletedExter
 
 function findByExternal(board,source,externalId,kind){
  const id=String(externalId);
- return board.assets.find(asset=>asset.source===source&&asset.externalId!=null&&String(asset.externalId)===id&&(source!=='cloudflare'||(asset.resourceKind||'zone')===(kind||'zone')));
+ return board.assets.find(asset=>asset.source===source&&asset.externalId!=null&&String(asset.externalId)===id&&(source==='cloudflare'?(asset.resourceKind||'zone')===(kind||'zone'):!Object.hasOwn(CLOUD_IMPORTS,source)||asset.resourceKind===kind));
 }
 
 function findNameCollision(board,source,name,type,externalId){
@@ -397,7 +412,7 @@ function syncedLabel(a){return a?.source==='csv'?'导入于':'同步于';}
 // A source that syncs by itself and has stopped answering looks as if it still syncs: an expired or revoked token just leaves the
 // records as they were (research U4). For the given automatic sources, the newest sync per source and account, when it is older than
 // STALE_SYNC_DAYS; the oldest first. Manual sources (GitHub, ~/.ssh/config) are as fresh as the person last made them, so not here.
-const STALE_SYNC_DAYS=3,SYNC_SOURCE_NAMES={cloudflare:'Cloudflare',github:'GitHub',ssh:'~/.ssh/config',...Object.fromEntries(Object.entries(REGISTRARS).map(([key,r])=>[key,r.name]))};
+const STALE_SYNC_DAYS=3,SYNC_SOURCE_NAMES={cloudflare:'Cloudflare',github:'GitHub',ssh:'~/.ssh/config',...Object.fromEntries([...Object.entries(REGISTRARS),...Object.entries(CLOUD_IMPORTS)].map(([key,r])=>[key,r.name]))};
 function staleSyncs(assets,{now=new Date(),auto=[]}={}){
  const groups=new Map(),today=localDay(now);
  for(const a of assets||[]){
@@ -600,6 +615,92 @@ function mergeRegistrar(board,result,syncedAt=new Date().toISOString()){
  if(result.complete!==false)for(const asset of next.assets)if(asset.source===source&&(asset.account||'')===account&&!seen.has(asset.id))asset.syncMissing=true;
  ensureBlock(next,'domain');
  return {board:next,added,read:domains.length,collisions,skipped};
+}
+
+const CLOUD_LIMIT=2000;
+// What Swift passed on, checked again here: a known kind each, a plain id, a name (a real domain name for domains), at most IP_LIMIT
+// addresses, a country code the board knows, a monthly price in a currency it knows, a link on the platform's own https host, an
+// expiry day and auto-renew for domains, and the status as a short lowercase word. Each kind and id once; at most CLOUD_LIMIT.
+function cleanCloudResources(source,list){
+ const vendor=Object.hasOwn(CLOUD_IMPORTS,source||'')?CLOUD_IMPORTS[source]:null,resources=[],ids=new Set();let skipped=0;
+ for(const raw of vendor&&Array.isArray(list)?list.slice(0,CLOUD_LIMIT):[]){
+  const kind=String(raw?.kind??''),id=String(raw?.id??'').trim(),domain=kind==='domain';
+  const name=domain?String(raw?.name??'').trim().toLowerCase().replace(/\.$/,''):String(raw?.name??'').replace(/[\u0000-\u001f\u007f]/g,'').trim().slice(0,100);
+  if(!Object.hasOwn(vendor.kinds,kind)||!/^[\w.-]{1,100}$/.test(id)||!name||domain&&!DOMAIN_NAME.test(name)||ids.has(`${kind}:${id}`)){skipped++;continue;}
+  ids.add(`${kind}:${id}`);
+  const item={kind,id,name,status:String(raw?.status??'').trim().toLowerCase().replace(/[^a-z_ -]/g,'').slice(0,30)};
+  const ips=parseIps((Array.isArray(raw?.ips)?raw.ips:[]).filter(ip=>typeof ip==='string').join(' ')).ips.map(x=>x.ip);
+  if(ips.length)item.ips=ips;
+  const region=String(raw?.region??'').toUpperCase();
+  if(regionName(region))item.region=region;
+  const value=Number(raw?.price?.value),currency=String(raw?.price?.currency??'');
+  if(currencyDisplay[currency]&&Number.isFinite(value)&&value>0&&value<100000)item.price={currency,value:String(Math.round(value*100)/100)};
+  const detail=String(raw?.detail??'').replace(/[\u0000-\u001f\u007f]/g,'').trim().slice(0,60);
+  if(detail)item.detail=detail;
+  try{const url=new URL(String(raw?.url??''));if(url.protocol==='https:'&&!url.username&&!url.password&&(url.hostname===vendor.host||url.hostname.endsWith('.'+vendor.host)))item.url=url.href;}catch{}
+  if(domain){const expires=registrarDate(raw?.expires),renew=registrarFlag(raw?.autoRenew);if(expires)item.expires=expires;if(renew!==null)item.autoRenew=renew;}
+  resources.push(item);
+ }
+ if(Array.isArray(list)&&list.length>CLOUD_LIMIT)skipped+=list.length-CLOUD_LIMIT;
+ return {resources,skipped};
+}
+// The credentials typed for a cloud platform, checked before anything is sent (Swift checks them again): '' when they look right, else
+// what is wrong. Optional fields may stay empty.
+function cloudCredentialProblem(source,values){
+ if(!Object.hasOwn(CLOUD_IMPORTS,source||''))return tr('不认识这个平台');
+ const fields=CLOUD_IMPORTS[source].fields,v=Object.fromEntries(fields.map(f=>[f.key,String(values?.[f.key]??'').trim()]));
+ if(fields.some(f=>!f.optional&&!v[f.key]))return tr('请填写 API 令牌');
+ if(source==='hetzner'){
+  if(!/^[A-Za-z0-9]{64}$/.test(v.token))return tr('Hetzner 的 API 令牌是 64 个字母和数字');
+  if(v.project.length>60||/[\u0000-\u001f\u007f]/.test(v.project))return tr('项目名最多 60 字');
+ }
+ if(source==='digitalocean'&&!/^do[opr]_v1_[a-f0-9]{64}$/.test(v.token))return tr('DigitalOcean 的令牌以 dop_v1_ 开头');
+ if(source==='vercel'){
+  if(!/^[A-Za-z0-9_-]{20,128}$/.test(v.token))return tr('Vercel 的令牌是一串字母和数字');
+  if(v.team&&!/^(?:team_[A-Za-z0-9]{1,60}|[a-z0-9](?:[a-z0-9-]{0,98}[a-z0-9])?)$/.test(v.team))return tr('团队要填 team_ 开头的 ID 或团队 slug');
+ }
+ return '';
+}
+// Cloud imports merge like Cloudflare: ids look like hetzner-server-<id>, a deleted one stays deleted (deletedExternalIds), the name the
+// person gave a record is kept (syncName holds the platform's), a same-name record of another source is asked about (collisions),
+// and the account's records of the kinds this answer read (queriedKinds; a kind the token may not read is left alone) that it no
+// longer returns are marked syncMissing, never removed. Addresses, the region and the status follow the platform; the monthly price
+// fills an empty cost, and after that the cost is the person's. A Vercel domain takes its expiry and auto-renew like a registrar's.
+function mergeCloudImport(board,result,syncedAt=new Date().toISOString()){
+ const source=result?.source,vendor=Object.hasOwn(CLOUD_IMPORTS,source||'')?CLOUD_IMPORTS[source]:null;
+ if(!vendor)return {board,added:0,read:0,collisions:[],skipped:0};
+ const next=structuredClone(board),{resources,skipped}=cleanCloudResources(source,result.resources),account=String(result.account||'').trim().slice(0,100),seen=new Set(),collisions=[];
+ const queried=new Set((Array.isArray(result.queriedKinds)?result.queriedKinds:Object.keys(vendor.kinds)).filter(kind=>Object.hasOwn(vendor.kinds,kind)));
+ let added=0;
+ if(!Array.isArray(next.deletedExternalIds))next.deletedExternalIds=[];
+ for(const item of resources){
+  const {type,purpose}=vendor.kinds[item.kind],id=`${source}-${item.kind}-${item.id}`;seen.add(id);
+  if(isBlacklisted(next,syncKey(source,item.id,item.kind))||isBlacklisted(next,id))continue;
+  const fields={syncName:item.name,account,syncStatus:item.status,syncedAt,externalId:item.id,resourceKind:item.kind,source,provider:vendor.name,
+   ...(item.ips?{ips:item.ips}:{}),...(item.region?{region:item.region}:{})};
+  if(type==='domain'){
+   const renew=item.autoRenew??null;
+   if(renew!==null)fields.autoRenew=renew?'on':'off';
+   if(item.expires)Object.assign(fields,{date:item.expires,dateKind:'expire',event:`${item.expires} ${dateKinds.expire.future}`,...(renew===null?{}:{cycle:renew?'yearly':''})});
+  }
+  if(!fields.event)fields.event=item.status||'状态未知';
+  const price=item.price?{cost:formatCost(item.price,'monthly'),cycle:'monthly'}:{};
+  const existing=next.assets.find(asset=>asset.id===id)||findByExternal(next,source,item.id,item.kind);
+  if(existing){
+   const own=(existing.syncName??existing.name)!==existing.name?existing.name:null;
+   applySyncedFields(existing,{...fields,name:own??item.name,...(!existing.cost||existing.cost==='未知'?price:{})});
+   seen.add(existing.id);
+  }else{
+   const collision=findNameCollision(next,source,item.name,type,item.id);
+   if(collision){collisions.push({assetId:collision.id,name:item.name,source:vendor.name,fields:{...fields,name:item.name,type,url:collision.url||item.url||vendor.manage,...(!collision.cost||collision.cost==='未知'?price:{})}});continue;}
+   next.assets.push({id,createdAt:syncedAt,type,name:item.name,purpose:[purpose,item.detail].filter(Boolean).join(' · '),date:'',dateKind:type==='domain'?'expire':'renew',cycle:'',cost:'未知',
+    notes:`${vendor.name} 资源列表同步${type==='domain'?(item.expires?'（含到期日）':'；到期日未知'):item.price?'；费用是列表月价，不含流量、备份和另计的附加项':'；账单未知'}。`,url:item.url||vendor.manage,art:'generic',...fields,...price});
+   added++;
+  }
+  ensureBlock(next,type);
+ }
+ if(result.complete!==false)for(const asset of next.assets)if(asset.source===source&&(asset.account||'')===account&&queried.has(asset.resourceKind)&&!seen.has(asset.id))asset.syncMissing=true;
+ return {board:next,added,read:resources.length,collisions,skipped};
 }
 
 function applyCollision(board,collision){
@@ -872,7 +973,7 @@ function applyAiItem(base,item,{assets=[],now=new Date(),fallback=true}={}){
 }
 
 // Cross-border accounts: region code, Chinese name and calling code.
-const regionList=[['CN','中国大陆','86'],['HK','中国香港','852'],['MO','中国澳门','853'],['TW','中国台湾','886'],['US','美国','1'],['GB','英国','44'],['JP','日本','81'],['KR','韩国','82'],['SG','新加坡','65'],['MY','马来西亚','60'],['TH','泰国','66'],['VN','越南','84'],['PH','菲律宾','63'],['ID','印度尼西亚','62'],['IN','印度','91'],['AU','澳大利亚','61'],['NZ','新西兰','64'],['CA','加拿大','1'],['MX','墨西哥','52'],['BR','巴西','55'],['AR','阿根廷','54'],['DE','德国','49'],['FR','法国','33'],['NL','荷兰','31'],['IE','爱尔兰','353'],['ES','西班牙','34'],['IT','意大利','39'],['CH','瑞士','41'],['SE','瑞典','46'],['PL','波兰','48'],['UA','乌克兰','380'],['RU','俄罗斯','7'],['KZ','哈萨克斯坦','7'],['TR','土耳其','90'],['AE','阿联酋','971'],['SA','沙特阿拉伯','966'],['IL','以色列','972'],['PK','巴基斯坦','92'],['NG','尼日利亚','234'],['ZA','南非','27'],['EG','埃及','20']];
+const regionList=[['CN','中国大陆','86'],['HK','中国香港','852'],['MO','中国澳门','853'],['TW','中国台湾','886'],['US','美国','1'],['GB','英国','44'],['JP','日本','81'],['KR','韩国','82'],['SG','新加坡','65'],['MY','马来西亚','60'],['TH','泰国','66'],['VN','越南','84'],['PH','菲律宾','63'],['ID','印度尼西亚','62'],['IN','印度','91'],['AU','澳大利亚','61'],['NZ','新西兰','64'],['CA','加拿大','1'],['MX','墨西哥','52'],['BR','巴西','55'],['AR','阿根廷','54'],['DE','德国','49'],['FR','法国','33'],['FI','芬兰','358'],['NL','荷兰','31'],['IE','爱尔兰','353'],['ES','西班牙','34'],['IT','意大利','39'],['CH','瑞士','41'],['SE','瑞典','46'],['PL','波兰','48'],['UA','乌克兰','380'],['RU','俄罗斯','7'],['KZ','哈萨克斯坦','7'],['TR','土耳其','90'],['AE','阿联酋','971'],['SA','沙特阿拉伯','966'],['IL','以色列','972'],['PK','巴基斯坦','92'],['NG','尼日利亚','234'],['ZA','南非','27'],['EG','埃及','20']];
 // regionList keeps the Chinese names the form matches; regionName is the name people read.
 function regionName(code){const name=regionList.find(([id])=>id===code)?.[1];return name?tr(name):'';}
 function regionFlag(code){return /^[A-Z]{2}$/.test(code||'')?String.fromCodePoint(...[...code].map(letter=>0x1F1A5+letter.charCodeAt(0))):'';}
@@ -2860,4 +2961,4 @@ function rdapFormFields(current,facts){
  return {fill,registry,registrar,differs:!!(registry&&date&&date!==registry)};
 }
 
-if(typeof module!=='undefined')module.exports={touchAsset,editedTime,TOMBSTONE_LIMIT,addTombstone,cleanTombstones,BOARD_SETTINGS,backupSettings,mergeBoardSettings,settleLinks,backupCounts,LEGACY_WORDS,LEGACY_STATES,MFA_KINDS,RECOVERY_TYPES,RECOVERY_FIELDS,BACKUP_KINDS,BACKUP_TYPES,IMPORTANCE,looksLikeSecret,recoveryText,recoveryGap,backupText,mailHost,mailDependents,selfRecovery,mailStake,PHONE_STATUSES,phoneTrouble,carrierNote,cardPaysPhone,setCardPays,CREDIT_RULES,creditRule,settleCreditExpiry,PLATFORM_SOURCES,missedReminders,reminderDays,STALE_SYNC_DAYS,staleSyncs,AUTO_RENEW_WORDS,CARD_STATUSES,cardTrouble,sourceTrouble,IMPACT_WORDS,verifyNumbers,phoneReach,phoneStake,syncedLabel,BILLING_TYPES,billingLabels,isFreeCost,billingTypeOf,validPromotion,moneyOn,settlePromotions,noteCostChange,costForecast,PAYMENT_LIMIT,CONFIRM_DAYS,paymentList,paidPayments,lastPayment,recordPayment,removePayment,occurrencesBetween,pendingCharges,pendingRenewals,confirmRenewal,cardOutlook,runsOut,needsConfirm,confirmWords,LIFECYCLE_RULES,lifecycleRule,lifecycleOf,AFTER_DUE_DAYS,monthsBetween,renewBase,canRenew,renewOptions,costFromPayment,renewAsset,confirmCharge,priceChange,paidTotals,ledgerRows,csvCell,ledgerCsv,SLEEP_CHECKED,SLEEP_RULES,KEEPALIVE_TYPES,KEEPALIVE_EVERY,sleepRuleOf,cleanKeepAlive,keepAliveCron,keepAliveWorkflow,cleanProject,PROJECTS_PER_ASSET,projectsOf,projectNameOk,renameProject,parseProjects,setProjects,inProject,projectNames,projectAssets,shutdownPlan,REVIEW_QUIET_DAYS,reviewQueue,icsFold,calendarIcs,escHtml,handoverHtml,rdapFacts,rdapCompare,rdapPhaseLabels,registryPhaseOf,RDAP_HOLDS,rdapHoldLabels,RDAP_MISSING_TLDS,rdapMissing,rdapNameservers,registryHoldOf,registryChangeOf,rdapRemember,registryAlerts,dueLevel,DOMAIN_NAME,domainFromText,domainListText,domainListItems,REGISTRAR_ALIASES,registrarProvider,rdapFormFields,renewalGrace,RENEWAL_GRACE_DAYS,maskName,PROVIDER_PRESETS,providerPresets,MAIN_CURRENCIES,FALLBACK_RATES,costAmount,syncMoney,convertMoney,formatMoney,costTotals,MOUNT_TYPES,relationKind,linkAllowed,LINK_KINDS,LINK_KIND_ORDER,linkKind,linkRisks,linkImpact,serverChain,serverChainCount,linkRelation,linkMetaOf,setLinkMeta,serverTone,peekSet,dropLinkMeta,IP_LIMIT,normalizeIp,parseIps,assetIps,primaryIp,maskIp,validIpList,ACTION_FIELDS,QUICK_LIMIT,validActionField,sshCommand,cloneUrl,quickActions,recencyTime,recentFirst,arrangeAssets,touchedPrefix,bringToFront,DISPLAY_LIMITS,formatCount,ensureBlock,iconHost,iconVendor,iconVendors,vendorForHost,iconPlan,iconSiteHost,iconSiteFor,iconPlatformOf,iconRows,guessAssetType,regionList,regionName,regionFlag,phoneParts,regionFromPhone,maskPhone,maskEmail,cardExpiry,expiryText,looksLikeCardNumber,linkAssets,unlinkAssets,linkedAssets,removeLinksTo,assetFingerprint,removeUntouchedDemo,orderAssets,moveAsset,dateKinds,billingCycles,dayNumber,localDay,isoDay,addMonths,nextOccurrence,assetDateStatus,upcomingEvents,REMINDER_LIMIT,reminderLeads,reminderPlan,syncKey,assetSyncKey,isBlacklisted,findByExternal,findNameCollision,mergeCloudflare,mergeGitHub,REGISTRARS,registrarDate,registrarFlag,REGISTRAR_LIMIT,cleanRegistrarDomains,mergeRegistrar,registrarCredentialProblem,NEW_BRANCH_DAYS,BRANCH_LIMIT,REPO_DETAIL_FIELDS,CI_STATES,CI_BAD,cleanCiRun,repoDetailFields,newBranches,applyRepoDetails,applyCollision,parseSender,registrableDomain,cleanMerchant,findAmounts,findDates,findDomains,evidenceFacts,inferCycle,formatCost,matchAsset,buildCandidates,evidencePayload,parseAiItems,applyAiItem,IMPORT_ROW_LIMIT,parseLooseDate,shiftDate,costParts,formatCostParts,inferTypeFromName,parseRepoUrl,parseQuickLine,AGENT_FIELDS,isAgentImport,parseAgentImport,parseDelimitedText,importHeaderField,rowsToImportItems,isCfsmBackup,parseCfsmBackup,classifyImportPayload,planImport,applyImport,parseBoardBackup,planBoardBackup,applyBoardBackup,demoImportSampleCsv,csvSyncKey,VENDOR_CSV_PRESETS,cloudflareTokenTemplateUrl,githubTokenTemplateUrl,CLOUDFLARE_TOKEN_PERMISSIONS,parseSshConfig,sshGitHosts,mergeSshConfig,parseEml,delimitedRecords,splitDelimitedLine,resolvePresetValue,SECRET_KINDS,secretKinds,rowSecrets,looksLikeEnv,screenText,PASSWORD_EXPORTS,passwordExportOf,importFileKind,importGate,screenBackup,AI_PLANS,AI_PLANS_CHECKED,aiPlanProviders,aiPlansFor,findAiPlan,aiPlanFields,icsRepeat,MASK_MARK,MASK_SETS,maskValue,maskAsset,maskMail,hasMask};
+if(typeof module!=='undefined')module.exports={touchAsset,editedTime,TOMBSTONE_LIMIT,addTombstone,cleanTombstones,BOARD_SETTINGS,backupSettings,mergeBoardSettings,settleLinks,backupCounts,LEGACY_WORDS,LEGACY_STATES,MFA_KINDS,RECOVERY_TYPES,RECOVERY_FIELDS,BACKUP_KINDS,BACKUP_TYPES,IMPORTANCE,looksLikeSecret,recoveryText,recoveryGap,backupText,mailHost,mailDependents,selfRecovery,mailStake,PHONE_STATUSES,phoneTrouble,carrierNote,cardPaysPhone,setCardPays,CREDIT_RULES,creditRule,settleCreditExpiry,PLATFORM_SOURCES,missedReminders,reminderDays,STALE_SYNC_DAYS,staleSyncs,AUTO_RENEW_WORDS,CARD_STATUSES,cardTrouble,sourceTrouble,IMPACT_WORDS,verifyNumbers,phoneReach,phoneStake,syncedLabel,BILLING_TYPES,billingLabels,isFreeCost,billingTypeOf,validPromotion,moneyOn,settlePromotions,noteCostChange,costForecast,PAYMENT_LIMIT,CONFIRM_DAYS,paymentList,paidPayments,lastPayment,recordPayment,removePayment,occurrencesBetween,pendingCharges,pendingRenewals,confirmRenewal,cardOutlook,runsOut,needsConfirm,confirmWords,LIFECYCLE_RULES,lifecycleRule,lifecycleOf,AFTER_DUE_DAYS,monthsBetween,renewBase,canRenew,renewOptions,costFromPayment,renewAsset,confirmCharge,priceChange,paidTotals,ledgerRows,csvCell,ledgerCsv,SLEEP_CHECKED,SLEEP_RULES,KEEPALIVE_TYPES,KEEPALIVE_EVERY,sleepRuleOf,cleanKeepAlive,keepAliveCron,keepAliveWorkflow,cleanProject,PROJECTS_PER_ASSET,projectsOf,projectNameOk,renameProject,parseProjects,setProjects,inProject,projectNames,projectAssets,shutdownPlan,REVIEW_QUIET_DAYS,reviewQueue,icsFold,calendarIcs,escHtml,handoverHtml,rdapFacts,rdapCompare,rdapPhaseLabels,registryPhaseOf,RDAP_HOLDS,rdapHoldLabels,RDAP_MISSING_TLDS,rdapMissing,rdapNameservers,registryHoldOf,registryChangeOf,rdapRemember,registryAlerts,dueLevel,DOMAIN_NAME,domainFromText,domainListText,domainListItems,REGISTRAR_ALIASES,registrarProvider,rdapFormFields,renewalGrace,RENEWAL_GRACE_DAYS,maskName,PROVIDER_PRESETS,providerPresets,MAIN_CURRENCIES,FALLBACK_RATES,costAmount,syncMoney,convertMoney,formatMoney,costTotals,MOUNT_TYPES,relationKind,linkAllowed,LINK_KINDS,LINK_KIND_ORDER,linkKind,linkRisks,linkImpact,serverChain,serverChainCount,linkRelation,linkMetaOf,setLinkMeta,serverTone,peekSet,dropLinkMeta,IP_LIMIT,normalizeIp,parseIps,assetIps,primaryIp,maskIp,validIpList,ACTION_FIELDS,QUICK_LIMIT,validActionField,sshCommand,cloneUrl,quickActions,recencyTime,recentFirst,arrangeAssets,touchedPrefix,bringToFront,DISPLAY_LIMITS,formatCount,ensureBlock,iconHost,iconVendor,iconVendors,vendorForHost,iconPlan,iconSiteHost,iconSiteFor,iconPlatformOf,iconRows,guessAssetType,regionList,regionName,regionFlag,phoneParts,regionFromPhone,maskPhone,maskEmail,cardExpiry,expiryText,looksLikeCardNumber,linkAssets,unlinkAssets,linkedAssets,removeLinksTo,assetFingerprint,removeUntouchedDemo,orderAssets,moveAsset,dateKinds,billingCycles,dayNumber,localDay,isoDay,addMonths,nextOccurrence,assetDateStatus,upcomingEvents,REMINDER_LIMIT,reminderLeads,reminderPlan,syncKey,assetSyncKey,isBlacklisted,findByExternal,findNameCollision,mergeCloudflare,mergeGitHub,REGISTRARS,registrarDate,registrarFlag,REGISTRAR_LIMIT,cleanRegistrarDomains,mergeRegistrar,registrarCredentialProblem,CLOUD_IMPORTS,CLOUD_LIMIT,cleanCloudResources,cloudCredentialProblem,mergeCloudImport,NEW_BRANCH_DAYS,BRANCH_LIMIT,REPO_DETAIL_FIELDS,CI_STATES,CI_BAD,cleanCiRun,repoDetailFields,newBranches,applyRepoDetails,applyCollision,parseSender,registrableDomain,cleanMerchant,findAmounts,findDates,findDomains,evidenceFacts,inferCycle,formatCost,matchAsset,buildCandidates,evidencePayload,parseAiItems,applyAiItem,IMPORT_ROW_LIMIT,parseLooseDate,shiftDate,costParts,formatCostParts,inferTypeFromName,parseRepoUrl,parseQuickLine,AGENT_FIELDS,isAgentImport,parseAgentImport,parseDelimitedText,importHeaderField,rowsToImportItems,isCfsmBackup,parseCfsmBackup,classifyImportPayload,planImport,applyImport,parseBoardBackup,planBoardBackup,applyBoardBackup,demoImportSampleCsv,csvSyncKey,VENDOR_CSV_PRESETS,cloudflareTokenTemplateUrl,githubTokenTemplateUrl,CLOUDFLARE_TOKEN_PERMISSIONS,parseSshConfig,sshGitHosts,mergeSshConfig,parseEml,delimitedRecords,splitDelimitedLine,resolvePresetValue,SECRET_KINDS,secretKinds,rowSecrets,looksLikeEnv,screenText,PASSWORD_EXPORTS,passwordExportOf,importFileKind,importGate,screenBackup,AI_PLANS,AI_PLANS_CHECKED,aiPlanProviders,aiPlansFor,findAiPlan,aiPlanFields,icsRepeat,MASK_MARK,MASK_SETS,maskValue,maskAsset,maskMail,hasMask};
