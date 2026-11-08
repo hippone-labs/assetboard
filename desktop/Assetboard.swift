@@ -627,6 +627,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
                                                   "aiKeySaved": self.ai.key() != nil, "cloudflareChecking": false, "githubChecking": false]
                 #if !ASSETBOARD_FREE
                 connections["registrars"] = RegistrarImport.shared.connections()
+                connections["cloudImports"] = CloudImport.shared.connections()
                 #endif
                 guard let bytes = try? JSONSerialization.data(withJSONObject: connections),
                       let json = String(data: bytes, encoding: .utf8) else { return }
@@ -1201,6 +1202,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         // Cloudflare, GitHub and AI are Pro: the free edition has no bridge for them, so their messages are ignored.
         // 从注册商导入 (RegistrarImport.swift): Namecheap and Porkbun domain lists, read-only.
         if let action = body["action"] as? String, action == "registrarSync" || action == "registrarDisconnect" { handleRegistrar(action, body); return }
+        // 从云平台导入 (CloudImport.swift): Hetzner, DigitalOcean and Vercel lists, read-only.
+        if let action = body["action"] as? String, action == "cloudImportSync" || action == "cloudImportDisconnect" { handleCloudImport(action, body); return }
         if body["action"] as? String == "cloudflareDisconnect" {
             if cloudflare.disconnect() { cloudflareResult(["ok": true, "disconnected": true]) }
             else { cloudflareResult(["ok": false, "error": L("无法从 macOS 钥匙串删除令牌，请重试。")]) }
@@ -1444,6 +1447,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         let registrarItem = NSMenuItem(title: L("从注册商导入…"), action: #selector(openRegistrars), keyEquivalent: "")
         registrarItem.target = self
         fileMenu.addItem(registrarItem)
+        let cloudItem = NSMenuItem(title: L("从云平台导入…"), action: #selector(openCloudImports), keyEquivalent: "")
+        cloudItem.target = self
+        fileMenu.addItem(cloudItem)
         let probeItem = NSMenuItem(title: L("探针数据源…"), action: #selector(openProbes), keyEquivalent: "")
         probeItem.target = self
         fileMenu.addItem(probeItem)
@@ -2421,6 +2427,12 @@ if CommandLine.arguments.contains(Updater.launchCheckFlag) {
     testRegistrars()
     #else
     print("PASS: registrar imports are not in the free edition")
+    #endif
+} else if CommandLine.arguments.contains("--test-cloud-import") {
+    #if !ASSETBOARD_FREE
+    testCloudImports()
+    #else
+    print("PASS: cloud imports are not in the free edition")
     #endif
 } else if CommandLine.arguments.contains("--test-cloudflare-inventory") {
     testCloudflareInventory()

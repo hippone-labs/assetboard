@@ -24,7 +24,7 @@ target=(-target "arm64-apple-macos$min_macos")
 # Start from an empty bundle: files left by an older build (or the other edition) must not ship.
 rm -rf "$app_dir"
 mkdir -p "$app_dir/Contents/MacOS" "$app_dir/Contents/Resources/Board"
-xcrun swiftc "${target[@]}" "$project_dir/desktop/Assetboard.swift" "$project_dir/desktop/Localization.swift" "$project_dir/desktop/LocalizationEN.swift" "$project_dir/desktop/CloudflareInventory.swift" "$project_dir/desktop/RegistrarImport.swift" "$project_dir/desktop/ProbeSource.swift" "$project_dir/desktop/PlatformStatus.swift" "$project_dir/desktop/SSHProbe.swift" "$project_dir/desktop/SSHHosts.swift" "$project_dir/desktop/LocalDatabase.swift" "$project_dir/desktop/OCRImporter.swift" "$project_dir/desktop/AIRecognizer.swift" "$project_dir/desktop/IconFetcher.swift" "$project_dir/desktop/LocalCLI.swift" "$project_dir/desktop/AgentInbox.swift" "$project_dir/desktop/AgentSocket.swift" "$project_dir/desktop/NetworkLog.swift" "$project_dir/desktop/ExchangeRates.swift" "$project_dir/desktop/Reminders.swift" "$project_dir/desktop/MoneyBridge.swift" "$project_dir/desktop/Updater.swift" "$project_dir/desktop/WindowChrome.swift" "${pro_swift[@]}" "${swift_flags[@]}" -o "$app_dir/Contents/MacOS/Assetboard" -framework Cocoa -framework WebKit -framework UserNotifications -framework PDFKit -framework Vision -lsqlite3 -O
+xcrun swiftc "${target[@]}" "$project_dir/desktop/Assetboard.swift" "$project_dir/desktop/Localization.swift" "$project_dir/desktop/LocalizationEN.swift" "$project_dir/desktop/CloudflareInventory.swift" "$project_dir/desktop/RegistrarImport.swift" "$project_dir/desktop/CloudImport.swift" "$project_dir/desktop/ProbeSource.swift" "$project_dir/desktop/PlatformStatus.swift" "$project_dir/desktop/SSHProbe.swift" "$project_dir/desktop/SSHHosts.swift" "$project_dir/desktop/LocalDatabase.swift" "$project_dir/desktop/OCRImporter.swift" "$project_dir/desktop/AIRecognizer.swift" "$project_dir/desktop/IconFetcher.swift" "$project_dir/desktop/LocalCLI.swift" "$project_dir/desktop/AgentInbox.swift" "$project_dir/desktop/AgentSocket.swift" "$project_dir/desktop/NetworkLog.swift" "$project_dir/desktop/ExchangeRates.swift" "$project_dir/desktop/Reminders.swift" "$project_dir/desktop/MoneyBridge.swift" "$project_dir/desktop/Updater.swift" "$project_dir/desktop/WindowChrome.swift" "${pro_swift[@]}" "${swift_flags[@]}" -o "$app_dir/Contents/MacOS/Assetboard" -framework Cocoa -framework WebKit -framework UserNotifications -framework PDFKit -framework Vision -lsqlite3 -O
 # The command line and MCP server for agents; it only talks to the running app over its local socket.
 if (( ! free )); then
   xcrun swiftc "${target[@]}" -parse-as-library "$project_dir/desktop/AssetboardCLI.swift" "$project_dir/desktop/Localization.swift" "$project_dir/desktop/LocalizationEN.swift" "$project_dir/desktop/AgentSocket.swift" -o "$app_dir/Contents/MacOS/assetboard-cli" -O
@@ -84,6 +84,7 @@ codesign --verify --deep --strict "$app_dir"
 "$app_dir/Contents/MacOS/Assetboard" --test-ssh-probe
 "$app_dir/Contents/MacOS/Assetboard" --test-github
 "$app_dir/Contents/MacOS/Assetboard" --test-registrar
+"$app_dir/Contents/MacOS/Assetboard" --test-cloud-import
 "$app_dir/Contents/MacOS/Assetboard" --test-ocr
 "$app_dir/Contents/MacOS/Assetboard" --test-icons
 "$app_dir/Contents/MacOS/Assetboard" --test-local
