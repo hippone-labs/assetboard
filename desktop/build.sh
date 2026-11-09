@@ -52,11 +52,21 @@ else
   # [s]tart / [e]nd match the markers without spelling them, so the export's check for leftover markers stays clean.
   sed '/<!-- private:[s]tart -->/,/<!-- private:[e]nd -->/d' "$project_dir/index.html" > "$app_dir/Contents/Resources/Board/index.html"
 fi
-icon_src="$project_dir/desktop/icon-1024.png"
+# The app icon. macOS 26 and later read CFBundleIconName from Assets.car, compiled by desktop/app-icon-car.sh (actool, Xcode) from
+# the Icon Composer icon desktop/AppIcon.icon: one full-bleed layer the system masks and edges itself. An icon only in AppIcon.icns
+# is put on a grey plate there. tools/app-icon.py makes AppIcon.icon and icon-macos-1024.png from desktop/icon-1024.png, the
+# drawing rendered from desktop/icon.svg.
+cmp -s "$project_dir/desktop/icon-1024.png" "$project_dir/desktop/AppIcon.icon/Assets/icon.png" \
+  || { print -u2 "desktop/AppIcon.icon differs from desktop/icon-1024.png: run python3 tools/app-icon.py"; exit 1; }
+[[ "$(awk '{ print $1 }' "$project_dir/desktop/Assets.car.sha256")" == "$(cat "$project_dir/desktop/AppIcon.icon/icon.json" "$project_dir/desktop/AppIcon.icon/Assets/icon.png" | shasum -a 256 | awk '{ print $1 }')" ]] \
+  || { print -u2 "desktop/Assets.car is not compiled from the current desktop/AppIcon.icon: run desktop/app-icon-car.sh on a Mac with Xcode"; exit 1; }
+cp "$project_dir/desktop/Assets.car" "$app_dir/Contents/Resources/Assets.car"
+# AppIcon.icns for older systems (and the disk image's volume icon): icon-macos-1024.png is on Apple's macOS grid, 824 px body with
+# rounded corners and shadow drawn in, transparent margin.
+icon_src="$project_dir/desktop/icon-macos-1024.png"
 icon_dir="$out_dir/AppIcon.iconset"
 rm -rf "$icon_dir"
 mkdir -p "$icon_dir"
-# icon-1024.png is full-bleed with no baked shadow: macOS applies the mask and shadow. It is rendered from desktop/icon.svg.
 for size in 16 32 128 256 512; do
   sips -z "$size" "$size" "$icon_src" --out "$icon_dir/icon_${size}x${size}.png" >/dev/null
   double=$((size * 2))
@@ -84,6 +94,7 @@ codesign --verify --deep --strict "$app_dir"
 "$app_dir/Contents/MacOS/Assetboard" --test-cloud-import
 "$app_dir/Contents/MacOS/Assetboard" --test-ocr
 "$app_dir/Contents/MacOS/Assetboard" --test-icons
+"$app_dir/Contents/MacOS/Assetboard" --test-app-icon
 "$app_dir/Contents/MacOS/Assetboard" --test-local
 "$app_dir/Contents/MacOS/Assetboard" --test-inbox
 "$app_dir/Contents/MacOS/Assetboard" --test-webview
