@@ -3,8 +3,8 @@
 // Where one Chinese word needs two English ones, the third argument names the use: tr('项目',null,'nav') reads '项目@nav' first.
 // A key with no English stays Chinese, so nothing is ever blank. Only text shown to people goes through tr(): words the code matches
 // against (pasted text, mail, OCR, stored values such as cost '未知') stay as they are.
-// The language: ?lang= (demo screenshots), else what the Mac app passes (its own setting, else the system's), else this browser's
-// choice in 设置, else Chinese. Loaded first, before every script that shows text.
+// The language: ?lang= (demo screenshots), else what the Mac app passes (its own setting, else English), else this browser's
+// choice in 设置, else English. Loaded first, before every script that shows text.
 const LANG_KEY='assetboard-lang-v1';
 const LANGS={zh:{name:'简体中文',html:'zh-CN',locale:'zh-CN'},en:{name:'English',html:'en',locale:'en-US'}};
 const I18N={en:{}};
@@ -12,8 +12,8 @@ let appLang=(()=>{
  if(typeof window==='undefined')return 'zh';
  const ok=v=>Object.hasOwn(LANGS,v)?v:'';
  try{const url=ok(new URLSearchParams(location.search).get('lang'));if(url)return url;}catch{}
- const native=window.__ASSETBOARD_NATIVE__;if(native)return ok(native.lang)||'zh';
- try{return ok(localStorage.getItem(LANG_KEY))||'zh';}catch{return 'zh';}
+ const native=window.__ASSETBOARD_NATIVE__;if(native&&ok(native.lang))return native.lang;
+ try{return ok(localStorage.getItem(LANG_KEY))||'en';}catch{return 'en';}
 })();
 function tr(text,vars,use){
  const dict=I18N[appLang]||{},key=use&&Object.hasOwn(dict,`${text}@${use}`)?`${text}@${use}`:text;

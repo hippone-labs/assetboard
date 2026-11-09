@@ -2312,7 +2312,8 @@ func testWebView() {
         let soon = formatter.string(from: Date().addingTimeInterval(3 * 86400))
         let data: [String: Any] = ["blocks": [["id": "domain", "width": 50, "collapsed": false, "height": NSNull()]],
                                    "assets": [["id": "a", "type": "domain", "name": "soon.dev", "provider": "Registrar", "account": "", "date": soon, "art": "generic", "source": "manual"]]]
-        let initial = String(data: try JSONSerialization.data(withJSONObject: ["data": data, "cloudflareConnected": false, "githubConnected": false]), encoding: .utf8)!
+        // The app always passes the language (Chinese in the self-tests); without it the page would open in English.
+        let initial = String(data: try JSONSerialization.data(withJSONObject: ["data": data, "cloudflareConnected": false, "githubConnected": false, "lang": AppLanguage.current]), encoding: .utf8)!
         let handler = WebViewTestHandler()
         let controller = WKUserContentController()
         controller.addUserScript(WKUserScript(source: "window.__errors=[];addEventListener('error',e=>__errors.push(e.message));window.__ASSETBOARD_NATIVE__ = \(initial);", injectionTime: .atDocumentStart, forMainFrameOnly: true))

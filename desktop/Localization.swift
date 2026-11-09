@@ -1,8 +1,8 @@
 import Foundation
 
 /// The interface language, 简体中文 or English, for the native side (menus, alerts, errors the page shows) and passed to the page as
-/// `__ASSETBOARD_NATIVE__.lang`. The person's choice in 设置 wins; otherwise the system's first language (Chinese for any zh-*,
-/// English for everything else). `--lang zh|en` overrides both (demo screenshots); the self-tests (`--test-…`, the CLI's `--self-test`) run in Chinese unless given `--lang`.
+/// `__ASSETBOARD_NATIVE__.lang`. The person's choice in 设置 wins; otherwise English, whatever the system's language (Chinese is
+/// one switch away in 设置). `--lang zh|en` overrides both (demo screenshots); the self-tests (`--test-…`, the CLI's `--self-test`) run in Chinese unless given `--lang`.
 enum AppLanguage {
     static let key = "AssetboardLanguage"
     static let all = ["zh", "en"]
@@ -23,8 +23,7 @@ enum AppLanguage {
         let args = CommandLine.arguments
         if let at = args.firstIndex(of: "--lang"), at + 1 < args.count, all.contains(args[at + 1]) { return args[at + 1] }
         if args.contains(where: { $0.hasPrefix("--test-") || $0 == "--self-test" }) { return "zh" }
-        if let stored { return stored }
-        return Locale.preferredLanguages.first.map { $0.lowercased().hasPrefix("zh") ? "zh" : "en" } ?? "zh"
+        return stored ?? "en"
     }()
 
     static var isEnglish: Bool { current == "en" }

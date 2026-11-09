@@ -27,6 +27,15 @@ server.on('error',error=>{console.error(error.code==='EADDRINUSE'?`127.0.0.1:${p
 
 server.listen(port,'127.0.0.1',async()=>{
  const browser=await chromium.launch(process.env.PLAYWRIGHT_CHROMIUM?{executablePath:process.env.PLAYWRIGHT_CHROMIUM}:{});
+ // The tests are written against the Chinese interface, while a board nobody chose a language for opens in English: every context
+ // (also those a test makes itself) starts as if 中文 had been chosen in 设置. ?lang= and a stored choice still win; a test of the
+ // default removes the choice in its own init script, which runs after this one.
+ const newContext=browser.newContext.bind(browser);
+ browser.newContext=async(...options)=>{
+  const context=await newContext(...options);
+  await context.addInitScript(()=>{try{if(!localStorage.getItem('assetboard-lang-v1'))localStorage.setItem('assetboard-lang-v1','zh');}catch{}});
+  return context;
+ };
  let failed=0;
  for(const file of listed){
   const context=await browser.newContext({viewport:{width:1400,height:900},locale:'zh-CN'}),page=await context.newPage(),errors=[];
