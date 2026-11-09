@@ -3,6 +3,8 @@ Object.assign(I18N.en,{
  '关于':'About',
  '版本':'Version',
  '检查更新…':'Check for updates…',
+ '当前版本 {version}':'Current version {version}',
+ '下载并安装':'Download and Install',
  '银行卡@one':'Bank card',
  '手机号@one':'Phone number',
  '服务器@one':'Server',

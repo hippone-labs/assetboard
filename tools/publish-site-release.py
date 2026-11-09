@@ -9,8 +9,12 @@ import json
 import plistlib
 import re
 import shutil
+import sys
 import zipfile
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import release_notes  # noqa: E402
 
 
 def minimum_system(archive, version):
@@ -46,6 +50,7 @@ def stage(site, archive, disk_image, version, notes):
         raise ValueError("Release archives are immutable")
     if not notes.strip():
         raise ValueError("Release notes are required")
+    by_language = release_notes.split(notes)
     minimum = minimum_system(archive, version)
     # The second language's pages: Chinese under zh/ (English at the root), or before that move, English under en/.
     second = site / ("zh" if (site / "zh/index.html").is_file() else "en")
@@ -79,7 +84,9 @@ def stage(site, archive, disk_image, version, notes):
     shutil.copyfile(disk_image, image_destination)
     for path, text in pages.items():
         path.write_text(text)
-    manifest_path.write_text(json.dumps({"version": version, "minimumSystemVersion": minimum, "notes": notes, "assets": [
+    # notesByLanguage is what the app shows, its own language first; notes, English then Chinese, is for apps that predate it.
+    manifest_path.write_text(json.dumps({"version": version, "minimumSystemVersion": minimum, "notes": release_notes.plain(by_language),
+                                         "notesByLanguage": by_language, "assets": [
         {"name": name, "url": f"https://assetboard.app/downloads/{name}", "sha256": digest}
     ]}, ensure_ascii=False, indent=2) + '\n')
 
