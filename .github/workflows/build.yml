@@ -74,6 +74,54 @@ jobs:
           path: ${{ runner.temp }}/logs/
           retention-days: 7
 
+  # Assets.car (the app icon for macOS 26 and later) needs actool, which comes with Xcode; the self-hosted Macs have only the
+  # Command Line Tools and build.sh copies the committed desktop/Assets.car. Here a GitHub-hosted Mac with Xcode compiles it from
+  # desktop/AppIcon.icon again: the job fails when the committed car's recorded source is not the current icon, and the fresh car is
+  # in the artifact. The free edition is then built and self-tested with it on macOS 26, where --test-app-icon checks the system's icon.
+  icon:
+    runs-on: macos-26
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Prepare logs
+        run: mkdir -p "$RUNNER_TEMP/logs" && { sw_vers; xcodebuild -version; } 2>&1 | tee "$RUNNER_TEMP/logs/env.log"
+
+      - name: Compile Assets.car
+        run: zsh desktop/app-icon-car.sh 2>&1 | tee "$RUNNER_TEMP/logs/actool.log"
+
+      - name: Upload Assets.car
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: assets-car-${{ github.sha }}
+          path: |
+            desktop/Assets.car
+            desktop/Assets.car.sha256
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Committed Assets.car is current
+        run: git diff --exit-code -- desktop/Assets.car.sha256 && test -z "$(git status --porcelain -- desktop/Assets.car.sha256)"
+
+      - name: Swift build + self-tests (free, macOS 26)
+        env:
+          ASSETBOARD_ICON_PREVIEW: ${{ runner.temp }}/logs/icon-free
+        run: ASSETBOARD_EDITION=free zsh desktop/build.sh 2>&1 | tee "$RUNNER_TEMP/logs/build-free.log"
+
+      - name: Disk image (free, macOS 26)
+        run: zsh desktop/dmg.sh dist/free/Assetboard.app "$RUNNER_TEMP/Assetboard-free.dmg" 2>&1 | tee "$RUNNER_TEMP/logs/dmg-free.log"
+
+      - name: Upload logs
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: icon-logs-${{ github.sha }}
+          path: ${{ runner.temp }}/logs/
+          retention-days: 7
+
   mac:
     runs-on: ${{ inputs.min_os && 'macos-15' || fromJSON('["self-hosted","macOS","ARM64","mac-build"]') }}
     timeout-minutes: 60
@@ -85,14 +133,19 @@ jobs:
       - name: Prepare logs
         run: mkdir -p "$RUNNER_TEMP/logs" && { sw_vers; xcrun swiftc --version; } 2>&1 | tee "$RUNNER_TEMP/logs/env.log"
 
-      # build.sh compiles with -target arm64-apple-macos<LSMinimumSystemVersion> and fails when a binary's minos differs.
+      # build.sh compiles with -target arm64-apple-macos<LSMinimumSystemVersion> and fails when a binary's minos differs. Its
+      # --test-app-icon checks Assets.car, CFBundleIconName and the icons the system draws, and leaves them as PNG in the logs.
       - name: Swift build + self-tests (full)
         id: full
+        env:
+          ASSETBOARD_ICON_PREVIEW: ${{ runner.temp }}/logs/icon-full
         run: zsh desktop/build.sh 2>&1 | tee "$RUNNER_TEMP/logs/build-full.log"
 
       - name: Swift build + self-tests (free)
         id: free
         if: ${{ !cancelled() }}
+        env:
+          ASSETBOARD_ICON_PREVIEW: ${{ runner.temp }}/logs/icon-free
         run: ASSETBOARD_EDITION=free zsh desktop/build.sh 2>&1 | tee "$RUNNER_TEMP/logs/build-free.log"
 
       - name: Zip apps
@@ -104,6 +157,7 @@ jobs:
           [ -d dist/free/Assetboard.app ] && ditto -c -k --keepParent dist/free/Assetboard.app "$RUNNER_TEMP/apps/Assetboard-free-$short.zip"
           # The drag-to-Applications disk image, unsigned here; release.sh signs and notarizes it.
           [ -d dist/Assetboard.app ] && zsh desktop/dmg.sh dist/Assetboard.app "$RUNNER_TEMP/apps/Assetboard-full-$short.dmg"
+          [ -d dist/free/Assetboard.app ] && zsh desktop/dmg.sh dist/free/Assetboard.app "$RUNNER_TEMP/apps/Assetboard-free-$short.dmg"
           ls -la "$RUNNER_TEMP/apps"
           {
             echo "### Build $short"
