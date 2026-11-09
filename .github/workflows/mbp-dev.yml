@@ -1,0 +1,64 @@
+# Installs the Pro developer build (desktop/dev-install.sh) on the MacBook Pro labelled assetboard-mbp, for the same
+# commit release-app just published. release-app.yml does not call this workflow. A job called from there would keep
+# that run in progress while this one waited for a runner, and concurrency group app-production-release would stay
+# occupied. timeout-minutes does not limit a wait for a runner. This workflow starts when release-app completes, and
+# the install job asks for a runner only when that run succeeded, or when someone starts it by hand. A failure here
+# is a separate run and cannot change the release.
+# The success conclusion is the whole release-app run, including mini-dev. A failed mini install skips this job.
+# Telling those jobs apart would need actions: read, which this file does not add. Start it by hand for that commit.
+# Skipping an offline Mac would mean listing self-hosted runners (GET /repos/{owner}/{repo}/actions/runners), which
+# GitHub allows only for repository administrators. This workflow grants contents: read and does not add
+# administration. An offline runner can therefore leave the job queued until GitHub's own 24 hour self-hosted queue
+# limit. This file does not shorten that wait, detect the offline machine, or schedule a later catch-up.
+# The build is ad-hoc signed, is not uploaded, and never leaves the Mac.
+name: mbp-dev
+
+on:
+  workflow_run:
+    # No branches filter. A published release is a tag (refs/tags/v*), which is not the main branch.
+    workflows: [release-app]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mbp-dev-install
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  install:
+    name: Update MBP dev build
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: [self-hosted, macOS, ARM64, assetboard-mbp]
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          persist-credentials: false
+      - name: Main only
+        run: |
+          git fetch --quiet --no-tags origin main
+          git merge-base --is-ancestor HEAD FETCH_HEAD
+      - name: Pro modules (private checkout beside the board)
+        # The same as in release-app.yml: the runner's gh login, or a PRO_REPO_TOKEN secret when set.
+        env:
+          PRO_REPO_TOKEN: ${{ secrets.PRO_REPO_TOKEN }}
+        run: |
+          if [ -n "${PRO_REPO_TOKEN:-}" ]; then export GH_TOKEN="$PRO_REPO_TOKEN"; fi
+          rm -rf pro
+          gh repo clone "${{ vars.PRO_REPO || 'hippone-labs/assetboard-pro' }}" pro -- --depth=1 --quiet
+          test -f pro/web/pro.js
+      - name: Build and install the developer build
+        run: zsh desktop/dev-install.sh | tee "$RUNNER_TEMP/dev-install.log"
+      - name: Summary
+        if: ${{ always() }}
+        run: |
+          { echo '### MBP dev build'; tail -3 "$RUNNER_TEMP/dev-install.log" 2>/dev/null || echo 'not installed'; } >> "$GITHUB_STEP_SUMMARY"
+          rm -rf pro dist

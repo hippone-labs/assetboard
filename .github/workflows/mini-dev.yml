@@ -2,6 +2,7 @@
 # workflow once the release job has succeeded), or by hand from the Actions tab for any commit of main. It runs on the runner
 # labelled assetboard-mini. Like release-app.yml it has no pull_request trigger. The build is ad-hoc signed, is not uploaded and
 # never leaves the Mac; a failure here says nothing about the release, which is already published by then.
+# The MacBook Pro install is mbp-dev.yml. It is a separate workflow and does not use this concurrency group.
 name: mini-dev
 
 on:

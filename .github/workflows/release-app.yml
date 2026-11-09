@@ -207,6 +207,8 @@ jobs:
           echo "GitHub Release: $url" >> "$GITHUB_STEP_SUMMARY"
 
   # The Mac mini's own developer build follows each release; its own workflow, so it can also run by hand (mini-dev.yml).
+  # The MacBook Pro install is mbp-dev.yml, started after this workflow finishes. It is not a job here: an offline Mac
+  # would keep group app-production-release occupied, and timeout-minutes does not limit that wait.
   mini-dev:
     name: Update Mini dev build
     needs: release
