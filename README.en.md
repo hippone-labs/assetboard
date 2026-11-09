@@ -8,10 +8,10 @@ A macOS app that records the expiry dates, costs and relations of digital assets
 
 [![build](https://github.com/hippone-labs/assetboard/actions/workflows/build.yml/badge.svg)](https://github.com/hippone-labs/assetboard/actions/workflows/build.yml)
 [![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
-[![macOS 15+](https://img.shields.io/badge/macOS-15%2B%20arm64-lightgrey)](https://assetboard.app/en/)
-[![Version](https://img.shields.io/badge/version-2026.11.5-lightgrey)](https://assetboard.app/en/)
+[![macOS 15+](https://img.shields.io/badge/macOS-15%2B%20arm64-lightgrey)](https://assetboard.app/)
+[![Version](https://img.shields.io/badge/version-2026.11.5-lightgrey)](https://assetboard.app/)
 
-[Website](https://assetboard.app/en/) · [User guide (Chinese)](GUIDE.md) · [简体中文](README.md) · [Issues](https://github.com/hippone-labs/assetboard/issues/new/choose)
+[Website](https://assetboard.app/) · [User guide (Chinese)](GUIDE.md) · [简体中文](README.md) · [Issues](https://github.com/hippone-labs/assetboard/issues/new/choose)
 
 </div>
 
@@ -37,7 +37,7 @@ A macOS app that records the expiry dates, costs and relations of digital assets
 
 Assetboard is a local app. Each asset has a date (expiry, auto-renew charge, trial end or cancel-by, optionally repeating monthly or yearly), a cost, a provider, an account and a management link, and assets can be linked to each other. From those dates the app lists what is due and sends system notifications; from the costs it computes totals.
 
-Data is kept in a SQLite file on the Mac; there is no account. The interface is one set of HTML/CSS/JS pages that the Mac app loads in a WKWebView; the same pages also run in a browser with fewer features. The interface is in Simplified Chinese and English.
+Data is kept in a SQLite file on the Mac; there is no account. The interface is one set of HTML/CSS/JS pages that the Mac app loads in a WKWebView; the same pages also run in a browser with fewer features. The interface is in English (the default) and Simplified Chinese, switched in Settings.
 
 ## What it records
 
@@ -50,7 +50,7 @@ Data is kept in a SQLite file on the Mac; there is no account. The interface is 
 
 ## Interface
 
-The sidebar holds Upcoming, All assets, Panorama, the categories, projects and Hidden. The middle shows the list and the right the selected asset's details. The list can switch to a grid or a 12-month timeline; Upcoming can switch to a month calendar.
+The sidebar holds Upcoming, All assets, Panorama, the categories, projects and Hidden. The middle shows a tile wall (a panel per category, in three densities) and the right the selected asset's details. It can switch to a list, a grid or a 12-month timeline; Upcoming can switch to a month calendar.
 
 | | |
 | --- | --- |
@@ -124,7 +124,7 @@ The full host list is in the [user guide](GUIDE.md#隐私与网络) (Chinese).
 
 ## Install
 
-Download the `.dmg` from [assetboard.app](https://assetboard.app/en/) and drag Assetboard into Applications. Requires macOS 15 or later on Apple Silicon. The package is signed and notarized; the app updates itself.
+Download the `.dmg` from [assetboard.app](https://assetboard.app/) and drag Assetboard into Applications. Requires macOS 15 or later on Apple Silicon. The package is signed and notarized; the app updates itself.
 
 Start with demo data (your data is not read or written, nothing goes over the network):
 
@@ -144,7 +144,7 @@ node --test               # unit tests
 The browser version needs no build and keeps data in the browser's localStorage, without notifications, text recognition, AI recognition or Keychain:
 
 ```sh
-python3 -m http.server 4317 --bind 127.0.0.1    # open http://127.0.0.1:4317; ?demo for demo data, ?lang=en for English
+python3 -m http.server 4317 --bind 127.0.0.1    # open http://127.0.0.1:4317; ?demo for demo data, ?lang=zh for Chinese
 ```
 
 | Path | Contents |

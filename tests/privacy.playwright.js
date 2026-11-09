@@ -10,7 +10,7 @@ async (page) => {
    {id:'d',type:'domain',name:'secret-project.dev',provider:'Cloudflare',account:'me@corp.example',source:'manual',art:'generic'},
    {id:'s',type:'server',name:'tokyo-box',provider:'Vultr',ips:['203.0.113.42'],source:'manual',art:'generic'},
    {id:'r',type:'repository',name:'acme/internal-tool',provider:'GitHub',account:'acme',source:'github',externalId:'1',art:'generic'}
-  ],deletedExternalIds:[]};save=()=>{};render();});
+  ],deletedExternalIds:[]};save=()=>{};setLayout('list');render();});
   const board=()=>p.locator('#board').innerText();
   check((await board()).includes('secret-project.dev')&&(await board()).includes('203.0.113.42'),'Plain by default');
 

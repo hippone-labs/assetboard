@@ -152,9 +152,9 @@ document.addEventListener('click',e=>{
 
 // MARK: The MCP tools (list_ai_usage, set_ai_usage_source): readings and the local switches; an endpoint is only turned on in the app.
 agentMethods.aiUsage=({vendor=''}={})=>{
- if(!featureOn('aiUsage'))throw new Error('AI 额度与用量在 设置 › 功能 里关着');
- const snap=aiUsageSnap();if(!snap)throw new Error('还没有读数：AI 额度与用量只在 Mac App 里读取');
- if(vendor&&!AI_USAGE_VENDORS[vendor])throw new Error(`vendor 只能是 ${Object.keys(AI_USAGE_VENDORS).join('、')}`);
+ if(!featureOn('aiUsage'))throw new Error(tr('AI 额度与用量在 设置 › 功能 里关着'));
+ const snap=aiUsageSnap();if(!snap)throw new Error(tr('还没有读数：AI 额度与用量只在 Mac App 里读取'));
+ if(vendor&&!AI_USAGE_VENDORS[vendor])throw new Error(tr('{key} 只能是 {values}',{key:'vendor',values:Object.keys(AI_USAGE_VENDORS).join(tr('、'))}));
  const owners=aiUsageOwners(state.assets),iso=t=>t?new Date(t).toISOString():null;
  const vendors=Object.values(snap.vendors||{}).filter(v=>!vendor||v.vendor===vendor).map(v=>{const id=owners.get(v.vendor),a=id&&state.assets.find(x=>x.id===id),seen=a&&agentSees(a);
   return {vendor:v.vendor,name:AI_USAGE_VENDORS[v.vendor]?.name||v.vendor,sources:v.sources,plan:v.plan||null,...(seen?{assetId:a.id,assetName:a.name}:{}),windows:(v.windows||[]).map(w=>({id:w.id,...(w.label?{label:w.label}:{}),usedPercent:w.used,resetsAt:iso(w.resetsAt)})),windowsFrom:v.windowsFrom||null,
@@ -164,11 +164,11 @@ agentMethods.aiUsage=({vendor=''}={})=>{
  return {readAt:iso(snap.at),pricesChecked:AI_USAGE_CHECKED,signals,vendors,sources:Object.entries(AI_USAGE_SOURCES).map(([id,s])=>{const st=snap.sources?.[id]||{},set=settings.find(x=>x.id===id)||{};return {id,name:s.name,vendor:s.vendor,found:!!st.found,local:set.local??s.local.length>0,endpoint:!!set.api,...(st.last?{lastUsed:iso(st.last)}:{}),...(st.error?{error:st.error}:{})};})};
 };
 agentMethods.aiUsageSet=({source,local,endpoint}={})=>{
- if(!AI_USAGE_SOURCES[source])throw new Error(`source 只能是 ${Object.keys(AI_USAGE_SOURCES).join('、')}`);
- if(endpoint!==undefined)throw new Error('额度接口要用这个工具自己的登录，只能由你在 Assetboard 的「AI 额度与用量」里打开或关闭');
- if(typeof local!=='boolean')throw new Error('local 需要是 true 或 false');
- if(!AI_USAGE_SOURCES[source].local.length)throw new Error(`${AI_USAGE_SOURCES[source].name} 没有本机文件可读`);
- if(!nativeStore||demoMode)throw new Error('只能在 Mac App 里设置');
+ if(!AI_USAGE_SOURCES[source])throw new Error(tr('{key} 只能是 {values}',{key:'source',values:Object.keys(AI_USAGE_SOURCES).join(tr('、'))}));
+ if(endpoint!==undefined)throw new Error(tr('额度接口要用这个工具自己的登录，只能由你在 Assetboard 的「AI 额度与用量」里打开或关闭'));
+ if(typeof local!=='boolean')throw new Error(tr('local 需要是 true 或 false'));
+ if(!AI_USAGE_SOURCES[source].local.length)throw new Error(tr('{name} 没有本机文件可读',{name:AI_USAGE_SOURCES[source].name}));
+ if(!nativeStore||demoMode)throw new Error(tr('只能在 Mac App 里设置'));
  aiUsageSend({action:'aiUsageSet',id:source,local});
  const settings=aiUsageNow.sources||[];const one=settings.find(x=>x.id===source);if(one)one.local=local;
  toast(local?tr('外部工具打开了读取 {name} 的本机文件',{name:AI_USAGE_SOURCES[source].name}):tr('外部工具关闭了读取 {name} 的本机文件',{name:AI_USAGE_SOURCES[source].name}));

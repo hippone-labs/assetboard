@@ -52,8 +52,10 @@ def stage(site, archive, disk_image, version, notes):
         raise ValueError("Release notes are required")
     by_language = release_notes.split(notes)
     minimum = minimum_system(archive, version)
+    # The second language's pages: Chinese under zh/ (English at the root), or before that move, English under en/.
+    second = site / ("zh" if (site / "zh/index.html").is_file() else "en")
     pages = {}
-    for path in [site / "index.html", site / "en/index.html"]:
+    for path in [site / "index.html", second / "index.html"]:
         text = path.read_text()
         text, links = re.subn(r"/downloads/Assetboard-macOS-arm64-\d+\.\d+\.\d+\.(?:zip|dmg)", f"/downloads/{image}", text)
         text, labels = re.subn(r"v\d+\.\d+\.\d+(?= · macOS)", f"v{version}", text)
@@ -65,14 +67,14 @@ def stage(site, archive, disk_image, version, notes):
     today = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).date()
     row = (f'\n  <li><a href="/downloads/{image}" download>Assetboard {html.escape(version)}</a><span class="v-meta">{today} · SHA-256 '
            f'<code title="{image_digest}">{image_digest[:8]}…{image_digest[-8:]}</code></span></li>')
-    for history in [site / "downloads/index.html", site / "en/downloads/index.html"]:
+    for history in [site / "downloads/index.html", second / "downloads/index.html"]:
         text = pages.get(history, history.read_text())
         if text.count('<ul class="versions">') != 1:
             raise ValueError(f"Unexpected downloads history layout: {history.relative_to(site)}")
         pages[history] = text.replace('<ul class="versions">', '<ul class="versions">' + row, 1)
     # Every page names the release's minimum macOS (major version only), in either language.
     major = minimum.split('.')[0]
-    for path in [site / "index.html", site / "en/index.html", site / "downloads/index.html", site / "en/downloads/index.html"]:
+    for path in [site / "index.html", second / "index.html", site / "downloads/index.html", second / "downloads/index.html"]:
         text = pages.get(path, path.read_text())
         text, count = re.subn(r"macOS \d+(?= 或更高| or later)", f"macOS {major}", text)
         if not count:
