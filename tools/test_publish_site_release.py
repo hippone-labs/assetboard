@@ -2,6 +2,7 @@ import hashlib
 import importlib.util
 import json
 import plistlib
+import shutil
 import tempfile
 import unittest
 import zipfile
@@ -62,6 +63,25 @@ class ReleaseTests(unittest.TestCase):
             self.assertIn(f'<code title="{digest}">{digest[:8]}…{digest[-8:]}</code>', text)
         with self.assertRaisesRegex(ValueError, 'newer'):
             publisher.stage(self.site, self.archive, self.image, '0.6.3', 'Repeat')
+
+    def test_chinese_under_zh_english_at_the_root(self):
+        shutil.rmtree(self.site / 'en')
+        (self.site / 'zh/downloads').mkdir(parents=True)
+        page = '<a href="/downloads/Assetboard-macOS-arm64-0.6.2.dmg">{}</a>' * 2 + 'v0.6.2 · macOS 27 {}'
+        for path, words in [('index.html', ('Download', 'or later')), ('zh/index.html', ('下载', '或更高'))]:
+            (self.site / path).write_text(page.format(words[0], words[0], words[1]))
+        for path, words in [('downloads/index.html', 'macOS 27 or later'), ('zh/downloads/index.html', 'macOS 27 或更高')]:
+            (self.site / path).write_text(f'<p>{words}</p><ul class="versions">\n  <li>Previous release</li></ul>')
+        publisher.stage(self.site, self.archive, self.image, '0.6.3', 'Release notes')
+        self.assertIn('v0.6.3 · macOS 15 or later', (self.site / 'index.html').read_text())
+        self.assertIn('v0.6.3 · macOS 15 或更高', (self.site / 'zh/index.html').read_text())
+        for path in ['index.html', 'zh/index.html']:
+            self.assertEqual((self.site / path).read_text().count(self.image.name), 2)
+        for path, words in [('downloads/index.html', 'macOS 15 or later'), ('zh/downloads/index.html', 'macOS 15 或更高')]:
+            text = (self.site / path).read_text()
+            self.assertIn(words, text)
+            self.assertLess(text.index('Assetboard 0.6.3'), text.index('Previous release'))
+        self.assertFalse((self.site / 'en').exists())
 
     def test_rejects_missing_notes_existing_archive_and_changed_layout(self):
         with self.assertRaisesRegex(ValueError, 'notes'):

@@ -62,6 +62,10 @@ async (page) => {
   // Right: the token goes to the app once, the fields empty, the answer becomes records.
   await p.evaluate(s=>{window.__answer=m=>({ok:true,connected:true,source:m.source,account:m.credentials?.project||'main',complete:true,queriedKinds:['server'],resources:s,warnings:[]});},servers([{kind:'server',id:'bad id',name:'nope'}]));
   await p.fill('#cloud-form [name="token"]',hetznerToken);await p.fill('#cloud-form [name="project"]','main');await p.click('#cloud-sync');
+  // The new servers are listed to pick from first (tests/connect-pick.playwright.js); all of them are taken here.
+  await p.waitForSelector('#connect-pick');
+  check(await p.evaluate(()=>!state.assets.some(a=>a.source==='hetzner')&&[...document.querySelectorAll('#connect-pick input[name="connect-take"]')].map(i=>i.value).join()==='hetzner-server-42'),'Nothing lands before the pick; web-1 is offered (web-2 is asked about after)');
+  await p.click('#connect-pick [data-action="connect-import"]');
   await until(p,()=>state.assets.some(a=>a.source==='hetzner'));
   const sent=await p.evaluate(()=>__sent.filter(m=>m.action==='cloudImportSync'));
   check(sent.length===1&&sent[0].source==='hetzner'&&JSON.stringify(sent[0].credentials)===JSON.stringify({token:hetznerToken,project:'main'}),'One request with the typed token: '+JSON.stringify(sent));
@@ -123,6 +127,7 @@ async (page) => {
    {kind:'droplet',id:'3164444',name:'app-1',status:'active',ips:['198.51.100.7'],region:'NL',price:{currency:'USD',value:6},url:'https://cloud.digitalocean.com/droplets/3164444'},
    {kind:'app',id:'4f6c71e2',name:'notes-web',status:'active',url:'https://cloud.digitalocean.com/apps/4f6c71e2'}]});});
   await p.fill('#cloud-form [name="token"]','dop_v1_'+'0f'.repeat(32));await p.click('#cloud-sync');
+  await p.waitForSelector('#connect-pick');await p.click('#connect-pick [data-action="connect-import"]');
   await until(p,()=>state.assets.some(a=>a.source==='digitalocean'));
   const ocean=await p.evaluate(()=>({types:state.assets.filter(a=>a.source==='digitalocean').map(a=>`${a.name}:${a.type}:${a.cost}`).sort(),text:document.querySelector('#modal[open]')?.innerText||''}));
   check(ocean.types.join()==='app-1:server:$6 / 月,notes-web:deployment:未知','Droplets are servers, apps deployments: '+ocean.types);
@@ -145,8 +150,8 @@ async (page) => {
   check(await p.evaluate(()=>state.assets.some(a=>a.source==='hetzner')&&$('#cloud-status').textContent==='未连接'),'Disconnecting keeps the records');
  } finally { await p.close(); }
 
- // ?free (the edition without connectors), the browser and the demo have no way in.
- for(const [url,native] of [['/?free',true],['/',false],['/?demo',false]]){
+ // ?free (the edition without connectors) and the browser have no way in; the demo answers with made-up resources (demo-data.js).
+ for(const [url,native] of [['/?free',true],['/',false]]){
   const q=await page.context().newPage();
   try{
    if(native)await q.addInitScript(`(${host.toString()})();`);
@@ -156,5 +161,13 @@ async (page) => {
    if(!native)check(!r.open&&/Mac App|演示/.test(r.toast),`${url}: cloudDialog explains instead of opening: ${r.toast}`);
   } finally { await q.close(); }
  }
+ const d=await page.context().newPage();
+ try{
+  await d.goto('http://127.0.0.1:4317/?demo');await until(d,()=>typeof importHub==='function');
+  const r=await d.evaluate(()=>{importHub();const hub=!!document.querySelector('#modal [data-action="cloud-import"]');prefsDialog('connections');const prefs=!!document.querySelector('#modal [data-action="cloud-import"][data-id="hetzner"]');cloudDialog('hetzner');return {hub,prefs,open:!!$('#cloud-form')};});
+  check(r.hub&&r.prefs&&r.open,'The demo offers the cloud platforms: '+JSON.stringify(r));
+  await d.fill('#cloud-form [name="token"]','a1'.repeat(32));await d.click('#cloud-sync');await d.waitForSelector('#connect-pick');
+  check(await d.evaluate(()=>document.querySelectorAll('#connect-pick input[name="connect-take"]').length===3&&!state.assets.some(a=>a.source==='hetzner')),'The demo answers in the page and lists three servers to pick');
+ } finally { await d.close(); }
  return 'ok';
 }
