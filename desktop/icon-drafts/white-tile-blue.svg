@@ -1,0 +1,13 @@
+<!-- Draft icon · B2 晴蓝格: 白格 with the ground pressed to the present icon's ring colour (#16171b) and the three plain tiles in the
+     present accent tile's blue (#5f93ea); tiles to ground 5.84:1. The white tile and its orange due dot are 白格's. Full-bleed 1024 × 1024. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+<rect width="1024" height="1024" fill="#16171b"/>
+<g fill="#5f93ea">
+<rect x="212" y="212" width="340" height="270" rx="54"/>
+<rect x="582" y="212" width="230" height="270" rx="54"/>
+<rect x="212" y="512" width="230" height="300" rx="54"/>
+</g>
+<rect x="472" y="512" width="340" height="300" rx="54" fill="#fff"/>
+<circle cx="790" cy="534" r="62" fill="#16171b"/>
+<circle cx="790" cy="534" r="46" fill="#f0a64b"/>
+</svg>

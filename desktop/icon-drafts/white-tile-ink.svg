@@ -1,0 +1,13 @@
+<!-- Draft icon · B1 墨蓝格: 白格 with the three plain tiles lifted to the 墨蓝 theme colour itself (#3b63c4) on the same ground
+     (#1d2027); tiles to ground 2.92:1. The white tile and its orange due dot are 白格's. Full-bleed 1024 × 1024 like desktop/icon.svg. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+<rect width="1024" height="1024" fill="#1d2027"/>
+<g fill="#3b63c4">
+<rect x="212" y="212" width="340" height="270" rx="54"/>
+<rect x="582" y="212" width="230" height="270" rx="54"/>
+<rect x="212" y="512" width="230" height="300" rx="54"/>
+</g>
+<rect x="472" y="512" width="340" height="300" rx="54" fill="#fff"/>
+<circle cx="790" cy="534" r="62" fill="#1d2027"/>
+<circle cx="790" cy="534" r="46" fill="#f0a64b"/>
+</svg>
