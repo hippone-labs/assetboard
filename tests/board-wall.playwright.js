@@ -2,7 +2,7 @@
 // Tile wall (board-wall.js): the default 全部资产 on a wide window, one column on a narrow one; panels move by drag and ⌥ + arrows
 // and keep their order after a reload; rows keep the list's ⌥↑↓ and click; three densities by ⌘−/⌘= and the switch, kept on this
 // device, the line at the top of the view staying put; the peek and 详细 list the facts (masked in privacy mode); the skin is a
-// setting that changes no layout.
+// setting that changes no layout. AI plans show their readings and 待引入 is a line under the wall.
 async (page) => {
  const p=await page.context().newPage();
  const check=(ok,message)=>{if(!ok)throw new Error(message);};
@@ -125,7 +125,20 @@ async (page) => {
   check(!(await p.locator('#board .wall').count())&&await p.locator('#layout-toggle [data-id="wall"]').isHidden()&&await p.locator('#density-toggle').isHidden(),'A category view is a list, without the wall in the switch');
   await p.evaluate(()=>{setView('all');$('#search').value='soon';$('#search').dispatchEvent(new Event('input',{bubbles:true}));});await settle();
   check(!(await p.locator('#board .wall').count()),'A search is a list');
+
+  // The demo on the wall: an AI plan's line carries its reading, 详细 and the peek its limits and period use; what a connected
+  // platform read and the board does not hold yet is a quiet 待引入 line that opens the pick.
+  await p.goto('http://127.0.0.1:4317/?demo');await settle();
+  await p.evaluate(()=>{setView('all');setLayout('wall');state.connectPending={cloudflare:{at:new Date().toISOString(),items:[{id:'x',type:'domain',name:'x.example.com',source:'cloudflare'}]}};setDensity('standard');render();});await settle();
+  check(/本周 88%/.test(await p.locator('#board .wall [data-asset="demo-a2"] .ai-quota').innerText()),'An AI plan on the wall shows its reading');
+  await p.evaluate(()=>setDensity('detail'));await settle();
+  const ai=await p.locator('#board .wall [data-asset="demo-a2"] .r-facts').innerText();
+  check(/额度/.test(ai)&&/本周 88%/.test(ai)&&/本期用量/.test(ai),'详细 lists an AI plan\'s limits and period use: '+ai);
+  check(await p.locator('#board .wall-pending [data-action="connect-pending"][data-id="cloudflare"]').count()===1,'待引入 is a quiet line under the wall');
+  await p.locator('#board .wall-pending [data-action="connect-pending"]').click();await settle();
+  check(await p.locator('#modal .connect-pick').count()===1,'待引入 under the wall opens the pick');
+  await p.evaluate(()=>{$('#modal').close();setDensity('standard');});
   if(errors.length)throw new Error(errors.join(' | '));
-  return 'PASS: tile wall default, narrow single column, panel moves kept, row moves, densities kept and anchored, peek, privacy, skin';
+  return 'PASS: tile wall default, narrow single column, panel moves kept, row moves, densities kept and anchored, peek, privacy, skin, AI readings, 待引入';
  } finally { await p.close(); }
 }

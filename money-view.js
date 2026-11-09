@@ -127,7 +127,7 @@ function extraFacts(a){
  else if(a.type==='domain'&&!hold&&Date.parse(a.registryCheckedAt||'')){const days=Math.floor((Date.now()-Date.parse(a.registryCheckedAt))/86400000);out.push(row(tr('注册局'),days>30?`<span class="quiet-fact">${tr('{n} 天前核对',{n:days})}</span>`:`${tr('核对一致')} · ${esc(String(a.registryCheckedAt).slice(0,10))}`));}
  // Without Pro what it wrote stays readable: the project and the last price change.
  if(proOff){if(projectsOf(a).length)out.push(row(tr('项目'),esc(projectsOf(a).join(tr('、')))));const c=priceChange(a);if(c)out.push(row(c.up?tr('涨价'):tr('降价'),`<span class="price-delta ${c.up?'up':'down'}">${esc(formatMoney(c.before,c.currency))} → ${esc(formatMoney(c.after,c.currency))}</span>`));}
- return out.join('')+slotHtml('facts',a,row);
+ return out.join('')+(a.type==='ai'&&typeof aiQuotaFactsHtml==='function'?aiQuotaFactsHtml(a,row):'')+slotHtml('facts',a,row);
 }
 function paymentsSection(a){
  if(a.hiddenAt)return '';

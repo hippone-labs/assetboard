@@ -40,8 +40,20 @@ function wallFacts(a){
   [2,tr('费用'),[costText(a),costHint(a)].filter(Boolean).join(' · ')],[2,tr('付款方式'),cards.map(c=>c.last4?`•••• ${c.last4}`:displayName(c)).join(tr('、'))],
   [3,tr('关联'),names(rest)],[3,tr('用途'),a.purpose&&a.purpose!==cats[a.type]?.name?a.purpose:''],[3,tr('保留原因'),a.reason],[3,'SSH',ssh],
   [3,tr('本机目录'),a.type==='repository'?a.localPath:''],[3,tr('DNS 托管'),a.type==='domain'?a.dnsHost:''],[3,tr('备案'),a.type==='domain'?a.icp:''],
+  ...wallAiFacts(a),
   [3,tr('状态'),CARD_STATUSES[a.cardStatus]||PHONE_STATUSES[a.phoneStatus]||''],[3,tr('重要程度'),IMPORTANCE[a.importance]||''],[3,tr('来源'),shownSource(a)],[3,tr('备注'),a.notes]
  ].filter(([,,v])=>v);
+}
+// An AI subscription's reading (ai-usage-view.js), with time and money: each window's use and reset, the period's use at API prices,
+// whether it is worth its price, and when it was last used here.
+function wallAiFacts(a){
+ const q=typeof aiQuotaFor==='function'?aiQuotaFor(a):null;if(!q)return [];
+ return [
+  [2,tr('额度'),q.windows.map(w=>`${aiWindowName(w)} ${Math.round(w.used)}%${w.resetsAt?` · ${aiResetText(w.resetsAt)}`:''}`).join('\n')||(q.limitHit?tr('用完了，{when}',{when:aiResetText(q.limitHit.resetsAt)}):'')],
+  [2,tr('本期用量'),q.period.n?`${aiUsd(q.period.cost)} · ${aiTokens(q.period.tokens)} tokens`:''],
+  [2,tr('值不值'),q.value!=null?(q.value>=1?tr('本期用量按 API 价是订阅价的 {x} 倍',{x:q.value}):tr('本期用量按 API 价只有订阅价的 {x} 倍',{x:q.value})):''],
+  [2,tr('最近使用'),q.last?aiAgoText(q.last):'']
+ ];
 }
 function wallFactsHtml(a,cls){
  let tier=0;
@@ -57,7 +69,12 @@ function wallBoardHtml(live){
  const empty=categoryIds().filter(id=>state.blocks.some(b=>b.id===id)&&!live.some(a=>a.type===id));
  const html=panels.map(({id,list})=>groupHtml({id,title:cats[id].name,glyph:`<span class="g-icon">${icon(id)}</span>`,list,fold:true,folded:!!state.blocks.find(b=>b.id===id)?.folded,reorder:true,summary:groupSummary(list)+(list.length>1?groupCostHtml(list):''),actions:categoryActions(id),wall:true})).join('');
  const rest=empty.length?`<p class="wall-empty"><span>${tr('空的类别')}</span>${empty.map(id=>`<button class="wall-add" data-action="add-asset" data-id="${esc(id)}" title="${tr('添加{name}',{name:esc(cats[id].name)})}">${ui('plus')}${esc(cats[id].name)}</button>`).join('')}</p>`:'';
- return `<div class="wall" data-density="${wallDensity}">${html}</div>${rest}`;
+ return `<div class="wall" data-density="${wallDensity}">${html}</div>${wallPendingHtml()}${rest}`;
+}
+// What a connected platform read and the board does not hold yet (待引入): one quiet line under the wall, a button per platform.
+function wallPendingHtml(){
+ const sources=typeof heldSources==='function'&&!proFree?heldSources(state):[];if(!sources.length)return '';
+ return `<p class="wall-empty wall-pending"><span>${tr('待引入')}</span>${sources.map(s=>`<button class="wall-add" data-action="connect-pending" data-id="${esc(s.source)}" title="${tr('还没在大板里，点开挑选')}">${ui('download')}${esc(s.name)} ${formatCount(s.count)}</button>`).join('')}</p>`;
 }
 // A panel's tilt under a skin that tilts: a steady -1…1 from its category, so a panel keeps its angle from one drawing to the next.
 function wallTilt(id){let h=7;for(const c of String(id))h=(h*31+c.charCodeAt(0))|0;return ((Math.abs(h)%17)/8-1).toFixed(2);}

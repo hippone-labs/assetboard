@@ -1,0 +1,5 @@
+[
+ {"id":"msg_v2_0001","data":"{\"agent\":\"build\",\"model\":{\"id\":\"gpt-5.2\",\"providerID\":\"openai\"},\"content\":[],\"finish\":\"stop\",\"cost\":0,\"tokens\":{\"input\":5519,\"output\":20,\"reasoning\":23,\"cache\":{\"read\":100,\"write\":50}},\"time\":{\"created\":1794124800000,\"completed\":1794124801000}}"},
+ {"id":"msg_v2_0002","data":"{\"agent\":\"build\",\"model\":{\"id\":\"qwen3-coder\",\"providerID\":\"opencode-go\"},\"content\":[],\"cost\":0.0123,\"tokens\":{\"input\":9000,\"output\":800,\"reasoning\":0,\"cache\":{\"read\":0,\"write\":0}},\"time\":{\"created\":1794128400000}}"},
+ {"id":"msg_v2_0003","data":"not json"}
+]

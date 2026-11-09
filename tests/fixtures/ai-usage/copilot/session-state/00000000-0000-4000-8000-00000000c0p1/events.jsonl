@@ -1,0 +1,4 @@
+{"type":"session.start","data":{"sessionId":"00000000-0000-4000-8000-00000000c0p1","context":{"cwd":"/work/demo-app"}},"id":"start-1","timestamp":"2026-11-07T10:00:00.000Z"}
+{"type":"user.message","data":{"content":"fictional prompt"},"id":"m-1","timestamp":"2026-11-07T10:00:30.000Z"}
+{"type":"session.usage_record","data":{"usage":{"model":"gpt-6.1-sol","inputTokens":32832,"outputTokens":32,"cacheReadTokens":0,"cacheWriteTokens":32829,"reasoningTokens":0,"cost":1.0,"duration":1500,"copilotUsage":{"totalNanoAiu":181977250}}},"id":"ev-1","timestamp":"2026-11-07T10:01:00.000Z"}
+{"type":"session.usage_record","data":{"usage":{"model":"claude-sonnet-4-6","inputTokens":21363,"outputTokens":179,"cacheReadTokens":20623,"cacheWriteTokens":737,"reasoningTokens":0,"cost":1.0,"duration":2799,"copilotUsage":{"totalNanoAiu":27170850}}},"id":"ev-2","timestamp":"2026-11-07T10:02:00.000Z"}
