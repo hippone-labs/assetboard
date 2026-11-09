@@ -9,7 +9,7 @@
 [![build](https://github.com/hippone-labs/assetboard/actions/workflows/build.yml/badge.svg)](https://github.com/hippone-labs/assetboard/actions/workflows/build.yml)
 [![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
 [![macOS 15+](https://img.shields.io/badge/macOS-15%2B%20arm64-lightgrey)](https://assetboard.app/zh/)
-[![Version](https://img.shields.io/badge/version-2026.11.5-lightgrey)](https://assetboard.app/zh/)
+[![Version](https://img.shields.io/badge/version-2026.11.8-lightgrey)](https://assetboard.app/zh/)
 
 [官网](https://assetboard.app/zh/) · [使用手册](GUIDE.md) · [English](README.en.md) · [问题反馈](https://github.com/hippone-labs/assetboard/issues/new/choose)
 
@@ -94,9 +94,11 @@ Assetboard 是一个本地 App：每条资产记下一个日期（到期、自�
 - 导出：JSON 备份（可以导回）、日历 .ics、付款账本 .csv、交接清单 .html。
 - 隐私模式：遮住名称、账号和 IP。
 - 网络记录：列出 App 发出的每个请求。
-- MCP 服务和命令行 `assetboard-cli`，供 Claude Code、Codex、Cursor 等工具读写资产，见[使用手册 · MCP 接入](GUIDE.md#mcp-接入外部-ai-工具与命令行)。
+- MCP 服务和命令行 `assetboard-cli`，供 Claude Code、Codex、Cursor 等工具读写资产，见[使用手册 · MCP 接入](GUIDE.md#mcp-接入外部-ai-工具与命令行)。每次外部调用都记在本机的 MCP 操作记录里（哪个客户端、什么时间、调了哪个工具、改了什么），在「设置 › MCP」查看。
+- AI 额度与用量：从本机的 Claude Code、Codex、Cursor、GitHub Copilot、Grok CLI、opencode、Antigravity 的文件读出额度和用量，显示在对应的 AI 订阅上：快用完、闲置、按 API 价折算值不值。只读数字、模型名和时间。
+- 代码仓库（Mac，默认关闭）：GitHub 同步时一并读取分支和最近一次 Actions，失败或运行中的排在行首，新分支显示 14 天。
 - 键盘操作，按 `?` 查看快捷键，见[使用手册 · 快捷键](GUIDE.md#快捷键)。
-- 主题色，浅色和深色跟随系统。
+- 主题色、两种磁贴墙皮肤（安静、冰箱贴）、三档密度，浅色和深色跟随系统；界面有英文（默认）和简体中文。
 
 ## 免费版与 Pro
 
@@ -117,7 +119,7 @@ Assetboard 是一个本地 App：每条资产记下一个日期（到期、自�
 
 - 数据在 `~/Library/Application Support/Assetboard/`：`assetboard.sqlite`，另有 JSON 镜像 `board.json`。没有云同步和遥测。
 - 令牌和 API key 存在 macOS 钥匙串。
-- App 自己会连的主机：检查更新（assetboard.app）、已知平台的网站图标、汇率（api.frankfurter.dev）、连上之后的 Cloudflare。其余连接（RDAP、AI、实时状态、GitHub、Namecheap、Porkbun、Hetzner、DigitalOcean、Vercel）在你打开或点击之后才发生。
+- App 自己会连的主机：检查更新（assetboard.app）、已知平台的网站图标、汇率（api.frankfurter.dev）、连上之后的 Cloudflare。其余连接（RDAP、AI、AI 工具的额度接口、实时状态、GitHub、Namecheap、Porkbun、Hetzner、DigitalOcean、Vercel）在你打开或点击之后才发生。
 - 网页本身由 Content-Security-Policy 禁止联网，所有请求经过 Swift 一侧，记在网络记录里。
 - 交给外部 AI 工具的数据默认遮住 IP、主机、手机号和邮箱，不含银行卡和手机号两类记录。
 

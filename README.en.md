@@ -9,7 +9,7 @@ A macOS app that records the expiry dates, costs and relations of digital assets
 [![build](https://github.com/hippone-labs/assetboard/actions/workflows/build.yml/badge.svg)](https://github.com/hippone-labs/assetboard/actions/workflows/build.yml)
 [![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
 [![macOS 15+](https://img.shields.io/badge/macOS-15%2B%20arm64-lightgrey)](https://assetboard.app/)
-[![Version](https://img.shields.io/badge/version-2026.11.5-lightgrey)](https://assetboard.app/)
+[![Version](https://img.shields.io/badge/version-2026.11.8-lightgrey)](https://assetboard.app/)
 
 [Website](https://assetboard.app/) · [User guide (Chinese)](GUIDE.md) · [简体中文](README.md) · [Issues](https://github.com/hippone-labs/assetboard/issues/new/choose)
 
@@ -92,9 +92,11 @@ Scripts can put JSON in this format into `~/Library/Application Support/Assetboa
 - Exports: JSON backup (can be imported again), calendar .ics, payment ledger .csv, handover list .html.
 - Privacy mode: masks names, accounts and IPs.
 - Network log: lists every request the app makes.
-- An MCP server and the `assetboard-cli` command line for Claude Code, Codex, Cursor and other tools to read and write assets.
+- An MCP server and the `assetboard-cli` command line for Claude Code, Codex, Cursor and other tools to read and write assets. Every external call goes into a local MCP activity log (which client, when, which tool, what changed), shown in Settings › MCP.
+- AI usage and limits: plan limits and usage of Claude Code, Codex, Cursor, GitHub Copilot, Grok CLI, opencode and Antigravity, read from their local files and shown on the matching AI subscription: close to the limit, idle, worth its price at API rates or not. Only numbers, model names and times are read.
+- Repositories (Mac, off by default): a GitHub sync also reads branches and the latest Actions run; a failed or running run leads the row, and new branches show for 14 days.
 - Keyboard control; `?` lists the shortcuts.
-- Accent themes; light and dark follow the system.
+- Accent themes, two tile-wall skins (Quiet, Fridge magnets) and three densities; light and dark follow the system.
 
 ## Free and Pro
 
@@ -115,7 +117,7 @@ This repository is the whole code of the free part; what you build from it works
 
 - Data is in `~/Library/Application Support/Assetboard/`: `assetboard.sqlite`, with a JSON mirror `board.json`. No cloud sync or telemetry.
 - Tokens and API keys are stored in the macOS Keychain.
-- Hosts the app contacts on its own: update checks (assetboard.app), site icons of known providers, exchange rates (api.frankfurter.dev), and Cloudflare once connected. Other connections (RDAP, AI, live status, GitHub, Namecheap, Porkbun, Hetzner, DigitalOcean, Vercel) happen only after you turn them on or click.
+- Hosts the app contacts on its own: update checks (assetboard.app), site icons of known providers, exchange rates (api.frankfurter.dev), and Cloudflare once connected. Other connections (RDAP, AI, the AI tools' quota endpoints, live status, GitHub, Namecheap, Porkbun, Hetzner, DigitalOcean, Vercel) happen only after you turn them on or click.
 - The page itself is barred from the network by its Content-Security-Policy; every request goes through the Swift side and is recorded in the network log.
 - Data given to external AI tools has IPs, hosts, phone numbers and emails masked by default and leaves out bank card and phone records.
 
