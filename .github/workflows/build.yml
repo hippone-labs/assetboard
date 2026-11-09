@@ -104,7 +104,7 @@ jobs:
           if-no-files-found: ignore
 
       - name: Committed Assets.car is current
-        run: git diff --exit-code -- desktop/Assets.car.sha256
+        run: git diff --exit-code -- desktop/Assets.car.sha256 && test -z "$(git status --porcelain -- desktop/Assets.car.sha256)"
 
       - name: Swift build + self-tests (free, macOS 26)
         env:
