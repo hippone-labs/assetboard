@@ -98,8 +98,10 @@ enum ClientSignals {
         var size = MemoryLayout<kinfo_proc>.stride
         var mib: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_PID, pid]
         guard sysctl(&mib, 4, &info, &size, nil, 0) == 0, size > 0 else { return nil }
-        let command = withUnsafePointer(to: &info.kp_proc.p_comm) { pointer in
-            pointer.withMemoryRebound(to: CChar.self, capacity: MemoryLayout.size(ofValue: info.kp_proc.p_comm)) { String(cString: $0) }
+        var name = info.kp_proc.p_comm
+        let capacity = MemoryLayout.size(ofValue: name)
+        let command = withUnsafePointer(to: &name) { pointer in
+            pointer.withMemoryRebound(to: CChar.self, capacity: capacity) { String(cString: $0) }
         }
         return (command, info.kp_eproc.e_ppid)
     }
