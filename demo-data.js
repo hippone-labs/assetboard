@@ -106,3 +106,68 @@ window.assetboardDemoBoard=function(){
  const block=id=>({id,folded:false});
  return {blocks:['domain','server','repository','subscription','ai','database','license'].map(block),assets,deletedExternalIds:[],cardOrder:{domain:['demo-d1']},featuredRepositoryIds:[],evidenceDecisions:{},iconSites:{'hetzner.com':'hetzner.example.com'}};
 };
+// The platforms' answers on the demo board (设置 › 连接, the import window): made-up resources in the shape the Mac app passes on, so
+// connecting and picking can be tried. Nothing is sent anywhere. Each read after the first finds one more resource, as a platform does
+// when something was bought or created since.
+window.assetboardDemoConnect=function(message,board){
+ const reads=window.assetboardDemoConnect.reads||(window.assetboardDemoConnect.reads={}),source=message.source||{cloudflareSync:'cloudflare',cloudflareDisconnect:'cloudflare',githubSync:'github',githubSyncLocal:'github',githubDisconnect:'github'}[message.action];
+ if(/Disconnect$/.test(message.action))return {ok:true,disconnected:true,source};
+ const n=reads[source]=(reads[source]||0)+1,more=(list,extra)=>n>1?[...list,...extra.slice(0,n-1)]:list;
+ const pad=v=>String(v).padStart(2,'0'),day=offset=>{const d=new Date();d.setDate(d.getDate()+offset);return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;};
+ const ago=days=>new Date(Date.now()-days*86400000).toISOString();
+ if(source==='cloudflare')return {ok:true,queriedKinds:['zone','pages','workers','r2'],resources:more([
+  {kind:'zone',id:'z1',name:'launch.example.dev',account:'Acme Labs',status:'active'},
+  {kind:'zone',id:'z2',name:'mail.example.org',account:'Acme Labs',status:'active'},
+  {kind:'registrar',id:'Acme Labs:launch.example.dev',name:'launch.example.dev',account:'Acme Labs',expiresAt:day(210),autoRenew:true},
+  {kind:'pages',id:'p1',name:'notes-web',account:'Acme Labs',status:'active'},
+  {kind:'workers',id:'w1',name:'link-shortener',account:'Acme Labs'},
+  {kind:'r2',id:'r1',name:'photo-archive',account:'Acme Labs'}],[{kind:'zone',id:'z3',name:'beta.example.app',account:'Acme Labs',status:'pending'}])};
+ if(source==='github'){
+  const have=(board?.assets||[]).filter(a=>a.source==='github').map(a=>({id:a.externalId,name:a.name,owner:a.account||'acme-labs',private:a.event==='私有仓库',archived:false,url:a.url||'',updatedAt:a.updatedAt||ago(3),pushedAt:a.pushedAt||ago(5),defaultBranch:a.defaultBranch||'main'}));
+  const fresh=['weather-cli','invoice-kit','docs-site','status-page','dotfiles'].map((name,i)=>({id:'demo-new-'+i,name:'acme-labs/'+name,owner:'acme-labs',private:i%2===1,archived:false,description:'',url:'',updatedAt:ago(i+1),pushedAt:ago(i+2),defaultBranch:'main'}));
+  return {ok:true,connected:true,accounts:['acme-labs'],repositories:[...have,...more(fresh.slice(0,4),fresh.slice(4))]};
+ }
+ if(source==='namecheap'||source==='porkbun')return {ok:true,source,account:'acme',complete:true,domains:more([
+  {id:'pb1',name:'example.app',expires:day(320),autoRenew:true,status:'active'},
+  {id:'pb2',name:'side.example.io',expires:day(45),autoRenew:false,status:'active'},
+  {id:'pb3',name:'api.example.dev',expires:day(190),autoRenew:true,status:'active'}],[{id:'pb4',name:'newidea.example.com',expires:day(365),autoRenew:true,status:'active'}])};
+ const cloud={
+  hetzner:[{kind:'server',id:'101',name:'hel1-worker',ips:['203.0.113.41'],region:'FI',price:{currency:'EUR',value:4.51},status:'running',detail:'CX22'},
+   {kind:'server',id:'102',name:'fsn1-db',ips:['203.0.113.42'],region:'DE',price:{currency:'EUR',value:7.59},status:'running',detail:'CX32'},
+   {kind:'server',id:'103',name:'nbg1-backup',ips:['203.0.113.43'],region:'DE',price:{currency:'EUR',value:3.79},status:'off',detail:'CX11'},
+   {kind:'server',id:'104',name:'ash-edge',ips:['203.0.113.44'],region:'US',price:{currency:'EUR',value:4.51},status:'running',detail:'CPX11'}],
+  digitalocean:[{kind:'droplet',id:'201',name:'sgp-api',ips:['198.51.100.61'],region:'SG',price:{currency:'USD',value:6},status:'active'},
+   {kind:'app',id:'202',name:'landing-app',status:'active'},{kind:'database',id:'203',name:'pg-cluster',status:'online'},
+   {kind:'droplet',id:'204',name:'sfo-runner',ips:['198.51.100.64'],region:'US',price:{currency:'USD',value:12},status:'active'}],
+  vercel:[{kind:'project',id:'prj_1',name:'studio-web',status:'ready'},{kind:'project',id:'prj_2',name:'notes-preview',status:'ready'},
+   {kind:'domain',id:'example.studio',name:'example.studio',expires:day(260),autoRenew:true},{kind:'project',id:'prj_3',name:'docs-v2',status:'ready'}]
+ }[source];
+ return cloud?{ok:true,source,account:'acme',complete:true,resources:more(cloud.slice(0,3),cloud.slice(3))}:{ok:false,source,error:'demo'};
+};
+// 设置 › MCP on the demo board: tools that are set up and have called, and a made-up 操作记录 on the demo records. Nothing calls.
+window.assetboardDemoAgentConfigs=function(){
+ return [['claude-code','~/.claude.json',true],['codex','~/.codex/config.toml',true],['cursor','~/.cursor/mcp.json',true],['claude-desktop','~/Library/Application Support/Claude/claude_desktop_config.json',false],['vscode','~/Library/Application Support/Code/User/mcp.json',false]]
+  .map(([id,path,configured])=>({id,path,found:true,configured}));
+};
+window.assetboardDemoAgentLog=function(){
+ const at=minutes=>new Date(Date.now()-minutes*60000).toISOString(),pad=n=>String(n).padStart(2,'0'),day=offset=>{const d=new Date();d.setDate(d.getDate()+offset);return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;};
+ const claude={id:'claude-code',name:'Claude Code',by:'clientInfo',version:'2.1.4',reported:'claude-code'},codex={id:'codex',name:'Codex',by:'clientInfo',version:'0.58.0',reported:'codex-mcp-client'},grok={id:'grok',name:'Grok',by:'process'},unknown={id:'unknown',name:'未知客户端',by:'none'};
+ const row=(minutes,client,method,tool,kind,rest={})=>({id:'demo-log-'+minutes,at:at(minutes),client,via:'mcp',method,tool,kind,ok:true,...rest});
+ const en=typeof appLang!=='undefined'&&appLang==='en',t=(zh,english)=>en?english:zh;
+ return [
+  row(4,claude,'update','update_asset','write',{changes:[{op:'update',id:'demo-s1',name:'tokyo-vps',type:'server',fields:[{field:'date',from:day(26),to:day(56)},{field:'cost',from:t('$6/月','$6/mo'),to:t('$7/月','$7/mo')},{field:'notes',from:'',to:t('续了一个月，涨到 $7','Renewed for a month, now $7')}]}]}),
+  row(6,claude,'get','get_asset','read',{params:{id:'demo-s1'},changes:[{op:'read',id:'demo-s1',name:'tokyo-vps',type:'server'}]}),
+  row(7,claude,'list','list_assets','read',{params:{type:'server'},count:3}),
+  row(38,codex,'add','add_assets','write',{params:{items:'2'},changes:[{op:'add',id:'demo-new-1',name:'status.example.dev',type:'domain',fields:[{field:'name',from:'',to:'status.example.dev'},{field:'provider',from:'',to:'Porkbun'},{field:'date',from:'',to:day(300)}]},{op:'add',id:'demo-new-2',name:'Uptime Basic',type:'subscription',fields:[{field:'name',from:'',to:'Uptime Basic'},{field:'cost',from:'',to:t('$5/月','$5/mo')}]}]}),
+  row(41,codex,'update','update_asset','write',{ok:false,error:t('找不到资产 demo-x9','No asset demo-x9')}),
+  row(43,codex,'deleteMany','request_delete_assets','write',{params:{ids:'1'},changes:[{op:'ask-delete',id:'demo-d4',name:'old-landing.example.com',type:'domain'}]}),
+  row(95,grok,'totals','get_cost_totals','read',{params:{currency:'USD'}}),
+  row(130,unknown,'list','list_assets','read',{params:{query:'vps'},count:2}),
+  row(1500,claude,'updateMany','update_assets','write',{params:{updates:'2'},changes:[{op:'update',id:'demo-r1',name:'acme-labs/notes-api',type:'repository',fields:[{field:'project',from:'',to:'notes-lab'}]},{op:'update',id:'demo-db1',name:'postgres-main',type:'database',fields:[{field:'project',from:'',to:'notes-lab'}]}]}),
+  row(1520,claude,'list','list_assets','read',{params:{type:'repository'},count:14})
+ ];
+};
+window.assetboardDemoAgentClients=function(){
+ const at=minutes=>new Date(Date.now()-minutes*60000).toISOString();
+ return [{id:'claude-code',name:'Claude Code',first:at(9000),last:at(4),calls:46,by:'clientInfo',version:'2.1.4'},{id:'codex',name:'Codex',first:at(4000),last:at(38),calls:12,by:'clientInfo',version:'0.58.0'},{id:'grok',name:'Grok',first:at(95),last:at(95),calls:1,by:'process'},{id:'unknown',name:'未知客户端',first:at(130),last:at(130),calls:1,by:'none'}];
+};

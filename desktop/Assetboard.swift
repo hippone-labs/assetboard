@@ -337,6 +337,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
     #endif
     var notificationStatus: String?
     /// 反馈与建议: a mail to the project address (the site's contact page says the same); GitHub issues work too.
+    /// 操作记录 keeps this many rows; older ones are dropped.
+    static let agentLogKeep = 1000
     static let feedbackURL = URL(string: "mailto:assetboard@163.com?subject=Assetboard%20%E5%8F%8D%E9%A6%88")!
 
     func publishConnectionState() {
@@ -459,8 +461,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         let id = UUID().uuidString
         // `via` says which client called: "mcp" from assetboard-cli's MCP server, anything else is the command line (the page keeps the
         // MCP lookups free and the rest for Pro).
+        // `client` is what assetboard-cli could tell about the tool that started it (ClientSignals), for 操作记录.
         let call: [String: Any] = ["requestId": id, "method": method, "params": request["params"] as? [String: Any] ?? [:],
-                                   "via": request["via"] as? String == "mcp" ? "mcp" : "cli"]
+                                   "via": request["via"] as? String == "mcp" ? "mcp" : "cli", "client": ClientSignals.sanitized(request["client"])]
         guard let data = try? JSONSerialization.data(withJSONObject: call), let json = String(data: data, encoding: .utf8) else {
             recordAgentCall(method, ok: false, started: Date(), note: L("请求无法编码")); reply(AgentSocketServer.failure(L("请求无法编码"))); return
         }
@@ -1149,6 +1152,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
             return
         }
         if body["action"] as? String == "networkLogClear" { try? store.database.clearNetworkLog(); publishNetworkLog(); return }
+        // 设置 › MCP: one 操作记录 row from the page (a connect only updates the tool's row), clearing it, and the client config check.
+        if body["action"] as? String == "agentLog" {
+            if let entry = body["entry"] as? [String: Any], let client = body["client"] as? [String: Any], let id = client["id"] as? String {
+                if entry["kind"] as? String != "connect" { try? store.database.appendAgentLog(entry, keep: AppDelegate.agentLogKeep) }
+                try? store.database.saveAgentClient(id: id, client)
+            }
+            return
+        }
+        if body["action"] as? String == "agentLogClear" { try? store.database.clearAgentLog(); return }
+        if body["action"] as? String == "agentConfigs" {
+            DispatchQueue.global(qos: .userInitiated).async {
+                let list = AgentClients.scan()
+                DispatchQueue.main.async {
+                    guard let data = try? JSONSerialization.data(withJSONObject: list), let json = String(data: data, encoding: .utf8) else { return }
+                    self.webView.evaluateJavaScript("window.assetboardAgentConfigs?.(\(json))")
+                }
+            }
+            return
+        }
         if body["action"] as? String == "agentReply" {
             if let id = body["requestId"] as? String, let reply = body["reply"] as? String, reply.utf8.count <= AgentSocket.maxBytes {
                 finishAgentRequest(id, Data(reply.utf8))
@@ -1375,6 +1397,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         initial["sshProbe"] = demoMode ? NSNull() as Any : sshProbeSettings.summary as Any
         // 平台状态: the sources without their tokens; the demo reads no platform.
         initial["platformSources"] = demoMode ? [] : platformSources.summary()
+        // 设置 › MCP: the recent 操作记录, the tools that have called and which tools have Assetboard in their config. The demo makes up its own.
+        if !demoMode {
+            initial["agentLog"] = (try? store.database.listAgentLog(limit: AppDelegate.agentLogKeep)) ?? []
+            initial["agentClients"] = (try? store.database.listAgentClients()) ?? []
+            initial["agentConfigs"] = AgentClients.scan()
+        }
         #endif
         // Screenshots (the window can only be captured, not clicked): `--demo --open-asset=<id>` opens that record's detail,
         // `--demo --panorama` opens 全景, `--demo --probe-sources` the probe settings (探针数据源). Only the demo reads them.
@@ -1738,6 +1766,58 @@ func testRegistryFacts() {
     precondition((RegistryLookup.pageFacts([:])["nameservers"] as? [Any])?.isEmpty == true, "A reply without nameservers sends an empty list")
     guard JSONSerialization.isValidJSONObject(facts) else { fatalError("The facts are not JSON") }
     print("PASS: RDAP reply trimmed to events, status, registrar and at most 13 nameserver names")
+}
+
+/// 设置 › MCP: the 操作记录 table, the tools' rows, which config files name Assetboard (read only), and what the CLI may tell about its parents.
+func testAgentLog() {
+    let manager = FileManager.default
+    let root = manager.temporaryDirectory.appendingPathComponent("assetboard-agent-log-" + UUID().uuidString)
+    defer { try? manager.removeItem(at: root) }
+    do {
+        let store = try BoardStore(root: root)
+        for index in 0..<15 { try store.database.appendAgentLog(["id": "e\(index)", "kind": "write", "method": "update"], keep: 10) }
+        let rows = try store.database.listAgentLog()
+        precondition(rows.count == 10 && rows.first?["id"] as? String == "e14", "Newest first, oldest dropped beyond the limit: \(rows.count)")
+        try store.database.appendAgentLog(["id": "big", "notes": String(repeating: "x", count: 70_000)], keep: 10)
+        let afterBig = try store.database.listAgentLog()
+        precondition(afterBig.first?["id"] as? String == "e14", "A row over 64 KB is not kept")
+        try store.database.saveAgentClient(id: "codex", ["id": "codex", "name": "Codex", "calls": 1])
+        try store.database.saveAgentClient(id: "codex", ["id": "codex", "name": "Codex", "calls": 2])
+        let clients = try store.database.listAgentClients()
+        precondition(clients.count == 1 && clients[0]["calls"] as? Int == 2, "One row per tool, updated in place")
+        try store.database.clearAgentLog()
+        let cleared = try store.database.listAgentLog(), kept = try store.database.listAgentClients()
+        precondition(cleared.isEmpty && kept.count == 1, "Clearing the log keeps the tools")
+
+        let home = root.appendingPathComponent("home")
+        let write = { (path: String, text: String) in
+            let url = home.appendingPathComponent(path)
+            try manager.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try Data(text.utf8).write(to: url)
+        }
+        try write(".claude.json", #"{"projects":{"/x/assetboard":{}},"mcpServers":{"assetboard":{"command":"/Applications/Assetboard.app/Contents/MacOS/assetboard-cli","args":["mcp"]}}}"#)
+        try write(".codex/config.toml", "[mcp_servers.assetboard]\ncommand = \"/opt/ab\"\nargs = [\"mcp\"]\n")
+        try write(".cursor/mcp.json", #"{"mcpServers":{"other":{"command":"x","env":{"API_TOKEN":"secret-value"}}}}"#)
+        try write(".gemini/settings.json", #"{"theme":"x","note":"/projects/assetboard"}"#)
+        let before = try Data(contentsOf: home.appendingPathComponent(".claude.json"))
+        let found = Dictionary(uniqueKeysWithValues: AgentClients.scan(home: home).map { ($0["id"] as! String, $0) })
+        precondition(found["claude-code"]?["configured"] as? Bool == true && found["claude-code"]?["path"] as? String == "~/.claude.json", "Claude Code by its command")
+        precondition(found["codex"]?["configured"] as? Bool == true, "Codex by its TOML table")
+        precondition(found["cursor"]?["found"] as? Bool == true && found["cursor"]?["configured"] as? Bool == false, "A config without Assetboard is found, not configured")
+        precondition(found["gemini"]?["configured"] as? Bool == false, "A folder named assetboard is no server")
+        precondition(found["zed"]?["found"] as? Bool == false, "A missing file is not found")
+        precondition(!String(describing: found).contains("secret-value"), "Nothing of a file's content comes back")
+        let after = try Data(contentsOf: home.appendingPathComponent(".claude.json"))
+        precondition(after == before, "Config files are only read")
+
+        precondition(ClientSignals.programName("/opt/homebrew/lib/node_modules/@anthropic-ai/claude-code/cli.js") == "claude-code", "A node script is named by its package")
+        precondition(ClientSignals.programName("/Users/someone/.local/bin/codex") == "codex", "Only the file name of a program")
+        precondition(ClientSignals.programName("/Users/someone/tools/run.js") == "run", "No folder that could hold a user name")
+        let clean = ClientSignals.sanitized(["name": "claude-code\u{0007}", "version": String(repeating: "9", count: 200), "processes": ["node", 3, "claude"], "env": ["CLAUDECODE"], "extra": "dropped"])
+        precondition(clean["name"] as? String == "claude-code" && (clean["version"] as? String)?.count == 60 && (clean["processes"] as? [String]) == ["node", "claude"] && clean["extra"] == nil, "The client part is cut to short strings: \(clean)")
+        precondition(ClientSignals.sanitized("x").isEmpty && !ClientSignals.ancestors().isEmpty, "A bad client part is dropped; this test has a parent")
+        print("PASS: 操作记录 table, tool rows, client config files read only (names, not content), CLI parent names")
+    } catch { fputs("Agent log test failed: \(error)\n", stderr); exit(1) }
 }
 
 func testNetworkLog() {
@@ -2449,6 +2529,8 @@ if CommandLine.arguments.contains(Updater.launchCheckFlag) {
     testRegistryFacts()
 } else if CommandLine.arguments.contains("--test-network-log") {
     testNetworkLog()
+} else if CommandLine.arguments.contains("--test-agent-log") {
+    testAgentLog()
 } else if CommandLine.arguments.contains("--test-agent-socket") {
     testAgentSocket()
 } else if CommandLine.arguments.contains("--test-icons") {

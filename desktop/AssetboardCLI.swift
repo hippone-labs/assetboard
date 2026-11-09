@@ -26,6 +26,11 @@ import Foundation
       history [<id>]                       价格变化历史（带 id 时含付款记录）
       projects [--currency USD]            项目：每月费用（共用的按份额分摊）、收入和盈亏，默认按 USD
       update-project <项目> <JSON | ->     改项目的每月收入和共用资产的份额，例如 {"revenue":{"amount":30,"currency":"USD"}}
+      activity [--client 工具] [--kind read|write] [--since 日期] [--limit N]
+                                           外部工具的操作记录，最近的在前
+      agents                               配置了 Assetboard 的工具，和调用过的工具及最近一次时间
+      candidates [--source 平台]            已连接平台上还没引入的资产
+      import-candidates <平台> [id…]        把待引入的资产引入大板（不给 id 就全部）
       mcp                                  以 MCP 服务器运行（stdio）
     结果以 JSON 输出；出错时退出码为 1。
     """
@@ -50,6 +55,11 @@ import Foundation
       history [<id>]                       Price history (with an id, also its payments)
       projects [--currency USD]            Projects: monthly cost (shared assets split by share), revenue and net, in USD by default
       update-project <name> <JSON | ->     Set a project's monthly revenue and its shared assets' shares, e.g. {"revenue":{"amount":30,"currency":"USD"}}
+      activity [--client TOOL] [--kind read|write] [--since DATE] [--limit N]
+                                           What external tools did, newest first
+      agents                               Tools with Assetboard in their config, and the tools that have called and when
+      candidates [--source PLATFORM]       Assets on connected platforms that are not on the board yet
+      import-candidates <platform> [id…]   Bring waiting assets onto the board (all of them without ids)
       mcp                                  Run as an MCP server (stdio)
     Results are printed as JSON; the exit code is 1 on an error.
     """
@@ -179,6 +189,18 @@ import Foundation
             return ("forecast", params)
         case "history":
             return ("costHistory", rest.first.map { ["id": $0] } ?? [:])
+        case "activity":
+            var params: [String: Any] = [:]
+            for (flagName, key) in [("--client", "client"), ("--kind", "kind"), ("--since", "since"), ("--until", "until"), ("--asset", "assetId")] { if let value = option(flagName) { params[key] = value } }
+            if let limit = option("--limit").flatMap(Int.init) { params["limit"] = limit }
+            return ("activity", params)
+        case "agents": return ("agents", [:])
+        case "candidates": return ("connectPending", option("--source").map { ["source": $0] } ?? [:])
+        case "import-candidates":
+            guard let source = rest.first else { throw UsageError(text: L("缺少平台，例如 github")) }
+            var params: [String: Any] = ["source": source]
+            if rest.count > 1 { params["ids"] = Array(rest.dropFirst()) }
+            return ("connectImport", params)
         default: throw UsageError(text: L("未知命令 {command}", ["command": command]) + "\n\n" + usage)
         }
     }
@@ -188,7 +210,7 @@ import Foundation
     /// Calls the app and returns its `result`; starts the app once when it is not running, then waits for it to load.
     /// `via` tells the app which client calls: "mcp" from the MCP server below, "cli" from the command line.
     static func invoke(_ method: String, _ params: [String: Any], via: String = "cli") throws -> Any {
-        let request: [String: Any] = ["method": method, "params": params, "via": via]
+        let request: [String: Any] = ["method": method, "params": params, "via": via, "client": via == "mcp" ? MCPServer.client : ClientSignals.current]
         var launched = false
         let deadline = Date().addingTimeInterval(25)
         while true {
@@ -245,14 +267,16 @@ import Foundation
         precondition(totals?.0 == "totals" && totals?.1["currency"] as? String == "USD", "totals with a currency")
         let delete = parsed(["delete", "x1", "--reason", "转出"])
         precondition(delete?.1["id"] as? String == "x1" && delete?.1["reason"] as? String == "转出", "delete with a reason")
-        let initialize = MCPServer.handle(["jsonrpc": "2.0", "id": 1, "method": "initialize", "params": ["protocolVersion": "2025-03-26"]])
+        MCPServer.greet = false
+        let initialize = MCPServer.handle(["jsonrpc": "2.0", "id": 1, "method": "initialize", "params": ["protocolVersion": "2025-03-26", "clientInfo": ["name": "claude-code", "version": "2.1.4", "token": "x"]]])
+        precondition(MCPServer.client["name"] as? String == "claude-code" && MCPServer.client["version"] as? String == "2.1.4" && MCPServer.client["token"] == nil && MCPServer.client["processes"] is [String], "initialize keeps who the client says it is, beside its parent programs")
         let info = initialize?["result"] as? [String: Any]
         precondition(info?["protocolVersion"] as? String == "2025-03-26" && (info?["capabilities"] as? [String: Any])?["tools"] != nil, "initialize echoes a known version")
         let future = MCPServer.handle(["jsonrpc": "2.0", "id": 2, "method": "initialize", "params": ["protocolVersion": "2099-01-01"]])
         precondition((future?["result"] as? [String: Any])?["protocolVersion"] as? String == MCPServer.protocolVersions[0], "An unknown version gets the newest")
         precondition(MCPServer.handle(["jsonrpc": "2.0", "method": "notifications/initialized"]) == nil, "Notifications get no reply")
         let tools = ((MCPServer.handle(["jsonrpc": "2.0", "id": "t", "method": "tools/list"])?["result"] as? [String: Any])?["tools"] as? [[String: Any]]) ?? []
-        precondition(tools.count == 25 && Set(tools.compactMap { $0["name"] as? String }) == Set(MCPServer.methods.keys), "Twenty-five tools, each mapped to a call")
+        precondition(tools.count == 29 && Set(tools.compactMap { $0["name"] as? String }) == Set(MCPServer.methods.keys), "Twenty-nine tools, each mapped to a call")
         precondition(Set(MCPServer.methods.values).count == MCPServer.methods.count && MCPServer.methods.values.allSatisfy { $0.count <= 40 }, "Each tool has its own call, short enough for the app")
         // No tool asks for a credential, and none reads or steers 实时状态 (probe sources, SSH 直读): those stay in the app.
         let secret = try! NSRegularExpression(pattern: "password|passwd|token|secret|session|cookie|jwt|username|credential", options: [.caseInsensitive])
@@ -279,6 +303,10 @@ import Foundation
         precondition((byName["list_icon_platforms"]?["annotations"] as? [String: Any])?["readOnlyHint"] as? Bool == true && (byName["fetch_icons"]?["annotations"] as? [String: Any])?["readOnlyHint"] as? Bool == false, "Read and write hints")
         precondition((((byName["update_asset"]?["inputSchema"] as? [String: Any])?["properties"] as? [String: Any])?["fields"] as? [String: Any]).flatMap { ($0["properties"] as? [String: Any])?.keys }.map { Set($0).isSuperset(of: ["hidden", "stopped", "visibility"]) && !$0.contains("probeLink") } == true, "update_asset takes hidden, stopped and visibility, not probeLink")
         precondition(parsed(["projects", "--currency", "USD"])?.1["currency"] as? String == "USD" && parsed(["projects"])?.1.isEmpty == true, "projects takes a currency")
+        let activity = parsed(["activity", "--client", "codex", "--kind", "write", "--limit", "5"])
+        precondition(activity?.0 == "activity" && activity?.1["client"] as? String == "codex" && activity?.1["limit"] as? Int == 5, "activity filters")
+        precondition(parsed(["candidates", "--source", "github"])?.1["source"] as? String == "github" && parsed(["import-candidates", "github", "a", "b"])?.1["ids"] as? [String] == ["a", "b"] && parsed(["import-candidates"]) == nil, "candidates and import-candidates")
+        for name in ["list_agent_activity", "list_agents", "list_import_candidates"] { precondition((byName[name]?["annotations"] as? [String: Any])?["readOnlyHint"] as? Bool == true, "\(name) reads only") }
         precondition(((byName["list_projects"]?["inputSchema"] as? [String: Any])?["properties"] as? [String: Any])?.keys.sorted() == ["currency"] && (byName["list_projects"]?["description"] as? String)?.contains("net") == true, "list_projects gives revenue and net in a currency")
         let project = parsed(["update-project", "web", "{\"revenue\":{\"amount\":30,\"currency\":\"USD\"}}"])
         precondition(project?.0 == "updateProject" && project?.1["name"] as? String == "web" && project?.1["revenue"] is [String: Any] && parsed(["update-project", "web"]) == nil && parsed(["update-project", "web", "[1]"]) == nil, "update-project takes a name and an object")
@@ -290,7 +318,7 @@ import Foundation
         precondition(tools.allSatisfy { JSONSerialization.isValidJSONObject($0) && ($0["inputSchema"] as? [String: Any])?["type"] as? String == "object" }, "Tool schemas are JSON objects")
         precondition((MCPServer.handle(["jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": ["name": "drop_all"]])?["error"] as? [String: Any])?["code"] as? Int == -32602, "An unknown tool is an error")
         precondition((MCPServer.handle(["jsonrpc": "2.0", "id": 4, "method": "resources/list"])?["error"] as? [String: Any])?["code"] as? Int == -32601, "An unknown method is an error")
-        print("PASS: CLI arguments, add formats, bad arguments, pay/renew/delete-many/update-many/update-project, MCP initialize and version, notifications, twenty-five tools with schemas (none asks for a credential or reaches 实时状态; destructive and open-world hints), unknown tool and method")
+        print("PASS: CLI arguments, add formats, bad arguments, pay/renew/delete-many/update-many/update-project/activity/candidates, MCP initialize with clientInfo and version, notifications, twenty-nine tools with schemas (none asks for a credential or reaches 实时状态; destructive and open-world hints), unknown tool and method")
     }
 
     static func pretty(_ value: Any) -> String {
@@ -304,6 +332,11 @@ import Foundation
 /// MCP over stdio (JSON-RPC 2.0, one message per line): tools that map onto the same calls as the command line.
 enum MCPServer {
     static let protocolVersions = ["2025-06-18", "2025-03-26", "2024-11-05"]
+    /// Who calls, for 操作记录: the parent programs and environment names (ClientSignals), and after initialize the client's own
+    /// name, title and version from clientInfo. Nothing else from the client is kept.
+    static var client: [String: Any] = ClientSignals.current
+    /// initialize tells a running app that this client has connected (it is not opened for that); off in the self-test.
+    static var greet = true
     /// The descriptions name parts of the app's interface; in English the Chinese words are left out or given in English.
     static func zh(_ text: String) -> String { AppLanguage.isEnglish ? "" : text }
     static var ssh: String { L("SSH 直读") }
@@ -415,7 +448,11 @@ enum MCPServer {
             tool("get_asset", "Get one asset", "Return every stored field of one asset by id (masked like list_assets; a bank card or phone number is refused unless the person allows them), with relations (each linked asset and what the link means from this side, e.g. 付款卡, 登录账号, 所在服务器) and risks (an expiring card or phone it depends on). Icons come as hasCustomIcon / hasSiteIcon / siteIconHost / iconStatus, not image data. A repository carries repository: {visibility, defaultBranch, branches {count, more, new}, actions {state, workflow, branch, at, url} or null, unread (permissions the token lacks)}; branches and actions are what the last GitHub sync read with 仓库分支和 Actions on.", ["id": id], ["id"], readOnly: true),
             tool("add_assets", "Add assets", "Add up to 100 assets. They are written at once and the user can undo the batch with ⌘Z. An asset whose category already holds the same name is skipped and its id returned, so use update_asset for it. Returns {added, skipped, errors, warnings}.", ["items": items], ["items"], readOnly: false, openWorld: true),
             tool("update_asset", "Update an asset", "Change some fields of one asset; fields not given stay as they are, and an empty string clears one. A masked value (holding •) sent back as it was read is left as it is; any other value holding • is refused. Records synced from a platform (Cloudflare, GitHub, Namecheap, Porkbun, Hetzner, DigitalOcean, Vercel) keep their name and category; their other fields can change. Returns the updated asset.", ["id": id, "fields": fields], ["id", "fields"], readOnly: false, destructive: true, openWorld: true),
-            tool("delete_asset", "Request deleting an asset", "Ask to delete one asset. Nothing is deleted right away: the user confirms in Assetboard, so this returns status \"pending\" and an actionId. Check it with get_action_status.", ["id": id, "reason": reason], ["id"], readOnly: false, destructive: true)
+            tool("delete_asset", "Request deleting an asset", "Ask to delete one asset. Nothing is deleted right away: the user confirms in Assetboard, so this returns status \"pending\" and an actionId. Check it with get_action_status.", ["id": id, "reason": reason], ["id"], readOnly: false, destructive: true),
+            tool("list_agent_activity", "List what tools did", "Assetboard's log of calls from external tools (MCP and assetboard-cli), newest first: at, client {id, name, by: clientInfo, process, env or none}, tool, kind (read or write), ok or error, params (what a read asked) and changes: for each record added, changed, removed or asked to delete, its id, name, type and the fields before and after (cut short; tokens and keys are never kept). Masked like list_assets. Filter by client (id or name, e.g. claude-code, codex, unknown), kind, since/until (dates) or assetId. Kept on this Mac only; the last 1000 calls.", ["client": text, "kind": ["type": "string", "enum": ["read", "write"]], "since": date, "until": date, "assetId": id, "limit": ["type": "integer", "minimum": 1, "maximum": 500]], [], readOnly: true),
+            tool("list_agents", "List connected tools", "Tools on this Mac whose own config file names Assetboard (configured, the file looked at; the files are read, never changed, and never returned), and the tools that have called (seen: name, lastUsed, firstSeen, calls, identifiedBy).", [:], [], readOnly: true),
+            tool("list_import_candidates", "List assets waiting to be imported", "Assets on connected platforms (Cloudflare, GitHub, Namecheap, Porkbun, Hetzner, DigitalOcean, Vercel) that the last read found and that are not on the board yet, per source: readAt, count, new (found after the first read), connected, items {id, name, type, account, date, new}. import_candidates brings them in.", ["source": ["type": "string", "enum": ["cloudflare", "github", "namecheap", "porkbun", "hetzner", "digitalocean", "vercel"]]], [], readOnly: true),
+            tool("import_candidates", "Import waiting assets", "Bring assets that list_import_candidates lists onto the board as synced records: ids from one source, or all of that source without ids. Undoable in the app. Returns {added, left, assets}.", ["source": ["type": "string", "enum": ["cloudflare", "github", "namecheap", "porkbun", "hetzner", "digitalocean", "vercel"]], "ids": ["type": "array", "minItems": 1, "maxItems": 2000, "items": ["type": "string"]]], ["source"], readOnly: false)
         ] + proTools
     }
 
@@ -441,7 +478,8 @@ enum MCPServer {
                           "get_cost_forecast": "forecast", "get_cost_history": "costHistory", "list_projects": "projects", "update_project": "updateProject", "list_unconfirmed_charges": "charges", "record_payment": "recordPayment", "renew_asset": "renew",
                           "update_assets": "updateMany", "request_delete_assets": "deleteMany", "list_pending_actions": "actions", "get_action_status": "action",
                           "list_icon_platforms": "iconPlatforms", "set_icon_site": "iconSite", "fetch_icons": "iconFetch",
-                          "get_cloudflare_sync_status": "cloudflareStatus", "sync_cloudflare": "cloudflareSync", "list_sync_blocklist": "syncBlocklist", "unblock_sync_item": "syncUnblock"]
+                          "get_cloudflare_sync_status": "cloudflareStatus", "sync_cloudflare": "cloudflareSync", "list_sync_blocklist": "syncBlocklist", "unblock_sync_item": "syncUnblock",
+                          "list_agent_activity": "activity", "list_agents": "agents", "list_import_candidates": "connectPending", "import_candidates": "connectImport"]
 
     static func run() {
         while let line = readLine(strippingNewline: true) {
@@ -462,11 +500,18 @@ enum MCPServer {
         switch method {
         case "initialize":
             let asked = params["protocolVersion"] as? String ?? ""
+            if let info = params["clientInfo"] as? [String: Any] {
+                client = ClientSignals.sanitized(info.filter { ["name", "title", "version"].contains($0.key) }).merging(ClientSignals.current) { own, _ in own }
+            }
+            if greet {
+                let hello: [String: Any] = ["method": "hello", "params": [String: Any](), "via": "mcp", "client": client]
+                DispatchQueue.global(qos: .utility).async { _ = try? AgentSocket.call(hello, timeout: 3) }
+            }
             reply["result"] = [
                 "protocolVersion": protocolVersions.contains(asked) ? asked : protocolVersions[0],
                 "capabilities": ["tools": ["listChanged": false]],
                 "serverInfo": ["name": "assetboard", "title": "Assetboard", "version": AssetboardCLI.version],
-                "instructions": "Assetboard keeps a person's domains, servers, subscriptions, bank cards (last 4 digits only), phone numbers and accounts on their Mac. Adds and edits apply at once and can be undone in the app; deletes wait for the person's confirmation. IP addresses, SSH hosts and users, phone numbers and email addresses come masked with • and bank cards and phone numbers are left out, unless the person allows them in the app's settings; search matches the real values, and a value holding • is never written back (leave the field out to keep it). Live readings (probe sources, \(ssh)) are not available to these tools. Site icons and the Cloudflare sync can be steered too: letting a sync add back a deleted item waits for confirmation as well, and slow work answers with a status to look up later. Accounts, passwords and tokens are entered in the app only and never pass through these tools. Never store passwords, verification codes or full card numbers."
+                "instructions": "Assetboard keeps a person's domains, servers, subscriptions, bank cards (last 4 digits only), phone numbers and accounts on their Mac. Adds and edits apply at once and can be undone in the app; deletes wait for the person's confirmation. IP addresses, SSH hosts and users, phone numbers and email addresses come masked with • and bank cards and phone numbers are left out, unless the person allows them in the app's settings; search matches the real values, and a value holding • is never written back (leave the field out to keep it). Live readings (probe sources, \(ssh)) are not available to these tools. Site icons and the Cloudflare sync can be steered too: letting a sync add back a deleted item waits for confirmation as well, and slow work answers with a status to look up later. Accounts, passwords and tokens are entered in the app only and never pass through these tools. Every call is written to a log on this Mac that the person can read in the app (and list_agent_activity returns), with this client's name. Assets found on connected platforms but not yet imported are listed by list_import_candidates. Never store passwords, verification codes or full card numbers."
             ]
         case "ping":
             reply["result"] = [String: Any]()

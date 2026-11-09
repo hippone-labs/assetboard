@@ -2290,3 +2290,55 @@ body::before,.native-app body::before{background:radial-gradient(70vw 65vh at 0%
 :root .r-date.dated{color:var(--ink)}
 #board[data-size=l] .row .r-cost,:root .r-cost{color:var(--ink);font-weight:500}
 #board[data-size=l] .row .r-cost{font-size:13px}
+/* 连接后挑选: the pick list right after a platform answers, the sidebar's 待引入 and the add form's pick from a connected platform. */
+.connect-pick{display:grid;gap:12px}
+.connect-summary{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px;color:var(--ink)}
+.connect-summary .connect-at{color:var(--muted)}
+.connect-summary .icon-button{flex:none}
+.connect-filter{width:100%}
+.connect-all{font-size:12px;color:var(--muted)}
+.connect-list{display:grid;gap:12px;max-height:46vh;overflow:auto}
+.connect-row .account-tag{margin-left:0;flex:none}
+.connect-row .chip.ok{margin-left:0}
+.connect-done summary{cursor:pointer;font-size:12px;font-weight:600;color:var(--muted)}
+.connect-done .import-rows{margin-top:8px;max-height:24vh;overflow:auto}
+.connect-row.done{color:var(--muted)}
+.connect-row.done strong{flex:1;font-weight:500;color:var(--muted)}
+.connect-check{display:inline-grid;place-items:center;width:16px;height:16px;flex:none;color:rgb(var(--tone-primary))}
+.connect-check .ui-icon,.connect-check svg{width:14px;height:14px}
+.connect-pick .confirm-actions .text-button{margin-left:auto}
+.prefs-row .connect-chip{cursor:pointer;border:0;font:inherit;font-size:11px;background:var(--hover);color:var(--ink)}
+.connect-form select{width:100%}
+/* 设置 › MCP: the tools that are set up or have called, and the 操作记录 (rows like 网络记录, writes show each field before and after). */
+:root #modal .prefs-sub-title{margin:18px 0 6px;font-size:12px;font-weight:600;color:var(--muted)}
+.agent-list{display:grid}
+.agent-row{display:flex;align-items:center;flex-wrap:wrap;gap:8px;min-height:36px;padding:4px 0;border-bottom:1px solid var(--border);font-size:13px}
+.agent-name{font-weight:500;color:var(--ink)}
+.agent-row .chip{flex:none}
+.agent-last{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.agent-row-actions{display:flex;align-items:center;gap:6px;margin-left:auto}
+.agent-more{margin-top:6px}
+.agent-more summary{cursor:pointer;padding:6px 0;font-size:12px;color:var(--muted)}
+.act-list{margin-top:4px}
+.act-row{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:baseline;gap:10px;padding:8px 12px;border-top:1px solid var(--border);font-size:12px}
+.net-day+.act-row{border-top:0}
+.act-main{min-width:0;display:grid;gap:4px}
+.act-line{display:flex;align-items:baseline;flex-wrap:wrap;gap:8px;min-width:0}
+.act-line strong{font-weight:600;color:var(--ink)}
+.act-kind{font-size:11px;color:var(--muted)}
+.act-row.write .act-kind{color:var(--ink);font-weight:500}
+.act-line code{font:11.5px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted)}
+.act-row.failed .net-failed{color:var(--warning);font-weight:500}
+.act-changes{list-style:none;margin:2px 0 0;padding:0;display:grid;gap:6px}
+.act-change{display:grid;gap:3px;padding:6px 8px;border-radius:var(--radius-sm);background:var(--hover)}
+.act-target{display:flex;align-items:baseline;gap:6px;min-width:0}
+.act-target strong{font-weight:600;color:var(--ink);overflow-wrap:anywhere}
+.act-target .chip{margin-left:auto;flex:none}
+.act-op{flex:none;color:var(--muted)}
+.act-fields{display:grid;gap:2px}
+.act-field{display:flex;align-items:baseline;flex-wrap:wrap;gap:6px;font-variant-numeric:tabular-nums}
+.act-key{flex:none;min-width:5.5em;color:var(--muted)}
+.act-field del{color:var(--muted);text-decoration:line-through;overflow-wrap:anywhere}
+.act-field ins{color:var(--ink);text-decoration:none;font-weight:500;overflow-wrap:anywhere}
+.act-field i{font-style:normal;color:var(--muted)}
+.act-more summary{cursor:pointer;font-size:11px;color:var(--muted);margin-top:4px}

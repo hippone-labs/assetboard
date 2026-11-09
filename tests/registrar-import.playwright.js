@@ -61,6 +61,10 @@ async (page) => {
   await p.evaluate(()=>{window.__answer=m=>({ok:true,connected:true,source:m.source,account:m.credentials?.apiUser||'apiexample',complete:true,domains:[
    {id:'127',name:'example.com',expires:'02/15/2027',autoRenew:'false',status:'active'},{id:'381',name:'example.net',expires:'04/28/2027',autoRenew:'true',status:'active'},{id:'9',name:'example.org',expires:'06/01/2027',autoRenew:'true',status:'active'},{id:'bad id',name:'nope'}]});});
   await p.fill('#registrar-form [name="clientIp"]','203.0.113.10');await p.click('#registrar-sync');
+  // The new domains are listed to pick from first (tests/connect-pick.playwright.js); all of them are taken here.
+  await p.waitForSelector('#connect-pick');
+  check(await p.evaluate(()=>!state.assets.some(a=>a.source==='namecheap')),'Nothing lands before the pick');
+  await p.click('#connect-pick [data-action="connect-import"]');
   await until(p,()=>state.assets.some(a=>a.source==='namecheap'));
   const sent=await p.evaluate(()=>__sent.filter(m=>m.action==='registrarSync'));
   check(sent.length===1&&sent[0].source==='namecheap'&&JSON.stringify(sent[0].credentials)===JSON.stringify({apiUser:'apiexample',apiKey:'0123456789abcdef0123456789abcdef',clientIp:'203.0.113.10'}),'One request with the typed credentials: '+JSON.stringify(sent));
@@ -116,8 +120,8 @@ async (page) => {
   check(await p.evaluate(()=>!state.assets.some(a=>a.name==='example.com')&&state.deletedExternalIds.includes('namecheap:127')),'A deleted registrar record stays deleted');
  } finally { await p.close(); }
 
- // ?free (the edition without connectors), the browser and the demo have no way in.
- for(const [url,native] of [['/?free',true],['/',false],['/?demo',false]]){
+ // ?free (the edition without connectors) and the browser have no way in; the demo answers with made-up domains (demo-data.js).
+ for(const [url,native] of [['/?free',true],['/',false]]){
   const q=await page.context().newPage();
   try{
    if(native)await q.addInitScript(`(${host.toString()})();`);
@@ -127,5 +131,14 @@ async (page) => {
    if(!native)check(!r.open&&/Mac App|演示/.test(r.toast),`${url}: registrarDialog explains instead of opening: ${r.toast}`);
   } finally { await q.close(); }
  }
+ const d=await page.context().newPage();
+ try{
+  await d.goto('http://127.0.0.1:4317/?demo');await until(d,()=>typeof importHub==='function');
+  const r=await d.evaluate(()=>{importHub();const hub=!!document.querySelector('#modal [data-action="registrar-import"]');registrarDialog('porkbun');return {hub,open:!!$('#registrar-form')};});
+  check(r.hub&&r.open,'The demo offers the registrars: '+JSON.stringify(r));
+  await d.fill('#registrar-form [name="apiKey"]','pk1_'+'a'.repeat(32));await d.fill('#registrar-form [name="secretKey"]','sk1_'+'b'.repeat(32));await d.click('#registrar-sync');
+  await d.waitForSelector('#connect-pick');
+  check(await d.evaluate(()=>document.querySelectorAll('#connect-pick input[name="connect-take"]').length===3),'The demo lists three domains to pick');
+ } finally { await d.close(); }
  return 'ok';
 }

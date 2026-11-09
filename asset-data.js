@@ -3064,4 +3064,122 @@ function rdapFormFields(current,facts){
  return {fill,registry,registrar,differs:!!(registry&&date&&date!==registry)};
 }
 
-if(typeof module!=='undefined')module.exports={PROJECT_CURRENCY,evenShares,costKind,cleanRevenue,cleanProjectMeta,setProjectRevenue,checkProjectShares,setProjectShares,pruneProjectShares,projectSharesOf,projectEconomics,PROJECT_META_LIMIT,touchAsset,editedTime,TOMBSTONE_LIMIT,addTombstone,cleanTombstones,BOARD_SETTINGS,backupSettings,mergeBoardSettings,settleLinks,backupCounts,LEGACY_WORDS,LEGACY_STATES,MFA_KINDS,RECOVERY_TYPES,RECOVERY_FIELDS,BACKUP_KINDS,BACKUP_TYPES,IMPORTANCE,looksLikeSecret,recoveryText,recoveryGap,backupText,mailHost,mailDependents,selfRecovery,mailStake,PHONE_STATUSES,phoneTrouble,carrierNote,cardPaysPhone,setCardPays,CREDIT_RULES,creditRule,settleCreditExpiry,PLATFORM_SOURCES,missedReminders,reminderDays,STALE_SYNC_DAYS,staleSyncs,AUTO_RENEW_WORDS,CARD_STATUSES,cardTrouble,sourceTrouble,IMPACT_WORDS,verifyNumbers,phoneReach,phoneStake,syncedLabel,BILLING_TYPES,billingLabels,isFreeCost,billingTypeOf,validPromotion,moneyOn,settlePromotions,noteCostChange,costForecast,PAYMENT_LIMIT,CONFIRM_DAYS,paymentList,paidPayments,lastPayment,recordPayment,removePayment,occurrencesBetween,pendingCharges,pendingRenewals,confirmRenewal,cardOutlook,runsOut,needsConfirm,confirmWords,LIFECYCLE_RULES,lifecycleRule,lifecycleOf,AFTER_DUE_DAYS,monthsBetween,renewBase,canRenew,renewOptions,costFromPayment,renewAsset,confirmCharge,priceChange,paidTotals,ledgerRows,csvCell,ledgerCsv,SLEEP_CHECKED,SLEEP_RULES,KEEPALIVE_TYPES,KEEPALIVE_EVERY,sleepRuleOf,cleanKeepAlive,keepAliveCron,keepAliveWorkflow,cleanProject,PROJECTS_PER_ASSET,projectsOf,projectNameOk,renameProject,parseProjects,setProjects,inProject,projectNames,projectAssets,shutdownPlan,REVIEW_QUIET_DAYS,reviewQueue,icsFold,calendarIcs,escHtml,handoverHtml,rdapFacts,rdapCompare,rdapPhaseLabels,registryPhaseOf,RDAP_HOLDS,rdapHoldLabels,RDAP_MISSING_TLDS,rdapMissing,rdapNameservers,registryHoldOf,registryChangeOf,rdapRemember,registryAlerts,dueLevel,DOMAIN_NAME,domainFromText,domainListText,domainListItems,REGISTRAR_ALIASES,registrarProvider,rdapFormFields,renewalGrace,RENEWAL_GRACE_DAYS,maskName,PROVIDER_PRESETS,providerPresets,MAIN_CURRENCIES,FALLBACK_RATES,costAmount,syncMoney,convertMoney,formatMoney,costTotals,MOUNT_TYPES,relationKind,linkAllowed,LINK_KINDS,LINK_KIND_ORDER,linkKind,linkRisks,linkImpact,serverChain,serverChainCount,linkRelation,linkMetaOf,setLinkMeta,serverTone,peekSet,dropLinkMeta,IP_LIMIT,normalizeIp,parseIps,assetIps,primaryIp,maskIp,validIpList,ACTION_FIELDS,QUICK_LIMIT,validActionField,sshCommand,cloneUrl,quickActions,recencyTime,recentFirst,arrangeAssets,touchedPrefix,bringToFront,DISPLAY_LIMITS,formatCount,ensureBlock,iconHost,iconVendor,iconVendors,vendorForHost,iconPlan,iconSiteHost,iconSiteFor,iconPlatformOf,iconRows,guessAssetType,regionList,regionName,regionFlag,phoneParts,regionFromPhone,maskPhone,maskEmail,cardExpiry,expiryText,looksLikeCardNumber,linkAssets,unlinkAssets,linkedAssets,removeLinksTo,assetFingerprint,removeUntouchedDemo,orderAssets,moveAsset,dateKinds,billingCycles,dayNumber,localDay,isoDay,addMonths,nextOccurrence,assetDateStatus,upcomingEvents,REMINDER_LIMIT,reminderLeads,reminderPlan,syncKey,assetSyncKey,isBlacklisted,findByExternal,findNameCollision,mergeCloudflare,mergeGitHub,REGISTRARS,registrarDate,registrarFlag,REGISTRAR_LIMIT,cleanRegistrarDomains,mergeRegistrar,registrarCredentialProblem,CLOUD_IMPORTS,CLOUD_LIMIT,cleanCloudResources,cloudCredentialProblem,mergeCloudImport,NEW_BRANCH_DAYS,BRANCH_LIMIT,REPO_DETAIL_FIELDS,CI_STATES,CI_BAD,cleanCiRun,repoDetailFields,newBranches,applyRepoDetails,applyCollision,parseSender,registrableDomain,cleanMerchant,findAmounts,findDates,findDomains,evidenceFacts,inferCycle,formatCost,matchAsset,buildCandidates,evidencePayload,parseAiItems,applyAiItem,IMPORT_ROW_LIMIT,parseLooseDate,shiftDate,costParts,formatCostParts,inferTypeFromName,parseRepoUrl,parseQuickLine,AGENT_FIELDS,isAgentImport,parseAgentImport,parseDelimitedText,importHeaderField,rowsToImportItems,isCfsmBackup,parseCfsmBackup,classifyImportPayload,planImport,applyImport,parseBoardBackup,planBoardBackup,applyBoardBackup,demoImportSampleCsv,csvSyncKey,VENDOR_CSV_PRESETS,cloudflareTokenTemplateUrl,githubTokenTemplateUrl,CLOUDFLARE_TOKEN_PERMISSIONS,parseSshConfig,sshGitHosts,mergeSshConfig,parseEml,delimitedRecords,splitDelimitedLine,resolvePresetValue,SECRET_KINDS,secretKinds,rowSecrets,looksLikeEnv,screenText,PASSWORD_EXPORTS,passwordExportOf,importFileKind,importGate,screenBackup,AI_PLANS,AI_PLANS_CHECKED,aiPlanProviders,aiPlansFor,findAiPlan,aiPlanFields,icsRepeat,MASK_MARK,MASK_SETS,maskValue,maskAsset,maskMail,hasMask};
+// ---- Connect, then pick. A platform read (Cloudflare, GitHub, a registrar, a cloud platform) updates the records already on the board
+// at once; the records it would add are held in board.connectPending[source] = {at, since, items} until the person picks them
+// (importHeld) or turns them down (ignoreHeld: onto the sync blocklist, so later reads skip them too). Each read replaces the
+// source's held list, so something removed on the platform leaves it. An item keeps firstSeen across reads; after the first read of a
+// source (since), an item first seen later is new on the platform.
+const CONNECT_PENDING_LIMIT=2000;
+const CONNECT_SOURCES=()=>['cloudflare','github',...Object.keys(REGISTRARS),...Object.keys(CLOUD_IMPORTS)];
+function holdNewAssets(before,merged,source,at=new Date().toISOString()){
+ const known=new Set(before.assets.map(a=>a.id)),held=merged.assets.filter(a=>!known.has(a.id));
+ const next={...merged,assets:merged.assets.filter(a=>known.has(a.id))};
+ next.blocks=merged.blocks.filter(b=>before.blocks.some(x=>x.id===b.id)||next.assets.some(a=>a.type===b.id));
+ const pending={...(merged.connectPending||{})},old=pending[source],was=new Map((old?.items||[]).map(a=>[a.id,a.firstSeen]));
+ // The first read of a source is the baseline: a source with records on the board, or held ones, has been read before.
+ const since=old?.since||old?.at||(before.assets.some(a=>a.source===source)?before.assets.filter(a=>a.source===source).map(a=>a.syncedAt||'').sort().pop()||at:'');
+ if(held.length)pending[source]={at,...(since?{since}:{}),items:held.slice(0,CONNECT_PENDING_LIMIT).map(a=>({...a,firstSeen:was.get(a.id)||at}))};else delete pending[source];
+ if(Object.keys(pending).length)next.connectPending=pending;else delete next.connectPending;
+ return {board:next,held:pending[source]?.items||[]};
+}
+function heldItems(board,source){const items=board?.connectPending?.[source]?.items;return Array.isArray(items)?items:[];}
+// An item is new when the source had been read before it first showed up.
+function heldIsNew(board,source,item){const since=board?.connectPending?.[source]?.since;return !!(since&&item?.firstSeen&&item.firstSeen>since);}
+function heldSources(board){
+ return CONNECT_SOURCES().filter(source=>heldItems(board,source).length).map(source=>{const items=heldItems(board,source);return {source,name:SYNC_SOURCE_NAMES[source]||source,at:board.connectPending[source].at,count:items.length,fresh:items.filter(item=>heldIsNew(board,source,item)).length,types:[...new Set(items.map(a=>a.type))]};});
+}
+function heldCount(board){return heldSources(board).reduce((n,s)=>n+s.count,0);}
+// What the board already holds from a source (shown as 已引入 in the pick list), newest read first.
+function connectedOnBoard(board,source){return (board?.assets||[]).filter(a=>a.source===source&&!a.syncMissing);}
+function setHeld(next,source,items){
+ const pending={...(next.connectPending||{})};
+ if(items.length)pending[source]={...pending[source],items};else delete pending[source];
+ if(Object.keys(pending).length)next.connectPending=pending;else delete next.connectPending;
+}
+// Moves the picked items (ids; null = all) onto the board as new records; an id the board already has is left out. Pure.
+function importHeld(board,source,ids=null,now=new Date().toISOString()){
+ const next=structuredClone(board),items=heldItems(next,source),pick=ids?new Set(ids):null,have=new Set(next.assets.map(a=>a.id)),added=[];
+ for(const item of items){
+  if(pick&&!pick.has(item.id))continue;
+  if(!have.has(item.id)){const {firstSeen,...asset}=item;asset.createdAt=now;next.assets.push(asset);added.push(asset);ensureBlock(next,asset.type);}
+ }
+ setHeld(next,source,items.filter(item=>pick&&!pick.has(item.id)));
+ return {board:next,added};
+}
+// Turns the given held items down: later reads skip them (deletedExternalIds), and 已删除的同步项 can bring them back.
+function ignoreHeld(board,source,ids){
+ const next=structuredClone(board),items=heldItems(next,source),drop=new Set(ids||[]);
+ if(!Array.isArray(next.deletedExternalIds))next.deletedExternalIds=[];
+ for(const item of items)if(drop.has(item.id))for(const key of [assetSyncKey(item),item.id])if(key&&!next.deletedExternalIds.includes(key))next.deletedExternalIds.push(key);
+ setHeld(next,source,items.filter(item=>!drop.has(item.id)));
+ return next;
+}
+function dropHeld(board,source){const next={...board};setHeld(next,source,[]);return next;}
+
+// ---- MCP 操作记录: what one call changed, record by record, as short text. Bookkeeping fields are left out, images are named, not
+// copied, long values are cut, and anything that looks like a token, key or full card number is replaced, so a log row never holds one.
+const ACTIVITY_SKIP=new Set(['updatedAt','editedAt','syncedAt','createdAt','branchSeen','branchesFrom','priceHistory','syncMissing','firstSeen','art']);
+const ACTIVITY_VALUE_LIMIT=80,ACTIVITY_FIELD_LIMIT=20,ACTIVITY_ASSET_LIMIT=50;
+const LONG_SECRET=/[A-Za-z0-9_+/=-]{32,}/g;
+function activityScrub(text){
+ const v=String(text);if(secretKinds(v).length)return '（已隐去）';
+ return v.replace(LONG_SECRET,m=>/[A-Za-z]/.test(m)&&/\d/.test(m)&&!/^data:/.test(m)?'（已隐去）':m);
+}
+function activityValue(value,key=''){
+ if(value==null||value==='')return '';
+ if(key==='iconData'||key==='siteIcon')return '图片';
+ if(typeof value==='number'||typeof value==='boolean')return String(value);
+ const text=typeof value==='string'?value:Array.isArray(value)&&value.every(x=>typeof x!=='object')?value.join(', '):JSON.stringify(value);
+ const clean=activityScrub(text.replace(/[\u0000-\u001f\u007f]+/g,' ').trim());
+ return clean.length>ACTIVITY_VALUE_LIMIT?clean.slice(0,ACTIVITY_VALUE_LIMIT-1)+'…':clean;
+}
+function activityFields(before,after){
+ const keys=[...new Set([...Object.keys(before||{}),...Object.keys(after||{})])].filter(key=>!ACTIVITY_SKIP.has(key)&&key!=='id');
+ const out=[];
+ for(const key of keys){
+  const from=before?before[key]:undefined,to=after?after[key]:undefined;
+  if(JSON.stringify(from??'')===JSON.stringify(to??''))continue;
+  out.push({field:key,from:activityValue(from,key),to:activityValue(to,key)});
+ }
+ return out.slice(0,ACTIVITY_FIELD_LIMIT);
+}
+// The records one call added, changed or removed, comparing the board's records before and after it.
+function assetChanges(beforeAssets,afterAssets){
+ const before=new Map((beforeAssets||[]).map(a=>[a.id,a])),after=new Map((afterAssets||[]).map(a=>[a.id,a])),out=[];
+ const name=a=>activityValue(a.name),entry=(op,a,fields)=>({op,id:a.id,name:name(a),type:a.type,...(fields.length?{fields}:{})});
+ for(const [id,a] of after){const b=before.get(id);if(!b)out.push(entry('add',a,activityFields(null,a).filter(f=>f.to&&f.field!=='type')));else{const fields=activityFields(b,a);if(fields.length)out.push(entry('update',a,fields));}}
+ for(const [id,b] of before)if(!after.has(id))out.push(entry('remove',b,[]));
+ return out.slice(0,ACTIVITY_ASSET_LIMIT);
+}
+// Which tool called: from what the MCP client says about itself (initialize's clientInfo), else the programs it runs under (the
+// assetboard-cli process's parents, file names only), else environment variable names a client sets; otherwise 未知客户端.
+// The CLI is the command line unless one of those says otherwise.
+const AGENT_CLIENTS=[
+ {id:'claude-code',name:'Claude Code',info:/claude[-_ ]?code/i,process:/^claude(-code)?$/,env:['CLAUDECODE','CLAUDE_CODE_ENTRYPOINT']},
+ {id:'claude-desktop',name:'Claude Desktop',info:/^claude-ai$|claude[-_ ]?desktop/i,process:/^Claude$/},
+ {id:'codex',name:'Codex',info:/codex/i,process:/^codex/i,env:['CODEX_SANDBOX','CODEX_MANAGED_BY_NPM']},
+ {id:'cursor',name:'Cursor',info:/cursor/i,process:/^Cursor/i,env:['CURSOR_TRACE_ID']},
+ {id:'windsurf',name:'Windsurf',info:/windsurf|codeium/i,process:/^Windsurf/i},
+ {id:'vscode',name:'VS Code',info:/visual studio code|^vscode|copilot/i,process:/^Code( Helper.*)?$/},
+ {id:'cline',name:'Cline',info:/^cline/i},
+ {id:'zed',name:'Zed',info:/^zed/i,process:/^zed$/i},
+ {id:'gemini',name:'Gemini CLI',info:/gemini/i,process:/^gemini$/i,env:['GEMINI_CLI']},
+ {id:'grok',name:'Grok',info:/grok/i,process:/^grok/i},
+ {id:'goose',name:'Goose',info:/goose/i,process:/^goose/i},
+ {id:'opencode',name:'opencode',info:/opencode/i,process:/^opencode$/i},
+ {id:'lmstudio',name:'LM Studio',info:/lm[-_ ]?studio/i,process:/^LM Studio/i}
+];
+function agentClientOf(signals,via='mcp'){
+ const s=signals&&typeof signals==='object'?signals:{},clean=v=>String(v??'').replace(/[\u0000-\u001f\u007f]/g,'').trim().slice(0,60);
+ const info=clean(s.name),title=clean(s.title),version=clean(s.version),processes=(Array.isArray(s.processes)?s.processes:[]).map(clean).filter(Boolean).slice(0,6),env=(Array.isArray(s.env)?s.env:[]).map(clean).filter(Boolean);
+ const out=(c,by)=>({id:c.id,name:c.name,by,...(version&&by==='clientInfo'?{version}:{}),...(info?{reported:info}:{})});
+ for(const c of AGENT_CLIENTS)if(info&&c.info.test(info)||title&&c.info.test(title))return out(c,'clientInfo');
+ for(const p of processes)for(const c of AGENT_CLIENTS)if(c.process&&c.process.test(p))return out(c,'process');
+ for(const c of AGENT_CLIENTS)if(c.env&&c.env.some(name=>env.includes(name)))return out(c,'env');
+ if(via==='cli')return {id:'cli',name:'assetboard-cli',by:'via'};
+ // A client that names itself but is not in the list keeps its own name.
+ if(info)return {id:'other:'+info.toLowerCase().replace(/[^a-z0-9._-]+/g,'-').slice(0,40),name:info,by:'clientInfo',...(version?{version}:{}),reported:info};
+ return {id:'unknown',name:'未知客户端',by:'none'};
+}
+
+if(typeof module!=='undefined')module.exports={CONNECT_PENDING_LIMIT,holdNewAssets,heldItems,heldIsNew,heldSources,heldCount,connectedOnBoard,importHeld,ignoreHeld,dropHeld,activityValue,activityFields,assetChanges,AGENT_CLIENTS,agentClientOf,PROJECT_CURRENCY,evenShares,costKind,cleanRevenue,cleanProjectMeta,setProjectRevenue,checkProjectShares,setProjectShares,pruneProjectShares,projectSharesOf,projectEconomics,PROJECT_META_LIMIT,touchAsset,editedTime,TOMBSTONE_LIMIT,addTombstone,cleanTombstones,BOARD_SETTINGS,backupSettings,mergeBoardSettings,settleLinks,backupCounts,LEGACY_WORDS,LEGACY_STATES,MFA_KINDS,RECOVERY_TYPES,RECOVERY_FIELDS,BACKUP_KINDS,BACKUP_TYPES,IMPORTANCE,looksLikeSecret,recoveryText,recoveryGap,backupText,mailHost,mailDependents,selfRecovery,mailStake,PHONE_STATUSES,phoneTrouble,carrierNote,cardPaysPhone,setCardPays,CREDIT_RULES,creditRule,settleCreditExpiry,PLATFORM_SOURCES,missedReminders,reminderDays,STALE_SYNC_DAYS,staleSyncs,AUTO_RENEW_WORDS,CARD_STATUSES,cardTrouble,sourceTrouble,IMPACT_WORDS,verifyNumbers,phoneReach,phoneStake,syncedLabel,BILLING_TYPES,billingLabels,isFreeCost,billingTypeOf,validPromotion,moneyOn,settlePromotions,noteCostChange,costForecast,PAYMENT_LIMIT,CONFIRM_DAYS,paymentList,paidPayments,lastPayment,recordPayment,removePayment,occurrencesBetween,pendingCharges,pendingRenewals,confirmRenewal,cardOutlook,runsOut,needsConfirm,confirmWords,LIFECYCLE_RULES,lifecycleRule,lifecycleOf,AFTER_DUE_DAYS,monthsBetween,renewBase,canRenew,renewOptions,costFromPayment,renewAsset,confirmCharge,priceChange,paidTotals,ledgerRows,csvCell,ledgerCsv,SLEEP_CHECKED,SLEEP_RULES,KEEPALIVE_TYPES,KEEPALIVE_EVERY,sleepRuleOf,cleanKeepAlive,keepAliveCron,keepAliveWorkflow,cleanProject,PROJECTS_PER_ASSET,projectsOf,projectNameOk,renameProject,parseProjects,setProjects,inProject,projectNames,projectAssets,shutdownPlan,REVIEW_QUIET_DAYS,reviewQueue,icsFold,calendarIcs,escHtml,handoverHtml,rdapFacts,rdapCompare,rdapPhaseLabels,registryPhaseOf,RDAP_HOLDS,rdapHoldLabels,RDAP_MISSING_TLDS,rdapMissing,rdapNameservers,registryHoldOf,registryChangeOf,rdapRemember,registryAlerts,dueLevel,DOMAIN_NAME,domainFromText,domainListText,domainListItems,REGISTRAR_ALIASES,registrarProvider,rdapFormFields,renewalGrace,RENEWAL_GRACE_DAYS,maskName,PROVIDER_PRESETS,providerPresets,MAIN_CURRENCIES,FALLBACK_RATES,costAmount,syncMoney,convertMoney,formatMoney,costTotals,MOUNT_TYPES,relationKind,linkAllowed,LINK_KINDS,LINK_KIND_ORDER,linkKind,linkRisks,linkImpact,serverChain,serverChainCount,linkRelation,linkMetaOf,setLinkMeta,serverTone,peekSet,dropLinkMeta,IP_LIMIT,normalizeIp,parseIps,assetIps,primaryIp,maskIp,validIpList,ACTION_FIELDS,QUICK_LIMIT,validActionField,sshCommand,cloneUrl,quickActions,recencyTime,recentFirst,arrangeAssets,touchedPrefix,bringToFront,DISPLAY_LIMITS,formatCount,ensureBlock,iconHost,iconVendor,iconVendors,vendorForHost,iconPlan,iconSiteHost,iconSiteFor,iconPlatformOf,iconRows,guessAssetType,regionList,regionName,regionFlag,phoneParts,regionFromPhone,maskPhone,maskEmail,cardExpiry,expiryText,looksLikeCardNumber,linkAssets,unlinkAssets,linkedAssets,removeLinksTo,assetFingerprint,removeUntouchedDemo,orderAssets,moveAsset,dateKinds,billingCycles,dayNumber,localDay,isoDay,addMonths,nextOccurrence,assetDateStatus,upcomingEvents,REMINDER_LIMIT,reminderLeads,reminderPlan,syncKey,assetSyncKey,isBlacklisted,findByExternal,findNameCollision,mergeCloudflare,mergeGitHub,REGISTRARS,registrarDate,registrarFlag,REGISTRAR_LIMIT,cleanRegistrarDomains,mergeRegistrar,registrarCredentialProblem,CLOUD_IMPORTS,CLOUD_LIMIT,cleanCloudResources,cloudCredentialProblem,mergeCloudImport,NEW_BRANCH_DAYS,BRANCH_LIMIT,REPO_DETAIL_FIELDS,CI_STATES,CI_BAD,cleanCiRun,repoDetailFields,newBranches,applyRepoDetails,applyCollision,parseSender,registrableDomain,cleanMerchant,findAmounts,findDates,findDomains,evidenceFacts,inferCycle,formatCost,matchAsset,buildCandidates,evidencePayload,parseAiItems,applyAiItem,IMPORT_ROW_LIMIT,parseLooseDate,shiftDate,costParts,formatCostParts,inferTypeFromName,parseRepoUrl,parseQuickLine,AGENT_FIELDS,isAgentImport,parseAgentImport,parseDelimitedText,importHeaderField,rowsToImportItems,isCfsmBackup,parseCfsmBackup,classifyImportPayload,planImport,applyImport,parseBoardBackup,planBoardBackup,applyBoardBackup,demoImportSampleCsv,csvSyncKey,VENDOR_CSV_PRESETS,cloudflareTokenTemplateUrl,githubTokenTemplateUrl,CLOUDFLARE_TOKEN_PERMISSIONS,parseSshConfig,sshGitHosts,mergeSshConfig,parseEml,delimitedRecords,splitDelimitedLine,resolvePresetValue,SECRET_KINDS,secretKinds,rowSecrets,looksLikeEnv,screenText,PASSWORD_EXPORTS,passwordExportOf,importFileKind,importGate,screenBackup,AI_PLANS,AI_PLANS_CHECKED,aiPlanProviders,aiPlansFor,findAiPlan,aiPlanFields,icsRepeat,MASK_MARK,MASK_SETS,maskValue,maskAsset,maskMail,hasMask};
