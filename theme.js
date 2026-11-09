@@ -152,6 +152,18 @@ function themeDialog(){
   status.textContent=tr('已预览「{name}」',{name:checked.theme.name==='自定义'?tr('自定义'):checked.theme.name});picker.value=checked.theme.accent;preview({id:'custom',custom:checked.theme});};
  document.querySelector('#save-theme').onclick=()=>{writeThemePref(pending);themePreview=false;document.querySelector('#modal').close();applyBoardTheme();};
 }
+// Skins (设置 › 外观 › 风格): how the tile wall looks, never what it shows or where. A skin is a name on <html data-skin>; material.css
+// gives it its tokens (a panel's tilt, edge, corner and thickness, how a dragged panel lifts and lands) and at most a thin decoration
+// layer. Layout, density and data are the same in every skin, so a new one is a row here and a block of tokens there.
+//  quiet   the quiet instrument: hairlines, no tilt, the default
+//  magnet  fridge magnets: a slight tilt that straightens under the pointer, a sticker's inner rim, a 2px edge of thickness; a dragged
+//          panel is picked up (a little turned) and snaps onto its place
+const BOARD_SKINS=[['quiet',tr('安静'),tr('细线和留白')],['magnet',tr('冰箱贴'),tr('轻微倾角，拖动像拿起一块磁贴')]];
+const SKIN_KEY='assetboard-skin-v1';
+let boardSkin=(()=>{try{const v=localStorage.getItem(SKIN_KEY);return BOARD_SKINS.some(([id])=>id===v)?v:'quiet';}catch{return 'quiet';}})();
+function applySkin(){document.documentElement.dataset.skin=boardSkin;}
+function setSkin(id){if(!BOARD_SKINS.some(([s])=>s===id))return false;boardSkin=id;try{localStorage.setItem(SKIN_KEY,id);}catch{}applySkin();return true;}
+applySkin();
 // Read once everything above exists (checkTheme needs HEX, declared below the state).
 themePref=readThemePref();
 document.addEventListener('DOMContentLoaded',()=>{

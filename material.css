@@ -2291,3 +2291,75 @@ body::before,.native-app body::before{background:radial-gradient(70vw 65vh at 0%
 :root .r-date.dated{color:var(--ink)}
 #board[data-size=l] .row .r-cost,:root .r-cost{color:var(--ink);font-weight:500}
 #board[data-size=l] .row .r-cost{font-size:13px}
+
+/* 全部资产 as a tile wall (board-wall.js, the default on 全部资产): a panel per category, packed into columns by script (absolute
+   positions). Layout, densities and the peek are the same under every skin; a skin (theme.js, html[data-skin]) only sets the
+   --wall-* tokens below and at most one thin decoration layer. The quiet skin is the instrument's: hairlines, no tilt, no shadow. */
+:root{--wall-radius:12px;--wall-border:var(--hairline);--wall-fill:var(--surface-content);--wall-tilt:0deg;--wall-rim:0 0 0 transparent;--wall-thick:0 0 0 transparent;--wall-lift-turn:0deg;--wall-lift-scale:1.01;--wall-lift-shadow:var(--shadow-hover);--wall-snap:0}
+#board .wall{position:relative;margin-top:14px}
+#board .wall>.group,#board .wall>.drop-slot{position:absolute;top:0;left:0}
+#board .wall>.group{container-type:inline-size;margin:0;padding:0 8px 4px;border:1px solid var(--wall-border);border-radius:var(--wall-radius);background:var(--wall-fill);box-shadow:var(--wall-rim),var(--wall-thick);rotate:calc(var(--tilt,0) * var(--wall-tilt));transition:rotate var(--motion-slow) var(--ease)}
+#board .wall>.group+.group{margin-top:0}
+#board .wall>.group:is(:hover,:focus-within){rotate:0deg}
+#board .wall>.drop-slot.panel-slot{margin:0;border:1.5px dashed var(--border-strong);border-radius:var(--wall-radius);background:var(--hover)}
+#board .wall>.group.is-dragging{z-index:70;rotate:var(--wall-lift-turn);box-shadow:var(--wall-rim),var(--wall-lift-shadow)!important}
+#board .wall>.group.is-dragging.lifted{scale:var(--wall-lift-scale)}
+#board .wall>.group.is-dragging.settling{rotate:0deg;transition:translate .2s cubic-bezier(.3,1.2,.5,1),scale .2s ease,rotate .2s ease,box-shadow .2s ease}
+#board .wall .group-head{position:relative;top:auto;z-index:auto;min-height:38px;margin:0 -8px;padding:0 6px 0 10px;border-radius:var(--wall-radius) var(--wall-radius) 0 0;background:none;box-shadow:0 1px 0 var(--hairline);touch-action:none}
+#board .wall>.group.folded .group-head{box-shadow:none}
+#board .wall .group-title{flex:none;max-width:62%}
+#board .wall .group-head .g-cost{min-width:0;padding-left:8px;overflow:hidden;text-overflow:ellipsis}
+#board .wall .g-actions{position:absolute;top:50%;right:6px;translate:0 -50%;margin:0;padding-left:6px;border-radius:7px;background:var(--wall-fill)}
+@media(hover:hover){#board .wall .group-head:not(:hover,:focus-within) .g-actions{visibility:hidden}}
+#board .wall .group-body.list{padding:3px 0 2px}
+/* a line: icon, name (and its second line), then the day count and the price at the right */
+#board .wall .row{margin:0 -4px;border-radius:7px}
+#board .wall .row+.row::before{left:36px;right:6px}
+#board .wall .row .item-open{grid-template-columns:18px minmax(6em,1fr) minmax(0,auto);column-gap:10px;min-height:34px;padding:3px 6px 3px 8px;border-radius:7px}
+#board .wall .row .r-main{display:flex;flex-direction:column;gap:1px;min-width:0}
+#board .wall .row .r-when{display:flex;grid-column:auto;grid-row:auto;flex-direction:row;align-items:center;gap:10px;min-width:0}
+#board .wall .row :is(.r-date,.r-cost){grid-column:auto;grid-row:auto}
+#board .wall .row .r-date{max-width:13em;white-space:nowrap;text-align:left}
+#board .wall .row .r-date.warn,#board .wall .row .r-date.overdue{border-radius:999px}
+#board .wall .row .r-cost{min-width:5.2em;font-size:12px}
+#board .wall .r-sub{font-size:11.5px;line-height:15px;color:var(--faint)}
+#board .wall .r-sub .account-tag{color:var(--faint);font-size:11.5px}
+#board .wall .item-open .tile.sm{width:18px;height:18px}
+#board .wall .row .r-actions{position:absolute;top:50%;right:2px;translate:0 -50%;width:auto;padding:0 2px 0 8px;border-radius:7px;background:linear-gradient(var(--hover),var(--hover)),var(--wall-fill)}
+#board .wall .row.selected .r-actions{background:linear-gradient(var(--selected),var(--selected)),var(--wall-fill)}
+#board .wall .row .r-actions{display:none}
+#board .wall .row:focus-within .r-actions{display:flex}
+@media(hover:hover){#board .wall .row:hover .r-actions{display:flex}}
+body.drag-active #board .wall .row .r-actions{display:none}
+/* 全局: name, day count and dot; 标准: + the price, and the second line once the panel has the room; 详细: every fact, by weight */
+#board .wall[data-density=glance] .row .item-open{min-height:28px;padding-block:2px}
+#board .wall[data-density=glance] :is(.r-sub,.r-cost,.live-line,.card-hit,.g-cost),#board .wall[data-density=detail] .r-sub{display:none}
+@container (max-width:359px){#board .wall[data-density=standard] .r-sub{display:none}}
+#board .wall[data-density=detail] .row .item-open{align-items:start;padding-block:7px}
+#board .wall[data-density=detail] .row .r-main{display:contents}
+#board .wall[data-density=detail] .row :is(.tile,.r-name,.r-when){grid-row:1}
+#board .wall[data-density=detail] .row .r-main>:not(.r-name){grid-column:2/-1}
+.r-facts,.peek-facts{display:grid;grid-template-columns:fit-content(8.5em) minmax(0,1fr);gap:2px 12px;margin:5px 0 1px;font-size:11.5px;line-height:16px;font-variant-numeric:tabular-nums}
+.fact-k{color:var(--faint)}
+.fact-v{min-width:0;color:var(--ink);overflow-wrap:anywhere;white-space:pre-line}
+.fact-v.t3{color:var(--muted)}
+.fact-k.gap,.fact-v.gap{margin-top:5px}
+/* the categories kept with nothing in them: one quiet line under the wall */
+.wall-empty{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:14px 0 0;font-size:12px;color:var(--muted)}
+.wall-empty>span{margin-right:4px}
+.wall-add{display:inline-flex;align-items:center;gap:4px;height:26px;padding:0 10px 0 8px;border:1px dashed var(--border-strong);border-radius:999px;background:none;color:var(--muted);font:inherit;cursor:default}
+.wall-add:hover,.wall-add:focus-visible{background:var(--hover);color:var(--ink)}
+.wall-add .ui-icon{width:12px;height:12px}
+/* the peek: one line's facts beside its panel; never takes a click */
+.wall-peek{position:fixed;z-index:80;width:300px;max-width:calc(100vw - 16px);padding:10px 12px 11px;border:1px solid var(--border);border-radius:10px;background:var(--surface-card);box-shadow:var(--shadow-hover);color:var(--ink);pointer-events:none}
+.wall-peek[hidden]{display:none}
+.peek-name{display:flex;align-items:center;gap:8px;margin:0;font-size:13px;line-height:18px;overflow-wrap:anywhere}
+.peek-name .tile{flex:none}
+.peek-sub{margin:2px 0 4px 28px;font-size:11.5px;color:var(--muted)}
+.wall-peek .peek-facts{margin:6px 0 0}
+/* 冰箱贴: each panel a magnet on the door. A steady small tilt that straightens under the pointer, a sticker's inner rim, a hard
+   2px edge for thickness (no blur); a dragged panel is picked up a little turned and settles with a small snap. No colour. */
+:root[data-skin=magnet]{--wall-radius:14px;--wall-border:var(--border);--wall-tilt:.45deg;--wall-rim:inset 0 0 0 3px var(--surface-content),inset 0 0 0 4px var(--hairline);--wall-thick:0 2px 0 rgba(var(--tone-ink),.09);--wall-lift-turn:-1.2deg;--wall-lift-scale:1.025;--wall-lift-shadow:0 2px 0 rgba(var(--tone-ink),.08),0 10px 22px -12px rgba(16,24,40,.3);--wall-snap:.012}
+:root[data-skin=magnet][data-scheme=dark]{--wall-thick:0 2px 0 rgba(0,0,0,.55);--wall-lift-shadow:0 2px 0 rgba(0,0,0,.5),0 10px 22px -12px rgba(0,0,0,.7)}
+:root[data-skin=magnet] #board .wall .group-head{box-shadow:0 1px 0 var(--hairline);margin-inline:-5px;padding-inline:7px 3px}
+@media(prefers-reduced-motion:reduce){#board .wall>.group,#board .wall>.group.is-dragging.settling{transition:none}:root[data-skin=magnet]{--wall-lift-turn:0deg}}

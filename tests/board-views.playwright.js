@@ -57,7 +57,7 @@ async (page) => {
   await p.click('[data-asset="far"] .tl-name');
   check(await p.evaluate(()=>activeAsset==='far'&&!$('#detail').hidden),'A timeline row opens the inspector');
   await p.evaluate(()=>closeDetail());
-  check(await p.evaluate(()=>JSON.parse(localStorage.getItem('assetboard-view-v1')).layout==='timeline'),'The timeline is remembered');
+  check(await p.evaluate(()=>JSON.parse(localStorage.getItem('assetboard-view-v1')).board==='timeline'),'The timeline is remembered');
   // Searching shows a list even while the timeline is chosen.
   await p.fill('#search','atlas');await p.waitForTimeout(150);
   check(await p.locator('#board .row[data-asset="repo"]').count()===1&&await p.locator('#layout-toggle [data-id="timeline"]').isHidden(),'A search is a list');

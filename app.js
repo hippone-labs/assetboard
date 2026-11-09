@@ -63,7 +63,7 @@ window.assetboardConnectionState=connections=>{
  if('notifications' in connections&&currentView()==='upcoming'&&!query)render();
  autoSyncCloudflare();
 };
-let state=structuredClone(seed),query='',view='all',layoutMode='list',upcomingMode='list',history=[],future=[],activeAsset=null,lastFocus=null,toastTimer,assetFormSnapshot=null;
+let state=structuredClone(seed),query='',view='all',layoutMode='wall',upcomingMode='list',history=[],future=[],activeAsset=null,lastFocus=null,toastTimer,assetFormSnapshot=null;
 let migratedLegacyData=false;
 try{const saved=demoMode?window.assetboardDemoBoard():nativeStore?nativeStore.data:JSON.parse(localStorage.getItem(key));if(saved&&Array.isArray(saved.blocks)&&Array.isArray(saved.assets)&&saved.blocks.every(b=>cats[b.id])){const migration=removeUntouchedDemo(saved);state=migration.board;migratedLegacyData=!!(migration.removed||migration.removedBlocks);}}catch{} if(!Array.isArray(state.deletedExternalIds))state.deletedExternalIds=[];
 // A block is its category id and whether its group is folded; nothing else is kept.
@@ -107,7 +107,7 @@ function icon(type){return `<svg viewBox="0 0 24 24" fill="none" stroke="current
 const uiGlyphs={pulse:'<path d="M3 12h4l2.5-6 5 12 2.5-6h4"/>',download:'<path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19.5h14"/>',file:'<path d="M7 3.5h6.5L18 8v12.5H7z"/><path d="M13.5 3.5V8H18"/>',plus:'<path d="M12 5v14M5 12h14"/>',mail:'<path d="M4 6h16v12H4zM4 6l8 7 8-7"/>',image:'<rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.5"/><path d="m5 17 4.5-4.5L13 16l2.5-2.5L19 17"/>',terminal:'<rect x="3.5" y="5" width="17" height="14" rx="2"/><path d="m7.5 10 3 2.5-3 2.5M13 15h3.5"/>',refresh:'<path d="M19.5 9.5A8 8 0 0 0 5.2 7.8M4.5 14.5a8 8 0 0 0 14.3 1.7"/><path d="M5 4v4h4M19 20v-4h-4"/>',cloud:'<path d="M3.5 15.5h12a4 4 0 0 0 .4-8 6 6 0 0 0-11.5 1.8A3.5 3.5 0 0 0 3.5 15.5Z"/>',server:'<rect x="4" y="4.5" width="16" height="6" rx="1.5"/><rect x="4" y="13.5" width="16" height="6" rx="1.5"/><path d="M7.5 7.5h.01M7.5 16.5h.01"/>',github:'<path d="M9 19c-4 1.5-4-2-7-2m14 5v-3.9a3.4 3.4 0 0 0-1-2.6c3.2-.3 6.5-1.5 6.5-7A5.2 5.2 0 0 0 19 4.6 4.8 4.8 0 0 0 18.9 1S17.7.7 15 2.5a10.4 10.4 0 0 0-6 0C6.3.7 5.1 1 5.1 1A4.8 4.8 0 0 0 5 4.6 5.2 5.2 0 0 0 3.5 8.5c0 5.4 3.3 6.7 6.5 7a3.4 3.4 0 0 0-1 2.6V22"/>',back:'<path d="M10 6 4 12l6 6M4 12h16"/>',info:'<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5M12 8h.01"/>',lock:'<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8.5 11V8a3.5 3.5 0 0 1 7 0v3"/>',warn:'<path d="M12 4 3 19.5h18z"/><path d="M12 10v4.5M12 17h.01"/>',check:'<path d="m5 12.5 4.5 4.5L19 7.5"/>',gear:'<circle cx="12" cy="12" r="3"/><path d="M12 3.5v2M12 18.5v2M3.5 12h2M18.5 12h2M6 6l1.4 1.4M16.6 16.6 18 18M18 6l-1.4 1.4M7.4 16.6 6 18"/>',tray:'<path d="M4 13.5 6.5 5.5h11L20 13.5V18a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18Z"/><path d="M4 13.5h4.5a1 1 0 0 1 1 1 2.5 2.5 0 0 0 5 0 1 1 0 0 1 1-1H20"/>',palette:'<path d="M12 3.5a8.5 8.5 0 1 0 0 17c1.2 0 1.8-.8 1.8-1.7 0-1.3-1-1.6-1-2.7 0-.9.7-1.6 1.7-1.6h2.2a3.3 3.3 0 0 0 3.3-3.3C20 6.9 16.5 3.5 12 3.5Z"/><circle cx="7.8" cy="11" r=".7"/><circle cx="10.5" cy="7.5" r=".7"/><circle cx="15" cy="8" r=".7"/>',clock:'<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',sidebar:'<rect x="3.5" y="5" width="17" height="14" rx="2.5"/><path d="M9.5 5v14"/>',eye:'<path d="M3.5 12s3.2-5.5 8.5-5.5S20.5 12 20.5 12s-3.2 5.5-8.5 5.5S3.5 12 3.5 12Z"/><circle cx="12" cy="12" r="2.5"/>',eyeoff:'<path d="M3.5 12s3.2-5.5 8.5-5.5S20.5 12 20.5 12s-3.2 5.5-8.5 5.5S3.5 12 3.5 12Z"/><circle cx="12" cy="12" r="2.5"/><path d="M4.5 4.5l15 15"/>',spark:'<path d="M11 4c.6 3.9 2.6 5.9 6.5 6.5-3.9.6-5.9 2.6-6.5 6.5-.6-3.9-2.6-5.9-6.5-6.5C8.4 9.9 10.4 7.9 11 4Z"/>'};
 uiGlyphs.grid='<rect x="4" y="4" width="7" height="7" rx="1.8"/><rect x="13" y="4" width="7" height="7" rx="1.8"/><rect x="4" y="13" width="7" height="7" rx="1.8"/><rect x="13" y="13" width="7" height="7" rx="1.8"/>';
 // v15 shell glyphs: view switch, sidebar views, disclosure, more, external link.
-Object.assign(uiGlyphs,{list:'<path d="M9 6.5h11M9 12h11M9 17.5h11"/><path d="M4.5 6.5h.01M4.5 12h.01M4.5 17.5h.01"/>',timeline:'<path d="M4 7h16M4 12h16M4 17h16" opacity=".35"/><circle cx="8" cy="7" r="1.8"/><circle cx="15" cy="12" r="1.8"/><circle cx="11" cy="17" r="1.8"/>',calendar:'<rect x="4" y="5.5" width="16" height="14" rx="2"/><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4"/>',tiles:'<rect x="4" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5"/>',stack:'<path d="m12 4 8 4-8 4-8-4z"/><path d="m4 12 8 4 8-4M4 16l8 4 8-4"/>',chevron:'<path d="m9.5 6 6 6-6 6"/>',more:'<path d="M6 12h.01M12 12h.01M18 12h.01" stroke-width="2.6"/>',external:'<path d="M13.5 4.5h6v6M19.5 4.5 11 13M17.5 13.5v5a1.5 1.5 0 0 1-1.5 1.5H6a1.5 1.5 0 0 1-1.5-1.5V8A1.5 1.5 0 0 1 6 6.5h5"/>'});
+Object.assign(uiGlyphs,{wall:'<rect x="4" y="4" width="7" height="9" rx="1.5"/><rect x="13" y="4" width="7" height="5" rx="1.5"/><rect x="4" y="15" width="7" height="5" rx="1.5"/><rect x="13" y="11" width="7" height="9" rx="1.5"/>','density-glance':'<path d="M5 6.5h14M5 10.2h14M5 13.8h14M5 17.5h14"/>','density-standard':'<path d="M5 7h14M5 14h14"/><path d="M5 10h8M5 17h8" opacity=".45"/>','density-detail':'<path d="M5 6h14"/><path d="M8 9.5h11M8 12.5h11M8 15.5h8" opacity=".45"/><path d="M5 19h14"/>',list:'<path d="M9 6.5h11M9 12h11M9 17.5h11"/><path d="M4.5 6.5h.01M4.5 12h.01M4.5 17.5h.01"/>',timeline:'<path d="M4 7h16M4 12h16M4 17h16" opacity=".35"/><circle cx="8" cy="7" r="1.8"/><circle cx="15" cy="12" r="1.8"/><circle cx="11" cy="17" r="1.8"/>',calendar:'<rect x="4" y="5.5" width="16" height="14" rx="2"/><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4"/>',tiles:'<rect x="4" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5"/>',stack:'<path d="m12 4 8 4-8 4-8-4z"/><path d="m4 12 8 4 8-4M4 16l8 4 8-4"/>',chevron:'<path d="m9.5 6 6 6-6 6"/>',more:'<path d="M6 12h.01M12 12h.01M18 12h.01" stroke-width="2.6"/>',external:'<path d="M13.5 4.5h6v6M19.5 4.5 11 13M17.5 13.5v5a1.5 1.5 0 0 1-1.5 1.5H6a1.5 1.5 0 0 1-1.5-1.5V8A1.5 1.5 0 0 1 6 6.5h5"/>'});
 function ui(name){return `<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${uiGlyphs[name]||''}</svg>`;}
 // One rounded tile per asset (DESIGN-PRINCIPLES §9): a real icon (custom iconData, then a fetched siteIcon) wins; the category line icon only fills in when there is none.
 function customIconSrc(a){return typeof a?.iconData==='string'&&a.iconData.length<400000&&/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(a.iconData)?a.iconData:'';}
@@ -207,7 +207,7 @@ function identityText(a){return {bankcard:[a.network&&tr(a.network),a.last4&&`�
 // The overview never truncates; groups fold instead. View and layout are per-viewer conveniences kept in localStorage, not in the board.
 const VIEW_KEY='assetboard-view-v1';
 function readViewPrefs(){try{return JSON.parse(localStorage.getItem(VIEW_KEY)||'{}')||{};}catch{return {};}}
-function writeViewPrefs(){try{localStorage.setItem(VIEW_KEY,JSON.stringify({view,layout:layoutMode,...(upcomingMode==='calendar'?{upcoming:'calendar'}:{}),...(displayCurrency?{currency:displayCurrency}:{}),...(privacy?{privacy:true}:{}),...(sidebarRail&&!railForced?{rail:true}:{}),...(navMoreOpen?{more:true}:{})}));}catch{}}
+function writeViewPrefs(){try{localStorage.setItem(VIEW_KEY,JSON.stringify({view,board:layoutMode,...(wallDensity!=='standard'?{density:wallDensity}:{}),...(upcomingMode==='calendar'?{upcoming:'calendar'}:{}),...(displayCurrency?{currency:displayCurrency}:{}),...(privacy?{privacy:true}:{}),...(sidebarRail&&!railForced?{rail:true}:{}),...(navMoreOpen?{more:true}:{})}));}catch{}}
 // Privacy mode (the eye in the bar, remembered per viewer): names, accounts and IPs are masked wherever records are listed or shown, for
 // screen sharing and screenshots. Records are never changed; search, copy and editing still use the real values.
 let privacy=readViewPrefs().privacy===true;
@@ -301,18 +301,19 @@ function costMeta(v){
 function costHint(a){
  const m=costAmount(a),cur=totalCurrency();if(!m)return '';
  const inCur=value=>m.currency===cur?value:convertMoney(value,m.currency,cur,fx.rates),out=[];
- if(m.currency!==cur){const v=inCur(m.value);if(v!==null)out.push(tr('约 {money}',{money:formatMoney(v,cur)+(m.months?` / ${Object.values(billingCycles).find(c=>c.months===m.months).suffix}`:'')}));}
+ if(m.currency!==cur){const v=inCur(m.value);if(v!==null)out.push(tr('约 {money}',{money:formatMoney(v,cur)+(m.months?` / ${tr(Object.values(billingCycles).find(c=>c.months===m.months).suffix,null,'unit')}`:'')}));}
  if(m.months>1){const v=inCur(m.value/m.months);if(v!==null)out.push(tr('每月约 {money}',{money:formatMoney(v,cur)}));}
  return out.join(tr('，'));
 }
-{const prefs=readViewPrefs();if(['grid','timeline'].includes(prefs.layout))layoutMode=prefs.layout;if(prefs.upcoming==='calendar')upcomingMode='calendar';if(typeof prefs.view==='string')view=prefs.view;}
+{const prefs=readViewPrefs();if(['list','grid','timeline','wall'].includes(prefs.board))layoutMode=prefs.board;if(WALL_DENSITIES.includes(prefs.density))wallDensity=prefs.density;if(prefs.upcoming==='calendar')upcomingMode='calendar';if(typeof prefs.view==='string')view=prefs.view;}
 // Sidebar categories follow state.blocks; a category that holds assets is always listed, even without a block entry.
 function categoryIds(){const ids=state.blocks.map(b=>b.id).filter(id=>cats[id]);for(const a of state.assets)if(cats[a.type]&&!ids.includes(a.type))ids.push(a.type);return ids;}
 function currentView(){if(view==='all'||view==='upcoming')return view;if(projectViewName(view))return projectAssets(state.assets,projectViewName(view)).length?view:'all';if(view==='hidden')return state.assets.some(isHidden)?'hidden':'all';return cats[view]&&categoryIds().includes(view)?view:'all';}
 function setView(next){if(!['all','upcoming','hidden'].includes(next)&&!cats[next]&&!projectViewName(next))return;view=next;writeViewPrefs();if(query){query='';$('#search').value='';}render();boardScroller().scrollTo(0,0);}
-// 即将到来 has its own pair (list or month calendar); every other view list, grid or timeline. A search is always a list or a grid.
-function setLayout(next){if(currentView()==='upcoming'&&!query){if(!['list','calendar'].includes(next)||next===upcomingMode)return;upcomingMode=next;}else{if(!['list','grid','timeline'].includes(next)||next===layoutMode)return;layoutMode=next;}writeViewPrefs();render();}
-function shownLayout(v){return v==='upcoming'&&!query?upcomingMode:(query||v==='hidden')&&layoutMode==='timeline'?'list':layoutMode;}
+// 即将到来 has its own pair (list or month calendar); every other view list, grid or timeline, and 全部资产 the tile wall too (the
+// default; board-wall.js). A search is always a list or a grid; a view without the wall shows the list in its place.
+function setLayout(next){if(currentView()==='upcoming'&&!query){if(!['list','calendar'].includes(next)||next===upcomingMode)return;upcomingMode=next;}else{if(!['list','grid','timeline','wall'].includes(next)||next===shownLayout(currentView()))return;layoutMode=next;}writeViewPrefs();render();}
+function shownLayout(v){return v==='upcoming'&&!query?upcomingMode:layoutMode==='wall'&&(query||v!=='all')||(query||v==='hidden')&&layoutMode==='timeline'?'list':layoutMode;}
 function liveAssets(){return state.assets.filter(a=>!isHidden(a));}
 // Frozen domains and renewals waiting for an answer count too (dueLevel), so a lapsed auto-renewal does not read as all clear.
 function dueLevels(list){let overdue=0,soon=0;for(const a of list){const level=dueLevel(a,{since:state.paymentsSince});if(level==='overdue')overdue++;else if(level==='soon')soon++;}return {overdue,soon};}
@@ -391,7 +392,8 @@ function renderHeader(v,shown){
  $('#view-menu').hidden=!(cats[v]&&!query);$('#view-menu').dataset.id=cats[v]?v:'';
  if(cats[v])$('#view-menu').setAttribute('aria-label',tr('{name}类别设置',{name:cats[v].name}));
  const toggle=$('#layout-toggle'),shown_=shownLayout(v),upcoming=v==='upcoming'&&!query;toggle.hidden=!state.assets.length;
- toggle.querySelectorAll('[data-action="layout"]').forEach(b=>{const id=b.dataset.id;b.hidden=upcoming?!['list','calendar'].includes(id):id==='calendar'||id==='timeline'&&(!!query||v==='hidden');});
+ toggle.querySelectorAll('[data-action="layout"]').forEach(b=>{const id=b.dataset.id;b.hidden=upcoming?!['list','calendar'].includes(id):id==='calendar'||id==='timeline'&&(!!query||v==='hidden')||id==='wall'&&(!!query||v!=='all');});
+ const density=$('#density-toggle');density.hidden=shown_!=='wall'||!state.assets.length;if(!density.hidden)density.innerHTML=densityButtons();
  $('#privacy-wrap').hidden=!state.assets.length;setIconButton($('#privacy-toggle'),privacy?'eyeoff':'eye',privacy?tr('显示名称、账号和 IP'):tr('隐藏名称、账号和 IP'));$('#privacy-toggle').setAttribute('aria-pressed',String(privacy));
  toggle.querySelectorAll('[data-action="layout"]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.id===shown_)));
  document.title=`${title} · Assetboard`;
@@ -418,7 +420,7 @@ function subLine(a,after=''){
 function statusHtml(e,dated){return `<span class="r-date${e.cls?' '+e.cls:dated&&e.text?' dated':''}">${e.cls?'<i class="dot" aria-hidden="true"></i>':''}${esc(e.text)}</span>`;}
 function itemLabel(a,e,cost){const live=probeState(a);return [displayName(a),isPrivateRepo(a)&&tr('私有仓库'),a.stopped&&tr('已停用'),live&&tr('探针{text}',{text:live.text}),isHidden(a)&&tr('已隐藏'),e.text,cost].filter(Boolean).join(tr('，'));}
 function itemActions(a){return isHidden(a)?`<button class="button r-restore" data-action="restore-asset" data-id="${esc(a.id)}">${tr('恢复')}</button><button class="button danger-quiet" data-action="delete-asset" data-id="${esc(a.id)}" title="${tr('只删除 Assetboard 里的记录')}">${tr('删除')}</button>`:quickButtons(a);}
-function itemHtml(a,{withType=false,grid=false}={}){
+function itemHtml(a,{withType=false,grid=false,wall=false}={}){
  const e=eventInfo(a),cost=costText(a),hint=[veil(a.name),a.purpose&&a.purpose!==cats[a.type]?.name?a.purpose:'',a.reason&&tr('保留原因：{reason}',{reason:a.reason})].filter(Boolean).join('\n');
  // In 即将到来 the category leads, then the keep reason when there is one (it is what helps decide), otherwise the source. A card or
  // number gives just its tail (•••• 8812) and what hangs on it, so 支付 N 项 fits the column.
@@ -429,16 +431,16 @@ function itemHtml(a,{withType=false,grid=false}={}){
  // A server linked to a probe shows its state on a line under the address: in place of the implied 运行中, and red when offline.
  // 已停用, set by hand, still stands (the readings show beside it), and a stopped server is never drawn as down.
  const live=probeState(a),probeLine=live?liveRowHtml(a):'';
- const name=`<span class="r-name"><span class="r-text">${esc(displayName(a))}</span>${lockMark(a)}${stopRing(a)}${relMark(a)}</span>`,subSpan=`<span class="r-sub${sub.cls&&!withType?' '+sub.cls:''}"${sub.text?` title="${esc(sub.text)}"`:''}>${subHtml}</span>`;
- const selected=activeAsset===a.id&&!$('#detail').hidden,hero=grid?cardHero(a,e):'',when=hero?cardWhen(a,e):e;
- return `<div class="${grid?'gcard':'row'}${hero?' has-hero':''}${a.stopped?' stopped':''}${live&&!live.online&&!a.stopped?' probe-down':''}${isHidden(a)?' is-hidden':''}${selected?' selected':''}" data-asset="${esc(a.id)}"><button class="item-open" data-action="detail" data-id="${esc(a.id)}" aria-label="${esc(itemLabel(a,e,cost))}" title="${esc(hint)}">${tile(a,grid?'':'sm')}<span class="r-main">${name}${subSpan}${probeLine}${searchHit(a)}</span>${hero?`<span class="g-hero-wrap">${hero}</span>`:''}<span class="r-when">${statusHtml(when,!!a.date)}<span class="r-cost"${costHint(a)?` title="${esc(costHint(a))}"`:''}>${priceMark(a)}${esc(cost)}</span></span></button><span class="r-actions">${itemActions(a)}</span></div>`;
+ const name=`<span class="r-name"><span class="r-text">${esc(displayName(a))}</span>${lockMark(a)}${stopRing(a)}${relMark(a)}</span>`,subSpan=`<span class="r-sub${sub.cls&&!withType?' '+sub.cls:''}"${sub.text&&!wall?` title="${esc(sub.text)}"`:''}>${subHtml}</span>`;
+ const selected=activeAsset===a.id&&!$('#detail').hidden,hero=grid?cardHero(a,e):'',when=hero?cardWhen(a,e):wall?wallWhen(a,e):e;
+ return `<div class="${grid?'gcard':'row'}${hero?' has-hero':''}${a.stopped?' stopped':''}${live&&!live.online&&!a.stopped?' probe-down':''}${isHidden(a)?' is-hidden':''}${selected?' selected':''}" data-asset="${esc(a.id)}"><button class="item-open" data-action="detail" data-id="${esc(a.id)}" aria-label="${esc(itemLabel(a,e,cost))}"${wall?'':` title="${esc(hint)}"`}>${tile(a,grid?'':'sm')}<span class="r-main">${name}${subSpan}${wall&&wallDensity==='detail'?wallFactsHtml(a,'r-facts'):''}${probeLine}${searchHit(a)}</span>${hero?`<span class="g-hero-wrap">${hero}</span>`:''}<span class="r-when">${statusHtml(when,!!a.date)}<span class="r-cost"${costHint(a)?` title="${esc(costHint(a))}"`:''}>${priceMark(a)}${esc(cost)}</span></span></button><span class="r-actions">${itemActions(a)}</span></div>`;
 }
 function groupSummary(list){const l=dueLevels(list);return l.overdue||l.soon?`<span class="g-sum" role="img" aria-label="${dueWords(l)}" title="${dueWords(l)}">${l.overdue?`<span class="g-flag overdue"><i class="dot" aria-hidden="true"></i>${formatCount(l.overdue)}</span>`:''}${l.soon?`<span class="g-flag soon"><i class="dot" aria-hidden="true"></i>${formatCount(l.soon)}</span>`:''}</span>`:'';}
 // A group is a category (or a date band, or the hidden pile). Only categories in the overview fold and reorder.
-function groupHtml({id,title,glyph='',list,fold=false,folded=false,reorder=false,head=true,summary='',actions='',withType=false}){
- const grid=layoutMode==='grid'&&!withType,count=`<span class="g-count">${formatCount(list.length)}</span>`;
+function groupHtml({id,title,glyph='',list,fold=false,folded=false,reorder=false,head=true,summary='',actions='',withType=false,wall=false}){
+ const grid=layoutMode==='grid'&&!withType&&!wall,count=`<span class="g-count">${formatCount(list.length)}</span>`;
  const heading=!head?'':`<header class="group-head">${fold?`<button class="group-title" data-action="collapse" data-id="${id}" aria-expanded="${!folded}" aria-controls="group-${id}" aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown" title="${folded?tr('展开（按住 ⌥ 点按：全部）'):tr('收起（按住 ⌥ 点按：全部）')}"><span class="g-chevron">${ui('chevron')}</span>${glyph}<span class="g-name">${esc(title)}</span>${count}</button>`:`<h2 class="group-title static">${glyph}<span class="g-name">${esc(title)}</span>${count}</h2>`}${summary}${actions?`<span class="g-actions">${actions}</span>`:''}</header>`;
- return `<section class="group${folded?' folded':''}${head?'':' solo'}" data-group="${id}" aria-label="${esc(title)}">${heading}${folded?'':`<div class="group-body ${grid?'grid':'list'}" id="group-${id}"${reorder?` data-reorder="${id}"`:''}>${list.map(a=>itemHtml(a,{withType,grid})).join('')}</div>`}</section>`;
+ return `<section class="group${folded?' folded':''}${head?'':' solo'}" data-group="${id}" aria-label="${esc(title)}"${wall?` style="--tilt:${wallTilt(id)}"`:''}>${heading}${folded?'':`<div class="group-body ${grid?'grid':'list'}" id="group-${id}"${reorder?` data-reorder="${id}"`:''}>${list.map(a=>itemHtml(a,{withType,grid,wall})).join('')}</div>`}</section>`;
 }
 function categoryActions(id){return `<button class="icon-button" data-action="add-asset" data-id="${id}" aria-label="${tr('添加{name}',{name:esc(cats[id].name)})}" title="${tr('添加{name}',{name:esc(cats[id].name)})}">${ui('plus')}</button><button class="icon-button" data-action="view" data-id="${id}" aria-label="${tr('只看{name}',{name:esc(cats[id].name)})}" title="${tr('只看{name}',{name:esc(cats[id].name)})}">${ui('chevron')}</button>`;}
 function arranged(id,list){return arrangeAssets(list,state.cardOrder?.[id]);}
@@ -472,15 +474,13 @@ function boardHtml(v){
   const hidden=state.assets.filter(isHidden);
   return {html:categoryIds().map(id=>{const list=arranged(id,hidden.filter(a=>a.type===id));return list.length?groupHtml({id,title:cats[id].name,glyph:typeGlyph(id),list}):'';}).join(''),count:hidden.length};
  }
- // ?lab: a prototype layout in place of the list (layout-lab.js).
- const lab=typeof labBoardHtml==='function'?labBoardHtml(v):null;if(lab)return lab;
  const live=liveAssets();
  if(cats[v]){
   const list=arranged(v,live.filter(a=>a.type===v));
   return {html:list.length?groupHtml({id:v,title:cats[v].name,list,reorder:true,head:false}):viewEmpty(`<span class="g-icon">${icon(v)}</span>`,tr('还没有{name}',{name:esc(cats[v].name)}),`<button class="button" data-action="add-asset" data-id="${v}">${ui('plus')}${tr('添加')}</button>`),count:list.length};
  }
- const html=categoryIds().map(id=>{const list=arranged(id,live.filter(a=>a.type===id));if(!list.length)return '';const folded=!!state.blocks.find(b=>b.id===id)?.folded;return groupHtml({id,title:cats[id].name,glyph:typeGlyph(id),list,fold:true,folded,reorder:true,summary:groupSummary(list)+groupCostHtml(list),actions:categoryActions(id)});}).join('');
- return {html:html?(typeof labLayout==='string'&&!query?labBarHtml():'')+overviewHtml(live)+html:viewEmpty(ui('stack'),tr('没有显示中的资产')),count:live.length};
+ const html=shownLayout(v)==='wall'?live.length?wallBoardHtml(live):'':categoryIds().map(id=>{const list=arranged(id,live.filter(a=>a.type===id));if(!list.length)return '';const folded=!!state.blocks.find(b=>b.id===id)?.folded;return groupHtml({id,title:cats[id].name,glyph:typeGlyph(id),list,fold:true,folded,reorder:true,summary:groupSummary(list)+groupCostHtml(list),actions:categoryActions(id)});}).join('');
+ return {html:html?overviewHtml(live)+html:viewEmpty(ui('stack'),tr('没有显示中的资产')),count:live.length};
 }
 let layoutFrame=0,renderedKey='',skipLayoutAnimation=false;
 function render(){
@@ -497,7 +497,7 @@ function render(){
  $('#board').hidden=welcome||!board.html;$('#welcome').hidden=!welcome;
  document.querySelectorAll('#welcome .native-only').forEach(el=>el.hidden=!nativeStore);
  $('#board').dataset.view=query?'search':cats[v]?'category':v;
- $('#board').innerHTML=board.html;
+ $('#board').innerHTML=board.html;packWall();
  $('#empty').hidden=welcome||!!board.html;
  $('#empty-title').textContent=tr('没有结果');$('#empty-note').hidden=true;$('#clear-search').textContent=tr('清除');
  syncToolbar();
@@ -2541,11 +2541,16 @@ function prefsDialog(section){
   full&&typeof probeOn==='function'&&probeOn()?link(tr('探针数据源'),null,'probe-sources',tr('监控面板的地址和账号')):'',
   full&&typeof sshOn==='function'&&sshOn()?link(tr('SSH 直读'),null,'ssh-probe-open',tr('逐台开启、读取间隔')):'',
   full&&typeof platformOn==='function'&&platformOn()?link(tr('平台状态'),platform.sources.length>0,'platform-sources',tr('Supabase、Vercel、Render、Upstash 上的项目状态')):''].join(''):'';
+ // 外观: the accent (the 主题 dialog), the wall's skin (theme.js) and its density (board-wall.js); all kept on this device only.
+ const radios=(label,list,on,action)=>`<div class="chip-group" role="radiogroup" aria-label="${label}">${list.map(([id,name,note])=>`<button type="button" class="choice" role="radio" aria-checked="${id===on}" data-action="${action}" data-id="${id}"${note?` title="${esc(note)}"`:''}>${esc(name)}</button>`).join('')}</div>`;
+ const look=[row(tr('主题'),`<span class="prefs-edition">${esc(tr(themeFor(themePref).name||'')||tr('墨蓝'))}</span><button class="button" data-action="prefs-theme">${tr('选择…')}</button>`,tr('强调色用于按钮、选中和链接；到期红、橙色保持不变')),
+  row(tr('风格'),radios(tr('风格'),BOARD_SKINS,boardSkin,'prefs-skin'),tr('只改磁贴墙的样子：倾角、边缘、拖动的手感；内容、布局和密度不变')),
+  row(tr('磁贴密度'),radios(tr('磁贴密度'),WALL_DENSITIES.map(id=>[id,WALL_DENSITY_NAMES[id]]),wallDensity,'prefs-density'),tr('全局只留名称和天数，详细把每条的属性都摊开；⌘− 和 ⌘= 或在触控板上捏合也能切换'))].join('');
  const edition=row(tr('版本类型'),`<span class="prefs-edition">${esc(typeof proEditionText==='function'&&proBuilt()?proEditionText():tr('免费版'))}</span>`);
  const about=[edition,nativeStore?row(tr('版本'),`<span class="prefs-version">${esc(nativeStore.version||'')}${mac?`<button class="button" data-action="check-updates">${tr('检查更新…')}</button>`:''}</span>`):'',
   mac?row(tr('自动检查更新'),toggle('prefs-native',nativeStore.autoUpdate!==false,tr('自动检查更新'),' data-id="autoUpdate"'),tr('每天最多读一次官网的版本文件')):''].join('');
  const licence=proBuilt()?proLicenceSection(row):'';
- const sections=[['general',tr('通用'),'gear',general],['features',tr('功能'),'spark',features],['connections',tr('连接'),'cloud',connections],['pro','Assetboard Pro','check',licence,'Pro'],['about',tr('关于'),'info',about]].filter(s=>s[3]);
+ const sections=[['general',tr('通用'),'gear',general],['look',tr('外观'),'palette',look],['features',tr('功能'),'spark',features],['connections',tr('连接'),'cloud',connections],['pro','Assetboard Pro','check',licence,'Pro'],['about',tr('关于'),'info',about]].filter(s=>s[3]);
  if(!sections.some(s=>s[0]===prefsSection))prefsSection='general';
  const nav=sections.map(([id,name,icon,,short])=>`<button type="button" class="prefs-tab" role="tab" id="prefs-tab-${id}" aria-controls="prefs-pane-${id}" aria-selected="${id===prefsSection}" tabindex="${id===prefsSection?0:-1}" data-action="prefs-section" data-id="${id}"${short?` title="${name}"`:''}>${ui(icon)}<span>${short||name}</span></button>`).join('');
  const panes=sections.map(([id,name,,html])=>`<section class="prefs-group" role="tabpanel" id="prefs-pane-${id}" aria-labelledby="prefs-tab-${id}"${id===prefsSection?'':' hidden'}><h3>${name}</h3>${html}</section>`).join('');
@@ -2580,6 +2585,7 @@ document.addEventListener('click',e=>{const button=e.target.closest('[data-actio
  if(action==='detail'){if($('#modal').open)$('#modal').close();showDetail(id,{focus:e.detail===0||!inspectorDocked()});}
  else if(action==='view')setView(id);
  else if(action==='layout')setLayout(id);
+ else if(action==='density')setDensity(id);
  else if(action==='calendar-month')shiftCalendar(Number(id));
  else if(action==='asset-menu'){if(!$('#menu').hidden&&$('#menu').anchor===button){closeMenu();return;}const a=state.assets.find(x=>x.id===id);if(a)openMenu(assetMenuItems(a),{anchor:button});}
  else if(action==='category-menu'){if(cats[button.dataset.id])settings(button.dataset.id);}
@@ -2653,6 +2659,9 @@ document.addEventListener('click',e=>{const button=e.target.closest('[data-actio
  else if(action==='prefs-lang')setLang(id);
  else if(action==='prefs-currency'){if(!MAIN_CURRENCIES.includes(id))return;displayCurrency=id;writeViewPrefs();askRates();render();prefsChanged();}
  else if(action==='prefs-privacy'){setPrivacy(button.checked);prefsChanged();}
+ else if(action==='prefs-theme')themeDialog();
+ else if(action==='prefs-skin'){if(setSkin(id)){render();prefsChanged();}}
+ else if(action==='prefs-density')setDensity(id);
  else if(action==='prefs-section'){prefsDialog(id);$(`#prefs-tab-${id}`)?.focus();}
  else if(action==='check-updates'){if(nativeStore&&!demoMode)window.webkit.messageHandlers.assetboard.postMessage({action:'checkUpdates'});}
  else if(action==='prefs-native'){if(!nativeStore||demoMode||!['statusItem','autoUpdate'].includes(id))return;nativeStore[id]=button.checked;window.webkit.messageHandlers.assetboard.postMessage({action:'preference',key:id,on:button.checked});}
@@ -2716,7 +2725,7 @@ document.addEventListener('click',e=>{const button=e.target.closest('[data-actio
  else if(action==='move-up'||action==='move-down'){moveBlock(id,action==='move-up'?-1:1);$('#modal').close();}
 });
 document.addEventListener('submit',async e=>{if(e.target.id!=='asset-form')return;e.preventDefault();const form=e.target,data=new FormData(form),name=String(data.get('name')).trim(),url=String(data.get('url')).trim(),file=form.elements.icon.files[0];if(!name)return;const leaked=['name','provider','account','purpose','reason','cost','notes'].find(key=>looksLikeCardNumber(data.get(key)));if(leaked){const input=form.elements[leaked];input.setCustomValidity(tr('这里像是完整卡号。Assetboard 只保存卡号后 4 位，请删掉后再保存。'));input.reportValidity();input.addEventListener('input',()=>input.setCustomValidity(''),{once:true});return;}if(url&&!safeManagementUrl(url)){form.elements.url.setCustomValidity(tr('请输入不含账号密码的 http 或 https 链接'));form.elements.url.reportValidity();return;}form.elements.url.setCustomValidity('');const entryChecks=[['amount',text=>{const t=text.trim().replace(/,/g,'');return !t||/^\d+(\.\d{1,2})?$/.test(t);},tr('请填写数字金额，例如 89 或 10.98')],['date',text=>!text.trim()||!!parseLooseDate(text),tr('日期无法识别，例如 2027-03-01 或 3/1')],['regionText',text=>!text.trim()||!!form.elements.region.value,tr('请从列表里选择国家或地区')]];for(const [field,ok,message] of entryChecks){const input=form.elements[field];if(!input||input.type==='hidden')continue;input.setCustomValidity(ok(input.value)?'':message);if(!input.checkValidity()){input.reportValidity();input.addEventListener('input',()=>input.setCustomValidity(''),{once:true});return;}}const actionHints={host:tr('请填写主机名或 IP，例如 203.0.113.10'),ips:tr('最多 4 个有效 IP，用逗号或空格分隔'),sshUser:tr('SSH 用户只能包含字母、数字和 _ . -'),sshPort:tr('端口是 1 到 65535 之间的数字'),localPath:tr('请填写以 / 或 ~/ 开头的本机目录'),dnsHost:tr('只写服务商名字，最多 60 字'),icp:tr('备案号要带 ICP，例如 京ICP备00000000号')};for(const key of Object.keys(actionHints)){const input=form.elements[key];if(!input)continue;input.setCustomValidity(validActionField(key,input.value)?'':actionHints[key]);if(!input.checkValidity()){input.reportValidity();input.addEventListener('input',()=>input.setCustomValidity(''),{once:true});return;}}if(file&&(!['image/png','image/jpeg','image/webp'].includes(file.type)||file.size>256*1024)){toast(tr('图标需为 PNG、JPEG 或 WebP，且不超过 256 KB'));return;}const submit=form.querySelector('[type="submit"]');submit.disabled=true;try{const iconData=file?await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=reject;reader.readAsDataURL(file);}):null;const id=form.dataset.id,chosen=String(data.get('type')||''),type=cats[chosen]?chosen:form.dataset.type,candidateKey=form.dataset.candidate,candidateItem=form.dataset.item===''||form.dataset.item===undefined?null:Number(form.dataset.item),profile=assetProfiles[type]||{},date=data.has('expiry')?cardExpiry(data.get('expiry'))||'':parseLooseDate(data.get('date')??''),dateKind=data.has('expiry')?'expire':dateKinds[data.get('dateKind')]?String(data.get('dateKind')):'expire',cycle=billingCycles[data.get('cycle')]?String(data.get('cycle')):'',extras=Object.fromEntries((profile.extra||[]).map(key=>[key,String(data.get(key)??'').trim()])),fields={name,provider:profile.fixedProvider||String(data.get('provider')??'').trim()||(assetProfiles[type]?'':'平台待补充'),account:String(data.get('account')).trim(),purpose:String(data.get('purpose')).trim(),reason:String(data.get('reason')||'').trim(),date,dateKind,cycle,cost:costFromForm(data,cycle),notes:String(data.get('notes')).trim(),url:url?safeManagementUrl(url):''},repoState=type==='repository'&&REPO_STATES.find(([key])=>key===data.get('repoState'))?.[0],event=repoState||(date?`${date} ${dateKinds[dateKind].future}`:'日期待补充');if(extras.region&&!regionName(extras.region))extras.region='';if(extras.last4&&!/^\d{4}$/.test(extras.last4))extras.last4='';if(extras.network&&!cardNetworks.includes(extras.network))extras.network='';if(extras.cardStatus&&!CARD_STATUSES[extras.cardStatus])extras.cardStatus='';if(extras.phoneStatus&&!PHONE_STATUSES[extras.phoneStatus])extras.phoneStatus='';if(extras.phone)extras.phone=extras.phone.slice(0,30);Object.assign(fields,extras);const money=moneyFromForm(form,data,id?state.assets.find(x=>x.id===id):null);if(!money)return;Object.assign(fields,money);for(const [key] of ACTION_FIELDS[type]||[])if(data.has(key))fields[key]=key==='ips'?parseIps(data.get(key)).ips.map(x=>x.ip):String(data.get(key)).trim();if(type==='server'&&data.has('sshAlias'))fields.sshAlias=String(data.get('sshAlias')).trim()||null;const keep=keepFromForm(form,data,type);if(!keep)return;Object.assign(fields,keep);const wake=wakeFromForm(form,data,type);if(!wake)return;Object.assign(fields,wake);checkpoint();let assetId=id;if(id){const a=state.assets.find(a=>a.id===id);const synced=PLATFORM_SOURCES.includes(a.source);if(a.source==='cloudflare'&&a.syncName==null)a.syncName=a.name;Object.assign(a,fields);clearEmptyFields(a);for(const key of ['region','last4','network','cardStatus','phone','phoneStatus'])if(!(key in extras))delete a[key];if(file)a.iconData=iconData;else if(data.has('removeIcon'))delete a.iconData;if(!synced){a.source='manual';a.type=type;a.event=event;}touchAsset(a);delete a.warn;ensureBlock(state,a.type);}else{assetId='asset-'+crypto.randomUUID();state.assets.push(clearEmptyFields({id:assetId,type,...fields,iconData,source:'manual',event,art:'generic',createdAt:new Date().toISOString()}));rdapFormKeep(state.assets.at(-1),form);if(state.cardOrder?.[type]?.length)state.cardOrder[type].unshift(assetId);ensureBlock(state,type);}const resolved=candidateKey?resolveCandidate(candidateKey,id?'linked':'created',assetId,candidateItem):0;assetFormSnapshot=null;save();render();if(id&&activeAsset===id)showDetail(id);const source=candidateKey&&findCandidate(candidateKey),items=source?.ai?.items||[],recorded=items.length>1?recordedItems(source):[],next=items.length>1?items.findIndex((_,index)=>!recorded.includes(index)):-1;if(next>=0){candidateReview(source,next);toast(tr('已记录，这份资料里还有 {n} 项',{n:items.length-recorded.length}),true);}else if(candidateKey&&nativeStore&&pendingCount()){inboxDialog(false);toast(resolved?tr('已记录，继续核对下一组'):tr('已记录'),true);}else{$('#modal').close();toast(id?tr('资料已更新'):tr('资产已添加'),true);}}catch{toast(tr('读取图标失败，请重试'));}finally{submit.disabled=false;}});
-setIconButton($('#add-block'),'plus',tr('添加资产'));document.querySelectorAll('#layout-toggle [data-action="layout"]').forEach(b=>b.innerHTML=ui({grid:'tiles',timeline:'timeline',calendar:'calendar'}[b.dataset.id]||'list'));$('#view-menu').innerHTML=ui('more');setIconButton($('#import-button'),'download',tr('导入'));$('#add-block').onclick=addAsset;$('#close-modal').onclick=()=>requestCloseModal();$('#close-detail').onclick=closeDetail;$('#modal').addEventListener('cancel',e=>{if(isAssetFormDirty()){e.preventDefault();requestCloseModal();}else assetFormSnapshot=null;});
+setIconButton($('#add-block'),'plus',tr('添加资产'));document.querySelectorAll('#layout-toggle [data-action="layout"]').forEach(b=>b.innerHTML=ui({wall:'wall',grid:'tiles',timeline:'timeline',calendar:'calendar'}[b.dataset.id]||'list'));$('#view-menu').innerHTML=ui('more');setIconButton($('#import-button'),'download',tr('导入'));$('#add-block').onclick=addAsset;$('#close-modal').onclick=()=>requestCloseModal();$('#close-detail').onclick=closeDetail;$('#modal').addEventListener('cancel',e=>{if(isAssetFormDirty()){e.preventDefault();requestCloseModal();}else assetFormSnapshot=null;});
 $('#search').oninput=e=>{query=e.target.value;render();};$('#clear-search').onclick=()=>{if(query){$('#search').value='';query='';render();}else addAsset();};
 // Keyboard map (DESIGN-PRINCIPLES §4 rule 4). Letter keys never act while typing, with a dialog open, or with ⌘/⌃/⌥ held.
 let helpReturn=null;
@@ -2746,7 +2755,7 @@ function keyAsset(e){const item=e.target.closest?.('#board [data-asset]');if(ite
 function fire(action,id){const b=document.createElement('button');b.hidden=true;b.dataset.action=action;b.dataset.id=id;document.body.append(b);b.click();b.remove();}
 function keysHelpHtml(){
  const row=(keys,label)=>`<li><span>${label}</span><span class="keys">${keys.map(k=>`<kbd>${k}</kbd>`).join('')}</span></li>`;
- const groups=[[tr('浏览'),[[['⌘K','/'],tr('搜索')],[['↑','↓'],tr('移动')],[['↩'],tr('详情')],[['←'],tr('侧边栏')],[['⌃⌘S'],tr('收起侧边栏')],[['P'],tr('全景')],[['esc'],tr('返回')]]],[tr('整理'),[[['I'],tr('导入')],[['N'],tr('新建')],[['E'],tr('编辑')],[['R'],tr('已续费')],[['H'],tr('隐藏')],[['F'],tr('置前')],[['⌥','↑ ↓'],tr('调整顺序')],[['L'],tr('关联')],[['S'],tr('停用')]]],[tr('快捷'),[[['O'],tr('打开')],[['⌘C'],tr('复制')]]],[tr('编辑'),[[['⌘Z'],tr('撤销')],[['⇧⌘Z'],tr('重做')],[['⌘↩'],tr('保存')],[['tab'],tr('换字段')]]]];
+ const groups=[[tr('浏览'),[[['⌘K','/'],tr('搜索')],[['↑','↓'],tr('移动')],[['↩'],tr('详情')],[['←'],tr('侧边栏')],[['⌃⌘S'],tr('收起侧边栏')],[['P'],tr('全景')],[['⌘−','⌘='],tr('磁贴密度')],[['esc'],tr('返回')]]],[tr('整理'),[[['I'],tr('导入')],[['N'],tr('新建')],[['E'],tr('编辑')],[['R'],tr('已续费')],[['H'],tr('隐藏')],[['F'],tr('置前')],[['⌥','↑ ↓'],tr('调整顺序')],[['L'],tr('关联')],[['S'],tr('停用')]]],[tr('快捷'),[[['O'],tr('打开')],[['⌘C'],tr('复制')]]],[tr('编辑'),[[['⌘Z'],tr('撤销')],[['⇧⌘Z'],tr('重做')],[['⌘↩'],tr('保存')],[['tab'],tr('换字段')]]]];
  return `<div class="keys-card" role="document" tabindex="-1"><div class="keys-head"><h2 id="keys-help-title" title="${tr('在输入框里打字时，字母键不生效')}">${tr('快捷键')}</h2><button class="close" data-action="keys-help" aria-label="${tr('关闭快捷键说明')}">×</button></div><div class="keys-grid">${groups.map(([title,rows])=>`<section><h3>${title}</h3><ul>${rows.map(([k,l])=>row(k,l)).join('')}</ul></section>`).join('')}</div></div>`;
 }
 function toggleKeysHelp(show){
@@ -2779,6 +2788,8 @@ document.addEventListener('keydown',e=>{
   const nav=e.target.closest?.('#sidebar .nav-item');if(nav){e.preventDefault();navMove(nav,key);return;}
   const from=e.target.closest?.('#board .group-title,#board .item-open');if(!from)return;
   e.preventDefault();
+  // The wall goes sideways to the next column; ← from the first column (and from a list) goes to the sidebar.
+  if(from.closest('.wall')&&(key==='ArrowLeft'||key==='ArrowRight')){const next=wallSideways(from,key);if(next){focusCard(next);const id=next.closest('[data-asset]')?.dataset.asset;if(id&&!$('#detail').hidden&&inspectorDocked())showDetail(id,{focus:false});return;}}
   if(key==='ArrowLeft'&&!from.closest('.group-body.grid')){($('#sidebar .nav-item.active')||$('#sidebar .nav-item'))?.focus();return;}
   moveFocus(from,key);return;
  }
@@ -2799,7 +2810,8 @@ document.addEventListener('keydown',e=>{
   if(!focusAsset(id))near.some(focusAsset);
  }
 });
-// Direct manipulation, no layout mode: a row moves within its group, onto a sidebar category to change its category, and sidebar categories reorder.
+// Direct manipulation, no layout mode: a row moves within its group, onto a sidebar category to change its category, and sidebar categories
+// reorder, as do the tile wall's panels (dragged by their header; board-wall.js packs them and picks the place).
 // Mouse starts after 5px, touch after a long press; Esc cancels; ⌥ + arrows is the keyboard path.
 let gesture=null,suppressClick=false,floatTip=null;
 const settleEase='cubic-bezier(.22,1,.36,1)';
@@ -2822,12 +2834,15 @@ function dragSource(target){
  if(query)return null;
  const item=target.closest('#board [data-reorder] > [data-asset]');
  if(item)return {kind:'card',el:item,container:item.parentElement,block:item.closest('.group')};
+ const head=target.closest('#board .wall > .group > .group-head');
+ if(head&&!target.closest('.g-actions'))return {kind:'panel',el:head.parentElement,container:head.parentElement.parentElement};
  const nav=target.closest('#sidebar .nav-item[data-block]');
  return nav?{kind:'block',el:nav,container:nav.parentElement}:null;
 }
 function releaseGesture(){const g=gesture;if(!g)return;clearTimeout(g.timer);cancelAnimationFrame(g.frame);removeEventListener('pointermove',dragMove);removeEventListener('pointerup',dragEnd);removeEventListener('pointercancel',dragEnd);gesture=null;}
-function slotOrder(g){const key=g.kind==='block'?'block':'asset';return [...g.container.children].filter(n=>n===g.slot||n!==g.el&&n.dataset[key]).map(n=>(n===g.slot?g.el:n).dataset[key]);}
-function measureItems(g){const key=g.kind==='block'?'block':'asset';g.items=[...g.container.children].filter(n=>n!==g.el&&n!==g.slot&&n.dataset[key]).map(n=>({el:n,r:docRect(n)}));g.slotRect=docRect(g.slot);g.box=docRect(g.container);}
+function dragKey(g){return {block:'block',panel:'group'}[g.kind]||'asset';}
+function slotOrder(g){const key=dragKey(g);return [...g.container.children].filter(n=>n===g.slot||n!==g.el&&n.dataset[key]).map(n=>(n===g.slot?g.el:n).dataset[key]);}
+function measureItems(g){const key=dragKey(g);g.items=[...g.container.children].filter(n=>n!==g.el&&n!==g.slot&&n.dataset[key]).map(n=>({el:n,r:docRect(n)}));g.slotRect=docRect(g.slot);g.box=docRect(g.container);}
 function beginDrag(g){
  const el=g.el;if(!el.isConnected){releaseGesture();return;}
  clearTimeout(g.timer);g.active=true;cancelAnimationFrame(layoutFrame);closeMenu(false);
@@ -2839,6 +2854,7 @@ function beginDrag(g){
  const placed=el.getBoundingClientRect();if(Math.abs(placed.left-r.left)>.5||Math.abs(placed.top-r.top)>.5){el.style.left=2*r.left-placed.left+'px';el.style.top=2*r.top-placed.top+'px';}
  // A row can also land on another category in the sidebar; those targets are fixed, so they are measured live.
  if(g.kind==='card'){g.asset=state.assets.find(a=>a.id===el.dataset.asset);g.homeRect=docRect(g.container);g.others=[...document.querySelectorAll('#sidebar .nav-item[data-block]')].filter(n=>n.dataset.block!==g.asset?.type);}
+ if(g.kind==='panel')packWall();
  g.initial=slotOrder(g);measureItems(g);
  const s=boardScroller(),bar=document.querySelector('#topbar');g.top=s!==document.scrollingElement?s.getBoundingClientRect().top:bar&&getComputedStyle(bar).display!=='none'?Math.max(0,bar.getBoundingClientRect().bottom):0;
  try{document.body.setPointerCapture(g.id);}catch{}
@@ -2859,6 +2875,7 @@ function moveSlot(g,mode,ref){
  if(motion)all.forEach(n=>n.getAnimations().forEach(a=>a.cancel()));
  if(mode==='home')g.el.before(g.slot);else if(mode==='before')ref.before(g.slot);else ref.after(g.slot);
  g.lockUntil=performance.now()+60;
+ if(g.kind==='panel')packWall();
  measureItems(g);
  if(motion)for(const n of all)slideFrom(n,from.get(n));
 }
@@ -2867,6 +2884,7 @@ function placeSlot(g){
  const s=boardScroller(),x=g.x+s.scrollLeft,y=g.y+s.scrollTop;
  if(g.kind==='card'){const over=g.others.find(n=>inside(n.getBoundingClientRect(),g.x,g.y))||null;setCrossTarget(g,over);if(over||!inside(g.homeRect,x,y)){moveSlot(g,'home');return;}}
  else if(x<g.box.left-48||x>g.box.right+48||y<g.box.top-48||y>g.box.bottom+48){moveSlot(g,'home');return;}
+ if(g.kind==='panel'){placePanel(g,x,y);return;}
  if(inside(g.slotRect,x,y))return;
  let best=null,distance=Infinity;
  for(const it of g.items){const dx=Math.max(it.r.left-x,0,x-it.r.right),dy=Math.max(it.r.top-y,0,y-it.r.bottom),d=dx*dx+dy*dy;if(d<distance){distance=d;best=it;}}
@@ -2878,7 +2896,7 @@ function dragTip(g){showTip(g.cross?g.crossAllowed?tr('移到「{name}」',{name
 function autoScroll(g){
  if(gesture!==g||!g.active)return;
  const s=boardScroller(),bottom=s===document.scrollingElement?innerHeight:s.getBoundingClientRect().bottom,zone=60,v=g.y<g.top+zone?-(g.top+zone-g.y)/zone:g.y>bottom-zone?(g.y-bottom+zone)/zone:0;
- if(v&&g.kind==='card'){const before=s.scrollTop;s.scrollBy(0,Math.sign(v)*Math.min(1,v*v)*20);if(s.scrollTop!==before)placeSlot(g);}
+ if(v&&g.kind!=='block'){const before=s.scrollTop;s.scrollBy(0,Math.sign(v)*Math.min(1,v*v)*20);if(s.scrollTop!==before)placeSlot(g);}
  g.frame=requestAnimationFrame(()=>autoScroll(g));
 }
 function dragMove(e){
@@ -2892,6 +2910,7 @@ function cleanupDrag(g){
  showTip('');document.body.classList.remove('drag-active');g.cross?.classList.remove('drop-into','drop-refused');
  g.el.classList.remove('is-dragging','lifted','settling','refused');for(const p of ['position','left','top','width','height','margin','translate','transformOrigin'])g.el.style[p]='';
  if(g.slot.isConnected)g.slot.replaceWith(g.el);
+ if(g.kind==='panel')packWall();
  if(gesture===g)gesture=null;
 }
 function abortDrag(g){releaseGesture();cleanupDrag(g);g.slot.remove();render();}
@@ -2907,7 +2926,8 @@ function dropDrag(g,cancelled=false){
   if(gesture!==g)return;cleanupDrag(g);
   if(changed&&g.kind==='block'){checkpoint();for(const type of next)ensureBlock(state,type);state.blocks=[...next.map(type=>state.blocks.find(b=>b.id===type)),...state.blocks.filter(b=>!next.includes(b.id))];save();}
   else if(changed&&g.kind==='card')saveCardOrder(g.container.dataset.reorder,touchedPrefix(g.initial,next));
-  render();if(changed)toast(g.kind==='block'?tr('类别顺序已调整'):tr('顺序已调整'),true);
+  else if(changed&&g.kind==='panel')commitPanelOrder(next);
+  render();if(g.kind==='panel')wallLanded(g.el.dataset.group);if(changed)toast(g.kind==='card'?tr('顺序已调整'):tr('类别顺序已调整'),true);
  };
  if(reduceMotion()){done();return;}
  const to=g.slot.getBoundingClientRect();g.el.classList.add('settling');g.el.classList.remove('lifted','refused');g.el.style.translate=`${to.left-g.rect.left}px ${to.top-g.rect.top}px`;setTimeout(done,MOTION_MS);
@@ -2934,7 +2954,8 @@ addEventListener('click',e=>{if(!suppressClick)return;suppressClick=false;e.prev
 addEventListener('keydown',e=>{if(e.key!=='Escape'||!gesture?.active)return;e.preventDefault();e.stopImmediatePropagation();suppressClick=true;addEventListener('pointerup',()=>setTimeout(()=>suppressClick=false,0),{once:true,capture:true});dropDrag(gesture,true);},true);
 for(const el of [$('#board'),$('#sidebar')]){el.addEventListener('touchmove',e=>{if(gesture?.active)e.preventDefault();},{passive:false});el.addEventListener('dragstart',e=>e.preventDefault());}
 document.addEventListener('contextmenu',e=>{if(gesture?.touch)e.preventDefault();});
-// ⌥ + arrows: a row moves one place within its group (grids also take ←/→); a sidebar category moves up or down.
+// ⌥ + arrows: a row moves one place within its group (grids also take ←/→); a sidebar category moves up or down, a wall panel to
+// either side.
 document.addEventListener('keydown',e=>{
  if(!e.altKey||e.metaKey||e.ctrlKey||query||!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key))return;
  const step=['ArrowLeft','ArrowUp'].includes(e.key)?-1:1,opener=e.target.closest?.('#board [data-reorder] .item-open');
@@ -2943,6 +2964,9 @@ document.addEventListener('keydown',e=>{
   const source=opener.closest('[data-asset]'),id=source.dataset.asset,siblings=[...source.parentElement.children].filter(n=>n.dataset.asset);
   if(commitAssetOrder(source,siblings[siblings.indexOf(source)+step],step>0)){focusAsset(id);toast(step<0?tr('已向前移动'):tr('已向后移动'),true);}return;
  }
+ // A wall panel moves among the panels shown, with all four arrows.
+ const panel=e.target.closest?.('#board .wall .group-title[data-action="collapse"]');
+ if(panel){e.preventDefault();const id=panel.dataset.id;if(movePanel(id,step))document.querySelector(`#board .group-title[data-id="${CSS.escape(id)}"]`)?.focus();return;}
  const nav=e.target.closest?.('#sidebar .nav-item[data-block]')||(e.key==='ArrowUp'||e.key==='ArrowDown')&&e.target.closest?.('#board .group-title[data-action="collapse"]');
  if(nav&&(e.key==='ArrowUp'||e.key==='ArrowDown')){e.preventDefault();const id=nav.dataset.block||nav.dataset.id,fromBoard=!!nav.closest('#board');if(moveBlock(id,step))document.querySelector(fromBoard?`#board .group-title[data-id="${CSS.escape(id)}"]`:`#sidebar .nav-item[data-block="${CSS.escape(id)}"]`)?.focus();}
 });

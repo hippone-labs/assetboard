@@ -34,7 +34,8 @@ async (page) => {
   const cols=await p.evaluate(()=>{const xs=sel=>new Set([...document.querySelectorAll(sel)].slice(0,20).map(n=>Math.round(n.getBoundingClientRect().left)));return [xs('#board .group[data-group="domain"] .r-sub').size,new Set([...document.querySelectorAll('#board .group[data-group="domain"] .r-date')].slice(0,20).map(n=>Math.round(n.getBoundingClientRect().right))).size,xs('#board .group[data-group="domain"] .r-text').size];});
   check(cols.every(n=>n===1),'Columns line up row to row: '+cols);
 
-  // Group headers stick under the bar while their rows scroll.
+  // Group headers stick under the bar while their rows scroll (in the list; the wall's panels scroll whole).
+  await p.evaluate(()=>setLayout('list'));
   await p.evaluate(()=>boardScroller().scrollTo(0,1600));await settle();
   const stuck=await p.evaluate(()=>{const head=document.querySelector('#board .group[data-group="domain"] .group-head'),bar=document.querySelector('#topbar').getBoundingClientRect();return {head:Math.round(head.getBoundingClientRect().top),bar:Math.round(bar.bottom),scrolled:boardScroller().scrollTop};});
   check(Math.abs(stuck.head-stuck.bar)<2,'The group header sticks under the bar: '+JSON.stringify(stuck));
@@ -53,7 +54,7 @@ async (page) => {
   // List/grid toggle and the chosen view survive a reload (a per-viewer convenience, not part of the board).
   await p.click('#layout-toggle [data-id="grid"]');await p.click('#sidebar .nav-item[data-id="repository"]');await settle();
   check(await p.evaluate(()=>document.querySelector('#view-title').textContent==='代码仓库'&&document.querySelectorAll('#board .gcard').length===40&&!document.querySelector('#board .group-head')),'A category view lists only its records, without a group header');
-  check(await p.evaluate(()=>JSON.parse(localStorage.getItem('assetboard-view-v1')).layout==='grid'&&!('view' in state)&&!('layout' in state)),'The view is kept per viewer, outside the board');
+  check(await p.evaluate(()=>JSON.parse(localStorage.getItem('assetboard-view-v1')).board==='grid'&&!('view' in state)&&!('layout' in state)),'The view is kept per viewer, outside the board');
   const kept=await p.evaluate(()=>JSON.stringify(state));
   await p.reload();await p.evaluate(kept=>{save=()=>{};state=JSON.parse(kept);render();},kept);await settle();
   check(await p.evaluate(()=>currentView()==='repository'&&layoutMode==='grid'&&!!document.querySelector('#sidebar .nav-item[data-id="repository"].active')),'View and layout come back after a reload');
