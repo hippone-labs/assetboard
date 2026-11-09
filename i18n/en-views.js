@@ -286,6 +286,12 @@ Object.assign(I18N.en,{
  '只问该后缀的注册局，记在网络记录里':'Only each TLD\'s own registry is asked, and every request is in the Network log',
  '打开每周核对':'Turn on weekly check',
  '只存在这台设备上':'Kept on this device only',
+ // layout-lab.js
+ '原型':'Prototype',
+ '磁贴墙':'Tile wall',
+ '时间条':'Time strips',
+ '按账号':'By account',
+ '未注明平台':'No provider',
  // board-views.js
  '{n} 过期':'{n} overdue',
  '{n} 离线':'{n} offline',

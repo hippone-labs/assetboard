@@ -41,7 +41,7 @@ for bin in "$app_dir"/Contents/MacOS/*; do
 done
 # The localizations macOS reads itself: Info.plist text (document type, Services menu); the rest is Localization.swift.
 cp -R "$project_dir/desktop/en.lproj" "$project_dir/desktop/zh-Hans.lproj" "$app_dir/Contents/Resources/"
-cp "$project_dir/index.html" "$project_dir/styles.css" "$project_dir/material.css" "$project_dir/app.js" "$project_dir/money-view.js" "$project_dir/board-views.js" "$project_dir/pro-load.js" "$app_dir/Contents/Resources/Board/"
+cp "$project_dir/index.html" "$project_dir/styles.css" "$project_dir/material.css" "$project_dir/app.js" "$project_dir/money-view.js" "$project_dir/board-views.js" "$project_dir/layout-lab.js" "$project_dir/layout-lab.css" "$project_dir/pro-load.js" "$app_dir/Contents/Resources/Board/"
 cp "$project_dir/theme.js" "$project_dir/asset-data.js" "$project_dir/demo-data.js" "$project_dir/features.js" "$project_dir/panorama.js" "$project_dir/panorama-view.js" "$project_dir/pro-slots.js" "$app_dir/Contents/Resources/Board/"
 cp "$project_dir/i18n.js" "$app_dir/Contents/Resources/Board/"
 mkdir -p "$app_dir/Contents/Resources/Board/i18n"

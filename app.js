@@ -472,13 +472,15 @@ function boardHtml(v){
   const hidden=state.assets.filter(isHidden);
   return {html:categoryIds().map(id=>{const list=arranged(id,hidden.filter(a=>a.type===id));return list.length?groupHtml({id,title:cats[id].name,glyph:typeGlyph(id),list}):'';}).join(''),count:hidden.length};
  }
+ // ?lab: a prototype layout in place of the list (layout-lab.js).
+ const lab=typeof labBoardHtml==='function'?labBoardHtml(v):null;if(lab)return lab;
  const live=liveAssets();
  if(cats[v]){
   const list=arranged(v,live.filter(a=>a.type===v));
   return {html:list.length?groupHtml({id:v,title:cats[v].name,list,reorder:true,head:false}):viewEmpty(`<span class="g-icon">${icon(v)}</span>`,tr('还没有{name}',{name:esc(cats[v].name)}),`<button class="button" data-action="add-asset" data-id="${v}">${ui('plus')}${tr('添加')}</button>`),count:list.length};
  }
  const html=categoryIds().map(id=>{const list=arranged(id,live.filter(a=>a.type===id));if(!list.length)return '';const folded=!!state.blocks.find(b=>b.id===id)?.folded;return groupHtml({id,title:cats[id].name,glyph:typeGlyph(id),list,fold:true,folded,reorder:true,summary:groupSummary(list)+groupCostHtml(list),actions:categoryActions(id)});}).join('');
- return {html:html?overviewHtml(live)+html:viewEmpty(ui('stack'),tr('没有显示中的资产')),count:live.length};
+ return {html:html?(typeof labLayout==='string'&&!query?labBarHtml():'')+overviewHtml(live)+html:viewEmpty(ui('stack'),tr('没有显示中的资产')),count:live.length};
 }
 let layoutFrame=0,renderedKey='',skipLayoutAnimation=false;
 function render(){
