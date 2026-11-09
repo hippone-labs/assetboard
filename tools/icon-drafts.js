@@ -7,7 +7,7 @@ const fs=require('fs'),path=require('path');
 const {chromium}=require('playwright');
 const root=path.join(__dirname,'..');
 // [file, label]; the present icon comes first on the sheet.
-const ICONS=[['desktop/icon.svg','现有'],['desktop/icon-drafts/lit-tile.svg','A · 亮格'],['desktop/icon-drafts/one-row.svg','B · 一行'],['desktop/icon-drafts/rise.svg','C · 升起']];
+const ICONS=[['desktop/icon.svg','现有'],['desktop/icon-drafts/ink-dot.svg','A · 白点'],['desktop/icon-drafts/white-tile.svg','B · 白格'],['desktop/icon-drafts/ink-field.svg','C · 墨蓝底']];
 const svgUrl=file=>'data:image/svg+xml;base64,'+fs.readFileSync(path.join(root,file)).toString('base64');
 
 // The Dock shape: a continuous-corner rounded square inset to 824 / 1024 of the tile, as macOS draws a full-bleed icon.
@@ -46,12 +46,12 @@ const whiteShare=url=>new Promise((resolve,reject)=>{const img=new Image();img.o
   for(const [file] of ICONS.slice(1)){
    const name=path.basename(file,'.svg');
    await page.setContent(`<style>body{margin:0}</style><img src="${svgUrl(file)}" width="1024" height="1024" style="display:block">`);
-   await page.screenshot({path:path.join(out,`icon-${name}.png`),omitBackground:true});
+   await page.screenshot({path:path.join(out,`icon2-${name}.png`),omitBackground:true});
    const share=await page.evaluate(whiteShare,svgUrl(file));
    console.log(`${name}: white ${(share.square*100).toFixed(1)}% of the square, ${(share.mask*100).toFixed(1)}% inside the Dock mask`);
   }
   await page.setViewportSize({width:1200,height:600});
   await page.setContent(sheet);
-  await page.screenshot({path:path.join(out,'icon-compare.png'),fullPage:true});
+  await page.screenshot({path:path.join(out,'icon2-compare.png'),fullPage:true});
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exit(1);});

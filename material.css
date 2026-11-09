@@ -2291,21 +2291,20 @@ body::before,.native-app body::before{background:radial-gradient(70vw 65vh at 0%
 #board[data-size=l] .row .r-cost,:root .r-cost{color:var(--ink);font-weight:500}
 #board[data-size=l] .row .r-cost{font-size:13px}
 
-/* 撞色 · experiment (theme.js, data-contrast; off by default). After the Grok Bot icon: large areas dark, black meets pure white
-   with no step between, and white only on the one figure that matters. The overview is one pure black panel; its first figure
-   (本月还要付) is #fff, the other figures and labels are greys, status keeps its red and amber. Dark: theme.js turns the window
-   pure black with #141414 surfaces and greyscale text and accent; the CTA becomes a grey outline so it does not compete with the
-   white. Light keeps the theme around the panel. */
-:root[data-contrast] .overview{margin:10px 0 8px;padding:14px 16px;border-radius:16px;background:#000;box-shadow:none}
+/* 撞色 · experiment (theme.js, data-contrast; off by default). After the Grok Bot icon's manner, in the theme's own colours: one
+   quiet, even field and a single small, whole piece of pure white against it, with no step, shadow or extra colour between.
+   The field is the overview, flat in the theme's accent taken deep (the icon's dark ground in the accent's hue; lighter in dark
+   so it lifts off the canvas). Its first figure (本月还要付) is the one #fff on screen; the other figures and labels are light
+   tints of the field, status keeps its red and amber in their dark-ground steps. The black CTA's text takes the paper colour so
+   the white stays on the one figure. */
+:root[data-contrast]{--field:color-mix(in oklab,rgb(var(--tone-primary)) 34%,#0b0d12)}
+:root[data-contrast] .overview{margin:10px 0 8px;padding:14px 16px;border-radius:16px;background:var(--field);box-shadow:none}
 :root[data-contrast] .ov-tile:hover{background:rgba(255,255,255,.06)}
-:root[data-contrast] .ov-label,:root[data-contrast] .ov-note{color:#8a8a8a}
-:root[data-contrast] .ov-value{color:#9a9a9a}
+:root[data-contrast] .ov-label,:root[data-contrast] .ov-note{color:color-mix(in oklab,#fff 62%,var(--field))}
+:root[data-contrast] .ov-value{color:color-mix(in oklab,#fff 70%,var(--field))}
 :root[data-contrast] .ov-tile:first-child .ov-value{color:#fff;font-size:36px;line-height:42px;margin-top:2px}
 :root[data-contrast] .ov-tile.soon .ov-value{color:#f0b35c}
 :root[data-contrast] .ov-tile.overdue .ov-value{color:#ff8b7d}
 :root[data-contrast] .ov-cells i{background:rgba(255,255,255,.16)}
-:root[data-contrast] .ov-cells i.on{background:#8a8a8a}
-:root[data-contrast][data-scheme=dark] .overview{box-shadow:inset 0 0 0 1px rgba(255,255,255,.09)}
-:root[data-contrast][data-scheme=dark]{--cta:transparent;--on-cta:rgb(var(--tone-ink));--cta-ring:rgba(255,255,255,.18)}
-:root[data-contrast][data-scheme=dark] :is(.button.primary,#add-block){box-shadow:inset 0 0 0 1px rgba(255,255,255,.28)}
-:root[data-contrast]:not([data-scheme=dark]){--on-cta:#e4e4e4}
+:root[data-contrast] .ov-cells i.on{background:color-mix(in oklab,#fff 62%,var(--field))}
+:root[data-contrast]:not([data-scheme=dark]){--on-cta:rgb(var(--tone-canvas))}

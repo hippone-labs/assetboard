@@ -1,0 +1,15 @@
+<!-- Draft icon · 墨蓝底: the present icon's board on the 墨蓝 theme colour (#3b63c4) as one flat field; the three plain tiles one
+     step lighter in the same hue (#5277d2), the accent tile the present icon's light blue (#9cc0f7). The one white is the due dot,
+     where the present icon has its orange one, ringed in the field. No gradient, shadow or glow. Full-bleed 1024 × 1024 like
+     desktop/icon.svg. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+<rect width="1024" height="1024" fill="#3b63c4"/>
+<g fill="#5277d2">
+<rect x="212" y="212" width="340" height="270" rx="54"/>
+<rect x="582" y="212" width="230" height="270" rx="54"/>
+<rect x="212" y="512" width="230" height="300" rx="54"/>
+</g>
+<rect x="472" y="512" width="340" height="300" rx="54" fill="#9cc0f7"/>
+<circle cx="790" cy="534" r="78" fill="#3b63c4"/>
+<circle cx="790" cy="534" r="60" fill="#fff"/>
+</svg>

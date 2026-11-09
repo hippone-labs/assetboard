@@ -1,0 +1,14 @@
+<!-- Draft icon · 白格: the present icon's board, flat. The ground is its dark (#1d2027); the three plain tiles sink into one deep
+     墨蓝 (#3a4977); the accent tile, the asset that needs you, is the one white, and keeps the present icon's orange due dot on
+     its corner, ringed in the ground. No gradient, shadow or glow. Full-bleed 1024 × 1024 like desktop/icon.svg. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+<rect width="1024" height="1024" fill="#1d2027"/>
+<g fill="#3a4977">
+<rect x="212" y="212" width="340" height="270" rx="54"/>
+<rect x="582" y="212" width="230" height="270" rx="54"/>
+<rect x="212" y="512" width="230" height="300" rx="54"/>
+</g>
+<rect x="472" y="512" width="340" height="300" rx="54" fill="#fff"/>
+<circle cx="790" cy="534" r="62" fill="#1d2027"/>
+<circle cx="790" cy="534" r="46" fill="#f0a64b"/>
+</svg>
