@@ -15,7 +15,7 @@ A macOS app that records the expiry dates, costs and relations of digital assets
 
 </div>
 
-![The All assets view: due this month, expiring within 30 days, needs attention, yearly total and live status on top, domains, servers and repositories grouped by category below, and one domain's details at the right](screenshots/board-en.webp)
+![The All assets view: due this month, expiring within 30 days, needs attention, yearly total and live status on top, a tile wall below with one panel per category (domains, servers with live readings, repositories with their Actions state, subscriptions, AI plans with their usage, databases, bank cards), and one domain's details at the right](screenshots/board-en.webp)
 
 <sub>Screenshots are from demo mode; the data is fictional.</sub>
 
