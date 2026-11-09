@@ -153,7 +153,7 @@ async (page) => {
  try {
   await p.evaluate(()=>iconBatchDialog());
   check(await p.evaluate(()=>document.querySelector('#modal').open&&!!document.querySelector('#icon-batch .icon-batch-hosts')),'Demo mode opens the dialog, for screenshots');
-  check(await p.evaluate(()=>navigator.language)==='en-US'&&(await p.locator('.icon-batch-lead').textContent())==='4 项待获取','A Chinese UI in an en-US browser still reads 4 项待获取: '+await p.locator('.icon-batch-lead').textContent());
+  check(await p.evaluate(()=>navigator.language)==='en-US'&&(await p.locator('.icon-batch-lead').textContent())==='8 项待获取','A Chinese UI in an en-US browser still reads 8 项待获取 (four AI plans of the 额度 demo among them): '+await p.locator('.icon-batch-lead').textContent());
   const demoRows=await p.evaluate(()=>Object.fromEntries([...document.querySelectorAll('#icon-batch li[data-platform]')].map(li=>[li.dataset.platform,[li.querySelector('.tile img')?'icon':'globe',li.querySelector('.icon-row-error,.icon-row-note')?.textContent||'',li.querySelector('.chip').textContent]])));
   check(demoRows['github.com']?.[0]==='icon'&&demoRows['hetzner.com']?.[0]==='icon'&&demoRows['hetzner.com'][1]==='hetzner.example.com'&&demoRows['vultr.com']?.[0]==='globe'&&demoRows['vultr.com'][1].includes('官网没有可下载的图标')&&demoRows['cloudflare.com']?.[0]==='globe'&&demoRows['namecheap.com']?.[2]==='1/2','The demo shows fetched, named-site, failed, missing and partial rows: '+JSON.stringify(demoRows));
   await p.locator('li[data-platform="vultr.com"] [data-action="icon-row-fetch"]').click();

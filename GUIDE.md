@@ -24,6 +24,7 @@
 - 定期清理（Pro）：按“每月多少钱 × 多久没动过”排队，一项一项决定保留、停用还是隐藏。
 - 关联与全景：域名、仓库、数据库可以挂在服务器、部署服务或对象存储上，订阅可以记上付款卡；按 `P` 进入全景，在“运行在哪”“谁在付钱”“用什么登录”“按项目”几个视角之间切换，一屏看清每台服务器、每个部署、每张卡、每个账号、每个项目里有什么；拖动或点卡片上的 ＋ 就能改关联。
 - 导入：粘贴或拖入 CSV / JSON / 邮件，粘贴域名或网址，识别截图和 PDF，接 GitHub、Cloudflare、Namecheap、Porkbun、Hetzner、DigitalOcean、Vercel，读 `~/.ssh/config`。有冲突、没读懂或丢弃了东西时先预览，整批可撤销。
+- AI 额度与用量（Mac App）：读本机 Claude Code、Codex、GitHub Copilot CLI、Grok CLI、opencode 的用量文件和 Cursor 的套餐，在对应的 AI 订阅上显示额度条（5 小时、本周、本月、高级请求）、重置倒计时、本期用量按 API 价折算值不值订阅价、多久没用。“AI 订阅”视图顶上按轻重列出要留意的：快用完、照现在的速度会用完、本机两周没用的付费订阅、用得远不到订阅价的。只读数字，不读对话内容，不联网；用各工具自己的登录去读它的额度接口（更准、还能读 Cursor、Copilot、Antigravity 的额度）要在“设置 › 连接 › AI 额度”里逐个打开，默认关。见下面的 [AI 额度与用量](#ai-额度与用量)。
 - 键盘：搜索、导入、关联、全景、隐藏、置前都有单键快捷键，`?` 查看全部。
 
 ## Pro 的购买与激活
@@ -139,8 +140,8 @@ Mac App 在菜单栏有一个小日历图标：显示 7 天内到期和待确认
 菜单“Assetboard → 设置…”（`⌘,`）或侧边栏底部“设置”，一处管所有开关。左边是分区，右边是选中分区的设置：
 
 - 通用： 语言（简体中文或 English，默认跟随系统；切换后当场生效，菜单也一起换）、计价币种、隐私模式、在菜单栏显示、系统通知状态。
-- 功能： 全景、实时状态（默认关闭；打开后可调读取间隔，15 秒到 60 分钟）、仓库分支和 Actions（默认关闭，Mac App）、外部工具接入（MCP，关掉后一律拒绝调用；下面两个开关默认关：把地址和联系方式交给 AI 工具、把银行卡和手机号交给 AI 工具）、自动获取网站图标、每周核对域名到期日。功能开关按此设备记住，不进资产数据，不随备份走。
-- 连接： Cloudflare、GitHub、Namecheap、Porkbun、Hetzner、DigitalOcean、Vercel、AI 识别、MCP 接入、探针数据源，各自显示是否已连接，点“设置…”打开对应面板。
+- 功能： 全景、AI 额度与用量（默认开，只读本机文件）、实时状态（默认关闭；打开后可调读取间隔，15 秒到 60 分钟）、仓库分支和 Actions（默认关闭，Mac App）、外部工具接入（MCP，关掉后一律拒绝调用；下面两个开关默认关：把地址和联系方式交给 AI 工具、把银行卡和手机号交给 AI 工具）、自动获取网站图标、每周核对域名到期日。功能开关按此设备记住，不进资产数据，不随备份走。
+- 连接： Cloudflare、GitHub、Namecheap、Porkbun、Hetzner、DigitalOcean、Vercel、AI 识别、MCP 接入、AI 额度、探针数据源，各自显示是否已连接，点“设置…”打开对应面板。
 - 关于： 当前版本、检查更新、自动检查更新。
 
 ### 收起侧边栏
@@ -158,6 +159,25 @@ Mac App 在菜单栏有一个小日历图标：显示 7 天内到期和待确认
 ### 网络记录
 
 App 会连的主机见[隐私与网络](#隐私与网络)，每个请求都记在网络记录里。侧边栏底部（或菜单「文件 → 网络记录…」）列出 App 发出的每个请求和外部对 App 的调用：检查更新（assetboard.app）、网站图标、汇率（Frankfurter）、Cloudflare、GitHub、注册局 RDAP、AI 识别、探针、SSH 直读、本机 `gh` 命令，以及 Agent 通过 `assetboard-cli` 的调用。每条只记方法、主机、路径、状态、大小、耗时、对方 IP 和 TLS 版本，不记请求内容、令牌和查询参数；最多保留 5000 条，可一键清空。页面本身由 Content-Security-Policy 禁止发出任何网络请求，所以联网只可能经过上面这些记录在案的路径。打开资产的管理链接由你的浏览器完成，不经过 Assetboard。
+
+### AI 额度与用量
+
+只在 Mac App 里有，“设置 › 功能 › AI 额度与用量”默认开；不用配置，装过、用过这些工具就会读到。
+
+| 工具 | 本机读什么（默认开） | 额度接口（默认关，逐个打开） |
+|---|---|---|
+| Claude Code | `~/.claude/projects`、`~/.config/claude/projects`（或 `CLAUDE_CONFIG_DIR`）里的会话日志：每次回答的 token、模型；用量上限提示里的重置时间；按日志估算的 5 小时块 | `api.anthropic.com` 的用量接口，用 Claude Code 的登录（Mac 上在钥匙串里，macOS 会先问你）：5 小时、本周、按模型的周额度和按量花费 |
+| Codex | `~/.codex/sessions`（或 `CODEX_HOME`）里的会话日志：token、模型，以及服务器最后一次报的 5 小时和每周额度、套餐 | `chatgpt.com` 的用量接口，用 `~/.codex/auth.json` |
+| Cursor | 本机状态库里的套餐名（不读令牌） | `cursor.com` 的用量汇总，用 Cursor 本机保存的会话令牌：本月已用比例、按量花费 |
+| GitHub Copilot | Copilot CLI 的 `~/.copilot/session-state/*/events.jsonl`：token、高级请求次数 | `api.github.com/copilot_internal/user`，用本机 `gh` 的登录：高级请求额度、每月重置日、套餐 |
+| Grok CLI | `~/.grok/sessions/*/*/usage.json`（xAI 的 grok）和 `~/.grok/grok.db`（社区版 grok-cli）：token、花费 | `cli-chat-proxy.grok.com` 的额度，用 `~/.grok/auth.json`：本周或本月已用比例、按量上限 |
+| opencode | `~/.local/share/opencode/opencode.db` 和旧版 `storage/message`：每条回答的 token 和花费；用的是 Claude、ChatGPT 等订阅时记到那家订阅上 | `opencode.ai` 的 Go 额度（5 小时、每周、每月），用 opencode 里 Go 的 key |
+| Antigravity | 本机没有可读的文件 | Antigravity 运行时它在 `127.0.0.1` 上的本机服务：5 小时和每周额度、套餐 |
+
+- 对应哪条订阅：按服务商自动对应（Anthropic → Claude、OpenAI → ChatGPT、Cursor、GitHub Copilot、Grok、Gemini → Google AI）；同一家有几条时显示在第一条在用的上。想指定，用 MCP 的 `update_asset` 设 `usageSource`；`none` 表示这条不显示用量。读到套餐但资产板里没有这条订阅时，“全部用量…”里可以一键添加。
+- 本期用量是“按各家 API 标价折算”的金额，订阅本身不按这个收费；用来回答“这个月值不值订阅价”。没有标价的模型只计 token。
+- 读数只在内存里，不进资产数据、备份、导出和交接清单。额度接口用的登录只在请求时读取，不保存、不写日志、不经过 MCP；接口不是公开 API，随时可能变，条款也没说允许别的应用读，打开前会再说一遍。每个请求都在网络记录里（服务名“AI 额度”），每个工具最多 10 分钟一次，被拒或请求太频繁时等 30 分钟。
+- MCP：`list_ai_usage` 读额度、用量和要留意的订阅；`set_ai_usage_source` 只能开关某个工具的本机读取，额度接口只能你自己在 App 里开。
 
 ### MCP 接入（外部 AI 工具与命令行）
 
@@ -180,7 +200,7 @@ assetboard-cli delete <id> --reason "已转出"            # 返回 pending，�
 assetboard-cli totals --currency CNY                   # 周期费用合计；新增和修改也可以直接传 amount + currency
 ```
 
-MCP 工具：`list_asset_types`、`list_assets`、`get_asset`、`get_cost_totals`、`get_cost_forecast`、`get_cost_history`、`list_projects`、`update_project`、`add_assets`、`update_asset`、`update_assets`、`renew_asset`、`record_payment`、`list_unconfirmed_charges`、`delete_asset`、`request_delete_assets`、`list_pending_actions`、`get_action_status`。
+MCP 工具：`list_ai_usage`、`set_ai_usage_source`、`list_asset_types`、`list_assets`、`get_asset`、`get_cost_totals`、`get_cost_forecast`、`get_cost_history`、`list_projects`、`update_project`、`add_assets`、`update_asset`、`update_assets`、`renew_asset`、`record_payment`、`list_unconfirmed_charges`、`delete_asset`、`request_delete_assets`、`list_pending_actions`、`get_action_status`。
 
 图标与同步的 MCP 工具：`list_icon_platforms`、`set_icon_site`、`fetch_icons`、`get_cloudflare_sync_status`、`sync_cloudflare`、`list_sync_blocklist`、`unblock_sync_item`。
 
@@ -241,6 +261,7 @@ App 自己会连的：
 | 探针（“设置 › 功能 › 实时状态”） | 你自己添加的监控面板，只读固定的几个接口，按你设的读取间隔 |
 | SSH 直读（同上，每台主机另外打开） | 你的服务器，用系统 `ssh`、你的 `~/.ssh/config` 和密钥，只跑一条固定的只读命令，按你设的读取间隔 |
 | SSH 直读写的主机条目 | 勾选「写进 ~/.ssh/assetboard.conf」的服务器记录：App 把它的 Host 写进 `~/.ssh/assetboard.conf`（并在 `~/.ssh/config` 顶部加一行 `Include assetboard.conf`），删除记录时删掉；只动这一个文件和那一行 | 本机 |
+| AI 额度的额度接口（“设置 › 连接 › AI 额度”里逐个工具打开） | `api.anthropic.com`、`chatgpt.com`、`cursor.com`、`api.github.com`、`cli-chat-proxy.grok.com`、`opencode.ai` 的用量接口，或 Antigravity 在 `127.0.0.1` 的本机服务；每个工具最多 10 分钟一次，用该工具自己的登录，不保存 |
 | 平台状态（同上，在“设置 › 连接 › 平台状态”里连接） | `api.supabase.com`、`api.vercel.com`、`api.render.com`、`api.upstash.com`，只发固定的读取请求，按你给每个平台设的间隔（1 到 60 分钟）；回答在 App 里裁成名称和状态，邮箱、主机名、环境变量和数据库密码不进页面 |
 
 你点了才会连的：同步 GitHub（`api.github.com`，或本机 `gh` 命令）、第一次连 Cloudflare、从注册商导入（`api.namecheap.com` 或 `api.porkbun.com`，只读域名列表）、从云平台导入（`api.hetzner.cloud`、`api.digitalocean.com` 或 `api.vercel.com`，只读列表）、“核对注册局日期”、粘贴域名或点“从注册局填写到期日和注册商”时的注册局查询、“获取网站图标”批量补齐、“检查更新…”。打开资产的管理链接由你的浏览器完成，不经过 Assetboard。

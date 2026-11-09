@@ -2290,3 +2290,38 @@ body::before,.native-app body::before{background:radial-gradient(70vw 65vh at 0%
 :root .r-date.dated{color:var(--ink)}
 #board[data-size=l] .row .r-cost,:root .r-cost{color:var(--ink);font-weight:500}
 #board[data-size=l] .row .r-cost{font-size:13px}
+
+/* v25 · AI 额度 (ai-usage-view.js): the row line reuses the live line and its thin meters; the AI view's band of what needs a look;
+   the detail's windows one per line; the dialog's vendors and tools. Amber only for a window that is nearly used up, a limit hit
+   or a plan idle for weeks; the dot carries it, the text stays ink. */
+.ai-quota .live-meter+span,.ai-quota .live-text{min-width:0}
+.aq-band{margin:0 0 14px;padding:10px 12px 10px 14px;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--surface-card);color:var(--ink);font-size:12.5px}
+.aq-head{display:flex;align-items:center;gap:10px;min-width:0}
+.aq-title{font-size:13px;font-weight:600}
+.aq-meta{flex:1;min-width:0;color:var(--muted);font-family:var(--num);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.aq-lines{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:4px}
+.aq-line{display:flex;align-items:center;gap:8px;min-width:0;padding-left:14px;position:relative}
+.aq-line>span{flex:1;min-width:0;overflow-wrap:anywhere}
+.aq-line .dot{position:absolute;left:2px;top:50%;width:6px;height:6px;margin-top:-3px;border-radius:50%;background:var(--muted)}
+.aq-line.amber .dot{background:var(--dot-amber)}
+.aq-wins{display:grid;gap:4px;min-width:0}
+.aq-win{display:flex}
+.ai-usage .aq-vendors{list-style:none;margin:0 0 14px;padding:0;display:grid;gap:0;border-top:1px solid var(--hairline)}
+.aq-vendor{display:grid;grid-template-columns:9em minmax(0,1fr) auto;align-items:center;gap:12px;padding:8px 2px;border-bottom:1px solid var(--hairline);font-size:13px}
+.aq-v-name{font-weight:500}
+.aq-v-read{gap:10px;white-space:nowrap;overflow:hidden}
+.aq-v-target{justify-self:end;text-align:right}
+.aq-sources{width:100%;border-collapse:collapse;font-size:12.5px;margin:0 0 10px}
+.aq-sources th,.aq-sources td{padding:7px 6px;border-bottom:1px solid var(--hairline);text-align:left;vertical-align:middle;font-weight:400}
+.aq-sources thead th{color:var(--muted);font-size:12px}
+.aq-sources tbody th{font-weight:500}
+.aq-s-name{display:block}
+.aq-s-when,.aq-s-error{display:block;color:var(--muted);font-size:11.5px;font-family:var(--num)}
+.aq-s-error{color:var(--danger);font-family:inherit}
+.ai-usage>.form-note[role=note]{display:flex;align-items:flex-start;gap:6px}
+.ai-usage>.form-note[role=note] .ui-icon{width:13px;height:13px;flex:none;margin-top:2px}
+@media (max-width:760px){.aq-vendor{grid-template-columns:minmax(0,1fr) auto}.aq-v-read{grid-column:1/-1;grid-row:2}}
+.aq-part{display:inline-flex;align-items:center}
+.aq-hot{color:var(--warning)}
+.aq-hot .live-meter::after{background:var(--dot-amber)}
+.aq-sep{white-space:pre}

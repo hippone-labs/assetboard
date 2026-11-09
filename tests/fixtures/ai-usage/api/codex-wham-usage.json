@@ -1,0 +1,1 @@
+{"plan_type":"pro","account_id":"fictional-account","email":"someone@example.com","rate_limit":{"primary_window":{"used_percent":96,"reset_at":1794146400,"limit_window_seconds":604800},"secondary_window":null},"additional_rate_limits":null,"credits":{"has_credits":true,"unlimited":false,"balance":"125"},"rate_limit_reset_credits":{"available_count":0}}
