@@ -56,23 +56,17 @@ else
   # [s]tart / [e]nd match the markers without spelling them, so the export's check for leftover markers stays clean.
   sed '/<!-- private:[s]tart -->/,/<!-- private:[e]nd -->/d' "$project_dir/index.html" > "$app_dir/Contents/Resources/Board/index.html"
 fi
-# The app icon. macOS 26 and later read CFBundleIconName from Assets.car, which actool compiles from the Icon Composer icon
-# desktop/AppIcon.icon (one full-bleed layer, the system masks it and adds the edge and shadow); an icon only in AppIcon.icns is put
-# on a grey plate there. tools/app-icon.py makes both forms from desktop/icon-1024.png, the drawing rendered from desktop/icon.svg.
+# The app icon. macOS 26 and later read CFBundleIconName from Assets.car, compiled by desktop/app-icon-car.sh (actool, Xcode) from
+# the Icon Composer icon desktop/AppIcon.icon: one full-bleed layer the system masks and edges itself. An icon only in AppIcon.icns
+# is put on a grey plate there. tools/app-icon.py makes AppIcon.icon and icon-macos-1024.png from desktop/icon-1024.png, the
+# drawing rendered from desktop/icon.svg.
 cmp -s "$project_dir/desktop/icon-1024.png" "$project_dir/desktop/AppIcon.icon/Assets/icon.png" \
   || { print -u2 "desktop/AppIcon.icon differs from desktop/icon-1024.png: run python3 tools/app-icon.py"; exit 1; }
-icon_plist="$out_dir/AppIcon-partial.plist"
-rm -f "$icon_plist"
-xcrun actool "$project_dir/desktop/AppIcon.icon" --compile "$app_dir/Contents/Resources" --platform macosx --target-device mac \
-  --minimum-deployment-target "$min_macos" --app-icon AppIcon --output-partial-info-plist "$icon_plist" \
-  --errors --warnings --output-format human-readable-text
-[[ -f "$app_dir/Contents/Resources/Assets.car" && -f "$icon_plist" ]] || { print -u2 "actool made no Assets.car"; exit 1; }
-[[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIconName' "$icon_plist")" == AppIcon \
-  && "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIconName' "$app_dir/Contents/Info.plist")" == AppIcon ]] \
-  || { print -u2 "CFBundleIconName must be AppIcon in Info.plist and in actool's output"; exit 1; }
-xcrun assetutil --info "$app_dir/Contents/Resources/Assets.car" | grep -q '"Name" : "AppIcon"' || { print -u2 "Assets.car has no AppIcon"; exit 1; }
+[[ "$(awk '{ print $1 }' "$project_dir/desktop/Assets.car.sha256")" == "$(cat "$project_dir/desktop/AppIcon.icon/icon.json" "$project_dir/desktop/AppIcon.icon/Assets/icon.png" | shasum -a 256 | awk '{ print $1 }')" ]] \
+  || { print -u2 "desktop/Assets.car is not compiled from the current desktop/AppIcon.icon: run desktop/app-icon-car.sh on a Mac with Xcode"; exit 1; }
+cp "$project_dir/desktop/Assets.car" "$app_dir/Contents/Resources/Assets.car"
 # AppIcon.icns for older systems (and the disk image's volume icon): icon-macos-1024.png is on Apple's macOS grid, 824 px body with
-# rounded corners and shadow drawn in, transparent margin. It replaces any AppIcon.icns actool wrote.
+# rounded corners and shadow drawn in, transparent margin.
 icon_src="$project_dir/desktop/icon-macos-1024.png"
 icon_dir="$out_dir/AppIcon.iconset"
 rm -rf "$icon_dir"
