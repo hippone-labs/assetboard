@@ -1,6 +1,6 @@
 #!/bin/zsh
-# Build the Pro developer build of this checkout and install it over /Applications/Assetboard.app on this Mac (the Mac mini after
-# every release, from .github/workflows/mini-dev.yml, or by hand: zsh desktop/dev-install.sh). It needs the private Pro checkout
+# Build the Pro developer build of this checkout and install it over /Applications/Assetboard.app on this Mac (the Mac mini or the
+# MacBook Pro after a release, from .github/workflows/mini-dev.yml or mbp-dev.yml, or by hand: zsh desktop/dev-install.sh). It needs the private Pro checkout
 # at pro/ and fails without it, rather than installing a free build. The build is ad-hoc signed, never with the release identity,
 # and stays on this Mac. A running Assetboard is asked to quit; one that does not quit in time is left running and nothing is
 # installed. The replaced app is kept for rollback; the board's data (~/Library/Application Support/Assetboard) is never touched.
