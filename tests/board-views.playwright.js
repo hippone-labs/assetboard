@@ -45,6 +45,15 @@ async (page) => {
   check(await p.locator('[data-asset="vps"] .tl-mark.later').count()>=10,'A monthly charge repeats through the year');
   check((await p.locator('[data-asset="late"] .tl-mark').first().getAttribute('class')).includes('overdue'),'Overdue is red');
   check(/1/.test(await p.locator('#board .tl-note').innerText()),'The undated record is counted');
+  // A date at the far end of the year puts its label on the left of the dot: nothing reaches past the chart, so the chart never
+  // scrolls sideways and no scrollbar lands on the Today label or the note under the chart.
+  const edge=await p.evaluate(async()=>{state.assets.push({id:'edge',type:'domain',name:'edge.example.com',provider:'Registrar',date:isoDay(localDay()+355),dateKind:'expire',cycle:'yearly',cost:'$9.90 / 年',source:'manual'});render();
+   const t=document.querySelector('#board .timeline'),label=document.querySelector('[data-asset="edge"] .tl-label'),track=label.parentElement.getBoundingClientRect(),l=label.getBoundingClientRect();
+   const out={before:label.classList.contains('before'),inside:l.right<=track.right+1,scroll:t.scrollWidth-t.clientWidth};state.assets=state.assets.filter(a=>a.id!=='edge');render();return out;});
+  check(edge.before&&edge.inside&&edge.scroll<=0,'A late label stays inside the chart: '+JSON.stringify(edge));
+  // The today line is measured on the chart, which keeps its 680px when the board is narrower and scrolls.
+  const line=await p.evaluate(()=>{const t=document.querySelector('#board .timeline');t.style.width='420px';const today=document.querySelector('.tl-today').getBoundingClientRect().left,chart=document.querySelector('.tl-chart'),name=parseFloat(getComputedStyle(t).getPropertyValue('--tl-name')),at=parseFloat(chart.style.getPropertyValue('--tl-at')),c=chart.getBoundingClientRect();const out={scrolls:t.scrollWidth>t.clientWidth,off:Math.abs(today-(c.left+name+(c.width-6-name)*at))};t.style.width='';return out;});
+  check(line.scrolls&&line.off<2,'The today line follows the chart when it scrolls: '+JSON.stringify(line));
   await p.click('[data-asset="far"] .tl-name');
   check(await p.evaluate(()=>activeAsset==='far'&&!$('#detail').hidden),'A timeline row opens the inspector');
   await p.evaluate(()=>closeDetail());

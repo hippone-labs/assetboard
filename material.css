@@ -2105,8 +2105,8 @@ body::before,.native-app body::before{background:radial-gradient(70vw 65vh at 0%
 .g-bar i{display:block;height:100%;border-radius:inherit;background:rgba(var(--tone-ink),.35)}
 .g-bar.soon i{background:var(--warning)}.g-bar.overdue i{background:var(--danger)}
 /* Timeline: a name column, then twelve months. */
-.timeline{position:relative;padding:6px 0 26px;overflow-x:auto;--tl-name:200px}
-.timeline>*{min-width:680px}
+.timeline{overflow-x:auto;overflow-y:hidden;padding:6px 0 14px;--tl-name:200px}
+.tl-chart{position:relative;min-width:680px;padding:0 6px 24px 0}
 #board[data-size=s] .timeline{--tl-name:130px}
 .tl-head,.tl-row{display:grid;grid-template-columns:var(--tl-name) minmax(0,1fr);align-items:center}
 .tl-head{height:26px;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
@@ -2122,10 +2122,11 @@ body::before,.native-app body::before{background:radial-gradient(70vw 65vh at 0%
 .tl-mark.soon{background:var(--warning)}.tl-mark.overdue{background:var(--danger)}
 .tl-mark.later{width:6px;height:6px;margin:-3px 0 0 -3px;background:rgba(var(--tone-ink),.3)}
 .tl-label{position:absolute;top:50%;transform:translateY(-50%);margin-left:10px;padding:0 6px 0 3px;border-radius:4px;background:var(--surface-content);font-size:11px;line-height:16px;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums;z-index:1}
+.tl-label.before{transform:translate(-100%,-50%);margin-left:-10px;padding:0 3px 0 6px}
 .tl-label.soon{color:var(--warning)}.tl-label.overdue{color:var(--danger)}
-.tl-today{position:absolute;top:6px;bottom:20px;left:calc(var(--tl-name) + (100% - var(--tl-name)) * var(--tl-at));width:0;border-left:1.5px solid rgb(var(--tone-primary));pointer-events:none;z-index:2;min-width:0}
+.tl-today{position:absolute;top:0;bottom:22px;left:calc(var(--tl-name) + (100% - 6px - var(--tl-name)) * var(--tl-at));width:0;border-left:1.5px solid rgb(var(--tone-primary));pointer-events:none;z-index:2}
 .tl-today span{position:absolute;bottom:-18px;left:0;transform:translateX(-50%);font-size:11px;font-weight:600;color:rgb(var(--tone-primary));white-space:nowrap}
-.tl-note{margin:4px 0 0;font-size:12px;color:var(--muted)}
+.tl-note{margin:2px 0 0;font-size:12px;color:var(--muted)}
 /* Month calendar of 即将到来: weeks from Monday, the month's total and list beside it. */
 .calendar{padding:10px 0 20px}
 .cal-head{display:flex;align-items:center;gap:6px;margin-bottom:10px}
