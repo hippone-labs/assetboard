@@ -77,6 +77,8 @@ open /Applications/Assetboard.app --args --demo
 | Inbox 文件夹（Pro） | 把 JSON 文件放进 `~/Library/Application Support/Assetboard/Inbox/`，App 打开或回到前台时读取，一律先进导入预览，确认才写入；导入或丢弃后原文件才移到 `Inbox/handled/`（保留 30 天），取消预览或退出 App 时文件留在原处。这个格式拖进窗口或 Dock 也能识别。格式见下 | App |
 | AI 识别（可选） | 接入你自己的模型（Claude、OpenAI 兼容接口或本机 Ollama），配置后，导入的截图、PDF、邮件和粘贴的文字会自动发给它识别（AI 识别设置里可关掉，关掉后只在你点“用 AI 识别”时发送）。本地规则只认中文账单和通知，英文的靠 AI。尚未用真实 API key 验证 | App |
 
+连接平台后挑选： Cloudflare、GitHub、注册商和云平台读完之后，已经在大板里的记录当场更新；新找到的不直接写进来，而是马上列出来让你挑（默认全选，已在大板里的标“已引入”，按类别分组，多了可以筛选），点“引入 N 项”才写入，`⌘Z` 撤销。没勾的、或点了“稍后”的，留在侧边栏的「待引入」（只显示数量，不着色）和「设置 › 连接」那一行里，随时打开再挑；“没勾的不再提醒”会把它们放进跳过名单，之后的读取也不会再列出（在导入窗口的“已删除的同步项”里能恢复）。每次读取都以平台的最新列表为准：平台上没了的不再列出；第一次读取之后才出现的标“新”。Cloudflare 每 12 小时的自动同步（Pro）找到新的 Zone 或域名时，只放进「待引入」并提示一句，不自动加进大板。添加资产时选域名、代码仓库、服务器、部署、数据库或存储，表单顶部会列出已连接平台上待引入的同类资产，选一项就直接引入；没有待引入的就给“从 X 重新读取”或“连接 X，拉取列表来选”，手动填写作兜底。断开某个平台会清掉它的待引入列表。
+
 Agent / 脚本的 JSON 格式（先写成临时名，写完再改名为 `.json`；一份最多 100 项、1 MB，只认下列字段，其余忽略）：
 
 ```json
@@ -141,7 +143,8 @@ Mac App 在菜单栏有一个小日历图标：显示 7 天内到期和待确认
 
 - 通用： 语言（简体中文或 English，默认跟随系统；切换后当场生效，菜单也一起换）、计价币种、隐私模式、在菜单栏显示、系统通知状态。
 - 功能： 全景、AI 额度与用量（默认开，只读本机文件）、实时状态（默认关闭；打开后可调读取间隔，15 秒到 60 分钟）、仓库分支和 Actions（默认关闭，Mac App）、外部工具接入（MCP，关掉后一律拒绝调用；下面两个开关默认关：把地址和联系方式交给 AI 工具、把银行卡和手机号交给 AI 工具）、自动获取网站图标、每周核对域名到期日。功能开关按此设备记住，不进资产数据，不随备份走。
-- 连接： Cloudflare、GitHub、Namecheap、Porkbun、Hetzner、DigitalOcean、Vercel、AI 识别、MCP 接入、AI 额度、探针数据源，各自显示是否已连接，点“设置…”打开对应面板。
+- 连接： Cloudflare、GitHub、Namecheap、Porkbun、Hetzner、DigitalOcean、Vercel、AI 识别、MCP 接入、AI 额度、探针数据源，各自显示是否已连接，点“设置…”打开对应面板；有待引入的资产时多一个“N 项待引入”，点开挑选。
+- MCP： 已接入的工具和操作记录，见下面的 [MCP 接入](#mcp-接入外部-ai-工具与命令行)。
 - 关于： 当前版本、检查更新、自动检查更新。
 
 ### 收起侧边栏
@@ -184,8 +187,8 @@ App 会连的主机见[隐私与网络](#隐私与网络)，每个请求都记�
 `Assetboard.app/Contents/MacOS/assetboard-cli` 通过数据目录里的本地 socket（`agent.sock`，仅本用户可读写）调用正在运行的 App；App 没开时会在后台打开它。演示模式不接受调用。
 
 ```sh
-# Claude Code
-claude mcp add assetboard -- /Applications/Assetboard.app/Contents/MacOS/assetboard-cli mcp
+# Claude Code（--scope user：所有项目都能用）
+claude mcp add --scope user assetboard -- /Applications/Assetboard.app/Contents/MacOS/assetboard-cli mcp
 # ChatGPT 桌面版的 Codex / Codex CLI（普通对话和网页版不能连本机工具）
 codex mcp add assetboard -- /Applications/Assetboard.app/Contents/MacOS/assetboard-cli mcp
 # Claude Desktop（claude_desktop_config.json）、Cursor（~/.cursor/mcp.json）及多数 MCP 工具：
@@ -204,6 +207,13 @@ MCP 工具：`list_ai_usage`、`set_ai_usage_source`、`list_asset_types`、`lis
 
 图标与同步的 MCP 工具：`list_icon_platforms`、`set_icon_site`、`fetch_icons`、`get_cloudflare_sync_status`、`sync_cloudflare`、`list_sync_blocklist`、`unblock_sync_item`。
 
+操作记录与待引入的 MCP 工具：`list_agent_activity`、`list_agents`、`list_import_candidates`（只读），`import_candidates`（引入待引入的资产，Pro）。命令行对应 `activity`、`agents`、`candidates`、`import-candidates`。
+
+- 操作记录： 外部工具（MCP 和命令行）的每次调用都记下来，在「设置 › MCP」里看：哪个工具、什么时间、调用了什么；写入的逐条列出新增、修改、移除或请求删除的资产，修改的写明每个字段改前和改后（太长的截断，图片只写“图片”，像令牌、密钥或完整卡号的文字一律换成“已隐去”）。可按工具、时间（今天 / 7 天 / 30 天）和类型（写入 / 查询 / 失败）筛选，最近的在上面；最多保留 1000 条，只存在这台 Mac 的数据库里，可一键清空。`list_agent_activity` 给外部工具看同一份记录，地址和联系方式照样遮住，银行卡和手机号的记录照样不给。
+- 识别是哪个工具： 先看 MCP 握手时工具自报的名字和版本（`initialize` 的 `clientInfo`，如 Claude Code、Claude Desktop、Codex、Cursor、VS Code、Gemini CLI、Grok）；没报或不认识，再看启动 `assetboard-cli` 的上级程序名（只取程序名或 npm 包名，不取路径）；再看几个工具会设的环境变量名（只看有没有，不读值）。都认不出记为“未知客户端”；自报了陌生名字的按它自己的名字记。命令行调用记为“命令行”。
+- 已接入的工具： 「设置 › MCP」列出这台 Mac 上常见工具的配置文件里有没有 Assetboard（Claude Code `~/.claude.json`、Claude Desktop、Codex `~/.codex/config.toml`、Cursor `~/.cursor/mcp.json`、Windsurf、VS Code、Zed、Gemini CLI、Grok CLI、Cline），以及调用过的工具和最近一次时间、调用次数。配置文件只读不改，内容不进页面也不进记录（别的服务器配置里可能有令牌）。没配置的工具旁边有“复制配置”，复制后按提示粘贴。MCP 工具一启动就会告诉正在运行的 App（不会因此打开 App），所以只连上、还没调用的工具也会显示。
+- 待引入： `list_import_candidates` 列出已连接平台上读到、还没在大板里的资产（按平台，带 `new`）；`import_candidates` 按 id 引入，或不给 id 引入该平台的全部，`⌘Z` 可撤销。
+
 - 默认遮住、默认不给： 外部工具读到的 IP、SSH 主机和用户、手机号和邮箱是遮住的（带 `•`，字段名列在 `masked` 里），银行卡和手机号两类记录读不到也改不了（`list_assets` 只给数量 `withheld`）；在「设置 › 功能 › 外部工具接入」里有两个开关可以改。搜索仍按真实值匹配。写回时，原样传回的遮住值保持不变，其他带 `•` 的值一律拒收。
 - 实时状态不给外部工具： 服务器的实时读数、探针数据源和 SSH 主机都没有 MCP 工具，资产里也不带读数；设置和关联只在 App 里做。探针数据源换了地址（协议、主机或端口）时，App 会丢掉已存的面板账号，要重新填写。
 - 凭据不经过 MCP： 这些工具不接收、也不返回用户名、密码、令牌或会话；面板账号只能在 App 的「探针数据源」里填，Cloudflare 令牌只能在「同步 Cloudflare…」里填，注册商的 API 凭据只能在「从注册商导入…」里填，云平台的令牌只能在「从云平台导入…」里填。从注册商和云平台读到的记录和 Cloudflare、GitHub 同步的一样，名称和类别以同步为准，不能通过 MCP 改；其他字段（备注、用途、费用、关联等）可以改，删除后下次同步不会加回来。
@@ -218,7 +228,7 @@ MCP 工具：`list_ai_usage`、`set_ai_usage_source`、`list_asset_types`、`lis
 - 批量： `update_assets` 一次最多 100 项，先逐项检查，合格的一起写入、一次撤销，返回每项成功或失败原因；`request_delete_assets` 一次提交多项删除，在 App 的一个列表里统一勾选确认。
 - 确认请求： 删除请求都会返回 `actionId`；`list_pending_actions`、`get_action_status` 查看状态：`pending`、`done`（至少删了一项）、`cancelled`（全部保留）、`failed`，每项写明 `deleted` / `kept` / `failed`。请求到达时 App 会弹出确认列表；正在编辑时窗口顶部出现提示条，点“查看”直接打开，Dock 图标也会跳一下。这些状态不受 `⌘Z` 影响。
 
-命令行对应：`update-many`、`delete-many`、`actions`、`action`、`pay`、`renew`、`charges`、`forecast`、`history`、`projects`、`update-project`（`assetboard-cli --help` 查看参数）。
+命令行对应：`update-many`、`delete-many`、`actions`、`action`、`pay`、`renew`、`charges`、`forecast`、`history`、`projects`、`update-project`、`activity`、`agents`、`candidates`、`import-candidates`（`assetboard-cli --help` 查看参数）。
 
 字段与上面的 Inbox 格式相同，另有 `reason`、`region`、`last4`、`network`、`phone`，服务器的 `host`、`ips`、`sshUser`、`sshPort`，仓库的 `localPath`。关联用 `linkTo` / `unlinkFrom`（资产 id 数组），规则与手动关联一致；查询结果的 `relations` 列出每项关联及其含义，`risks` 列出到期的付款卡或手机号。检查和表单一致：日期、链接、类别不对会被拒绝，完整卡号会被拒绝；同类别同名的新增会跳过并返回已有的 id。图标：`iconHost` 填域名（如 `wise.com`），App 自己去拉网站图标（同「获取网站图标」，记在网络记录里），结果见记录的 `iconStatus`；`icon` 直接给 PNG/JPEG/WebP 的 data URL（最大 256 KB），作为自定义图标；传空字符串清除。查询返回完整记录，图标只给 `hasCustomIcon`、`hasSiteIcon`、`siteIconHost`，不含图片数据。Agent 一次请求删除多项时，App 用一个可勾选的列表统一确认。
 

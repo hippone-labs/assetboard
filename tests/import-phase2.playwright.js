@@ -69,6 +69,7 @@ async (page) => {
   await p.evaluate(()=>githubDialog());
   await p.waitForSelector('[data-action="github-local-sync"]');
   await p.evaluate(()=>window.webkit.messageHandlers.assetboard.postMessage({action:'githubSyncLocal'}));
+  await p.waitForSelector('#connect-pick');await p.click('#connect-pick [data-action="connect-import"]');
   await p.waitForTimeout(120);
   const accounts=await p.evaluate(()=>[...new Set(state.assets.filter(a=>a.source==='github').map(a=>a.account))].sort());
   check(JSON.stringify(accounts)===JSON.stringify(['alice','bob']),'Multi-account gh merge tags owners: '+accounts);
