@@ -210,6 +210,14 @@ body{background:rgb(var(--tone-canvas));color:var(--ink)}
 .button.danger:hover{background:#86392a}
 .confirm-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}
 .confirm-message{font-size:12px;color:var(--ink)}
+.update-offer{display:grid;gap:12px}
+.update-offer>.form-note{margin:0}
+.update-notes{font-size:13px;line-height:1.6;color:var(--ink)}
+.update-notes ul{margin:0;padding-left:18px;display:grid;gap:6px}
+.update-notes p{margin:0 0 6px;font-weight:600}
+.update-other{border-top:1px solid var(--border);padding-top:8px}
+.update-other summary{cursor:pointer;color:var(--muted);font-size:12px}
+.update-other .update-notes{margin-top:8px;color:var(--muted)}
 .collision-list{display:grid;gap:8px;margin:6px 0 4px;font-size:12px}
 .field-row{display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:8px}
 @media(max-width:520px){.field-row{grid-template-columns:1fr}}
