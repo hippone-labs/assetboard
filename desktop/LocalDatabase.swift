@@ -20,6 +20,8 @@ final class LocalDatabase {
         try execute("CREATE TABLE IF NOT EXISTS evidence (id TEXT PRIMARY KEY, kind TEXT NOT NULL, source TEXT NOT NULL, title TEXT NOT NULL, body TEXT NOT NULL, imported_at TEXT NOT NULL, asset_id TEXT, payload TEXT NOT NULL)")
         try execute("CREATE INDEX IF NOT EXISTS evidence_source ON evidence(source, imported_at)")
         try execute("CREATE TABLE IF NOT EXISTS network_log (seq INTEGER PRIMARY KEY AUTOINCREMENT, payload TEXT NOT NULL)")
+        try execute("CREATE TABLE IF NOT EXISTS agent_log (seq INTEGER PRIMARY KEY AUTOINCREMENT, payload TEXT NOT NULL)")
+        try execute("CREATE TABLE IF NOT EXISTS agent_clients (id TEXT PRIMARY KEY, payload TEXT NOT NULL)")
     }
 
     deinit { sqlite3_close(connection) }
@@ -184,4 +186,45 @@ final class LocalDatabase {
     }
 
     func clearNetworkLog() throws { try execute("DELETE FROM network_log") }
+
+    /// 操作记录 (设置 › MCP): one JSON row per call an external tool made, as the page wrote it; oldest dropped beyond `keep`.
+    /// A row larger than 64 KB is not kept.
+    func appendAgentLog(_ entry: [String: Any], keep: Int) throws {
+        let bytes = try JSONSerialization.data(withJSONObject: entry, options: [.sortedKeys])
+        guard bytes.count <= 64 * 1024 else { return }
+        let insert = try statement("INSERT INTO agent_log(payload) VALUES(?)")
+        defer { sqlite3_finalize(insert) }
+        try bind(String(data: bytes, encoding: .utf8) ?? "{}", to: insert, at: 1)
+        guard sqlite3_step(insert) == SQLITE_DONE else { throw failure(L("保存操作记录失败")) }
+        let prune = try statement("DELETE FROM agent_log WHERE seq <= (SELECT MAX(seq) FROM agent_log) - ?")
+        defer { sqlite3_finalize(prune) }
+        guard sqlite3_bind_int(prune, 1, Int32(max(1, keep))) == SQLITE_OK, sqlite3_step(prune) == SQLITE_DONE else { throw failure(L("整理操作记录失败")) }
+    }
+    /// Most recent first.
+    func listAgentLog(limit: Int = 1000) throws -> [[String: Any]] { try payloads("SELECT payload FROM agent_log ORDER BY seq DESC LIMIT ?", limit: limit) }
+    func clearAgentLog() throws { try execute("DELETE FROM agent_log") }
+    /// One row per tool that has called: its name, first and last call and how many. Kept when the log is cleared or pruned.
+    func saveAgentClient(id: String, _ client: [String: Any]) throws {
+        let bytes = try JSONSerialization.data(withJSONObject: client, options: [.sortedKeys])
+        guard !id.isEmpty, id.count <= 80, bytes.count <= 4096 else { return }
+        let upsert = try statement("INSERT INTO agent_clients(id,payload) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload")
+        defer { sqlite3_finalize(upsert) }
+        try bind(id, to: upsert, at: 1)
+        try bind(String(data: bytes, encoding: .utf8) ?? "{}", to: upsert, at: 2)
+        guard sqlite3_step(upsert) == SQLITE_DONE else { throw failure(L("保存操作记录失败")) }
+    }
+    func listAgentClients() throws -> [[String: Any]] { try payloads("SELECT payload FROM agent_clients LIMIT ?", limit: 200) }
+    private func payloads(_ sql: String, limit: Int) throws -> [[String: Any]] {
+        let query = try statement(sql)
+        defer { sqlite3_finalize(query) }
+        guard sqlite3_bind_int(query, 1, Int32(max(1, min(limit, 5000)))) == SQLITE_OK else { throw failure(L("查询数量无效")) }
+        var rows: [[String: Any]] = []
+        while true {
+            let status = sqlite3_step(query)
+            if status == SQLITE_DONE { return rows }
+            guard status == SQLITE_ROW else { throw failure(L("无法读取操作记录")) }
+            if let raw = sqlite3_column_text(query, 0),
+               let row = (try? JSONSerialization.jsonObject(with: Data(String(cString: raw).utf8))) as? [String: Any] { rows.append(row) }
+        }
+    }
 }

@@ -51,6 +51,8 @@ const nativeStore=window.__ASSETBOARD_NATIVE__;
 const MOTION_MS=200;
 // Demo mode (`--demo` in the Mac app, `?demo` in the browser) shows the fictional board from demo-data.js and never saves.
 const demoMode=!!(nativeStore?.demo||(!nativeStore&&new URLSearchParams(location.search).has('demo')))&&typeof window.assetboardDemoBoard==='function';
+// What the platform dialogs read and write about connections: the Mac app's state, or on the demo board one in memory (demo-data.js answers).
+const hostStore=nativeStore||(demoMode?{demo:true,registrars:{},cloudImports:{}}:null);
 window.assetboardDemoBlocked=()=>{if($('#modal')?.open)$('#modal').close();toast(tr('演示模式下不可用'));};
 window.assetboardConnectionState=connections=>{
  if(!nativeStore)return;
@@ -63,7 +65,7 @@ window.assetboardConnectionState=connections=>{
  if('notifications' in connections&&currentView()==='upcoming'&&!query)render();
  autoSyncCloudflare();
 };
-let state=structuredClone(seed),query='',view='all',layoutMode='list',upcomingMode='list',history=[],future=[],activeAsset=null,lastFocus=null,toastTimer,assetFormSnapshot=null;
+let state=structuredClone(seed),query='',view='all',layoutMode='wall',upcomingMode='list',history=[],future=[],activeAsset=null,lastFocus=null,toastTimer,assetFormSnapshot=null;
 let migratedLegacyData=false;
 try{const saved=demoMode?window.assetboardDemoBoard():nativeStore?nativeStore.data:JSON.parse(localStorage.getItem(key));if(saved&&Array.isArray(saved.blocks)&&Array.isArray(saved.assets)&&saved.blocks.every(b=>cats[b.id])){const migration=removeUntouchedDemo(saved);state=migration.board;migratedLegacyData=!!(migration.removed||migration.removedBlocks);}}catch{} if(!Array.isArray(state.deletedExternalIds))state.deletedExternalIds=[];
 // A block is its category id and whether its group is folded; nothing else is kept.
@@ -87,7 +89,7 @@ window.assetboardReminderOpen=id=>{if($('#modal')?.open)$('#modal').close();if(t
 function checkpoint(){history.push(JSON.stringify(state));if(history.length>25)history.shift();future=[];}
 // A Latin word set into Chinese text gets a space on the side that meets a Chinese character (添加 AI 订阅资产, 添加 Apple ID 资产).
 function zhGap(text){text=String(text);return appLang==='zh'?(/^[A-Za-z0-9]/.test(text)?' ':'')+text+(/[A-Za-z0-9]$/.test(text)?' ':''):text;}
-function toast(message,undoable=false,redoable=false){clearTimeout(toastTimer);$('#toast').classList.remove('notice','ask');$('#toast').setAttribute('role','status');const offer=(undoable&&history.length)||(redoable&&future.length);$('#toast').innerHTML=`<span>${esc(message)}</span>${undoable&&history.length?'<button class="toast-undo" data-action="undo">'+tr('撤销')+'</button>':redoable&&future.length?'<button class="toast-undo" data-action="redo">'+tr('重做')+'</button>':''}`;$('#toast').classList.add('show');toastTimer=setTimeout(()=>$('#toast').classList.remove('show'),offer?6000:3000);}
+function toast(message,undoable=false,redoable=false,act=null){clearTimeout(toastTimer);$('#toast').classList.remove('notice','ask');$('#toast').setAttribute('role','status');const offer=(undoable&&history.length)||(redoable&&future.length)||!!act;$('#toast').innerHTML=`<span>${esc(message)}</span>${undoable&&history.length?'<button class="toast-undo" data-action="undo">'+tr('撤销')+'</button>':redoable&&future.length?'<button class="toast-undo" data-action="redo">'+tr('重做')+'</button>':act?`<button class="toast-undo" data-action="${esc(act.action)}"${act.id?` data-id="${esc(act.id)}"`:''}>${esc(act.label)}</button>`:''}`;$('#toast').classList.add('show');toastTimer=setTimeout(()=>$('#toast').classList.remove('show'),offer?6000:3000);}
 // A notice is a toast that matters: something the person tried did not happen. It is louder, stays longer, waits while hovered
 // or focused, and has its own close button.
 const NOTICE_MS=10000;
@@ -107,7 +109,7 @@ function icon(type){return `<svg viewBox="0 0 24 24" fill="none" stroke="current
 const uiGlyphs={pulse:'<path d="M3 12h4l2.5-6 5 12 2.5-6h4"/>',download:'<path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19.5h14"/>',file:'<path d="M7 3.5h6.5L18 8v12.5H7z"/><path d="M13.5 3.5V8H18"/>',plus:'<path d="M12 5v14M5 12h14"/>',mail:'<path d="M4 6h16v12H4zM4 6l8 7 8-7"/>',image:'<rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.5"/><path d="m5 17 4.5-4.5L13 16l2.5-2.5L19 17"/>',terminal:'<rect x="3.5" y="5" width="17" height="14" rx="2"/><path d="m7.5 10 3 2.5-3 2.5M13 15h3.5"/>',refresh:'<path d="M19.5 9.5A8 8 0 0 0 5.2 7.8M4.5 14.5a8 8 0 0 0 14.3 1.7"/><path d="M5 4v4h4M19 20v-4h-4"/>',cloud:'<path d="M3.5 15.5h12a4 4 0 0 0 .4-8 6 6 0 0 0-11.5 1.8A3.5 3.5 0 0 0 3.5 15.5Z"/>',server:'<rect x="4" y="4.5" width="16" height="6" rx="1.5"/><rect x="4" y="13.5" width="16" height="6" rx="1.5"/><path d="M7.5 7.5h.01M7.5 16.5h.01"/>',github:'<path d="M9 19c-4 1.5-4-2-7-2m14 5v-3.9a3.4 3.4 0 0 0-1-2.6c3.2-.3 6.5-1.5 6.5-7A5.2 5.2 0 0 0 19 4.6 4.8 4.8 0 0 0 18.9 1S17.7.7 15 2.5a10.4 10.4 0 0 0-6 0C6.3.7 5.1 1 5.1 1A4.8 4.8 0 0 0 5 4.6 5.2 5.2 0 0 0 3.5 8.5c0 5.4 3.3 6.7 6.5 7a3.4 3.4 0 0 0-1 2.6V22"/>',back:'<path d="M10 6 4 12l6 6M4 12h16"/>',info:'<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5M12 8h.01"/>',lock:'<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8.5 11V8a3.5 3.5 0 0 1 7 0v3"/>',warn:'<path d="M12 4 3 19.5h18z"/><path d="M12 10v4.5M12 17h.01"/>',check:'<path d="m5 12.5 4.5 4.5L19 7.5"/>',gear:'<circle cx="12" cy="12" r="3"/><path d="M12 3.5v2M12 18.5v2M3.5 12h2M18.5 12h2M6 6l1.4 1.4M16.6 16.6 18 18M18 6l-1.4 1.4M7.4 16.6 6 18"/>',tray:'<path d="M4 13.5 6.5 5.5h11L20 13.5V18a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18Z"/><path d="M4 13.5h4.5a1 1 0 0 1 1 1 2.5 2.5 0 0 0 5 0 1 1 0 0 1 1-1H20"/>',palette:'<path d="M12 3.5a8.5 8.5 0 1 0 0 17c1.2 0 1.8-.8 1.8-1.7 0-1.3-1-1.6-1-2.7 0-.9.7-1.6 1.7-1.6h2.2a3.3 3.3 0 0 0 3.3-3.3C20 6.9 16.5 3.5 12 3.5Z"/><circle cx="7.8" cy="11" r=".7"/><circle cx="10.5" cy="7.5" r=".7"/><circle cx="15" cy="8" r=".7"/>',clock:'<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',sidebar:'<rect x="3.5" y="5" width="17" height="14" rx="2.5"/><path d="M9.5 5v14"/>',eye:'<path d="M3.5 12s3.2-5.5 8.5-5.5S20.5 12 20.5 12s-3.2 5.5-8.5 5.5S3.5 12 3.5 12Z"/><circle cx="12" cy="12" r="2.5"/>',eyeoff:'<path d="M3.5 12s3.2-5.5 8.5-5.5S20.5 12 20.5 12s-3.2 5.5-8.5 5.5S3.5 12 3.5 12Z"/><circle cx="12" cy="12" r="2.5"/><path d="M4.5 4.5l15 15"/>',spark:'<path d="M11 4c.6 3.9 2.6 5.9 6.5 6.5-3.9.6-5.9 2.6-6.5 6.5-.6-3.9-2.6-5.9-6.5-6.5C8.4 9.9 10.4 7.9 11 4Z"/>'};
 uiGlyphs.grid='<rect x="4" y="4" width="7" height="7" rx="1.8"/><rect x="13" y="4" width="7" height="7" rx="1.8"/><rect x="4" y="13" width="7" height="7" rx="1.8"/><rect x="13" y="13" width="7" height="7" rx="1.8"/>';
 // v15 shell glyphs: view switch, sidebar views, disclosure, more, external link.
-Object.assign(uiGlyphs,{list:'<path d="M9 6.5h11M9 12h11M9 17.5h11"/><path d="M4.5 6.5h.01M4.5 12h.01M4.5 17.5h.01"/>',timeline:'<path d="M4 7h16M4 12h16M4 17h16" opacity=".35"/><circle cx="8" cy="7" r="1.8"/><circle cx="15" cy="12" r="1.8"/><circle cx="11" cy="17" r="1.8"/>',calendar:'<rect x="4" y="5.5" width="16" height="14" rx="2"/><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4"/>',tiles:'<rect x="4" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5"/>',stack:'<path d="m12 4 8 4-8 4-8-4z"/><path d="m4 12 8 4 8-4M4 16l8 4 8-4"/>',chevron:'<path d="m9.5 6 6 6-6 6"/>',more:'<path d="M6 12h.01M12 12h.01M18 12h.01" stroke-width="2.6"/>',external:'<path d="M13.5 4.5h6v6M19.5 4.5 11 13M17.5 13.5v5a1.5 1.5 0 0 1-1.5 1.5H6a1.5 1.5 0 0 1-1.5-1.5V8A1.5 1.5 0 0 1 6 6.5h5"/>'});
+Object.assign(uiGlyphs,{wall:'<rect x="4" y="4" width="7" height="9" rx="1.5"/><rect x="13" y="4" width="7" height="5" rx="1.5"/><rect x="4" y="15" width="7" height="5" rx="1.5"/><rect x="13" y="11" width="7" height="9" rx="1.5"/>','density-glance':'<path d="M5 6.5h14M5 10.2h14M5 13.8h14M5 17.5h14"/>','density-standard':'<path d="M5 7h14M5 14h14"/><path d="M5 10h8M5 17h8" opacity=".45"/>','density-detail':'<path d="M5 6h14"/><path d="M8 9.5h11M8 12.5h11M8 15.5h8" opacity=".45"/><path d="M5 19h14"/>',list:'<path d="M9 6.5h11M9 12h11M9 17.5h11"/><path d="M4.5 6.5h.01M4.5 12h.01M4.5 17.5h.01"/>',timeline:'<path d="M4 7h16M4 12h16M4 17h16" opacity=".35"/><circle cx="8" cy="7" r="1.8"/><circle cx="15" cy="12" r="1.8"/><circle cx="11" cy="17" r="1.8"/>',calendar:'<rect x="4" y="5.5" width="16" height="14" rx="2"/><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4"/>',tiles:'<rect x="4" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5"/>',stack:'<path d="m12 4 8 4-8 4-8-4z"/><path d="m4 12 8 4 8-4M4 16l8 4 8-4"/>',chevron:'<path d="m9.5 6 6 6-6 6"/>',more:'<path d="M6 12h.01M12 12h.01M18 12h.01" stroke-width="2.6"/>',external:'<path d="M13.5 4.5h6v6M19.5 4.5 11 13M17.5 13.5v5a1.5 1.5 0 0 1-1.5 1.5H6a1.5 1.5 0 0 1-1.5-1.5V8A1.5 1.5 0 0 1 6 6.5h5"/>'});
 function ui(name){return `<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${uiGlyphs[name]||''}</svg>`;}
 // One rounded tile per asset (DESIGN-PRINCIPLES §9): a real icon (custom iconData, then a fetched siteIcon) wins; the category line icon only fills in when there is none.
 function customIconSrc(a){return typeof a?.iconData==='string'&&a.iconData.length<400000&&/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(a.iconData)?a.iconData:'';}
@@ -207,7 +209,7 @@ function identityText(a){return {bankcard:[a.network&&tr(a.network),a.last4&&`�
 // The overview never truncates; groups fold instead. View and layout are per-viewer conveniences kept in localStorage, not in the board.
 const VIEW_KEY='assetboard-view-v1';
 function readViewPrefs(){try{return JSON.parse(localStorage.getItem(VIEW_KEY)||'{}')||{};}catch{return {};}}
-function writeViewPrefs(){try{localStorage.setItem(VIEW_KEY,JSON.stringify({view,layout:layoutMode,...(upcomingMode==='calendar'?{upcoming:'calendar'}:{}),...(displayCurrency?{currency:displayCurrency}:{}),...(privacy?{privacy:true}:{}),...(sidebarRail&&!railForced?{rail:true}:{}),...(navMoreOpen?{more:true}:{})}));}catch{}}
+function writeViewPrefs(){try{localStorage.setItem(VIEW_KEY,JSON.stringify({view,board:layoutMode,...(wallDensity!=='standard'?{density:wallDensity}:{}),...(upcomingMode==='calendar'?{upcoming:'calendar'}:{}),...(displayCurrency?{currency:displayCurrency}:{}),...(privacy?{privacy:true}:{}),...(sidebarRail&&!railForced?{rail:true}:{}),...(navMoreOpen?{more:true}:{})}));}catch{}}
 // Privacy mode (the eye in the bar, remembered per viewer): names, accounts and IPs are masked wherever records are listed or shown, for
 // screen sharing and screenshots. Records are never changed; search, copy and editing still use the real values.
 let privacy=readViewPrefs().privacy===true;
@@ -301,18 +303,19 @@ function costMeta(v){
 function costHint(a){
  const m=costAmount(a),cur=totalCurrency();if(!m)return '';
  const inCur=value=>m.currency===cur?value:convertMoney(value,m.currency,cur,fx.rates),out=[];
- if(m.currency!==cur){const v=inCur(m.value);if(v!==null)out.push(tr('约 {money}',{money:formatMoney(v,cur)+(m.months?` / ${Object.values(billingCycles).find(c=>c.months===m.months).suffix}`:'')}));}
+ if(m.currency!==cur){const v=inCur(m.value);if(v!==null)out.push(tr('约 {money}',{money:formatMoney(v,cur)+(m.months?` / ${tr(Object.values(billingCycles).find(c=>c.months===m.months).suffix,null,'unit')}`:'')}));}
  if(m.months>1){const v=inCur(m.value/m.months);if(v!==null)out.push(tr('每月约 {money}',{money:formatMoney(v,cur)}));}
  return out.join(tr('，'));
 }
-{const prefs=readViewPrefs();if(['grid','timeline'].includes(prefs.layout))layoutMode=prefs.layout;if(prefs.upcoming==='calendar')upcomingMode='calendar';if(typeof prefs.view==='string')view=prefs.view;}
+{const prefs=readViewPrefs();if(['list','grid','timeline','wall'].includes(prefs.board))layoutMode=prefs.board;if(WALL_DENSITIES.includes(prefs.density))wallDensity=prefs.density;if(prefs.upcoming==='calendar')upcomingMode='calendar';if(typeof prefs.view==='string')view=prefs.view;}
 // Sidebar categories follow state.blocks; a category that holds assets is always listed, even without a block entry.
 function categoryIds(){const ids=state.blocks.map(b=>b.id).filter(id=>cats[id]);for(const a of state.assets)if(cats[a.type]&&!ids.includes(a.type))ids.push(a.type);return ids;}
 function currentView(){if(view==='all'||view==='upcoming')return view;if(projectViewName(view))return projectAssets(state.assets,projectViewName(view)).length?view:'all';if(view==='hidden')return state.assets.some(isHidden)?'hidden':'all';return cats[view]&&categoryIds().includes(view)?view:'all';}
 function setView(next){if(!['all','upcoming','hidden'].includes(next)&&!cats[next]&&!projectViewName(next))return;view=next;writeViewPrefs();if(query){query='';$('#search').value='';}render();boardScroller().scrollTo(0,0);}
-// 即将到来 has its own pair (list or month calendar); every other view list, grid or timeline. A search is always a list or a grid.
-function setLayout(next){if(currentView()==='upcoming'&&!query){if(!['list','calendar'].includes(next)||next===upcomingMode)return;upcomingMode=next;}else{if(!['list','grid','timeline'].includes(next)||next===layoutMode)return;layoutMode=next;}writeViewPrefs();render();}
-function shownLayout(v){return v==='upcoming'&&!query?upcomingMode:(query||v==='hidden')&&layoutMode==='timeline'?'list':layoutMode;}
+// 即将到来 has its own pair (list or month calendar); every other view list, grid or timeline, and 全部资产 the tile wall too (the
+// default; board-wall.js). A search is always a list or a grid; a view without the wall shows the list in its place.
+function setLayout(next){if(currentView()==='upcoming'&&!query){if(!['list','calendar'].includes(next)||next===upcomingMode)return;upcomingMode=next;}else{if(!['list','grid','timeline','wall'].includes(next)||next===shownLayout(currentView()))return;layoutMode=next;}writeViewPrefs();render();}
+function shownLayout(v){return v==='upcoming'&&!query?upcomingMode:layoutMode==='wall'&&(query||v!=='all')||(query||v==='hidden')&&layoutMode==='timeline'?'list':layoutMode;}
 function liveAssets(){return state.assets.filter(a=>!isHidden(a));}
 // Frozen domains and renewals waiting for an answer count too (dueLevel), so a lapsed auto-renewal does not read as all clear.
 function dueLevels(list){let overdue=0,soon=0;for(const a of list){const level=dueLevel(a,{since:state.paymentsSince});if(level==='overdue')overdue++;else if(level==='soon')soon++;}return {overdue,soon};}
@@ -344,8 +347,8 @@ function renderSidebar(){
  if(rail){
   // Everything that is not in the column goes to the 更多 menu (railMoreHtml); its dot is the worst of the folded categories.
   const sum=folded.reduce((t,id)=>({overdue:t.overdue+stats[id].overdue,soon:t.soon+stats[id].soon}),{overdue:0,soon:0}),worst=worstLevel(sum),words=dueWords(sum);
-  railMoreParts={cats:folded.map(id=>catItem(id,true)).join(''),projects:projectNavHtml(),hidden:hiddenItem,tools};
-  const extra=!!(railMoreParts.projects||hidden||tools),cur=currentView(),inside=!query&&!(typeof panoOpen!=='undefined'&&panoOpen)&&(folded.includes(cur)||cur==='hidden'||!!projectViewName(cur));
+  railMoreParts={cats:folded.map(id=>catItem(id,true)).join(''),projects:projectNavHtml(),hidden:connectNavItem(false)+hiddenItem,tools};
+  const extra=!!(railMoreParts.projects||railMoreParts.hidden||tools),cur=currentView(),inside=!query&&!(typeof panoOpen!=='undefined'&&panoOpen)&&(folded.includes(cur)||cur==='hidden'||!!projectViewName(cur));
   const curName=inside?(cats[cur]?.name||(cur==='hidden'?tr('已隐藏'):tr('项目 {name}',{name:projectViewName(cur)}))):'';
   const more=folded.length||extra?`<button class="nav-item nav-more${inside?' active':''}" data-action="nav-more" data-id="more" aria-haspopup="menu" aria-expanded="false"${inside?' aria-current="page"':''}${worst?` data-due="${worst}"`:''} data-tip="${tr('更多')}${folded.length?` · ${folded.length}`:''}" aria-label="${tr('更多')}${folded.length?tr('，')+tr('{n} 个类别',{n:folded.length}):''}${words?tr('，')+words:''}${curName?tr('，')+tr('当前：{name}',{name:esc(curName)}):''}">${ui('more')}<span class="nav-label">${tr('更多')}</span>${railDot(worst)}</button>`:'';
   const catItems=shown.map(id=>catItem(id)).join('')+more;
@@ -356,7 +359,8 @@ function renderSidebar(){
  const worst=folded.some(id=>stats[id].overdue)?'overdue':folded.some(id=>stats[id].soon)?'soon':'',word=navMoreOpen?tr('收起'):tr('更多');
  const more=folded.length?`<button class="nav-item nav-more" data-action="nav-more" aria-expanded="${navMoreOpen}"${navMoreOpen?' aria-controls="nav-more-list"':''}${worst&&!navMoreOpen?` data-due="${worst}"`:''} aria-label="${word} ${tr('{n} 个类别',{n:folded.length})}">${ui(navMoreOpen?'chevron':'more')}<span class="nav-label">${word}</span>${navMoreOpen?'':navCount(folded.length,worst)}</button>${navMoreOpen?`<div class="nav-more-list" id="nav-more-list">${folded.map(id=>catItem(id)).join('')}</div>`:''}`:'';
  const catItems=shown.map(id=>catItem(id)).join('')+more;
- $('#sidebar').innerHTML=`${views}${catItems?`<div class="nav-group nav-cats" role="group" aria-labelledby="nav-cats-title"><h2 class="nav-title" id="nav-cats-title">${tr('类别')}</h2>${catItems}</div>`:''}${projectNavHtml()}${hidden?`<div class="nav-group">${hiddenItem}</div>`:''}${tools?`<div class="nav-group nav-foot">${tools}</div>`:''}`;
+ const pendingItem=connectNavItem(false);
+ $('#sidebar').innerHTML=`${views}${catItems?`<div class="nav-group nav-cats" role="group" aria-labelledby="nav-cats-title"><h2 class="nav-title" id="nav-cats-title">${tr('类别')}</h2>${catItems}</div>`:''}${projectNavHtml()}${hidden||pendingItem?`<div class="nav-group">${pendingItem}${hidden?hiddenItem:''}</div>`:''}${tools?`<div class="nav-group nav-foot">${tools}</div>`:''}`;
 }
 // 更多 on the rail: a menu beside it with the same entries the expanded sidebar would show (names, counts, dots), in #menu, so the
 // menu keys apply: ↑↓ Home End move, Enter picks, Esc or Tab close and Esc returns to 更多. A pick keeps focus on the column.
@@ -391,7 +395,8 @@ function renderHeader(v,shown){
  $('#view-menu').hidden=!(cats[v]&&!query);$('#view-menu').dataset.id=cats[v]?v:'';
  if(cats[v])$('#view-menu').setAttribute('aria-label',tr('{name}类别设置',{name:cats[v].name}));
  const toggle=$('#layout-toggle'),shown_=shownLayout(v),upcoming=v==='upcoming'&&!query;toggle.hidden=!state.assets.length;
- toggle.querySelectorAll('[data-action="layout"]').forEach(b=>{const id=b.dataset.id;b.hidden=upcoming?!['list','calendar'].includes(id):id==='calendar'||id==='timeline'&&(!!query||v==='hidden');});
+ toggle.querySelectorAll('[data-action="layout"]').forEach(b=>{const id=b.dataset.id;b.hidden=upcoming?!['list','calendar'].includes(id):id==='calendar'||id==='timeline'&&(!!query||v==='hidden')||id==='wall'&&(!!query||v!=='all');});
+ const density=$('#density-toggle');density.hidden=shown_!=='wall'||!state.assets.length;if(!density.hidden)density.innerHTML=densityButtons();
  $('#privacy-wrap').hidden=!state.assets.length;setIconButton($('#privacy-toggle'),privacy?'eyeoff':'eye',privacy?tr('显示名称、账号和 IP'):tr('隐藏名称、账号和 IP'));$('#privacy-toggle').setAttribute('aria-pressed',String(privacy));
  toggle.querySelectorAll('[data-action="layout"]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.id===shown_)));
  document.title=`${title} · Assetboard`;
@@ -418,7 +423,7 @@ function subLine(a,after=''){
 function statusHtml(e,dated){return `<span class="r-date${e.cls?' '+e.cls:dated&&e.text?' dated':''}">${e.cls?'<i class="dot" aria-hidden="true"></i>':''}${esc(e.text)}</span>`;}
 function itemLabel(a,e,cost){const live=probeState(a);return [displayName(a),isPrivateRepo(a)&&tr('私有仓库'),a.stopped&&tr('已停用'),live&&tr('探针{text}',{text:live.text}),isHidden(a)&&tr('已隐藏'),e.text,cost].filter(Boolean).join(tr('，'));}
 function itemActions(a){return isHidden(a)?`<button class="button r-restore" data-action="restore-asset" data-id="${esc(a.id)}">${tr('恢复')}</button><button class="button danger-quiet" data-action="delete-asset" data-id="${esc(a.id)}" title="${tr('只删除 Assetboard 里的记录')}">${tr('删除')}</button>`:quickButtons(a);}
-function itemHtml(a,{withType=false,grid=false}={}){
+function itemHtml(a,{withType=false,grid=false,wall=false}={}){
  const e=eventInfo(a),cost=costText(a),hint=[veil(a.name),a.purpose&&a.purpose!==cats[a.type]?.name?a.purpose:'',a.reason&&tr('保留原因：{reason}',{reason:a.reason})].filter(Boolean).join('\n');
  // In 即将到来 the category leads, then the keep reason when there is one (it is what helps decide), otherwise the source. A card or
  // number gives just its tail (•••• 8812) and what hangs on it, so 支付 N 项 fits the column.
@@ -428,17 +433,17 @@ function itemHtml(a,{withType=false,grid=false}={}){
  const subHtml=withType&&impact.length?`${esc(cats[a.type].one)}${short?`<span class="sub-sep" aria-hidden="true">·</span>${esc(short)}`:''}${impactHtml}`:withType?`${esc(cats[a.type].one)}${a.reason?`<span class="sub-sep" aria-hidden="true">·</span><span class="r-reason">${esc(a.reason)}</span>`:sub.text?`<span class="sub-sep" aria-hidden="true">·</span>${sub.html}`:''}`:sub.html;
  // A server linked to a probe shows its state on a line under the address: in place of the implied 运行中, and red when offline.
  // 已停用, set by hand, still stands (the readings show beside it), and a stopped server is never drawn as down.
- const live=probeState(a),probeLine=live?liveRowHtml(a):'';
- const name=`<span class="r-name"><span class="r-text">${esc(displayName(a))}</span>${lockMark(a)}${stopRing(a)}${relMark(a)}</span>`,subSpan=`<span class="r-sub${sub.cls&&!withType?' '+sub.cls:''}"${sub.text?` title="${esc(sub.text)}"`:''}>${subHtml}</span>`;
- const selected=activeAsset===a.id&&!$('#detail').hidden,hero=grid?cardHero(a,e):'',when=hero?cardWhen(a,e):e;
- return `<div class="${grid?'gcard':'row'}${hero?' has-hero':''}${a.stopped?' stopped':''}${live&&!live.online&&!a.stopped?' probe-down':''}${isHidden(a)?' is-hidden':''}${selected?' selected':''}" data-asset="${esc(a.id)}"><button class="item-open" data-action="detail" data-id="${esc(a.id)}" aria-label="${esc(itemLabel(a,e,cost))}" title="${esc(hint)}">${tile(a,grid?'':'sm')}<span class="r-main">${name}${subSpan}${probeLine}${searchHit(a)}</span>${hero?`<span class="g-hero-wrap">${hero}</span>`:''}<span class="r-when">${statusHtml(when,!!a.date)}<span class="r-cost"${costHint(a)?` title="${esc(costHint(a))}"`:''}>${priceMark(a)}${esc(cost)}</span></span></button><span class="r-actions">${itemActions(a)}</span></div>`;
+ const live=probeState(a),probeLine=live?liveRowHtml(a):a.type==='ai'&&typeof aiQuotaRowHtml==='function'?aiQuotaRowHtml(a):'';
+ const name=`<span class="r-name"><span class="r-text">${esc(displayName(a))}</span>${lockMark(a)}${stopRing(a)}${relMark(a)}</span>`,subSpan=`<span class="r-sub${sub.cls&&!withType?' '+sub.cls:''}"${sub.text&&!wall?` title="${esc(sub.text)}"`:''}>${subHtml}</span>`;
+ const selected=activeAsset===a.id&&!$('#detail').hidden,hero=grid?cardHero(a,e):'',when=hero?cardWhen(a,e):wall?wallWhen(a,e):e;
+ return `<div class="${grid?'gcard':'row'}${hero?' has-hero':''}${a.stopped?' stopped':''}${live&&!live.online&&!a.stopped?' probe-down':''}${isHidden(a)?' is-hidden':''}${selected?' selected':''}" data-asset="${esc(a.id)}"><button class="item-open" data-action="detail" data-id="${esc(a.id)}" aria-label="${esc(itemLabel(a,e,cost))}"${wall?'':` title="${esc(hint)}"`}>${tile(a,grid?'':'sm')}<span class="r-main">${name}${subSpan}${wall&&wallDensity==='detail'?wallFactsHtml(a,'r-facts'):''}${probeLine}${searchHit(a)}</span>${hero?`<span class="g-hero-wrap">${hero}</span>`:''}<span class="r-when">${statusHtml(when,!!a.date)}<span class="r-cost"${costHint(a)?` title="${esc(costHint(a))}"`:''}>${priceMark(a)}${esc(cost)}</span></span></button><span class="r-actions">${itemActions(a)}</span></div>`;
 }
 function groupSummary(list){const l=dueLevels(list);return l.overdue||l.soon?`<span class="g-sum" role="img" aria-label="${dueWords(l)}" title="${dueWords(l)}">${l.overdue?`<span class="g-flag overdue"><i class="dot" aria-hidden="true"></i>${formatCount(l.overdue)}</span>`:''}${l.soon?`<span class="g-flag soon"><i class="dot" aria-hidden="true"></i>${formatCount(l.soon)}</span>`:''}</span>`:'';}
 // A group is a category (or a date band, or the hidden pile). Only categories in the overview fold and reorder.
-function groupHtml({id,title,glyph='',list,fold=false,folded=false,reorder=false,head=true,summary='',actions='',withType=false}){
- const grid=layoutMode==='grid'&&!withType,count=`<span class="g-count">${formatCount(list.length)}</span>`;
+function groupHtml({id,title,glyph='',list,fold=false,folded=false,reorder=false,head=true,summary='',actions='',withType=false,wall=false}){
+ const grid=layoutMode==='grid'&&!withType&&!wall,count=`<span class="g-count">${formatCount(list.length)}</span>`;
  const heading=!head?'':`<header class="group-head">${fold?`<button class="group-title" data-action="collapse" data-id="${id}" aria-expanded="${!folded}" aria-controls="group-${id}" aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown" title="${folded?tr('展开（按住 ⌥ 点按：全部）'):tr('收起（按住 ⌥ 点按：全部）')}"><span class="g-chevron">${ui('chevron')}</span>${glyph}<span class="g-name">${esc(title)}</span>${count}</button>`:`<h2 class="group-title static">${glyph}<span class="g-name">${esc(title)}</span>${count}</h2>`}${summary}${actions?`<span class="g-actions">${actions}</span>`:''}</header>`;
- return `<section class="group${folded?' folded':''}${head?'':' solo'}" data-group="${id}" aria-label="${esc(title)}">${heading}${folded?'':`<div class="group-body ${grid?'grid':'list'}" id="group-${id}"${reorder?` data-reorder="${id}"`:''}>${list.map(a=>itemHtml(a,{withType,grid})).join('')}</div>`}</section>`;
+ return `<section class="group${folded?' folded':''}${head?'':' solo'}" data-group="${id}" aria-label="${esc(title)}"${wall?` style="--tilt:${wallTilt(id)}"`:''}>${heading}${folded?'':`<div class="group-body ${grid?'grid':'list'}" id="group-${id}"${reorder?` data-reorder="${id}"`:''}>${list.map(a=>itemHtml(a,{withType,grid,wall})).join('')}</div>`}</section>`;
 }
 function categoryActions(id){return `<button class="icon-button" data-action="add-asset" data-id="${id}" aria-label="${tr('添加{name}',{name:esc(cats[id].name)})}" title="${tr('添加{name}',{name:esc(cats[id].name)})}">${ui('plus')}</button><button class="icon-button" data-action="view" data-id="${id}" aria-label="${tr('只看{name}',{name:esc(cats[id].name)})}" title="${tr('只看{name}',{name:esc(cats[id].name)})}">${ui('chevron')}</button>`;}
 function arranged(id,list){return arrangeAssets(list,state.cardOrder?.[id]);}
@@ -475,9 +480,10 @@ function boardHtml(v){
  const live=liveAssets();
  if(cats[v]){
   const list=arranged(v,live.filter(a=>a.type===v));
-  return {html:list.length?groupHtml({id:v,title:cats[v].name,list,reorder:true,head:false}):viewEmpty(`<span class="g-icon">${icon(v)}</span>`,tr('还没有{name}',{name:esc(cats[v].name)}),`<button class="button" data-action="add-asset" data-id="${v}">${ui('plus')}${tr('添加')}</button>`),count:list.length};
+  const band=v==='ai'&&typeof aiQuotaBandHtml==='function'?aiQuotaBandHtml(list):'';
+  return {html:list.length?band+groupHtml({id:v,title:cats[v].name,list,reorder:true,head:false}):viewEmpty(`<span class="g-icon">${icon(v)}</span>`,tr('还没有{name}',{name:esc(cats[v].name)}),`<button class="button" data-action="add-asset" data-id="${v}">${ui('plus')}${tr('添加')}</button>`),count:list.length};
  }
- const html=categoryIds().map(id=>{const list=arranged(id,live.filter(a=>a.type===id));if(!list.length)return '';const folded=!!state.blocks.find(b=>b.id===id)?.folded;return groupHtml({id,title:cats[id].name,glyph:typeGlyph(id),list,fold:true,folded,reorder:true,summary:groupSummary(list)+groupCostHtml(list),actions:categoryActions(id)});}).join('');
+ const html=shownLayout(v)==='wall'?live.length?wallBoardHtml(live):'':categoryIds().map(id=>{const list=arranged(id,live.filter(a=>a.type===id));if(!list.length)return '';const folded=!!state.blocks.find(b=>b.id===id)?.folded;return groupHtml({id,title:cats[id].name,glyph:typeGlyph(id),list,fold:true,folded,reorder:true,summary:groupSummary(list)+groupCostHtml(list),actions:categoryActions(id)});}).join('');
  return {html:html?overviewHtml(live)+html:viewEmpty(ui('stack'),tr('没有显示中的资产')),count:live.length};
 }
 let layoutFrame=0,renderedKey='',skipLayoutAnimation=false;
@@ -495,7 +501,7 @@ function render(){
  $('#board').hidden=welcome||!board.html;$('#welcome').hidden=!welcome;
  document.querySelectorAll('#welcome .native-only').forEach(el=>el.hidden=!nativeStore);
  $('#board').dataset.view=query?'search':cats[v]?'category':v;
- $('#board').innerHTML=board.html;
+ $('#board').innerHTML=board.html;packWall();
  $('#empty').hidden=welcome||!!board.html;
  $('#empty-title').textContent=tr('没有结果');$('#empty-note').hidden=true;$('#clear-search').textContent=tr('清除');
  syncToolbar();
@@ -916,7 +922,7 @@ function markTone(src){
 function refreshMarkTones(){document.querySelectorAll('.tile.custom-art img,.site-mark').forEach(img=>{const tone=markTones.get(img.getAttribute('src'));if(tone===undefined)return;const host=img.classList.contains('site-mark')?img:img.parentElement;host.classList.toggle('mark-dark',tone==='mark-dark');host.classList.toggle('mark-light',tone==='mark-light');});}
 function closeDetail(){$('#detail').hidden=true;activeAsset=null;markSelected();if(lastFocus?.isConnected)lastFocus.focus();}
 // Dialog widths by content: short confirmations narrow, lists wide, forms in between.
-const MODAL_SIZES={add:'l',asset:'xl',prefs:'l',confirm:'s',inbox:'l','import-preview':'l',agent:'l',network:'l',cost:'l'};
+const MODAL_SIZES={connect:'l',asset:'xl',prefs:'l',confirm:'s',inbox:'l','import-preview':'l',agent:'l',network:'l',cost:'l'};
 function modal(title,html,view=''){const dialog=$('#modal'),content=$('#modal-content'),scroll=dialog.open&&dialog.dataset.view===view?content.scrollTop:0;$('#modal-title').textContent=title;content.innerHTML=html;dialog.dataset.view=view;dialog.dataset.size=MODAL_SIZES[view]||'';if(!html.includes('id="asset-form"')&&!html.includes("id='asset-form'")&&!html.includes('id="dirty-save"'))assetFormSnapshot=null;if(nativeStore)content.querySelectorAll('.form-note').forEach(el=>{if(el.textContent.includes(tr('浏览器')))el.textContent=el.textContent.replaceAll(tr('当前浏览器'),tr('此 Mac')).replaceAll(tr('此浏览器'),tr('此 Mac'));});if(!dialog.open)dialog.showModal();content.scrollTop=scroll;
  // Opening puts focus on the close button, which draws a ring before anything was pressed; start in the body instead.
  if(document.activeElement===$('#close-modal')||!dialog.contains(document.activeElement))content.focus({preventScroll:true});
@@ -937,7 +943,7 @@ function agentToolHtml(tool,cli){
  const q=JSON.stringify(cli),json=JSON.stringify({mcpServers:{assetboard:{command:cli,args:['mcp']}}},null,2);
  let blocks=0;const block=(text,label)=>{const id=`agent-code-${tool}-${++blocks}`;return `<div class="agent-code"><pre id="${id}">${esc(text)}</pre><button type="button" class="button" data-action="agent-copy" data-id="${id}" aria-label="${tr('复制{what}',{what:label})}">${tr('复制')}</button></div>`;};
  const note=text=>`<p class="form-note">${text}</p>`;
- if(tool==='claude-code')return note(tr('在终端运行一次，之后在 Claude Code 里直接说“把 example.com 加到 Assetboard，3 月 1 日到期”。'))+block(`claude mcp add assetboard -- ${q} mcp`,tr('Claude Code 命令'));
+ if(tool==='claude-code')return note(tr('在终端运行一次，之后在 Claude Code 里直接说“把 example.com 加到 Assetboard，3 月 1 日到期”。'))+block(`claude mcp add --scope user assetboard -- ${q} mcp`,tr('Claude Code 命令'));
  if(tool==='claude-desktop')return note(tr('Claude Desktop：设置 → 开发者 → 编辑配置，把下面这段合并进 claude_desktop_config.json，然后重启 Claude。'))+block(json,tr('Claude Desktop 配置'));
  if(tool==='codex')return note(tr('ChatGPT 桌面版的 Codex、Codex CLI 和 IDE 插件共用一份配置。在终端运行：'))+block(`codex mcp add assetboard -- ${q} mcp`,tr('Codex 命令'))+note(tr('或者把这段加进 ~/.codex/config.toml：'))+block(`[mcp_servers.assetboard]\ncommand = ${q}\nargs = ["mcp"]`,tr('Codex 配置'))+note(tr('ChatGPT 的普通对话和网页版不能连接本机工具。'));
  if(tool==='cursor')return note(tr('把下面这段合并进 ~/.cursor/mcp.json（所有项目可用），保存后在 Cursor 设置的 MCP 页确认已连接。'))+block(json,tr('Cursor 配置'));
@@ -1024,8 +1030,8 @@ function importHub(){
    ${source('import-pick-file','file',tr('文件'),tr('选择文件'))}
    ${source('manual-import','plus',tr('手动'))}
    ${source('inbox','mail',tr('通知'),tr('粘贴续费通知'))}
-   ${native&&!proFree?source('registrar-import','cloud',tr('注册商'),tr('从 Namecheap、Porkbun 读取域名和到期日')):''}
-   ${native&&!proFree?source('cloud-import','server',tr('云平台'),tr('从 Hetzner、DigitalOcean、Vercel 读取服务器和部署')):''}
+   ${(native||demoMode)&&!proFree?source('registrar-import','cloud',tr('注册商'),tr('从 Namecheap、Porkbun 读取域名和到期日')):''}
+   ${(native||demoMode)&&!proFree?source('cloud-import','server',tr('云平台'),tr('从 Hetzner、DigitalOcean、Vercel 读取服务器和部署')):''}
    ${slotHtml('importSources',ctx)}
    ${native?source('ocr-import','image',tr('截图'),tr('选择截图或 PDF')):''}
    ${demoMode?`<button class="button primary" data-action="import-demo-sample">${tr('试用示例')}</button>`:''}
@@ -1372,7 +1378,7 @@ function agentAsset(a){
  const masked=Object.keys(rest).filter(key=>JSON.stringify(rest[key])!==JSON.stringify(a[key]));
  const relations=linkedAssets(state.assets,a).map(x=>{const k=linkKind(a,x),meta=k.kind==='mount'?(x.type==='server'?linkMetaOf(a,x.id):linkMetaOf(x,a.id)):null;return {...(agentSees(x)?{id:x.id,name:agentShown(x).name}:{withheld:true}),type:x.type,relation:k.kind,label:k.label,...(meta?.standby?{standby:true}:{}),...(meta?.proxied?{proxied:true}:{})};});
  const money=moneyOn(a,localDay()),change=priceChange(a),charges=pendingChargesAsked([a]);
- return {...rest,...agentRepository(a),typeName:cats[a.type]?.name||a.type,billingType:billingTypeOf(a),billingTypeSet:BILLING_TYPES.includes(a.billingType),...(money?{currentPrice:{amount:money.value,currency:money.currency,months:money.months,basis:money.basis}}:{}),...(change?{priceChange:change}:{}),...(charges.length?{unconfirmedCharges:charges.map(c=>c.due)}:{}),hidden:isHidden(a),hasCustomIcon:!!customIconSrc(a),hasSiteIcon:!!siteIconSrc(a),relations,...(risks.length?{risks:risks.map(agentRiskText)}:{}),...(masked.length?{masked}:{}),...(status?{iconStatus:status}:{})};
+ return {...rest,...agentRepository(a),typeName:cats[a.type]?.name||a.type,billingType:billingTypeOf(a),billingTypeSet:BILLING_TYPES.includes(a.billingType),...(money?{currentPrice:{amount:money.value,currency:money.currency,months:money.months,basis:money.basis}}:{}),...(change?{priceChange:change}:{}),...(charges.length?{unconfirmedCharges:charges.map(c=>c.due)}:{}),hidden:isHidden(a),hasCustomIcon:!!customIconSrc(a),hasSiteIcon:!!siteIconSrc(a),relations,...(risks.length?{risks:risks.map(agentRiskText)}:{}),...(masked.length?{masked}:{}),...(status?{iconStatus:status}:{}),...(a.type==='ai'&&typeof aiQuotaAgent==='function'?aiQuotaAgent(a):{})};
 }
 // linkTo / unlinkFrom: ids of records to link or unlink, under the same rules as the picker (legal pairs, one account per server).
 function agentLinkIds(input,key){
@@ -1451,6 +1457,8 @@ function agentFields(input,type,base=null){
   if(key==='projectId')continue;
   if(key==='visibility'){if(type!=='repository')return {error:tr('visibility 只用于代码仓库')};if(base&&PLATFORM_SOURCES.includes(base.source))return {error:tr('这个仓库从 GitHub 同步，可见性以 GitHub 为准')};const text=raw==null?'':String(raw).trim();if(text&&!REPO_VISIBILITY[text])return {error:tr('{key} 只能是 {values} 或留空',{key:'visibility',values:Object.keys(REPO_VISIBILITY).join(tr('、'))})};fields.event=REPO_VISIBILITY[text]||'';continue;}
   if(key==='billingType'){const text=raw==null?'':String(raw).trim();if(text&&!BILLING_TYPES.includes(text))return {error:tr('{key} 只能是 {values} 或留空',{key:'billingType',values:BILLING_TYPES.join(tr('、'))})};fields.billingType=text;continue;}
+  // AI 额度: which tool's usage an AI subscription shows (a vendor id), none for no usage, empty to match by vendor (ai-usage.js aiVendorOf).
+  if(key==='usageSource'){if(type!=='ai')return {error:tr('usageSource 只用于 AI 订阅')};const text=raw==null?'':String(raw).trim();if(text&&text!=='none'&&!Object.hasOwn(AI_USAGE_VENDORS,text))return {error:tr('{key} 只能是 {values} 或留空（按服务商自动对应）',{key:'usageSource',values:[...Object.keys(AI_USAGE_VENDORS),'none'].join(tr('、'))})};fields.usageSource=text;continue;}
   const value=raw===null||raw===undefined?'':typeof raw==='number'?String(raw):key==='ips'&&Array.isArray(raw)?raw.join(', '):raw;
   if(typeof value!=='string')return {error:tr('{key} 需要是文字',{key})};
   const text=value.trim();
@@ -1821,9 +1829,82 @@ document.addEventListener('submit',e=>{
  if(applied||failed)toast(failed?tr('已允许 {n} 项，{failed} 项没有成功',{n:formatCount(applied),failed:formatCount(failed)}):tr('已允许 {n} 项',{n:formatCount(applied)}));
  drainIntake();
 });
+// ---- MCP 操作记录 and the tools that are connected. Every call that reaches the board (MCP and the command line) is written down: which
+// tool (agentClientOf: what the MCP client says about itself, else the programs and environment it runs in), when, what it asked and,
+// for a write, each record it added, changed or removed with the fields before and after (assetChanges: cut short, images named,
+// anything that looks like a token or key replaced). The Mac app keeps the rows in its database, on this Mac only (AgentLog in
+// LocalDatabase.swift); the page holds the recent ones. hello (sent when an MCP client starts) only marks the tool as seen.
+const AGENT_READS=new Set(['types','list','get','totals','forecast','costHistory','projects','charges','actions','action','iconPlatforms','cloudflareStatus','syncBlocklist','activity','agents','connectPending','aiUsage','hello']);
+const AGENT_TOOL_NAMES={types:'list_asset_types',list:'list_assets',get:'get_asset',add:'add_assets',update:'update_asset',updateMany:'update_assets',delete:'delete_asset',deleteMany:'request_delete_assets',totals:'get_cost_totals',forecast:'get_cost_forecast',costHistory:'get_cost_history',projects:'list_projects',updateProject:'update_project',charges:'list_unconfirmed_charges',recordPayment:'record_payment',renew:'renew_asset',actions:'list_pending_actions',action:'get_action_status',iconPlatforms:'list_icon_platforms',iconSite:'set_icon_site',iconFetch:'fetch_icons',cloudflareStatus:'get_cloudflare_sync_status',cloudflareSync:'sync_cloudflare',syncBlocklist:'list_sync_blocklist',syncUnblock:'unblock_sync_item',activity:'list_agent_activity',agents:'list_agents',connectPending:'list_import_candidates',connectImport:'import_candidates',aiUsage:'list_ai_usage',aiUsageSet:'set_ai_usage_source'};
+const AGENT_LOG_KEEP=1000;
+let agentLogRows=Array.isArray(nativeStore?.agentLog)?nativeStore.agentLog.slice(0,AGENT_LOG_KEEP):demoMode&&typeof window.assetboardDemoAgentLog==='function'?window.assetboardDemoAgentLog():[];
+let agentSeen=Object.fromEntries((Array.isArray(nativeStore?.agentClients)?nativeStore.agentClients:demoMode&&typeof window.assetboardDemoAgentClients==='function'?window.assetboardDemoAgentClients():[]).filter(c=>c&&c.id).map(c=>[c.id,c]));
+let agentConfigs=Array.isArray(nativeStore?.agentConfigs)?nativeStore.agentConfigs:demoMode&&typeof window.assetboardDemoAgentConfigs==='function'?window.assetboardDemoAgentConfigs():[];
+// What a read asked for, in a few words; the arguments of writes show in their changes instead.
+function agentLogParams(method,params){
+ const keep=['type','query','id','project','status','currency','groupBy','from','to','source','client','kind','name','platform','key','vendor','local'],out={};
+ for(const key of keep)if(params&&params[key]!=null&&params[key]!==''&&typeof params[key]!=='object')out[key]=activityValue(params[key]);
+ for(const key of ['items','updates','ids'])if(Array.isArray(params?.[key]))out[key]=String(params[key].length);
+ return out;
+}
+function agentLogEntry(call,{ok,error,result,before}){
+ const method=String(call?.method||'').slice(0,40),client=agentClientOf(call?.client,call?.via==='cli'?'cli':'mcp'),read=AGENT_READS.has(method);
+ const at=new Date().toISOString(),params=call?.params&&typeof call.params==='object'?call.params:{};
+ let changes=[];
+ if(ok&&!read&&before)changes=assetChanges(before,state.assets);
+ if(ok&&(method==='delete'||method==='deleteMany')){const ids=method==='delete'?[params.id]:params.ids||[];changes=ids.map(id=>state.assets.find(a=>a.id===id)).filter(Boolean).slice(0,ACTIVITY_ASSET_LIMIT).map(a=>({op:'ask-delete',id:a.id,name:activityValue(a.name),type:a.type}));}
+ if(ok&&method==='get'&&result?.id)changes=[{op:'read',id:result.id,name:activityValue(result.name),type:result.type}];
+ const count=ok&&read&&result&&typeof result==='object'?(Number.isFinite(result.total)?result.total:Array.isArray(result)?result.length:null):null;
+ return {id:`${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`,at,client,via:call?.via==='cli'?'cli':'mcp',method,tool:AGENT_TOOL_NAMES[method]||method,kind:method==='hello'?'connect':read?'read':'write',ok:!!ok,
+  ...(error?{error:activityValue(error)}:{}),...(Object.keys(agentLogParams(method,params)).length?{params:agentLogParams(method,params)}:{}),...(count!=null?{count}:{}),...(changes.length?{changes}:{})};
+}
+function agentLogAdd(entry){
+ const seen=agentSeen[entry.client.id]||{id:entry.client.id,name:entry.client.name,first:entry.at,calls:0};
+ agentSeen[entry.client.id]={...seen,name:entry.client.name,last:entry.at,...(entry.kind==='connect'?{}:{calls:(seen.calls||0)+1}),...(entry.client.version?{version:entry.client.version}:{}),by:entry.client.by};
+ if(entry.kind!=='connect'){agentLogRows.unshift(entry);if(agentLogRows.length>AGENT_LOG_KEEP)agentLogRows.length=AGENT_LOG_KEEP;}
+ if(nativeStore&&!demoMode)try{window.webkit.messageHandlers.assetboard.postMessage({action:'agentLog',entry,client:agentSeen[entry.client.id]});}catch{}
+ if($('#modal')?.open&&$('#modal').dataset.view==='prefs'&&prefsSection==='mcp')prefsDialog();
+}
+window.assetboardAgentConfigs=list=>{agentConfigs=Array.isArray(list)?list:[];if($('#modal')?.open&&$('#modal').dataset.view==='prefs'&&prefsSection==='mcp')prefsDialog();};
+// The log as agents read it: masked and withheld like list_assets (a bank card or phone number record is left out unless allowed).
+function agentLogMasked(entry){
+ const changes=(entry.changes||[]).map(c=>{
+  if(!agentSees({type:c.type}))return {op:c.op,type:c.type,withheld:true};
+  if(featureOn('agentAddresses'))return c;
+  const masked=(c.fields||[]).map(f=>{const m=maskAsset({type:c.type,[f.field]:f.from},'agent'),n=maskAsset({type:c.type,[f.field]:f.to},'agent');return {...f,from:m[f.field],to:n[f.field]};});
+  return {...c,...(c.fields?{fields:masked}:{})};
+ });
+ return {...entry,...(entry.changes?{changes}:{})};
+}
+Object.assign(agentMethods,{
+ hello:()=>({ok:true}),
+ activity:({client='',since='',until='',kind='',assetId='',limit=50}={})=>{
+  if(kind&&!['read','write'].includes(kind))throw new Error(tr('{key} 只能是 {values} 或留空',{key:'kind',values:['read','write'].join(tr('、'))}));
+  const from=since?Date.parse(since):NaN,to=until?Date.parse(until):NaN;
+  if(since&&Number.isNaN(from)||until&&Number.isNaN(to))throw new Error(tr('since / until 需要是日期，例如 2026-11-01'));
+  const hits=agentLogRows.filter(r=>(!client||r.client.id===client||r.client.name.toLowerCase()===String(client).toLowerCase())&&(!kind||r.kind===kind)&&(!since||Date.parse(r.at)>=from)&&(!until||Date.parse(r.at)<=to+(until.length===10?86399999:0))&&(!assetId||(r.changes||[]).some(c=>c.id===assetId)));
+  const n=Math.min(Math.max(Number(limit)||50,1),500);
+  return {total:hits.length,entries:hits.slice(0,n).map(agentLogMasked),kept:AGENT_LOG_KEEP};
+ },
+ agents:()=>({configured:agentClientRows().filter(r=>r.config).map(r=>({id:r.id,name:r.name,configured:r.config.configured,file:r.config.path})),
+  seen:Object.values(agentSeen).sort((x,y)=>String(y.last).localeCompare(String(x.last))).map(c=>({id:c.id,name:c.name,lastUsed:c.last,firstSeen:c.first,calls:c.calls||0,identifiedBy:c.by||'none',...(c.version?{version:c.version}:{})}))}),
+ connectPending:({source=''}={})=>{
+  if(source&&!CONNECT_SOURCES().includes(source))throw new Error(tr('{key} 只能是 {values}',{key:'source',values:CONNECT_SOURCES().join(tr('、'))}));
+  return {sources:heldSources(state).filter(s=>!source||s.source===source).map(s=>({source:s.source,name:s.name,readAt:s.at,count:s.count,new:s.fresh,connected:connectConnected(s.source),
+   items:heldItems(state,s.source).filter(agentSees).map(a=>{const x=agentShown(a);return {id:a.id,name:x.name,type:a.type,typeName:cats[a.type]?.name||a.type,...(x.account?{account:x.account}:{}),...(a.date?{date:a.date}:{}),...(heldIsNew(state,s.source,a)?{new:true}:{})};})}))};
+ },
+ connectImport:({source,ids=null}={})=>{
+  if(!CONNECT_SOURCES().includes(source))throw new Error(tr('{key} 只能是 {values}',{key:'source',values:CONNECT_SOURCES().join(tr('、'))}));
+  if(ids!=null&&(!Array.isArray(ids)||ids.length>CONNECT_PENDING_LIMIT||ids.some(id=>typeof id!=='string')))throw new Error(tr('ids 需要是待引入项的 id 数组'));
+  const held=heldItems(state,source);if(!held.length)throw new Error(tr('{name} 没有待引入的资产',{name:connectName(source)}));
+  const unknown=(ids||[]).filter(id=>!held.some(a=>a.id===id));if(unknown.length)throw new Error(tr('不在待引入里：{ids}',{ids:unknown.slice(0,5).join(tr('、'))}));
+  const {added}=connectImport(source,ids);toast(tr('外部工具从 {name} 引入了 {n} 项',{name:connectName(source),n:formatCount(added)}),true);
+  return {added,left:heldItems(state,source).length,assets:state.assets.filter(a=>(ids||held.map(x=>x.id)).includes(a.id)).filter(agentSees).map(agentAsset)};
+ }
+});
 // Without Pro an external tool gets the read-only MCP tools; the command line, every write and Pro's own readings wait for a licence.
 // The app passes which client called (via: 'mcp' from the MCP server, otherwise the command line).
-const AGENT_PRO_METHODS=['add','update','updateMany','updateProject','delete','deleteMany','recordPayment','renew','forecast','costHistory'];
+const AGENT_PRO_METHODS=['add','update','updateMany','updateProject','delete','deleteMany','recordPayment','renew','forecast','costHistory','connectImport'];
 function agentProRefusal(call){
  if(!proOff)return '';
  if(call?.via!=='mcp')return tr('命令行在 Assetboard Pro 里；MCP 的查询工具免费');
@@ -1831,13 +1912,15 @@ function agentProRefusal(call){
  return '';
 }
 window.assetboardAgent=call=>{
- const send=body=>{if(nativeStore&&call?.requestId)window.webkit.messageHandlers.assetboard.postMessage({action:'agentReply',requestId:String(call.requestId),reply:JSON.stringify(body)});return body;};
+ const before=AGENT_READS.has(call?.method)?null:structuredClone(state.assets);let result;
+ const reply=body=>{if(nativeStore&&call?.requestId)window.webkit.messageHandlers.assetboard.postMessage({action:'agentReply',requestId:String(call.requestId),reply:JSON.stringify(body)});return body;};
+ const send=body=>{reply(body);if(!demoMode)try{agentLogAdd(agentLogEntry(call,{ok:body.ok,error:body.error,result,before}));}catch{}return body;};
  if(demoMode)return send({ok:false,error:tr('演示模式不接受外部调用')});
  if(!featureOn('agent'))return send({ok:false,error:tr('外部工具接入已在 Assetboard 的设置里关闭')});
  const refused=agentProRefusal(call);if(refused)return send({ok:false,error:refused});
  const handler=Object.hasOwn(agentMethods,call?.method)?agentMethods[call.method]:Object.hasOwn(proSlots.agentMethods,call?.method)?proSlots.agentMethods[call.method]:null;
  if(!handler)return send({ok:false,error:tr('未知方法 {method}，可用：{methods}',{method:String(call?.method).slice(0,40),methods:[...Object.keys(agentMethods),...Object.keys(proSlots.agentMethods)].join(tr('、'))})});
- try{return send({ok:true,result:handler(call.params&&typeof call.params==='object'&&!Array.isArray(call.params)?call.params:{})});}
+ try{result=handler(call.params&&typeof call.params==='object'&&!Array.isArray(call.params)?call.params:{});return send({ok:true,result});}
  catch(error){return send({ok:false,error:String(error?.message||error)});}
 };
 function importJsonText(text,{filename='',mode='merge'}={}){
@@ -2197,7 +2280,7 @@ function profileFields(type,v,cost=''){
  const server=type==='server'?[sshPickField(v),actions?`<div class="field-row action-fields">${actions}</div>`:'',slotHtml('serverFields',v)].join(''):actions?`<div class="field-row action-fields">${actions}</div>`:'';
  const visibility=type==='repository'&&!PLATFORM_SOURCES.includes(v.source)?`<div class="field"><span class="field-label">${tr('可见性')}</span>${chipGroup('repoState',[['',tr('未记')],...REPO_STATES],REPO_STATES.some(([key])=>key===v.event)?v.event:'',tr('可见性'))}</div>`:'';
  const plans=type==='ai'?`<div class="field-row"><button type="button" class="text-button inline-button" data-action="ai-plans">${tr('从常见 AI 套餐添加…')}</button></div>`:'';
- return provider+plans+visibility+(MONEY_FIRST.has(type)?cost:'')+region+phone+card+dates+(type==='domain'?rdapFormHtml(v):'')+(MONEY_FIRST.has(type)?'':cost)+account+server+keepFields(type,v)+wakeFields(type,v)+(p.note?`<span class="form-note form-warning">${p.note}</span>`:'');
+ return connectFormField(type,v)+provider+plans+visibility+(MONEY_FIRST.has(type)?cost:'')+region+phone+card+dates+(type==='domain'?rdapFormHtml(v):'')+(MONEY_FIRST.has(type)?'':cost)+account+server+keepFields(type,v)+wakeFields(type,v)+(p.note?`<span class="form-note form-warning">${p.note}</span>`:'');
 }
 // Adding a server the way a terminal user thinks: pick one of the hosts in ~/.ssh/config (the Mac app reads the file when the form
 // opens, `sshConfigHosts`) and the name, host, user and port are filled in; the alias is kept on the record (sshAlias) so SSH 直读
@@ -2232,43 +2315,44 @@ function autoSyncCloudflare(now=Date.now()){
  return true;
 }
 function cloudflareDialog(){
- if(!nativeStore){toast(tr('Cloudflare 仅 Mac App 可用'));return;}
- const connected=nativeStore.cloudflareConnected,last=lastCloudflareSync();
+ if(!hostStore){toast(tr('Cloudflare 仅 Mac App 可用'));return;}
+ const connected=hostStore.cloudflareConnected,last=lastCloudflareSync();
  const tokenUrl=cloudflareTokenTemplateUrl({name:'Assetboard'});
- const status=connected?tr('已连接'):nativeStore.cloudflareChecking?tr('检查钥匙串…'):nativeStore.keychainUnavailable?tr('钥匙串没有响应，可重新输入令牌'):tr('未连接');
+ const status=connected?tr('已连接'):hostStore.cloudflareChecking?tr('检查钥匙串…'):hostStore.keychainUnavailable?tr('钥匙串没有响应，可重新输入令牌'):tr('未连接');
  modal('Cloudflare',`<div class="form"><div class="platform-bar"><span id="cloudflare-status" class="chip ${connected?'ok':''}">${status}</span><button class="button" data-action="setup-cloudflare" data-url="${esc(tokenUrl)}" title="${tr('打开预填只读权限的建令牌页：Zone、Account Settings、Pages、Workers Scripts、R2 Read；含 Registrar 读权限时还会读域名到期日')}">${tr('建令牌 ↗')}</button></div><label>${connected?tr('更换令牌'):tr('令牌')}<input id="cloudflare-token" type="password" autocomplete="off" spellcheck="false" placeholder="${connected?tr('留空使用已保存的令牌'):tr('粘贴只读令牌')}"></label><div class="confirm-actions"><button id="cloudflare-sync" class="button primary">${connected?tr('重新同步'):tr('验证并同步')}</button>${connected?`<button id="cloudflare-disconnect" class="button" title="${tr('删除本机保存的令牌；Cloudflare 后台的令牌需自行撤销，已同步资产保留')}">${tr('断开')}</button>`:''}</div>${connected?`<p class="form-note cloudflare-last">${last?tr('上次同步 {when}。',{when:esc(new Date(last).toLocaleString(trLocale()))}):''}${proOff?tr('新增的域名和资源点「重新同步」读入。'):tr('新增的域名和资源点「重新同步」读入；App 开着时每 12 小时自动同步。')}</p>`:''}<p class="form-note platform-note">${ui('lock')}${tr('只读；令牌存入 macOS 钥匙串')}</p>${connected?proHint(tr('每 12 小时自动同步在 Pro 里。')):''}</div>`);
  if(cloudflareAuto){$('#cloudflare-sync').disabled=true;$('#cloudflare-status').textContent=tr('正在自动同步…');}
- $('#cloudflare-sync').onclick=()=>{const token=$('#cloudflare-token').value;$('#cloudflare-token').value='';$('#cloudflare-sync').disabled=true;$('#cloudflare-status').textContent=tr('验证中…');window.webkit.messageHandlers.assetboard.postMessage({action:'cloudflareSync',token});};
- if(connected)$('#cloudflare-disconnect').onclick=()=>window.webkit.messageHandlers.assetboard.postMessage({action:'cloudflareDisconnect'});
+ $('#cloudflare-sync').onclick=()=>{const token=$('#cloudflare-token').value;$('#cloudflare-token').value='';$('#cloudflare-sync').disabled=true;$('#cloudflare-status').textContent=tr('验证中…');connectPost({action:'cloudflareSync',token});};
+ if(connected)$('#cloudflare-disconnect').onclick=()=>connectPost({action:'cloudflareDisconnect'});
 }
 window.assetboardCloudflareResult=result=>{
  // An automatic sync answers quietly, unless the Cloudflare dialog was opened while it ran: then it is that dialog's answer.
- const auto=cloudflareAuto&&!$('#cloudflare-sync');cloudflareAuto=false;
+ const auto=cloudflareAuto&&!($('#modal').open&&$('#cloudflare-sync'));cloudflareAuto=false;
  if(auto){
   if(!result.ok||result.disconnected){if(!result.ok){cloudflareAutoError=String(result.error||tr('没有回应')).slice(0,120);render();}return;}
   cloudflareAutoError='';
-  const merge=mergeCloudflare(state,result);if(merge.added)checkpoint();state=merge.board;save();render();
-  if(merge.collisions.length)notice(tr('Cloudflare 自动同步：新增 {added}，{n} 项与本地记录同名，可在「文件 → 同步 Cloudflare…」重新同步后确认',{added:merge.added,n:merge.collisions.length}));
-  else if(merge.added)toast(tr('Cloudflare 自动同步：新增 {added}',{added:merge.added}),true);
+  // New zones and Registrar domains wait in 待引入 (one quiet line); the records already on the board are brought up to date.
+  const before=heldItems(state,'cloudflare').length,merge=mergeCloudflare(state,result),held=connectHold('cloudflare',merge),fresh=held.filter(a=>heldIsNew(state,'cloudflare',a)).length;save();render();
+  if(merge.collisions.length)notice(tr('Cloudflare 自动同步：{n} 项与本地记录同名，可在「文件 → 同步 Cloudflare…」重新同步后确认',{n:merge.collisions.length}));
+  else if(held.length>before||fresh&&held.length)toast(tr('Cloudflare 有 {n} 项新资产待引入',{n:fresh||held.length-before}),false,false,{action:'connect-pending',id:'cloudflare',label:tr('查看')});
   return;
  }
  if(!result.ok){const status=$('#cloudflare-status');if(status)status.textContent=result.error||tr('同步失败');status.classList.add('bad');const button=$('#cloudflare-sync');if(button)button.disabled=false;return;}
- if(result.disconnected){nativeStore.cloudflareConnected=false;cloudflareDialog();toast(tr('已删除令牌'));return;}
- checkpoint();const merge=mergeCloudflare(state,result);state=merge.board;cloudflareAutoError='';
- nativeStore.cloudflareConnected=true;save();render();$('#modal').close();toast(tr('Cloudflare：读 {read}，新增 {added}',{read:merge.read,added:merge.added}),true);
- syncFollowUp('Cloudflare',merge,result.warnings||[]);
+ if(result.disconnected){hostStore.cloudflareConnected=false;state=dropHeld(state,'cloudflare');save();render();cloudflareDialog();toast(tr('已删除令牌'));return;}
+ checkpoint();const merge=mergeCloudflare(state,result);connectHold('cloudflare',merge);cloudflareAutoError='';
+ hostStore.cloudflareConnected=true;save();render();$('#modal').close();
+ connectPicked('cloudflare',merge.read,()=>syncFollowUp('Cloudflare',merge,result.warnings||[]));
 };
 function githubDialog(){
- if(!nativeStore){toast(tr('GitHub 仅 Mac App 可用'));return;}
- const connected=nativeStore.githubConnected;
+ if(!hostStore){toast(tr('GitHub 仅 Mac App 可用'));return;}
+ const connected=hostStore.githubConnected;
  const cli=window.__localCli||{};
  const accounts=cli.ghAccounts||[];
  const tags=accounts.map(n=>`<span class="account-tag">${esc(n)}</span>`).join('');
  const status=connected?tr('已连接'):cli.gh===false?tr('未检测到 gh'):tr('未连接');
  modal('GitHub',`<div class="form"><div class="platform-bar"><span id="github-status" class="chip ${connected?'ok':''}">${status}</span><button class="button" data-action="setup-github-token" title="${featureOn('repoDetails')?tr('打开 GitHub 细粒度令牌页：Metadata、Contents、Actions → Read'):tr('打开 GitHub 细粒度令牌页：Metadata → Read')}">${tr('建令牌 ↗')}</button></div><button id="github-local-sync" class="button primary" data-action="github-local-sync" title="${tr('只调用 gh 命令，不读它的凭据文件；多个账号的仓库显示在同一区块')}">${ui('github')}${tr('用本机 gh')}${tags}</button><label>${connected?tr('更换令牌'):tr('或填写令牌')}<input id="github-token" type="password" autocomplete="off" spellcheck="false" placeholder="${connected?tr('留空使用已保存的令牌'):tr('粘贴只读令牌')}"></label><div class="confirm-actions"><button id="github-sync" class="button">${connected?tr('用已保存的令牌同步'):tr('验证并同步')}</button>${connected?`<button id="github-disconnect" class="button" title="${tr('删除 Assetboard 保存的令牌，已同步资产保留')}">${tr('断开')}</button>`:''}</div><p class="form-note platform-note">${ui('lock')}${tr('只读；令牌存入 macOS 钥匙串')}</p></div>`);
  if(!cli.gh&&cli.gh!==false)requestLocalCliDetect();
- $('#github-sync').onclick=()=>{const token=$('#github-token').value;$('#github-token').value='';$('#github-sync').disabled=true;$('#github-status').textContent=tr('验证中…');window.webkit.messageHandlers.assetboard.postMessage({action:'githubSync',token,details:featureOn('repoDetails')});};
- if(connected)$('#github-disconnect').onclick=()=>window.webkit.messageHandlers.assetboard.postMessage({action:'githubDisconnect'});
+ $('#github-sync').onclick=()=>{const token=$('#github-token').value;$('#github-token').value='';$('#github-sync').disabled=true;$('#github-status').textContent=tr('验证中…');connectPost({action:'githubSync',token,details:featureOn('repoDetails')});};
+ if(connected)$('#github-disconnect').onclick=()=>connectPost({action:'githubDisconnect'});
 }
 window.assetboardGitHubResult=result=>{
  if(!result.ok){
@@ -2282,12 +2366,10 @@ window.assetboardGitHubResult=result=>{
   }
   return;
  }
- if(result.disconnected){nativeStore.githubConnected=false;githubDialog();toast(tr('已删除令牌'));return;}
- checkpoint();const merge=mergeGitHub(state,result);state=merge.board;
- nativeStore.githubConnected=!!result.connected||nativeStore.githubConnected;save();render();$('#modal').close();
- const who=(result.accounts||[]).length?` ${result.accounts.join(tr('、'))}`:'';
- toast(`GitHub${who}`+tr('：读 {read}，新增 {added}',{read:merge.read,added:merge.added}),true);
- syncFollowUp('GitHub',merge,result.warnings||[]);
+ if(result.disconnected){hostStore.githubConnected=false;state=dropHeld(state,'github');save();render();githubDialog();toast(tr('已删除令牌'));return;}
+ checkpoint();const merge=mergeGitHub(state,result);connectHold('github',merge);
+ hostStore.githubConnected=!!result.connected||hostStore.githubConnected;save();render();$('#modal').close();
+ connectPicked('github',merge.read,()=>syncFollowUp('GitHub',merge,result.warnings||[]));
 };
 let pendingCollisions=[];
 function syncFollowUp(source,merge,warnings){
@@ -2300,13 +2382,12 @@ function syncFollowUp(source,merge,warnings){
 // them (GET only, recorded in 网络记录), keeps them in the Keychain when the read worked and answers with the domains, which
 // mergeRegistrar puts on the board like a Cloudflare sync (collisions asked in syncFollowUp). 重新同步 reads again with the kept ones.
 let registrarPick='namecheap';
-function registrarConnected(source){return !!nativeStore?.registrars?.[source];}
+function registrarConnected(source){return !!hostStore?.registrars?.[source];}
 function lastRegistrarSync(source){return Math.max(0,...state.assets.filter(a=>a.source===source).map(a=>Date.parse(a.syncedAt)||0));}
 const REGISTRAR_NOTES={namecheap:()=>tr('Namecheap 只接受白名单 IP 发来的请求：在 Namecheap 的 Profile › Tools › API Access 打开 API，把这台 Mac 上网用的公网 IPv4 加进 Whitelisted IPs，再把同一个地址填在这里。换了网络（IP 变了）要重新加。它的 API Key 能管理整个账号（包括购买和改 DNS），Assetboard 只调用读取域名列表的接口。'),
  porkbun:()=>tr('在 Porkbun 的 Account › API Access 建一对 key，权限只勾 Read 即可。Assetboard 只调用读取域名列表的接口。')};
 function registrarDialog(source=registrarPick){
- if(!nativeStore){toast(tr('从注册商导入只在 Mac App 里可用'));return;}
- if(demoMode){toast(tr('演示模式下不可用'));return;}
+ if(!hostStore){toast(tr('从注册商导入只在 Mac App 里可用'));return;}
  registrarPick=Object.hasOwn(REGISTRARS,source)?source:'namecheap';
  const key=registrarPick,r=REGISTRARS[key],connected=registrarConnected(key),last=lastRegistrarSync(key);
  const picks=Object.entries(REGISTRARS).map(([id,v])=>`<button type="button" class="choice" role="radio" aria-checked="${id===key}" data-action="registrar-pick" data-id="${id}">${esc(v.name)}</button>`).join('');
@@ -2317,9 +2398,9 @@ function registrarDialog(source=registrarPick){
   const problem=typed||!connected?registrarCredentialProblem(key,values):'';
   if(problem){status.textContent=problem;status.classList.add('bad');status.classList.remove('ok');return;}
   inputs.forEach(i=>{i.value='';});$('#registrar-sync').disabled=true;status.classList.remove('bad');status.textContent=tr('验证中…');
-  window.webkit.messageHandlers.assetboard.postMessage({action:'registrarSync',source:key,credentials:typed?values:null});
+  connectPost({action:'registrarSync',source:key,credentials:typed?values:null});
  };
- if(connected)$('#registrar-disconnect').onclick=()=>window.webkit.messageHandlers.assetboard.postMessage({action:'registrarDisconnect',source:key});
+ if(connected)$('#registrar-disconnect').onclick=()=>connectPost({action:'registrarDisconnect',source:key});
 }
 window.assetboardRegistrarResult=result=>{
  const source=result?.source;if(!Object.hasOwn(REGISTRARS,source))return;
@@ -2329,24 +2410,22 @@ window.assetboardRegistrarResult=result=>{
   if(status){status.textContent=error;status.classList.add('bad');status.classList.remove('ok');const button=$('#registrar-sync');if(button)button.disabled=false;}else notice(`${name}${tr('：')}${error}`);
   return;
  }
- nativeStore.registrars={...nativeStore.registrars||{},[source]:!result.disconnected};
- if(result.disconnected){if(open)registrarDialog(source);toast(tr('已删除凭据'));return;}
- checkpoint();const merge=mergeRegistrar(state,result);state=merge.board;save();render();if(open)$('#modal').close();
- toast(name+tr('：读 {read}，新增 {added}',{read:merge.read,added:merge.added}),true);
- syncFollowUp(name,merge,[...(result.warnings||[]).map(String),...(merge.skipped?[tr('{n} 项不是有效的域名，没有读入',{n:merge.skipped})]:[])]);
+ hostStore.registrars={...hostStore.registrars||{},[source]:!result.disconnected};
+ if(result.disconnected){state=dropHeld(state,source);save();render();if(open)registrarDialog(source);toast(tr('已删除凭据'));return;}
+ checkpoint();const merge=mergeRegistrar(state,result);connectHold(source,merge);save();render();if(open)$('#modal').close();
+ connectPicked(source,merge.read,()=>syncFollowUp(name,merge,[...(result.warnings||[]).map(String),...(merge.skipped?[tr('{n} 项不是有效的域名，没有读入',{n:merge.skipped})]:[])]));
 };
 // ---- 从云平台导入 (Hetzner, DigitalOcean, Vercel; Mac app, read-only). The same shape as 从注册商导入: the person pastes a token once,
 // Swift lists the servers, deployments, databases and domains with it (GET only, recorded in 网络记录), keeps it in the Keychain
 // when the read worked and answers with the resources, which mergeCloudImport puts on the board. Vercel has no read-only token, so
 // a new one is kept only after the person ticks that they know what it can do.
 let cloudPick='hetzner';
-function cloudConnected(source){return !!nativeStore?.cloudImports?.[source];}
+function cloudConnected(source){return !!hostStore?.cloudImports?.[source];}
 const CLOUD_NOTES={hetzner:()=>tr('在 Hetzner Console 打开项目，Security › API tokens 里建一个权限为 Read 的令牌。一个令牌只管一个项目；项目名可不填，填了会记在“账号”里。Assetboard 只读取服务器列表。'),
  digitalocean:()=>tr('在 DigitalOcean 的 API › Tokens 建一个 Custom Scopes 令牌，只勾 droplet、app、database 和 account 的 read。没勾的类别会跳过。Assetboard 只读取 Droplet、App 和数据库的列表。'),
  vercel:()=>tr('Vercel 的令牌没有只读的，能改动它所属的整个账号或团队（包括删除项目和改域名）。Assetboard 只读取项目和域名列表。建令牌时选要读的团队，并设到期时间；只读入在 Vercel 注册的域名，只是指向 Vercel 的请从注册商导入。')};
 function cloudDialog(source=cloudPick){
- if(!nativeStore){toast(tr('从云平台导入只在 Mac App 里可用'));return;}
- if(demoMode){toast(tr('演示模式下不可用'));return;}
+ if(!hostStore){toast(tr('从云平台导入只在 Mac App 里可用'));return;}
  cloudPick=Object.hasOwn(CLOUD_IMPORTS,source)?source:'hetzner';
  const key=cloudPick,c=CLOUD_IMPORTS[key],connected=cloudConnected(key),last=lastRegistrarSync(key);
  const picks=Object.entries(CLOUD_IMPORTS).map(([id,v])=>`<button type="button" class="choice" role="radio" aria-checked="${id===key}" data-action="cloud-pick" data-id="${id}">${esc(v.name)}</button>`).join('');
@@ -2358,9 +2437,9 @@ function cloudDialog(source=cloudPick){
   const problem=typed||!connected?cloudCredentialProblem(key,values)||(c.wide&&!$('#cloud-wide').checked?tr('请先勾选：这个令牌权限大'):''):'';
   if(problem){status.textContent=problem;status.classList.add('bad');status.classList.remove('ok');return;}
   inputs.forEach(i=>{i.value='';});$('#cloud-sync').disabled=true;status.classList.remove('bad');status.textContent=tr('验证中…');
-  window.webkit.messageHandlers.assetboard.postMessage({action:'cloudImportSync',source:key,credentials:typed?values:null});
+  connectPost({action:'cloudImportSync',source:key,credentials:typed?values:null});
  };
- if(connected)$('#cloud-disconnect').onclick=()=>window.webkit.messageHandlers.assetboard.postMessage({action:'cloudImportDisconnect',source:key});
+ if(connected)$('#cloud-disconnect').onclick=()=>connectPost({action:'cloudImportDisconnect',source:key});
 }
 window.assetboardCloudImportResult=result=>{
  const source=result?.source;if(!Object.hasOwn(CLOUD_IMPORTS,source||''))return;
@@ -2370,12 +2449,128 @@ window.assetboardCloudImportResult=result=>{
   if(status){status.textContent=error;status.classList.add('bad');status.classList.remove('ok');const button=$('#cloud-sync');if(button)button.disabled=false;}else notice(`${name}${tr('：')}${error}`);
   return;
  }
- nativeStore.cloudImports={...nativeStore.cloudImports||{},[source]:!result.disconnected};
- if(result.disconnected){if(open)cloudDialog(source);toast(tr('已删除令牌'));return;}
- checkpoint();const merge=mergeCloudImport(state,result);state=merge.board;save();render();if(open)$('#modal').close();
- toast(name+tr('：读 {read}，新增 {added}',{read:merge.read,added:merge.added}),true);
- syncFollowUp(name,merge,[...(result.warnings||[]).map(String).slice(0,10),...(merge.skipped?[tr('{n} 项读不懂，没有读入',{n:merge.skipped})]:[])]);
+ hostStore.cloudImports={...hostStore.cloudImports||{},[source]:!result.disconnected};
+ if(result.disconnected){state=dropHeld(state,source);save();render();if(open)cloudDialog(source);toast(tr('已删除令牌'));return;}
+ checkpoint();const merge=mergeCloudImport(state,result);connectHold(source,merge);save();render();if(open)$('#modal').close();
+ connectPicked(source,merge.read,()=>syncFollowUp(name,merge,[...(result.warnings||[]).map(String).slice(0,10),...(merge.skipped?[tr('{n} 项读不懂，没有读入',{n:merge.skipped})]:[])]));
 };
+// ---- Connect, then pick. Right after a platform answers, the records it would add are listed to pick from (all ticked; what the board
+// already holds from it is listed as 已引入), so connecting is one step to a filled board and nothing arrives unasked. What is not
+// picked waits in board.connectPending (asset-data.js): the sidebar's 待引入, the 设置 › 连接 row and the add form offer it until it is
+// picked or turned down. On the demo board demo-data.js answers in place of the platforms, so the whole path can be tried.
+function connectPost(message){
+ if(!demoMode){window.webkit.messageHandlers.assetboard.postMessage(message);return;}
+ const reply=typeof window.assetboardDemoConnect==='function'?window.assetboardDemoConnect(message,state):{ok:false,error:tr('演示模式下不可用')};
+ const answer={cloudflareSync:'assetboardCloudflareResult',cloudflareDisconnect:'assetboardCloudflareResult',githubSync:'assetboardGitHubResult',githubSyncLocal:'assetboardGitHubResult',githubDisconnect:'assetboardGitHubResult',registrarSync:'assetboardRegistrarResult',registrarDisconnect:'assetboardRegistrarResult',cloudImportSync:'assetboardCloudImportResult',cloudImportDisconnect:'assetboardCloudImportResult'}[message.action];
+ if(answer)setTimeout(()=>window[answer]?.(reply),350);
+}
+function connectName(source){return SYNC_SOURCE_NAMES[source]||source;}
+// GitHub through the local gh keeps no token here: it counts as connected once its repositories are on the board.
+function connectConnected(source){return source==='cloudflare'?!!hostStore?.cloudflareConnected:source==='github'?!!hostStore?.githubConnected||connectedOnBoard(state,'github').length>0:Object.hasOwn(REGISTRARS,source)?registrarConnected(source):cloudConnected(source);}
+// Applies a merge with its new records held back; returns the held list.
+function connectHold(source,merge){const {board,held}=holdNewAssets(state,merge.board,source);state=board;return held;}
+// After a read the person started: the pick list when something is new, otherwise a short answer; then what the read left to ask.
+function connectPicked(source,read,then){
+ if(heldItems(state,source).length){connectDialog(source,{then});return;}
+ toast(read?tr('{name}：读到 {n} 项，都已在大板里',{name:connectName(source),n:formatCount(read)}):tr('{name}：没有读到资产',{name:connectName(source)}));then?.();
+}
+let connectThen=null,connectFilter='';
+// The candidates of one source, ticked; held items first (by category), then 已引入 folded.
+function connectRowFacts(a){
+ const when=a.date?`${a.date} ${tr(dateKinds[a.dateKind]?.future||dateKinds.expire.future)}`:'',cost=costText(a),ip=a.type==='server'?primaryIp(a)?.ip:'';
+ const text=[when,cost,ip&&veil(ip)].filter(Boolean).join(' · ');return text?`<span class="import-facts">${esc(text)}</span>`:'';
+}
+function connectDialog(source,{then}={}){
+ const sources=heldSources(state);
+ if(!source||!heldItems(state,source).length&&!then)source=sources[0]?.source||source;
+ if(then!==undefined)connectThen=then;
+ if(!source){toast(tr('没有待引入的资产'));return;}
+ const items=heldItems(state,source),done=connectedOnBoard(state,source),name=connectName(source),at=state.connectPending?.[source]?.at;
+ const tabs=sources.length>1||sources.length&&!sources.some(s=>s.source===source)?`<div class="chip-group connect-tabs" role="radiogroup" aria-label="${tr('平台')}">${sources.map(s=>`<button type="button" class="choice" role="radio" aria-checked="${s.source===source}" data-action="connect-pending" data-id="${s.source}">${esc(s.name)} <span class="net-count">${formatCount(s.count)}</span></button>`).join('')}</div>`:'';
+ const needle=connectFilter.trim().toLowerCase(),shown=a=>!needle||`${a.name} ${a.account||''}`.toLowerCase().includes(needle);
+ const row=a=>`<label class="check-label import-row connect-row"${shown(a)?'':' hidden'}><input type="checkbox" name="connect-take" value="${esc(a.id)}" checked><strong>${esc(veil(a.name))}</strong>${heldIsNew(state,source,a)?`<span class="chip ok">${tr('新')}</span>`:''}${connectRowFacts(a)}${a.account?`<span class="account-tag">${esc(veil(a.account))}</span>`:''}</label>`;
+ const types=[...new Set(items.map(a=>a.type))];
+ const groups=types.map(type=>{const list=items.filter(a=>a.type===type);return `<section class="import-group add"><h3><i class="dot" aria-hidden="true"></i>${esc(cats[type]?.name||type)}<b class="count">${formatCount(list.length)}</b></h3><div class="import-rows">${list.map(row).join('')}</div></section>`;}).join('');
+ const doneHtml=done.length?`<details class="connect-done"${done.length<=6&&items.length<=6?' open':''}><summary>${tr('已引入')} · ${formatCount(done.length)}</summary><div class="import-rows">${done.slice(0,200).map(a=>`<div class="import-row connect-row done"><span class="connect-check" aria-hidden="true">${ui('check')}</span><strong>${esc(veil(a.name))}</strong><span class="chip">${tr('已引入')}</span></div>`).join('')}${done.length>200?`<p class="form-note">${tr('另外 {n} 项',{n:formatCount(done.length-200)})}</p>`:''}</div></details>`:'';
+ const refresh=(nativeStore&&!demoMode||demoMode)?`<button type="button" class="icon-button" data-action="connect-refresh" data-id="${source}" title="${tr('重新读取 {name}',{name})}" aria-label="${tr('重新读取 {name}',{name})}">${ui('refresh')}</button>`:'';
+ const summary=items.length?tr('{name} 上有 {n} 项还没在大板里',{name,n:formatCount(items.length)}):tr('{name} 上的资产都已在大板里',{name});
+ modal(tr('从 {name} 引入',{name}),`<div class="form connect-pick" id="connect-pick" data-source="${source}">
+  ${tabs}
+  <div class="connect-summary"><span>${esc(summary)}${at?` <span class="connect-at" title="${esc(new Date(at).toLocaleString(trLocale()))}">· ${esc(tr('读取于 {when}',{when:networkDay(at)}))}</span>`:''}</span>${refresh}</div>
+  ${items.length>12?`<input type="search" id="connect-filter" class="connect-filter" placeholder="${tr('筛选名称或账号')}" aria-label="${tr('筛选名称或账号')}" value="${esc(connectFilter)}">`:''}
+  ${items.length>1?`<label class="check-label connect-all"><input type="checkbox" id="connect-all" checked>${tr('全选')}</label>`:''}
+  <div class="connect-list">${groups}</div>
+  ${doneHtml}
+  <div class="confirm-actions">${items.length?`<button type="button" class="button primary" data-action="connect-import" data-id="${source}">${tr('引入 {n} 项',{n:formatCount(items.length)})}</button><button type="button" class="button" data-action="connect-later">${tr('稍后')}</button><button type="button" class="text-button connect-ignore" data-action="connect-ignore" data-id="${source}" hidden>${tr('没勾的不再提醒')}</button>`:`<button type="button" class="button primary" data-action="connect-later">${tr('完成')}</button>`}</div>
+ </div>`,'connect');
+ connectCountRefresh();
+}
+function connectTaken(){return [...document.querySelectorAll('#connect-pick input[name="connect-take"]')];}
+function connectCountRefresh(){
+ const boxes=connectTaken(),on=boxes.filter(b=>b.checked).length,go=$('#connect-pick [data-action="connect-import"]');
+ if(go){go.textContent=tr('引入 {n} 项',{n:formatCount(on)});go.disabled=!on;}
+ const all=$('#connect-all');if(all){all.checked=on===boxes.length;all.indeterminate=on>0&&on<boxes.length;}
+ const ignore=$('#connect-pick .connect-ignore');if(ignore)ignore.hidden=on===boxes.length;
+}
+document.addEventListener('change',e=>{
+ if(e.target.id==='connect-all'){const shown=connectTaken().filter(b=>!b.closest('label').hidden);for(const b of shown)b.checked=e.target.checked;connectCountRefresh();}
+ else if(e.target.name==='connect-take')connectCountRefresh();
+});
+document.addEventListener('input',e=>{
+ if(e.target.id!=='connect-filter')return;connectFilter=e.target.value;const needle=connectFilter.trim().toLowerCase();
+ for(const label of document.querySelectorAll('#connect-pick .connect-list .connect-row'))label.hidden=!!needle&&!label.textContent.toLowerCase().includes(needle);
+});
+// After the pick list closes (picked, later or turned down): what the read itself left to ask (same-name records, unread kinds).
+function connectAfter(){const then=connectThen;connectThen=null;connectFilter='';then?.();}
+function connectImport(source,ids){
+ const before=state.assets.length;checkpoint();const {board,added}=importHeld(state,source,ids);state=board;save();render();
+ return {added:added.length,ok:state.assets.length>before};
+}
+function connectImportPicked(source){
+ const ids=connectTaken().filter(b=>b.checked).map(b=>b.value);if(!ids.length)return;
+ const {added}=connectImport(source,ids),left=heldItems(state,source).length;$('#modal').close();
+ toast(left?tr('已引入 {n} 项，{left} 项留在待引入',{n:formatCount(added),left:formatCount(left)}):tr('已引入 {n} 项',{n:formatCount(added)}),true);
+ connectAfter();
+}
+function connectIgnore(source){
+ const ids=connectTaken().filter(b=>!b.checked).map(b=>b.value);if(!ids.length)return;
+ checkpoint();state=ignoreHeld(state,source,ids);save();render();
+ if(heldItems(state,source).length)connectDialog(source);else{$('#modal').close();connectAfter();}
+ toast(tr('{n} 项不再提醒，之后的读取也会跳过',{n:formatCount(ids.length)}),true);
+}
+// 重新读取: the source's own dialog reads again with what it keeps (token, gh or the saved credentials); its answer opens this list.
+function connectRefresh(source){
+ const open={cloudflare:()=>cloudflareDialog(),github:()=>githubDialog()}[source]||(Object.hasOwn(REGISTRARS,source)?()=>registrarDialog(source):()=>cloudDialog(source));
+ open();const button=source==='cloudflare'?$('#cloudflare-sync'):source==='github'?(hostStore?.githubConnected?$('#github-sync'):$('#github-local-sync')):source in REGISTRARS?$('#registrar-sync'):$('#cloud-sync');
+ if(button&&connectConnected(source))button.click();
+}
+// The sidebar's 待引入: calm (a count, no colour), only while something waits.
+function connectNavItem(rail){
+ const n=heldCount(state);if(!n)return '';
+ const label=tr('待引入');
+ return `<button class="nav-item" data-action="connect-pending" data-id="" ${rail?`data-tip="${label} · ${n}" `:''}aria-label="${label}${tr('，')}${tr('{n} 项',{n})}" title="${esc(heldSources(state).map(s=>`${s.name} ${s.count}`).join(' · '))}">${ui('download')}<span class="nav-label">${label}</span>${navCount(n)}</button>`;
+}
+// The platforms that can fill a category, for the add form: the held records of that category to pick from, else a way to read one.
+const CONNECT_TYPES={domain:['cloudflare','namecheap','porkbun','vercel'],repository:['github'],server:['hetzner','digitalocean'],deployment:['cloudflare','vercel','digitalocean'],database:['digitalocean'],storage:['cloudflare']};
+function connectFormField(type,v){
+ if(v.id||!CONNECT_TYPES[type]||!hostStore)return '';
+ const sources=proFree?[]:CONNECT_TYPES[type],held=sources.flatMap(src=>heldItems(state,src).filter(a=>a.type===type).map(a=>({src,a})));
+ if(held.length){
+  const groups=sources.filter(src=>held.some(h=>h.src===src)).map(src=>`<optgroup label="${esc(connectName(src))}">${held.filter(h=>h.src===src).map(({a})=>`<option value="${esc(src)}|${esc(a.id)}">${esc(veil(a.name))}${a.account?` · ${esc(veil(a.account))}`:''}</option>`).join('')}</optgroup>`).join('');
+  return `<div class="field connect-form"><label>${tr('从已连接的平台引入')}<select name="connectPick" aria-describedby="connect-form-note"><option value="">${tr('不选，手动填')}</option>${groups}</select></label><span id="connect-form-note" class="form-note">${tr('选一项就直接引入，名称、日期和链接都由平台给')}</span></div>`;
+ }
+ const connected=sources.filter(connectConnected);
+ if(connected.length)return `<div class="field connect-form"><button type="button" class="text-button inline-button" data-action="connect-refresh" data-id="${connected[0]}">${tr('从 {name} 重新读取…',{name:connectName(connected[0])})}</button></div>`;
+ const first=sources[0];
+ return first?`<div class="field connect-form"><button type="button" class="text-button inline-button" data-action="connect-source" data-id="${first}">${tr('连接 {name}，拉取列表来选…',{name:connectName(first)})}</button></div>`:'';
+}
+document.addEventListener('change',e=>{
+ const sel=e.target.closest?.('#asset-form select[name="connectPick"]');if(!sel||!sel.value)return;
+ const [source,id]=sel.value.split('|'),a=heldItems(state,source).find(x=>x.id===id);if(!a)return;
+ assetFormSnapshot=null;connectImport(source,[id]);$('#modal').close();showDetail(id,{focus:true});toast(tr('已从 {name} 引入「{asset}」',{name:connectName(source),asset:a.name}),true);
+});
+$('#modal').addEventListener('close',()=>{if(!$('#modal').open&&$('#modal').dataset.view==='connect')connectAfter();});
+function connectSourceOpen(source){if(source==='cloudflare')cloudflareDialog();else if(source==='github')githubDialog();else if(Object.hasOwn(REGISTRARS,source))registrarDialog(source);else cloudDialog(source);}
 window.assetboardOCRResult=result=>{
  if(!result.ok){toast(result.error||tr('本地识别失败'));return;}
  requestEvidence(()=>{
@@ -2508,6 +2703,80 @@ function settings(id){if(!cats[id])return;const count=state.assets.filter(a=>a.t
 // once; the panel is drawn again after a change, with focus kept on the control. Features are per viewer (features.js); 自动获取网站图标
 // and 每周核对注册局 are board settings (state), since they decide what the app does with the records.
 // The sections, each a page of the panel, chosen in the list at its left; the one shown is kept while the panel is drawn again.
+// 设置 › MCP: the tools set up on this Mac (their own config files, read by the Mac app and never changed: AgentClients.swift), the ones
+// that have called and when, a config to copy for the rest, and the 操作记录 with filters by tool, time and kind, newest first.
+const AGENT_CONFIG_CLIENTS=['claude-code','claude-desktop','codex','cursor','windsurf','vscode','zed','gemini','grok','cline'];
+// Where each tool reads its MCP servers, and what to put there (the Mac app's own checks look at the same files).
+function agentConfigCopy(id,cli){
+ const q=JSON.stringify(cli),servers=JSON.stringify({mcpServers:{assetboard:{command:cli,args:['mcp']}}},null,2);
+ return {
+  'claude-code':{text:`claude mcp add --scope user assetboard -- ${q} mcp`,where:tr('在终端运行')},
+  'claude-desktop':{text:servers,where:'~/Library/Application Support/Claude/claude_desktop_config.json'},
+  codex:{text:`codex mcp add assetboard -- ${q} mcp`,where:tr('在终端运行')},
+  cursor:{text:servers,where:'~/.cursor/mcp.json'},
+  windsurf:{text:servers,where:'~/.codeium/windsurf/mcp_config.json'},
+  vscode:{text:JSON.stringify({servers:{assetboard:{type:'stdio',command:cli,args:['mcp']}}},null,2),where:'~/Library/Application Support/Code/User/mcp.json'},
+  zed:{text:JSON.stringify({context_servers:{assetboard:{command:cli,args:['mcp']}}},null,2),where:'~/.config/zed/settings.json'},
+  gemini:{text:servers,where:'~/.gemini/settings.json'},
+  grok:{text:servers,where:'~/.grok/user-settings.json'},
+  cline:{text:servers,where:tr('Cline 的 MCP Servers › Configure')}
+ }[id]||{text:servers,where:tr('工具的 MCP 配置')};
+}
+function agentClientName(id){return AGENT_CLIENTS.find(c=>c.id===id)?.name||agentSeen[id]?.name||id;}
+// One row per tool: the common ones (configured or not) and any other that has called.
+function agentClientRows(){
+ const rows=AGENT_CONFIG_CLIENTS.map(id=>({id,name:agentClientName(id),config:agentConfigs.find(c=>c.id===id)||null,seen:agentSeen[id]||null}));
+ for(const c of Object.values(agentSeen))if(!AGENT_CONFIG_CLIENTS.includes(c.id))rows.push({id:c.id,name:c.name,config:null,seen:c});
+ const rank=r=>r.config?.configured||r.seen?0:r.config?.found?1:2;
+ return rows.sort((x,y)=>rank(x)-rank(y)||String(y.seen?.last||'').localeCompare(String(x.seen?.last||''))||x.name.localeCompare(y.name));
+}
+function agentWhen(at){const d=new Date(at);return Number.isNaN(d.getTime())?'':`${networkDay(at)} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;}
+function agentClientRowHtml(r){
+ const configured=!!r.config?.configured,found=!!r.config?.found,name=r.id==='unknown'?tr('未知客户端'):r.id==='cli'?tr('命令行 assetboard-cli'):r.name;
+ const chip=configured?`<span class="chip ok" title="${esc(r.config.path||'')}">${tr('已配置')}</span>`:r.seen?`<span class="chip">${tr('连过')}</span>`:found?`<span class="chip">${tr('未配置')}</span>`:'';
+ const last=r.seen?.last?`<span class="agent-last">${esc(tr('最近 {when}',{when:agentWhen(r.seen.last)}))}${r.seen.calls?` · ${esc(tr('{n} 次调用',{n:formatCount(r.seen.calls)}))}`:''}</span>`:'';
+ const copy=!configured&&AGENT_CONFIG_CLIENTS.includes(r.id)?`<button type="button" class="button" data-action="agent-config-copy" data-id="${r.id}" title="${esc(agentConfigCopy(r.id,'').where)}">${tr('复制配置')}</button>`:'';
+ const log=r.seen?.calls?`<button type="button" class="text-button" data-action="agent-log-filter" data-kind="client" data-id="${esc(r.id)}">${tr('看记录')}</button>`:'';
+ return `<div class="agent-row" data-client="${esc(r.id)}"><span class="agent-name">${esc(name)}</span>${chip}${last}<span class="agent-row-actions">${log}${copy}</span></div>`;
+}
+const ACTIVITY_FIELD_NAMES={name:'名称',type:'类别',provider:'平台',account:'账号',date:'日期',dateKind:'日期类型',cycle:'重复',cost:'费用',amount:'金额',currency:'币种',billingType:'计费方式',url:'链接',purpose:'用途',reason:'保留原因',notes:'备注',project:'项目',hiddenAt:'隐藏',stopped:'已停用',ips:'IP',host:'主机',sshUser:'SSH 用户',sshPort:'SSH 端口',links:'关联',iconData:'自定义图标',siteIcon:'网站图标',siteIconHost:'图标网站',payments:'付款记录',importance:'重要程度',event:'状态',region:'地区',last4:'卡号后 4 位',network:'卡组织',phone:'号码',promotion:'优惠',projectShares:'项目份额',localPath:'本地目录',mfa:'两步验证',backup:'备份'};
+const ACTIVITY_OPS={add:'新增',update:'修改',remove:'移除','ask-delete':'请求删除',read:'读取'};
+let agentLogFilter={client:'',days:0,kind:''},agentLogShown=100;
+function agentLogHits(){
+ const now=Date.now(),f=agentLogFilter,today=localDay(new Date());
+ return agentLogRows.filter(r=>(!f.client||r.client?.id===f.client)&&(!f.kind||(f.kind==='failed'?!r.ok:r.kind===f.kind))&&(!f.days||(f.days===1?localDay(new Date(r.at))===today:now-Date.parse(r.at)<=f.days*86400000)));
+}
+function activityChangeHtml(c){
+ const shown=(f,v)=>f.field==='cost'?costUnit(v):v==='图片'||v==='（已隐去）'?tr(v):v,fields=(c.fields||[]).map(f=>`<div class="act-field"><span class="act-key">${esc(tr(ACTIVITY_FIELD_NAMES[f.field]||f.field))}</span>${c.op==='add'?'':`<del>${f.from?esc(veil(shown(f,f.from))):`<i>${tr('空')}</i>`}</del><span aria-hidden="true">→</span>`}<ins>${f.to?esc(veil(shown(f,f.to))):`<i>${tr('空')}</i>`}</ins></div>`).join('');
+ return `<li class="act-change ${esc(c.op)}"><div class="act-target"><span class="act-op">${esc(tr(ACTIVITY_OPS[c.op]||c.op))}</span><strong>${esc(veil(c.name||c.id||''))}</strong><span class="chip">${esc(cats[c.type]?.one||cats[c.type]?.name||c.type||'')}</span></div>${fields?`<div class="act-fields">${fields}</div>`:''}</li>`;
+}
+function activityRowHtml(r){
+ const params=Object.entries(r.params||{}).map(([k,v])=>`${k}=${v}`).join(' · '),changes=r.changes||[],write=r.kind==='write';
+ const what=write?changes.length?changes.slice(0,3).map(c=>`${tr(ACTIVITY_OPS[c.op]||c.op)} ${veil(c.name||'')}`).join(tr('，'))+(changes.length>3?tr('等 {n} 项',{n:formatCount(changes.length)}):''):r.ok?tr('没有改动资产'):'':[params,r.count!=null?tr('{n} 条结果',{n:formatCount(r.count)}):''].filter(Boolean).join(' · ');
+ const list=changes.length&&(write||r.method==='get')?`<ul class="act-changes">${changes.slice(0,5).map(activityChangeHtml).join('')}</ul>${changes.length>5?`<details class="act-more"><summary>${tr('另外 {n} 项',{n:formatCount(changes.length-5)})}</summary><ul class="act-changes">${changes.slice(5).map(activityChangeHtml).join('')}</ul></details>`:''}`:'';
+ const client=r.client?.id==='unknown'?tr('未知客户端'):r.client?.id==='cli'?tr('命令行'):r.client?.name||'';
+ return `<li class="act-row${r.ok?'':' failed'} ${write?'write':'read'}"><span class="net-time">${networkTime(r.at)}</span><div class="act-main"><div class="act-line"><strong>${esc(client)}</strong><span class="act-kind">${write?tr('写入'):tr('查询')}</span><code>${esc(r.tool||r.method)}</code>${r.ok?'':`<span class="net-failed">${tr('失败')}</span>`}</div>${what&&!list?`<div class="net-meta">${esc(what)}</div>`:''}${r.error?`<div class="net-meta">${esc(r.error)}</div>`:''}${list}</div></li>`;
+}
+let agentConfigsAt=0;
+function agentMcpSection(row){
+ // The config files are read again when the page opens (at most every 10 s), so a tool set up a moment ago shows.
+ if(nativeStore&&!demoMode&&Date.now()-agentConfigsAt>10000){agentConfigsAt=Date.now();try{window.webkit.messageHandlers.assetboard.postMessage({action:'agentConfigs'});}catch{}}
+ const cli=nativeStore?.cliPath||'/Applications/Assetboard.app/Contents/MacOS/assetboard-cli',rows=agentClientRows(),known=rows.filter(r=>r.config?.configured||r.seen||r.config?.found),rest=rows.filter(r=>!known.includes(r));
+ const clients=`<div class="agent-list">${known.map(agentClientRowHtml).join('')||`<p class="form-note">${tr('这台 Mac 上还没有工具配置 Assetboard，也没有工具调用过。')}</p>`}</div>${rest.length?`<details class="agent-more"><summary>${tr('其他常见工具')} · ${formatCount(rest.length)}</summary><div class="agent-list">${rest.map(agentClientRowHtml).join('')}</div></details>`:''}`;
+ const hits=agentLogHits(),f=agentLogFilter,chip=(kind,value,label,count)=>`<button type="button" class="choice" role="radio" aria-checked="${String(f[kind])===String(value)}" data-action="agent-log-filter" data-kind="${kind}" data-id="${esc(value)}">${esc(label)}${count===undefined?'':` <span class="net-count">${formatCount(count)}</span>`}</button>`;
+ const byClient=[...new Set(agentLogRows.map(r=>r.client?.id).filter(Boolean))];
+ let day='',list='';
+ for(const r of hits.slice(0,agentLogShown)){const d=networkDay(r.at);if(d!==day){day=d;list+=`<li class="net-day">${esc(d)}</li>`;}list+=activityRowHtml(r);}
+ const filters=agentLogRows.length?`<div class="chip-group net-filters" role="radiogroup" aria-label="${tr('工具')}">${chip('client','',tr('全部工具'))}${byClient.map(id=>chip('client',id,id==='unknown'?tr('未知客户端'):id==='cli'?tr('命令行'):agentClientName(id),agentLogRows.filter(r=>r.client?.id===id).length)).join('')}</div>
+  <div class="chip-group net-filters" role="radiogroup" aria-label="${tr('时间')}">${chip('days',0,tr('全部时间'))}${chip('days',1,tr('今天'))}${chip('days',7,tr('7 天'))}${chip('days',30,tr('30 天'))}</div>
+  <div class="chip-group net-filters" role="radiogroup" aria-label="${tr('类型')}">${chip('kind','',tr('全部'))}${chip('kind','write',tr('写入'),agentLogRows.filter(r=>r.kind==='write').length)}${chip('kind','read',tr('查询'),agentLogRows.filter(r=>r.kind==='read').length)}${agentLogRows.some(r=>!r.ok)?chip('kind','failed',tr('失败'),agentLogRows.filter(r=>!r.ok).length):''}</div>`:'';
+ const log=`${filters}<ul class="net-list act-list">${list||`<li class="net-day">${agentLogRows.length?tr('没有符合条件的记录'):tr('还没有外部工具调用过')}</li>`}</ul>${hits.length>agentLogShown?`<button type="button" class="text-button" data-action="agent-log-more">${tr('再显示 {n} 条（共 {total}）',{n:formatCount(Math.min(100,hits.length-agentLogShown)),total:formatCount(hits.length)})}</button>`:''}${agentLogRows.length&&!demoMode?`<div class="confirm-actions"><button type="button" class="button" data-action="agent-log-clear">${tr('清空记录')}</button></div>`:''}`;
+ return `${featureOn('agent')?'':`<p class="form-note">${tr('外部工具接入已关闭，调用都会被拒绝（仍记在下面）。')}<button class="text-button" data-action="prefs" data-id="features">${tr('打开设置')}</button></p>`}
+  ${featureOn('agent')?row(tr('接入说明'),`<button class="button" data-action="agent-setup">${tr('MCP 接入…')}</button>`,tr('给外部工具的配置')):''}
+  <h4 class="prefs-sub-title">${tr('已接入的工具')}</h4>${clients}
+  <h4 class="prefs-sub-title" title="${tr('只存在这台 Mac 上；不记令牌、密码和钥匙串内容，像密钥的文字会被隐去')}">${tr('操作记录')}</h4>
+  <p class="form-note">${tr('外部工具每次查询和修改都记在这里，只存在这台 Mac 上。')}</p>${log}`;
+}
 let prefsSection='general';
 function prefsDialog(section){
  if(typeof section==='string')prefsSection=section;
@@ -2527,23 +2796,32 @@ function prefsDialog(section){
  const features=[...Object.entries(FEATURES).filter(([,f])=>usable(f)&&(!f.under||featureOn(f.under))).map(([key,f])=>{const html=row(f.name,(f.pro?proToggle:toggle)('prefs-feature',featureOn(key),f.name,` data-id="${key}"`),f.note);const sub=key==='probe'&&featureOn('probe')&&typeof liveIntervalField==='function'?row(tr('读取间隔'),liveIntervalField(),tr('多久读一次服务器；只在窗口显示时读，连不上时自动拉长')).replace('class="prefs-row"','class="prefs-row prefs-sub"'):'';return (f.under?html.replace('class="prefs-row"','class="prefs-row prefs-sub"'):html)+sub;}),
   mac?row(tr('自动获取网站图标'),toggle('auto-icons',state.autoIcons!==false,tr('自动获取网站图标')),tr('新添加的资产认出是已知平台时，从它的官网取图标；每次请求都记在网络记录里')):'',
   mac?row(tr('每周核对域名到期日'),proToggle('rdap-auto',!!state.rdapAuto,tr('每周向注册局核对域名到期日')),tr('每周把每个域名发给它的注册局（公开 RDAP）查一次；日期不同只提示，不改')):''].join('');
- const link=(name,on,action,title)=>row(name,`${on===null?'':`<span class="chip ${on?'ok':''}">${on?tr('已连接'):tr('未连接')}</span>`}<button class="button" data-action="${action}">${tr('设置…')}</button>`,title);
+ const waiting=source=>{const n=source?heldItems(state,source).length:0;return n?`<button type="button" class="chip connect-chip" data-action="connect-pending" data-id="${source}" title="${tr('还没在大板里，点开挑选')}">${tr('{n} 项待引入',{n:formatCount(n)})}</button>`:'';};
+ const link=(name,on,action,title,source='')=>row(name,`${waiting(source)}${on===null?'':`<span class="chip ${on?'ok':''}">${on?tr('已连接'):tr('未连接')}</span>`}<button class="button" data-action="${action}">${tr('设置…')}</button>`,title);
  // The connectors, AI and MCP are in the full build (the free edition compiles without them); the 12-hour sync and probes are Pro.
- const full=mac&&proBuilt();
- const connections=mac?[full?link('Cloudflare',!!nativeStore.cloudflareConnected,'cloudflare-import',proOff?tr('只读 API 令牌，点同步时读取；每 12 小时自动同步在 Pro 里'):tr('只读 API 令牌，每 12 小时同步')):'',
-  full?link('GitHub',!!nativeStore.githubConnected,'github-import',tr('本机 gh 或只读令牌')):'',
-  ...(proFree?[]:Object.entries(REGISTRARS).map(([id,r])=>link(r.name,registrarConnected(id),'registrar-import',tr('只读 API Key，读取域名和到期日')).replace('data-action="registrar-import"',`data-action="registrar-import" data-id="${id}"`))),
-  ...(proFree?[]:Object.entries(CLOUD_IMPORTS).map(([id,c])=>link(c.name,cloudConnected(id),'cloud-import',c.wide?tr('令牌权限大，只用来读取项目和域名'):tr('只读令牌，读取服务器和部署')).replace('data-action="cloud-import"',`data-action="cloud-import" data-id="${id}"`))),
+ // The demo board shows the platform rows too: demo-data.js answers for the platforms, so connecting and picking can be tried.
+ const linkable=mac||demoMode,full=mac&&proBuilt(),platforms=linkable&&proBuilt();
+ const connections=linkable?[platforms?link('Cloudflare',!!hostStore.cloudflareConnected,'cloudflare-import',proOff?tr('只读 API 令牌，点同步时读取；每 12 小时自动同步在 Pro 里'):tr('只读 API 令牌，每 12 小时同步'),'cloudflare'):'',
+  platforms?link('GitHub',!!hostStore.githubConnected,'github-import',tr('本机 gh 或只读令牌'),'github'):'',
+  ...(proFree?[]:Object.entries(REGISTRARS).map(([id,r])=>link(r.name,registrarConnected(id),'registrar-import',tr('只读 API Key，读取域名和到期日'),id).replace('data-action="registrar-import"',`data-action="registrar-import" data-id="${id}"`))),
+  ...(proFree?[]:Object.entries(CLOUD_IMPORTS).map(([id,c])=>link(c.name,cloudConnected(id),'cloud-import',c.wide?tr('令牌权限大，只用来读取项目和域名'):tr('只读令牌，读取服务器和部署'),id).replace('data-action="cloud-import"',`data-action="cloud-import" data-id="${id}"`))),
   full?link(tr('AI 识别'),!!nativeStore.ai?.model,'ai-settings',tr('你自己的模型和 API key，只在你点识别时发送')):'',
   full&&featureOn('agent')?link(tr('MCP 接入'),null,'agent-setup',tr('给外部工具的配置')):'',
   full&&typeof probeOn==='function'&&probeOn()?link(tr('探针数据源'),null,'probe-sources',tr('监控面板的地址和账号')):'',
   full&&typeof sshOn==='function'&&sshOn()?link(tr('SSH 直读'),null,'ssh-probe-open',tr('逐台开启、读取间隔')):'',
+  featureOn('aiUsage')&&typeof aiUsageDialog==='function'?link(tr('AI 额度'),null,'ai-usage-open',tr('本机 AI 工具的用量和订阅额度；用登录凭据读额度接口默认关')):'',
   full&&typeof platformOn==='function'&&platformOn()?link(tr('平台状态'),platform.sources.length>0,'platform-sources',tr('Supabase、Vercel、Render、Upstash 上的项目状态')):''].join(''):'';
+ // 外观: the accent (the 主题 dialog), the wall's skin (theme.js) and its density (board-wall.js); all kept on this device only.
+ const radios=(label,list,on,action)=>`<div class="chip-group" role="radiogroup" aria-label="${label}">${list.map(([id,name,note])=>`<button type="button" class="choice" role="radio" aria-checked="${id===on}" data-action="${action}" data-id="${id}"${note?` title="${esc(note)}"`:''}>${esc(name)}</button>`).join('')}</div>`;
+ const look=[row(tr('主题'),`<span class="prefs-edition">${esc(tr(themeFor(themePref).name||'')||tr('墨蓝'))}</span><button class="button" data-action="prefs-theme">${tr('选择…')}</button>`,tr('强调色用于按钮、选中和链接；到期红、橙色保持不变')),
+  row(tr('风格'),radios(tr('风格'),BOARD_SKINS,boardSkin,'prefs-skin'),tr('只改磁贴墙的样子：倾角、边缘、拖动的手感；内容、布局和密度不变')),
+  row(tr('磁贴密度'),radios(tr('磁贴密度'),WALL_DENSITIES.map(id=>[id,WALL_DENSITY_NAMES[id]]),wallDensity,'prefs-density'),tr('全局只留名称和天数，详细把每条的属性都摊开；⌘− 和 ⌘= 或在触控板上捏合也能切换'))].join('');
  const edition=row(tr('版本类型'),`<span class="prefs-edition">${esc(typeof proEditionText==='function'&&proBuilt()?proEditionText():tr('免费版'))}</span>`);
  const about=[edition,nativeStore?row(tr('版本'),`<span class="prefs-version">${esc(nativeStore.version||'')}${mac?`<button class="button" data-action="check-updates">${tr('检查更新…')}</button>`:''}</span>`):'',
   mac?row(tr('自动检查更新'),toggle('prefs-native',nativeStore.autoUpdate!==false,tr('自动检查更新'),' data-id="autoUpdate"'),tr('每天最多读一次官网的版本文件')):''].join('');
  const licence=proBuilt()?proLicenceSection(row):'';
- const sections=[['general',tr('通用'),'gear',general],['features',tr('功能'),'spark',features],['connections',tr('连接'),'cloud',connections],['pro','Assetboard Pro','check',licence,'Pro'],['about',tr('关于'),'info',about]].filter(s=>s[3]);
+ const mcp=(mac||demoMode)&&!proFree?agentMcpSection(row):'';
+ const sections=[['general',tr('通用'),'gear',general],['look',tr('外观'),'palette',look],['features',tr('功能'),'spark',features],['connections',tr('连接'),'cloud',connections],['mcp','MCP','terminal',mcp],['pro','Assetboard Pro','check',licence,'Pro'],['about',tr('关于'),'info',about]].filter(s=>s[3]);
  if(!sections.some(s=>s[0]===prefsSection))prefsSection='general';
  const nav=sections.map(([id,name,icon,,short])=>`<button type="button" class="prefs-tab" role="tab" id="prefs-tab-${id}" aria-controls="prefs-pane-${id}" aria-selected="${id===prefsSection}" tabindex="${id===prefsSection?0:-1}" data-action="prefs-section" data-id="${id}"${short?` title="${name}"`:''}>${ui(icon)}<span>${short||name}</span></button>`).join('');
  const panes=sections.map(([id,name,,html])=>`<section class="prefs-group" role="tabpanel" id="prefs-pane-${id}" aria-labelledby="prefs-tab-${id}"${id===prefsSection?'':' hidden'}><h3>${name}</h3>${html}</section>`).join('');
@@ -2569,6 +2847,7 @@ function prefsChanged(){if($('#modal').open&&$('#modal').dataset.view==='prefs')
 function setFeatureNow(key,on){
  setFeature(key,on);
  if(key==='panorama'&&!on&&typeof panoOpen!=='undefined'&&panoOpen)panoramaOpen(false);
+ if(key==='aiUsage'&&typeof aiUsageSwitch==='function')aiUsageSwitch(on);
  if(key==='probe'&&on){if(typeof probeStart==='function')probeStart();if(typeof sshStart==='function')sshStart();if(typeof platformStart==='function')platformStart();}
  drawTopnavActions();render();prefsChanged();toast(on?tr('{name}：已打开',{name:FEATURES[key].name}):tr('{name}：已关闭',{name:FEATURES[key].name}));
 }
@@ -2578,6 +2857,7 @@ document.addEventListener('click',e=>{const button=e.target.closest('[data-actio
  if(action==='detail'){if($('#modal').open)$('#modal').close();showDetail(id,{focus:e.detail===0||!inspectorDocked()});}
  else if(action==='view')setView(id);
  else if(action==='layout')setLayout(id);
+ else if(action==='density')setDensity(id);
  else if(action==='calendar-month')shiftCalendar(Number(id));
  else if(action==='asset-menu'){if(!$('#menu').hidden&&$('#menu').anchor===button){closeMenu();return;}const a=state.assets.find(x=>x.id===id);if(a)openMenu(assetMenuItems(a),{anchor:button});}
  else if(action==='category-menu'){if(cats[button.dataset.id])settings(button.dataset.id);}
@@ -2634,6 +2914,10 @@ document.addEventListener('click',e=>{const button=e.target.closest('[data-actio
  else if(action==='import-hub')importHub();
  else if(action==='ai-plans')aiPlansDialog();
  else if(action==='agent-setup')agentSetupDialog();
+ else if(action==='agent-config-copy'){const c=agentConfigCopy(id,nativeStore?.cliPath||'/Applications/Assetboard.app/Contents/MacOS/assetboard-cli');copyText(c.text,tr('已复制 {name} 的配置：{where}',{name:agentClientName(id),where:c.where}));}
+ else if(action==='agent-log-filter'){const kind=button.dataset.kind;if(!['client','days','kind'].includes(kind))return;agentLogFilter={...agentLogFilter,[kind]:kind==='days'?Number(id)||0:id||''};agentLogShown=100;prefsDialog('mcp');}
+ else if(action==='agent-log-more'){agentLogShown+=100;prefsDialog();}
+ else if(action==='agent-log-clear')confirmDialog(tr('清空操作记录？'),tr('只清除这份记录，不影响资产和接入的工具。'),tr('清空'),true).then(ok=>{if(ok){agentLogRows=[];if(nativeStore&&!demoMode)window.webkit.messageHandlers.assetboard.postMessage({action:'agentLogClear'});}prefsDialog('mcp');});
  else if(action==='agent-tab'){if(!AGENT_TOOLS.some(([tool])=>tool===id))return;agentTool=id;try{localStorage.setItem('assetboard-agent-tool',id);}catch{}agentSetupDialog();}
  else if(action==='network-log')networkDialog();
  else if(action==='cost-panel'){askRates();costDialog();}
@@ -2651,6 +2935,9 @@ document.addEventListener('click',e=>{const button=e.target.closest('[data-actio
  else if(action==='prefs-lang')setLang(id);
  else if(action==='prefs-currency'){if(!MAIN_CURRENCIES.includes(id))return;displayCurrency=id;writeViewPrefs();askRates();render();prefsChanged();}
  else if(action==='prefs-privacy'){setPrivacy(button.checked);prefsChanged();}
+ else if(action==='prefs-theme')themeDialog();
+ else if(action==='prefs-skin'){if(setSkin(id)){render();prefsChanged();}}
+ else if(action==='prefs-density')setDensity(id);
  else if(action==='prefs-section'){prefsDialog(id);$(`#prefs-tab-${id}`)?.focus();}
  else if(action==='check-updates'){if(nativeStore&&!demoMode)window.webkit.messageHandlers.assetboard.postMessage({action:'checkUpdates'});}
  else if(action==='prefs-native'){if(!nativeStore||demoMode||!['statusItem','autoUpdate'].includes(id))return;nativeStore[id]=button.checked;window.webkit.messageHandlers.assetboard.postMessage({action:'preference',key:id,on:button.checked});}
@@ -2676,6 +2963,12 @@ document.addEventListener('click',e=>{const button=e.target.closest('[data-actio
  else if(action==='github-import')githubDialog();
  else if(action==='cloudflare-import')cloudflareDialog();
  else if(action==='registrar-import')registrarDialog(button.dataset.id||registrarPick);
+ else if(action==='connect-pending')connectDialog(button.dataset.id||'');
+ else if(action==='connect-import')connectImportPicked(button.dataset.id);
+ else if(action==='connect-ignore')connectIgnore(button.dataset.id);
+ else if(action==='connect-later')$('#modal').close();
+ else if(action==='connect-refresh')connectRefresh(button.dataset.id);
+ else if(action==='connect-source')connectSourceOpen(button.dataset.id);
  else if(action==='registrar-pick')registrarDialog(button.dataset.id);
  else if(action==='cloud-import')cloudDialog(button.dataset.id||cloudPick);
  else if(action==='cloud-pick')cloudDialog(button.dataset.id);
@@ -2691,11 +2984,10 @@ document.addEventListener('click',e=>{const button=e.target.closest('[data-actio
   window.webkit.messageHandlers.assetboard.postMessage({action:'sshConfigImport'});
  }
  else if(action==='github-local-sync'){
-  if(demoMode){window.assetboardDemoBlocked();return;}
-  if(!nativeStore)return;
+  if(!hostStore)return;
   const btn=button;btn.disabled=true;
   const status=$('#github-status');if(status)status.textContent=tr('正在用本机 gh 读取各账号仓库…');
-  window.webkit.messageHandlers.assetboard.postMessage({action:'githubSyncLocal',details:featureOn('repoDetails')});
+  connectPost({action:'githubSyncLocal',details:featureOn('repoDetails')});
  }
  else if(action==='open-ci'){if(demoMode){window.assetboardDemoBlocked();return;}const ci=ciRunOf(state.assets.find(a=>a.id===id));if(ci&&nativeStore)window.webkit.messageHandlers.assetboard.postMessage({action:'openExternal',url:ci.url});else if(ci)window.open(ci.url,'_blank','noopener,noreferrer');}
  else if(action==='external'){const a=state.assets.find(a=>a.id===id),url=safeManagementUrl(a?.url);if(!url||new URL(url).hostname==='example.com'){toast(tr('先在资料里填管理链接'));return;}if(nativeStore)window.webkit.messageHandlers.assetboard.postMessage({action:'openExternal',url});else window.open(url,'_blank','noopener,noreferrer');}
@@ -2714,7 +3006,7 @@ document.addEventListener('click',e=>{const button=e.target.closest('[data-actio
  else if(action==='move-up'||action==='move-down'){moveBlock(id,action==='move-up'?-1:1);$('#modal').close();}
 });
 document.addEventListener('submit',async e=>{if(e.target.id!=='asset-form')return;e.preventDefault();const form=e.target,data=new FormData(form),name=String(data.get('name')).trim(),url=String(data.get('url')).trim(),file=form.elements.icon.files[0];if(!name)return;const leaked=['name','provider','account','purpose','reason','cost','notes'].find(key=>looksLikeCardNumber(data.get(key)));if(leaked){const input=form.elements[leaked];input.setCustomValidity(tr('这里像是完整卡号。Assetboard 只保存卡号后 4 位，请删掉后再保存。'));input.reportValidity();input.addEventListener('input',()=>input.setCustomValidity(''),{once:true});return;}if(url&&!safeManagementUrl(url)){form.elements.url.setCustomValidity(tr('请输入不含账号密码的 http 或 https 链接'));form.elements.url.reportValidity();return;}form.elements.url.setCustomValidity('');const entryChecks=[['amount',text=>{const t=text.trim().replace(/,/g,'');return !t||/^\d+(\.\d{1,2})?$/.test(t);},tr('请填写数字金额，例如 89 或 10.98')],['date',text=>!text.trim()||!!parseLooseDate(text),tr('日期无法识别，例如 2027-03-01 或 3/1')],['regionText',text=>!text.trim()||!!form.elements.region.value,tr('请从列表里选择国家或地区')]];for(const [field,ok,message] of entryChecks){const input=form.elements[field];if(!input||input.type==='hidden')continue;input.setCustomValidity(ok(input.value)?'':message);if(!input.checkValidity()){input.reportValidity();input.addEventListener('input',()=>input.setCustomValidity(''),{once:true});return;}}const actionHints={host:tr('请填写主机名或 IP，例如 203.0.113.10'),ips:tr('最多 4 个有效 IP，用逗号或空格分隔'),sshUser:tr('SSH 用户只能包含字母、数字和 _ . -'),sshPort:tr('端口是 1 到 65535 之间的数字'),localPath:tr('请填写以 / 或 ~/ 开头的本机目录'),dnsHost:tr('只写服务商名字，最多 60 字'),icp:tr('备案号要带 ICP，例如 京ICP备00000000号')};for(const key of Object.keys(actionHints)){const input=form.elements[key];if(!input)continue;input.setCustomValidity(validActionField(key,input.value)?'':actionHints[key]);if(!input.checkValidity()){input.reportValidity();input.addEventListener('input',()=>input.setCustomValidity(''),{once:true});return;}}if(file&&(!['image/png','image/jpeg','image/webp'].includes(file.type)||file.size>256*1024)){toast(tr('图标需为 PNG、JPEG 或 WebP，且不超过 256 KB'));return;}const submit=form.querySelector('[type="submit"]');submit.disabled=true;try{const iconData=file?await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=reject;reader.readAsDataURL(file);}):null;const id=form.dataset.id,chosen=String(data.get('type')||''),type=cats[chosen]?chosen:form.dataset.type,candidateKey=form.dataset.candidate,candidateItem=form.dataset.item===''||form.dataset.item===undefined?null:Number(form.dataset.item),profile=assetProfiles[type]||{},date=data.has('expiry')?cardExpiry(data.get('expiry'))||'':parseLooseDate(data.get('date')??''),dateKind=data.has('expiry')?'expire':dateKinds[data.get('dateKind')]?String(data.get('dateKind')):'expire',cycle=billingCycles[data.get('cycle')]?String(data.get('cycle')):'',extras=Object.fromEntries((profile.extra||[]).map(key=>[key,String(data.get(key)??'').trim()])),fields={name,provider:profile.fixedProvider||String(data.get('provider')??'').trim()||(assetProfiles[type]?'':'平台待补充'),account:String(data.get('account')).trim(),purpose:String(data.get('purpose')).trim(),reason:String(data.get('reason')||'').trim(),date,dateKind,cycle,cost:costFromForm(data,cycle),notes:String(data.get('notes')).trim(),url:url?safeManagementUrl(url):''},repoState=type==='repository'&&REPO_STATES.find(([key])=>key===data.get('repoState'))?.[0],event=repoState||(date?`${date} ${dateKinds[dateKind].future}`:'日期待补充');if(extras.region&&!regionName(extras.region))extras.region='';if(extras.last4&&!/^\d{4}$/.test(extras.last4))extras.last4='';if(extras.network&&!cardNetworks.includes(extras.network))extras.network='';if(extras.cardStatus&&!CARD_STATUSES[extras.cardStatus])extras.cardStatus='';if(extras.phoneStatus&&!PHONE_STATUSES[extras.phoneStatus])extras.phoneStatus='';if(extras.phone)extras.phone=extras.phone.slice(0,30);Object.assign(fields,extras);const money=moneyFromForm(form,data,id?state.assets.find(x=>x.id===id):null);if(!money)return;Object.assign(fields,money);for(const [key] of ACTION_FIELDS[type]||[])if(data.has(key))fields[key]=key==='ips'?parseIps(data.get(key)).ips.map(x=>x.ip):String(data.get(key)).trim();if(type==='server'&&data.has('sshAlias'))fields.sshAlias=String(data.get('sshAlias')).trim()||null;const keep=keepFromForm(form,data,type);if(!keep)return;Object.assign(fields,keep);const wake=wakeFromForm(form,data,type);if(!wake)return;Object.assign(fields,wake);checkpoint();let assetId=id;if(id){const a=state.assets.find(a=>a.id===id);const synced=PLATFORM_SOURCES.includes(a.source);if(a.source==='cloudflare'&&a.syncName==null)a.syncName=a.name;Object.assign(a,fields);clearEmptyFields(a);for(const key of ['region','last4','network','cardStatus','phone','phoneStatus'])if(!(key in extras))delete a[key];if(file)a.iconData=iconData;else if(data.has('removeIcon'))delete a.iconData;if(!synced){a.source='manual';a.type=type;a.event=event;}touchAsset(a);delete a.warn;ensureBlock(state,a.type);}else{assetId='asset-'+crypto.randomUUID();state.assets.push(clearEmptyFields({id:assetId,type,...fields,iconData,source:'manual',event,art:'generic',createdAt:new Date().toISOString()}));rdapFormKeep(state.assets.at(-1),form);if(state.cardOrder?.[type]?.length)state.cardOrder[type].unshift(assetId);ensureBlock(state,type);}const resolved=candidateKey?resolveCandidate(candidateKey,id?'linked':'created',assetId,candidateItem):0;assetFormSnapshot=null;save();render();if(id&&activeAsset===id)showDetail(id);const source=candidateKey&&findCandidate(candidateKey),items=source?.ai?.items||[],recorded=items.length>1?recordedItems(source):[],next=items.length>1?items.findIndex((_,index)=>!recorded.includes(index)):-1;if(next>=0){candidateReview(source,next);toast(tr('已记录，这份资料里还有 {n} 项',{n:items.length-recorded.length}),true);}else if(candidateKey&&nativeStore&&pendingCount()){inboxDialog(false);toast(resolved?tr('已记录，继续核对下一组'):tr('已记录'),true);}else{$('#modal').close();toast(id?tr('资料已更新'):tr('资产已添加'),true);}}catch{toast(tr('读取图标失败，请重试'));}finally{submit.disabled=false;}});
-setIconButton($('#add-block'),'plus',tr('添加资产'));document.querySelectorAll('#layout-toggle [data-action="layout"]').forEach(b=>b.innerHTML=ui({grid:'tiles',timeline:'timeline',calendar:'calendar'}[b.dataset.id]||'list'));$('#view-menu').innerHTML=ui('more');setIconButton($('#import-button'),'download',tr('导入'));$('#add-block').onclick=addAsset;$('#close-modal').onclick=()=>requestCloseModal();$('#close-detail').onclick=closeDetail;$('#modal').addEventListener('cancel',e=>{if(isAssetFormDirty()){e.preventDefault();requestCloseModal();}else assetFormSnapshot=null;});
+setIconButton($('#add-block'),'plus',tr('添加资产'));document.querySelectorAll('#layout-toggle [data-action="layout"]').forEach(b=>b.innerHTML=ui({wall:'wall',grid:'tiles',timeline:'timeline',calendar:'calendar'}[b.dataset.id]||'list'));$('#view-menu').innerHTML=ui('more');setIconButton($('#import-button'),'download',tr('导入'));$('#add-block').onclick=addAsset;$('#close-modal').onclick=()=>requestCloseModal();$('#close-detail').onclick=closeDetail;$('#modal').addEventListener('cancel',e=>{if(isAssetFormDirty()){e.preventDefault();requestCloseModal();}else assetFormSnapshot=null;});
 $('#search').oninput=e=>{query=e.target.value;render();};$('#clear-search').onclick=()=>{if(query){$('#search').value='';query='';render();}else addAsset();};
 // Keyboard map (DESIGN-PRINCIPLES §4 rule 4). Letter keys never act while typing, with a dialog open, or with ⌘/⌃/⌥ held.
 let helpReturn=null;
@@ -2744,7 +3036,7 @@ function keyAsset(e){const item=e.target.closest?.('#board [data-asset]');if(ite
 function fire(action,id){const b=document.createElement('button');b.hidden=true;b.dataset.action=action;b.dataset.id=id;document.body.append(b);b.click();b.remove();}
 function keysHelpHtml(){
  const row=(keys,label)=>`<li><span>${label}</span><span class="keys">${keys.map(k=>`<kbd>${k}</kbd>`).join('')}</span></li>`;
- const groups=[[tr('浏览'),[[['⌘K','/'],tr('搜索')],[['↑','↓'],tr('移动')],[['↩'],tr('详情')],[['←'],tr('侧边栏')],[['⌃⌘S'],tr('收起侧边栏')],[['P'],tr('全景')],[['esc'],tr('返回')]]],[tr('整理'),[[['I'],tr('导入')],[['N'],tr('新建')],[['E'],tr('编辑')],[['R'],tr('已续费')],[['H'],tr('隐藏')],[['F'],tr('置前')],[['⌥','↑ ↓'],tr('调整顺序')],[['L'],tr('关联')],[['S'],tr('停用')]]],[tr('快捷'),[[['O'],tr('打开')],[['⌘C'],tr('复制')]]],[tr('编辑'),[[['⌘Z'],tr('撤销')],[['⇧⌘Z'],tr('重做')],[['⌘↩'],tr('保存')],[['tab'],tr('换字段')]]]];
+ const groups=[[tr('浏览'),[[['⌘K','/'],tr('搜索')],[['↑','↓'],tr('移动')],[['↩'],tr('详情')],[['←'],tr('侧边栏')],[['⌃⌘S'],tr('收起侧边栏')],[['P'],tr('全景')],[['⌘−','⌘='],tr('磁贴密度')],[['esc'],tr('返回')]]],[tr('整理'),[[['I'],tr('导入')],[['N'],tr('新建')],[['E'],tr('编辑')],[['R'],tr('已续费')],[['H'],tr('隐藏')],[['F'],tr('置前')],[['⌥','↑ ↓'],tr('调整顺序')],[['L'],tr('关联')],[['S'],tr('停用')]]],[tr('快捷'),[[['O'],tr('打开')],[['⌘C'],tr('复制')]]],[tr('编辑'),[[['⌘Z'],tr('撤销')],[['⇧⌘Z'],tr('重做')],[['⌘↩'],tr('保存')],[['tab'],tr('换字段')]]]];
  return `<div class="keys-card" role="document" tabindex="-1"><div class="keys-head"><h2 id="keys-help-title" title="${tr('在输入框里打字时，字母键不生效')}">${tr('快捷键')}</h2><button class="close" data-action="keys-help" aria-label="${tr('关闭快捷键说明')}">×</button></div><div class="keys-grid">${groups.map(([title,rows])=>`<section><h3>${title}</h3><ul>${rows.map(([k,l])=>row(k,l)).join('')}</ul></section>`).join('')}</div></div>`;
 }
 function toggleKeysHelp(show){
@@ -2777,6 +3069,8 @@ document.addEventListener('keydown',e=>{
   const nav=e.target.closest?.('#sidebar .nav-item');if(nav){e.preventDefault();navMove(nav,key);return;}
   const from=e.target.closest?.('#board .group-title,#board .item-open');if(!from)return;
   e.preventDefault();
+  // The wall goes sideways to the next column; ← from the first column (and from a list) goes to the sidebar.
+  if(from.closest('.wall')&&(key==='ArrowLeft'||key==='ArrowRight')){const next=wallSideways(from,key);if(next){focusCard(next);const id=next.closest('[data-asset]')?.dataset.asset;if(id&&!$('#detail').hidden&&inspectorDocked())showDetail(id,{focus:false});return;}}
   if(key==='ArrowLeft'&&!from.closest('.group-body.grid')){($('#sidebar .nav-item.active')||$('#sidebar .nav-item'))?.focus();return;}
   moveFocus(from,key);return;
  }
@@ -2797,7 +3091,8 @@ document.addEventListener('keydown',e=>{
   if(!focusAsset(id))near.some(focusAsset);
  }
 });
-// Direct manipulation, no layout mode: a row moves within its group, onto a sidebar category to change its category, and sidebar categories reorder.
+// Direct manipulation, no layout mode: a row moves within its group, onto a sidebar category to change its category, and sidebar categories
+// reorder, as do the tile wall's panels (dragged by their header; board-wall.js packs them and picks the place).
 // Mouse starts after 5px, touch after a long press; Esc cancels; ⌥ + arrows is the keyboard path.
 let gesture=null,suppressClick=false,floatTip=null;
 const settleEase='cubic-bezier(.22,1,.36,1)';
@@ -2820,12 +3115,15 @@ function dragSource(target){
  if(query)return null;
  const item=target.closest('#board [data-reorder] > [data-asset]');
  if(item)return {kind:'card',el:item,container:item.parentElement,block:item.closest('.group')};
+ const head=target.closest('#board .wall > .group > .group-head');
+ if(head&&!target.closest('.g-actions'))return {kind:'panel',el:head.parentElement,container:head.parentElement.parentElement};
  const nav=target.closest('#sidebar .nav-item[data-block]');
  return nav?{kind:'block',el:nav,container:nav.parentElement}:null;
 }
 function releaseGesture(){const g=gesture;if(!g)return;clearTimeout(g.timer);cancelAnimationFrame(g.frame);removeEventListener('pointermove',dragMove);removeEventListener('pointerup',dragEnd);removeEventListener('pointercancel',dragEnd);gesture=null;}
-function slotOrder(g){const key=g.kind==='block'?'block':'asset';return [...g.container.children].filter(n=>n===g.slot||n!==g.el&&n.dataset[key]).map(n=>(n===g.slot?g.el:n).dataset[key]);}
-function measureItems(g){const key=g.kind==='block'?'block':'asset';g.items=[...g.container.children].filter(n=>n!==g.el&&n!==g.slot&&n.dataset[key]).map(n=>({el:n,r:docRect(n)}));g.slotRect=docRect(g.slot);g.box=docRect(g.container);}
+function dragKey(g){return {block:'block',panel:'group'}[g.kind]||'asset';}
+function slotOrder(g){const key=dragKey(g);return [...g.container.children].filter(n=>n===g.slot||n!==g.el&&n.dataset[key]).map(n=>(n===g.slot?g.el:n).dataset[key]);}
+function measureItems(g){const key=dragKey(g);g.items=[...g.container.children].filter(n=>n!==g.el&&n!==g.slot&&n.dataset[key]).map(n=>({el:n,r:docRect(n)}));g.slotRect=docRect(g.slot);g.box=docRect(g.container);}
 function beginDrag(g){
  const el=g.el;if(!el.isConnected){releaseGesture();return;}
  clearTimeout(g.timer);g.active=true;cancelAnimationFrame(layoutFrame);closeMenu(false);
@@ -2837,6 +3135,7 @@ function beginDrag(g){
  const placed=el.getBoundingClientRect();if(Math.abs(placed.left-r.left)>.5||Math.abs(placed.top-r.top)>.5){el.style.left=2*r.left-placed.left+'px';el.style.top=2*r.top-placed.top+'px';}
  // A row can also land on another category in the sidebar; those targets are fixed, so they are measured live.
  if(g.kind==='card'){g.asset=state.assets.find(a=>a.id===el.dataset.asset);g.homeRect=docRect(g.container);g.others=[...document.querySelectorAll('#sidebar .nav-item[data-block]')].filter(n=>n.dataset.block!==g.asset?.type);}
+ if(g.kind==='panel')packWall();
  g.initial=slotOrder(g);measureItems(g);
  const s=boardScroller(),bar=document.querySelector('#topbar');g.top=s!==document.scrollingElement?s.getBoundingClientRect().top:bar&&getComputedStyle(bar).display!=='none'?Math.max(0,bar.getBoundingClientRect().bottom):0;
  try{document.body.setPointerCapture(g.id);}catch{}
@@ -2857,6 +3156,7 @@ function moveSlot(g,mode,ref){
  if(motion)all.forEach(n=>n.getAnimations().forEach(a=>a.cancel()));
  if(mode==='home')g.el.before(g.slot);else if(mode==='before')ref.before(g.slot);else ref.after(g.slot);
  g.lockUntil=performance.now()+60;
+ if(g.kind==='panel')packWall();
  measureItems(g);
  if(motion)for(const n of all)slideFrom(n,from.get(n));
 }
@@ -2865,6 +3165,7 @@ function placeSlot(g){
  const s=boardScroller(),x=g.x+s.scrollLeft,y=g.y+s.scrollTop;
  if(g.kind==='card'){const over=g.others.find(n=>inside(n.getBoundingClientRect(),g.x,g.y))||null;setCrossTarget(g,over);if(over||!inside(g.homeRect,x,y)){moveSlot(g,'home');return;}}
  else if(x<g.box.left-48||x>g.box.right+48||y<g.box.top-48||y>g.box.bottom+48){moveSlot(g,'home');return;}
+ if(g.kind==='panel'){placePanel(g,x,y);return;}
  if(inside(g.slotRect,x,y))return;
  let best=null,distance=Infinity;
  for(const it of g.items){const dx=Math.max(it.r.left-x,0,x-it.r.right),dy=Math.max(it.r.top-y,0,y-it.r.bottom),d=dx*dx+dy*dy;if(d<distance){distance=d;best=it;}}
@@ -2876,7 +3177,7 @@ function dragTip(g){showTip(g.cross?g.crossAllowed?tr('移到「{name}」',{name
 function autoScroll(g){
  if(gesture!==g||!g.active)return;
  const s=boardScroller(),bottom=s===document.scrollingElement?innerHeight:s.getBoundingClientRect().bottom,zone=60,v=g.y<g.top+zone?-(g.top+zone-g.y)/zone:g.y>bottom-zone?(g.y-bottom+zone)/zone:0;
- if(v&&g.kind==='card'){const before=s.scrollTop;s.scrollBy(0,Math.sign(v)*Math.min(1,v*v)*20);if(s.scrollTop!==before)placeSlot(g);}
+ if(v&&g.kind!=='block'){const before=s.scrollTop;s.scrollBy(0,Math.sign(v)*Math.min(1,v*v)*20);if(s.scrollTop!==before)placeSlot(g);}
  g.frame=requestAnimationFrame(()=>autoScroll(g));
 }
 function dragMove(e){
@@ -2890,6 +3191,7 @@ function cleanupDrag(g){
  showTip('');document.body.classList.remove('drag-active');g.cross?.classList.remove('drop-into','drop-refused');
  g.el.classList.remove('is-dragging','lifted','settling','refused');for(const p of ['position','left','top','width','height','margin','translate','transformOrigin'])g.el.style[p]='';
  if(g.slot.isConnected)g.slot.replaceWith(g.el);
+ if(g.kind==='panel')packWall();
  if(gesture===g)gesture=null;
 }
 function abortDrag(g){releaseGesture();cleanupDrag(g);g.slot.remove();render();}
@@ -2905,7 +3207,8 @@ function dropDrag(g,cancelled=false){
   if(gesture!==g)return;cleanupDrag(g);
   if(changed&&g.kind==='block'){checkpoint();for(const type of next)ensureBlock(state,type);state.blocks=[...next.map(type=>state.blocks.find(b=>b.id===type)),...state.blocks.filter(b=>!next.includes(b.id))];save();}
   else if(changed&&g.kind==='card')saveCardOrder(g.container.dataset.reorder,touchedPrefix(g.initial,next));
-  render();if(changed)toast(g.kind==='block'?tr('类别顺序已调整'):tr('顺序已调整'),true);
+  else if(changed&&g.kind==='panel')commitPanelOrder(next);
+  render();if(g.kind==='panel')wallLanded(g.el.dataset.group);if(changed)toast(g.kind==='card'?tr('顺序已调整'):tr('类别顺序已调整'),true);
  };
  if(reduceMotion()){done();return;}
  const to=g.slot.getBoundingClientRect();g.el.classList.add('settling');g.el.classList.remove('lifted','refused');g.el.style.translate=`${to.left-g.rect.left}px ${to.top-g.rect.top}px`;setTimeout(done,MOTION_MS);
@@ -2932,7 +3235,8 @@ addEventListener('click',e=>{if(!suppressClick)return;suppressClick=false;e.prev
 addEventListener('keydown',e=>{if(e.key!=='Escape'||!gesture?.active)return;e.preventDefault();e.stopImmediatePropagation();suppressClick=true;addEventListener('pointerup',()=>setTimeout(()=>suppressClick=false,0),{once:true,capture:true});dropDrag(gesture,true);},true);
 for(const el of [$('#board'),$('#sidebar')]){el.addEventListener('touchmove',e=>{if(gesture?.active)e.preventDefault();},{passive:false});el.addEventListener('dragstart',e=>e.preventDefault());}
 document.addEventListener('contextmenu',e=>{if(gesture?.touch)e.preventDefault();});
-// ⌥ + arrows: a row moves one place within its group (grids also take ←/→); a sidebar category moves up or down.
+// ⌥ + arrows: a row moves one place within its group (grids also take ←/→); a sidebar category moves up or down, a wall panel to
+// either side.
 document.addEventListener('keydown',e=>{
  if(!e.altKey||e.metaKey||e.ctrlKey||query||!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key))return;
  const step=['ArrowLeft','ArrowUp'].includes(e.key)?-1:1,opener=e.target.closest?.('#board [data-reorder] .item-open');
@@ -2941,6 +3245,9 @@ document.addEventListener('keydown',e=>{
   const source=opener.closest('[data-asset]'),id=source.dataset.asset,siblings=[...source.parentElement.children].filter(n=>n.dataset.asset);
   if(commitAssetOrder(source,siblings[siblings.indexOf(source)+step],step>0)){focusAsset(id);toast(step<0?tr('已向前移动'):tr('已向后移动'),true);}return;
  }
+ // A wall panel moves among the panels shown, with all four arrows.
+ const panel=e.target.closest?.('#board .wall .group-title[data-action="collapse"]');
+ if(panel){e.preventDefault();const id=panel.dataset.id;if(movePanel(id,step))document.querySelector(`#board .group-title[data-id="${CSS.escape(id)}"]`)?.focus();return;}
  const nav=e.target.closest?.('#sidebar .nav-item[data-block]')||(e.key==='ArrowUp'||e.key==='ArrowDown')&&e.target.closest?.('#board .group-title[data-action="collapse"]');
  if(nav&&(e.key==='ArrowUp'||e.key==='ArrowDown')){e.preventDefault();const id=nav.dataset.block||nav.dataset.id,fromBoard=!!nav.closest('#board');if(moveBlock(id,step))document.querySelector(fromBoard?`#board .group-title[data-id="${CSS.escape(id)}"]`:`#sidebar .nav-item[data-block="${CSS.escape(id)}"]`)?.focus();}
 });

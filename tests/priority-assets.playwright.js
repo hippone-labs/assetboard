@@ -42,6 +42,7 @@ async (page) => {
   await add('appleid',{name:'美区主号',account:'han.dev@example.org',region:'US'});
   const apple=await find('美区主号');
   check(apple?.provider==='Apple','Apple ID provider is fixed');
+  await p.evaluate(()=>setLayout('list'));
   const boardText=await p.locator('#board').innerText();
   check(boardText.includes('+44 ••• 0123')&&!boardText.includes('900123'),'The board must show the number masked');
   check(boardText.includes('ha•••@example.org')&&!boardText.includes('han.dev@'),'The board must show the email masked');

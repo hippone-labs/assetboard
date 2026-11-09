@@ -50,7 +50,7 @@ Data is kept in a SQLite file on the Mac; there is no account. The interface is 
 
 ## Interface
 
-The sidebar holds Upcoming, All assets, Panorama, the categories, projects and Hidden. The middle shows the list and the right the selected asset's details. The list can switch to a grid or a 12-month timeline; Upcoming can switch to a month calendar.
+The sidebar holds Upcoming, All assets, Panorama, the categories, projects and Hidden. The middle shows a tile wall (a panel per category, in three densities) and the right the selected asset's details. It can switch to a list, a grid or a 12-month timeline; Upcoming can switch to a month calendar.
 
 | | |
 | --- | --- |
