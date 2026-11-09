@@ -1104,7 +1104,6 @@ Object.assign(I18N.en,{
  '命令行 assetboard-cli':'Command line (assetboard-cli)',
  '已配置':'Set up',
  '连过':'Has called',
- '最近 {when}':'last {when}',
  '{n} 次调用':['{n} call','{n} calls'],
  '复制配置':'Copy config',
  '看记录':'Show log',

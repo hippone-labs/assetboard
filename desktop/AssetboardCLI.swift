@@ -25,6 +25,7 @@ import Foundation
       forecast [--from 日期] [--to 日期] [--currency CNY] [--project P]
       history [<id>]                       价格变化历史（带 id 时含付款记录）
       projects [--currency USD]            项目：每月费用（共用的按份额分摊）、收入和盈亏，默认按 USD
+      ai-usage [vendor]                    AI 额度与用量：各工具的额度窗口、重置时间、本期用量和要留意的订阅
       update-project <项目> <JSON | ->     改项目的每月收入和共用资产的份额，例如 {"revenue":{"amount":30,"currency":"USD"}}
       activity [--client 工具] [--kind read|write] [--since 日期] [--limit N]
                                            外部工具的操作记录，最近的在前
@@ -54,6 +55,7 @@ import Foundation
       forecast [--from DATE] [--to DATE] [--currency CNY] [--project P]
       history [<id>]                       Price history (with an id, also its payments)
       projects [--currency USD]            Projects: monthly cost (shared assets split by share), revenue and net, in USD by default
+      ai-usage [vendor]                    AI usage: each tool's limit windows, reset times, this period's usage and plans to look at
       update-project <name> <JSON | ->     Set a project's monthly revenue and its shared assets' shares, e.g. {"revenue":{"amount":30,"currency":"USD"}}
       activity [--client TOOL] [--kind read|write] [--since DATE] [--limit N]
                                            What external tools did, newest first
@@ -178,6 +180,7 @@ import Foundation
             return ("renew", params)
         case "charges": return ("charges", [:])
         case "projects": return ("projects", option("--currency").map { ["currency": $0] } ?? [:])
+        case "ai-usage": return ("aiUsage", rest.first.map { ["vendor": $0] } ?? [:])
         case "update-project":
             guard rest.count >= 2 else { throw UsageError(text: L("用法：update-project <项目> <JSON | ->")) }
             guard var params = try json(rest[1]) as? [String: Any] else { throw UsageError(text: L("字段需要是 JSON 对象")) }
@@ -276,7 +279,9 @@ import Foundation
         precondition((future?["result"] as? [String: Any])?["protocolVersion"] as? String == MCPServer.protocolVersions[0], "An unknown version gets the newest")
         precondition(MCPServer.handle(["jsonrpc": "2.0", "method": "notifications/initialized"]) == nil, "Notifications get no reply")
         let tools = ((MCPServer.handle(["jsonrpc": "2.0", "id": "t", "method": "tools/list"])?["result"] as? [String: Any])?["tools"] as? [[String: Any]]) ?? []
-        precondition(tools.count == 29 && Set(tools.compactMap { $0["name"] as? String }) == Set(MCPServer.methods.keys), "Twenty-nine tools, each mapped to a call")
+        precondition(tools.count == 31 && Set(tools.compactMap { $0["name"] as? String }) == Set(MCPServer.methods.keys), "Thirty-one tools, each mapped to a call")
+        precondition(((tools.first { $0["name"] as? String == "set_ai_usage_source" }?["inputSchema"] as? [String: Any])?["properties"] as? [String: Any])?.keys.sorted() == ["local", "source"], "set_ai_usage_source can only switch local reading, never an endpoint")
+        precondition(parsed(["ai-usage"])?.0 == "aiUsage" && parsed(["ai-usage", "openai"])?.1["vendor"] as? String == "openai", "ai-usage takes a vendor")
         precondition(Set(MCPServer.methods.values).count == MCPServer.methods.count && MCPServer.methods.values.allSatisfy { $0.count <= 40 }, "Each tool has its own call, short enough for the app")
         // No tool asks for a credential, and none reads or steers 实时状态 (probe sources, SSH 直读): those stay in the app.
         let secret = try! NSRegularExpression(pattern: "password|passwd|token|secret|session|cookie|jwt|username|credential", options: [.caseInsensitive])
@@ -318,7 +323,7 @@ import Foundation
         precondition(tools.allSatisfy { JSONSerialization.isValidJSONObject($0) && ($0["inputSchema"] as? [String: Any])?["type"] as? String == "object" }, "Tool schemas are JSON objects")
         precondition((MCPServer.handle(["jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": ["name": "drop_all"]])?["error"] as? [String: Any])?["code"] as? Int == -32602, "An unknown tool is an error")
         precondition((MCPServer.handle(["jsonrpc": "2.0", "id": 4, "method": "resources/list"])?["error"] as? [String: Any])?["code"] as? Int == -32601, "An unknown method is an error")
-        print("PASS: CLI arguments, add formats, bad arguments, pay/renew/delete-many/update-many/update-project/activity/candidates, MCP initialize with clientInfo and version, notifications, twenty-nine tools with schemas (none asks for a credential or reaches 实时状态; destructive and open-world hints), unknown tool and method")
+        print("PASS: CLI arguments, add formats, bad arguments, pay/renew/delete-many/update-many/update-project/activity/candidates, MCP initialize with clientInfo and version, notifications, thirty-one tools with schemas (AI usage: read, local switch only) (none asks for a credential or reaches 实时状态; destructive and open-world hints), unknown tool and method")
     }
 
     static func pretty(_ value: Any) -> String {
@@ -398,6 +403,7 @@ enum MCPServer {
             "iconHost": text("Site to take the icon from, e.g. wise.com: Assetboard fetches it itself over https (see iconStatus on the asset); empty removes the site icon"),
             "icon": text("An icon you already have, as data:image/png, jpeg or webp;base64,… up to 256 KB; shown instead of the site icon; empty removes it"),
             "hidden": ["type": "boolean", "description": "Updates only: true hides the asset (\(zh("隐藏: "))left out of lists, totals and reminders), false shows it again"],
+            "usageSource": ["type": "string", "enum": ["", "anthropic", "openai", "cursor", "copilot", "grok", "google", "opencode", "none"], "description": "AI plans: whose usage the record shows in \(L("AI 额度")) (list_ai_usage vendors); empty matches by provider, none shows no usage"],
             "stopped": ["type": "boolean", "description": "Updates only: true marks it \(L("已停用")) (servers, domains, repositories, databases, licenses, subscriptions, AI plans, deployments, storage, phone numbers), false in use again"],
         ]
     }
@@ -448,6 +454,8 @@ enum MCPServer {
             tool("get_asset", "Get one asset", "Return every stored field of one asset by id (masked like list_assets; a bank card or phone number is refused unless the person allows them), with relations (each linked asset and what the link means from this side, e.g. 付款卡, 登录账号, 所在服务器) and risks (an expiring card or phone it depends on). Icons come as hasCustomIcon / hasSiteIcon / siteIconHost / iconStatus, not image data. A repository carries repository: {visibility, defaultBranch, branches {count, more, new}, actions {state, workflow, branch, at, url} or null, unread (permissions the token lacks)}; branches and actions are what the last GitHub sync read with 仓库分支和 Actions on.", ["id": id], ["id"], readOnly: true),
             tool("add_assets", "Add assets", "Add up to 100 assets. They are written at once and the user can undo the batch with ⌘Z. An asset whose category already holds the same name is skipped and its id returned, so use update_asset for it. Returns {added, skipped, errors, warnings}.", ["items": items], ["items"], readOnly: false, openWorld: true),
             tool("update_asset", "Update an asset", "Change some fields of one asset; fields not given stay as they are, and an empty string clears one. A masked value (holding •) sent back as it was read is left as it is; any other value holding • is refused. Records synced from a platform (Cloudflare, GitHub, Namecheap, Porkbun, Hetzner, DigitalOcean, Vercel) keep their name and category; their other fields can change. Returns the updated asset.", ["id": id, "fields": fields], ["id", "fields"], readOnly: false, destructive: true, openWorld: true),
+            tool("list_ai_usage", "AI usage and plan limits", "What the AI tools signed in on this Mac have used and how much of their plans is left, read by the app from their local files (Claude Code, Codex, Copilot CLI, Grok CLI, opencode, Cursor's plan) and, where the person turned it on in the app, from a tool's own usage endpoint. Returns signals (most urgent first: full = a window at 95% or more, tight = 80% or more or on pace to run out before it resets, idle = a paid plan not used here for 14 days, low = well into the period and worth under half the price at API prices, value = worth more than the price), vendors [{vendor, name, sources, plan, assetId (the AI plan record it shows on), windows [{id (5h, week, month, premium…), usedPercent, resetsAt}], windowsFrom (local or api), lastUsed, days [{day, apiValueUsd, tokens, requests}], models, localBlock}] and sources [{id, found, local, endpoint, lastUsed, error}]. Numbers, model names and times only: never conversations, paths or credentials. apiValueUsd is what the tokens would cost at API list prices, not what was billed.", ["vendor": ["type": "string", "enum": ["anthropic", "openai", "cursor", "copilot", "grok", "google", "opencode"]]], [], readOnly: true),
+            tool("set_ai_usage_source", "Turn local AI usage reading on or off", "Turn reading one tool's local usage files on or off (source: claude, codex, cursor, copilot, grok or opencode). Reading a tool's usage endpoint with its login can only be turned on or off by the person in the app; endpoint is refused here. Which record shows a vendor's usage is update_asset usageSource.", ["source": ["type": "string", "enum": ["claude", "codex", "cursor", "copilot", "grok", "opencode", "antigravity"]], "local": ["type": "boolean"]], ["source", "local"], readOnly: false),
             tool("delete_asset", "Request deleting an asset", "Ask to delete one asset. Nothing is deleted right away: the user confirms in Assetboard, so this returns status \"pending\" and an actionId. Check it with get_action_status.", ["id": id, "reason": reason], ["id"], readOnly: false, destructive: true),
             tool("list_agent_activity", "List what tools did", "Assetboard's log of calls from external tools (MCP and assetboard-cli), newest first: at, client {id, name, by: clientInfo, process, env or none}, tool, kind (read or write), ok or error, params (what a read asked) and changes: for each record added, changed, removed or asked to delete, its id, name, type and the fields before and after (cut short; tokens and keys are never kept). Masked like list_assets. Filter by client (id or name, e.g. claude-code, codex, unknown), kind, since/until (dates) or assetId. Kept on this Mac only; the last 1000 calls.", ["client": text, "kind": ["type": "string", "enum": ["read", "write"]], "since": date, "until": date, "assetId": id, "limit": ["type": "integer", "minimum": 1, "maximum": 500]], [], readOnly: true),
             tool("list_agents", "List connected tools", "Tools on this Mac whose own config file names Assetboard (configured, the file looked at; the files are read, never changed, and never returned), and the tools that have called (seen: name, lastUsed, firstSeen, calls, identifiedBy).", [:], [], readOnly: true),
@@ -476,7 +484,7 @@ enum MCPServer {
 
     static let methods = ["get_cost_totals": "totals", "list_asset_types": "types", "list_assets": "list", "get_asset": "get", "add_assets": "add", "update_asset": "update", "delete_asset": "delete",
                           "get_cost_forecast": "forecast", "get_cost_history": "costHistory", "list_projects": "projects", "update_project": "updateProject", "list_unconfirmed_charges": "charges", "record_payment": "recordPayment", "renew_asset": "renew",
-                          "update_assets": "updateMany", "request_delete_assets": "deleteMany", "list_pending_actions": "actions", "get_action_status": "action",
+                          "update_assets": "updateMany", "request_delete_assets": "deleteMany", "list_ai_usage": "aiUsage", "set_ai_usage_source": "aiUsageSet", "list_pending_actions": "actions", "get_action_status": "action",
                           "list_icon_platforms": "iconPlatforms", "set_icon_site": "iconSite", "fetch_icons": "iconFetch",
                           "get_cloudflare_sync_status": "cloudflareStatus", "sync_cloudflare": "cloudflareSync", "list_sync_blocklist": "syncBlocklist", "unblock_sync_item": "syncUnblock",
                           "list_agent_activity": "activity", "list_agents": "agents", "list_import_candidates": "connectPending", "import_candidates": "connectImport"]
@@ -511,7 +519,7 @@ enum MCPServer {
                 "protocolVersion": protocolVersions.contains(asked) ? asked : protocolVersions[0],
                 "capabilities": ["tools": ["listChanged": false]],
                 "serverInfo": ["name": "assetboard", "title": "Assetboard", "version": AssetboardCLI.version],
-                "instructions": "Assetboard keeps a person's domains, servers, subscriptions, bank cards (last 4 digits only), phone numbers and accounts on their Mac. Adds and edits apply at once and can be undone in the app; deletes wait for the person's confirmation. IP addresses, SSH hosts and users, phone numbers and email addresses come masked with • and bank cards and phone numbers are left out, unless the person allows them in the app's settings; search matches the real values, and a value holding • is never written back (leave the field out to keep it). Live readings (probe sources, \(ssh)) are not available to these tools. Site icons and the Cloudflare sync can be steered too: letting a sync add back a deleted item waits for confirmation as well, and slow work answers with a status to look up later. Accounts, passwords and tokens are entered in the app only and never pass through these tools. Every call is written to a log on this Mac that the person can read in the app (and list_agent_activity returns), with this client's name. Assets found on connected platforms but not yet imported are listed by list_import_candidates. Never store passwords, verification codes or full card numbers."
+                "instructions": "Assetboard keeps a person's domains, servers, subscriptions, bank cards (last 4 digits only), phone numbers and accounts on their Mac. Adds and edits apply at once and can be undone in the app; deletes wait for the person's confirmation. IP addresses, SSH hosts and users, phone numbers and email addresses come masked with • and bank cards and phone numbers are left out, unless the person allows them in the app's settings; search matches the real values, and a value holding • is never written back (leave the field out to keep it). Live readings (probe sources, \(ssh)) are not available to these tools. list_ai_usage gives the AI tools' usage and plan limits as numbers; reading a tool's usage endpoint with its login is switched on in the app only. Site icons and the Cloudflare sync can be steered too: letting a sync add back a deleted item waits for confirmation as well, and slow work answers with a status to look up later. Accounts, passwords and tokens are entered in the app only and never pass through these tools. Every call is written to a log on this Mac that the person can read in the app (and list_agent_activity returns), with this client's name. Assets found on connected platforms but not yet imported are listed by list_import_candidates. Never store passwords, verification codes or full card numbers."
             ]
         case "ping":
             reply["result"] = [String: Any]()

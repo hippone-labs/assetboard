@@ -17,7 +17,7 @@ async (page) => {
   const pay=await p.evaluate(()=>({cards:[...document.querySelectorAll('.pano-card')].map(c=>c.dataset.lane+'='+[...c.querySelectorAll('.pano-chip')].map(x=>x.dataset.chip).join('+')),sub:document.querySelector('.pano-card[data-lane="demo-c1"] .pl-prov')?.textContent,tone:document.querySelector('.pano-card[data-lane="demo-c2"]').classList.contains('amber'),loose:document.querySelector('.pano-loose')?.getAttribute('aria-label'),looseIds:[...document.querySelectorAll('.pano-loose .pano-chip')].map(c=>c.dataset.chip),focus:document.activeElement?.dataset.lens}));
   check(pay.cards.join()==='demo-c1=demo-a1+demo-u3+demo-d3,demo-c2=demo-u1+demo-u2','Cards hold what they pay for: '+pay.cards.join());
   check(pay.sub==='Visa •••• 4242'&&pay.tone,'Card shows network and last four; the card near expiry is amber: '+JSON.stringify(pay));
-  check(pay.loose==='没记付款卡，3 项'&&pay.looseIds.join()==='demo-d1,demo-d2,demo-s1'&&pay.focus==='pay','The yearly domains and the monthly server have no card; focus stays on the switch: '+JSON.stringify(pay));
+  check(pay.loose==='没记付款卡，7 项'&&pay.looseIds.join()==='demo-a2,demo-a3,demo-a5,demo-a4,demo-d1,demo-d2,demo-s1'&&pay.focus==='pay','The AI plans the 额度 demo adds, the yearly domains and the monthly server have no card; focus stays on the switch: '+JSON.stringify(pay));
   // Remembered across opening and reloads.
   await p.keyboard.press('Escape');await p.keyboard.press('p');await p.waitForTimeout(200);
   check(await p.evaluate(()=>panoLens)==='pay','The lens is remembered when reopening');

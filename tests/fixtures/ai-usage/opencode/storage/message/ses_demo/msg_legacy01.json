@@ -1,0 +1,1 @@
+{"id":"msg_legacy01","sessionID":"ses_demo","role":"assistant","modelID":"claude-sonnet-4-5","providerID":"anthropic","mode":"build","path":{"cwd":"/work/demo-app","root":"/work/demo-app"},"cost":0.05,"tokens":{"input":1200,"output":300,"reasoning":0,"cache":{"read":5000,"write":100}},"time":{"created":1794056400000,"completed":1794056410000}}

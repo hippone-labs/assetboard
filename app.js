@@ -431,7 +431,7 @@ function itemHtml(a,{withType=false,grid=false}={}){
  const subHtml=withType&&impact.length?`${esc(cats[a.type].one)}${short?`<span class="sub-sep" aria-hidden="true">·</span>${esc(short)}`:''}${impactHtml}`:withType?`${esc(cats[a.type].one)}${a.reason?`<span class="sub-sep" aria-hidden="true">·</span><span class="r-reason">${esc(a.reason)}</span>`:sub.text?`<span class="sub-sep" aria-hidden="true">·</span>${sub.html}`:''}`:sub.html;
  // A server linked to a probe shows its state on a line under the address: in place of the implied 运行中, and red when offline.
  // 已停用, set by hand, still stands (the readings show beside it), and a stopped server is never drawn as down.
- const live=probeState(a),probeLine=live?liveRowHtml(a):'';
+ const live=probeState(a),probeLine=live?liveRowHtml(a):a.type==='ai'&&typeof aiQuotaRowHtml==='function'?aiQuotaRowHtml(a):'';
  const name=`<span class="r-name"><span class="r-text">${esc(displayName(a))}</span>${lockMark(a)}${stopRing(a)}${relMark(a)}</span>`,subSpan=`<span class="r-sub${sub.cls&&!withType?' '+sub.cls:''}"${sub.text?` title="${esc(sub.text)}"`:''}>${subHtml}</span>`;
  const selected=activeAsset===a.id&&!$('#detail').hidden,hero=grid?cardHero(a,e):'',when=hero?cardWhen(a,e):e;
  return `<div class="${grid?'gcard':'row'}${hero?' has-hero':''}${a.stopped?' stopped':''}${live&&!live.online&&!a.stopped?' probe-down':''}${isHidden(a)?' is-hidden':''}${selected?' selected':''}" data-asset="${esc(a.id)}"><button class="item-open" data-action="detail" data-id="${esc(a.id)}" aria-label="${esc(itemLabel(a,e,cost))}" title="${esc(hint)}">${tile(a,grid?'':'sm')}<span class="r-main">${name}${subSpan}${probeLine}${searchHit(a)}</span>${hero?`<span class="g-hero-wrap">${hero}</span>`:''}<span class="r-when">${statusHtml(when,!!a.date)}<span class="r-cost"${costHint(a)?` title="${esc(costHint(a))}"`:''}>${priceMark(a)}${esc(cost)}</span></span></button><span class="r-actions">${itemActions(a)}</span></div>`;
@@ -478,7 +478,8 @@ function boardHtml(v){
  const live=liveAssets();
  if(cats[v]){
   const list=arranged(v,live.filter(a=>a.type===v));
-  return {html:list.length?groupHtml({id:v,title:cats[v].name,list,reorder:true,head:false}):viewEmpty(`<span class="g-icon">${icon(v)}</span>`,tr('还没有{name}',{name:esc(cats[v].name)}),`<button class="button" data-action="add-asset" data-id="${v}">${ui('plus')}${tr('添加')}</button>`),count:list.length};
+  const band=v==='ai'&&typeof aiQuotaBandHtml==='function'?aiQuotaBandHtml(list):'';
+  return {html:list.length?band+groupHtml({id:v,title:cats[v].name,list,reorder:true,head:false}):viewEmpty(`<span class="g-icon">${icon(v)}</span>`,tr('还没有{name}',{name:esc(cats[v].name)}),`<button class="button" data-action="add-asset" data-id="${v}">${ui('plus')}${tr('添加')}</button>`),count:list.length};
  }
  const html=categoryIds().map(id=>{const list=arranged(id,live.filter(a=>a.type===id));if(!list.length)return '';const folded=!!state.blocks.find(b=>b.id===id)?.folded;return groupHtml({id,title:cats[id].name,glyph:typeGlyph(id),list,fold:true,folded,reorder:true,summary:groupSummary(list)+groupCostHtml(list),actions:categoryActions(id)});}).join('');
  return {html:html?overviewHtml(live)+html:viewEmpty(ui('stack'),tr('没有显示中的资产')),count:live.length};
@@ -1375,7 +1376,7 @@ function agentAsset(a){
  const masked=Object.keys(rest).filter(key=>JSON.stringify(rest[key])!==JSON.stringify(a[key]));
  const relations=linkedAssets(state.assets,a).map(x=>{const k=linkKind(a,x),meta=k.kind==='mount'?(x.type==='server'?linkMetaOf(a,x.id):linkMetaOf(x,a.id)):null;return {...(agentSees(x)?{id:x.id,name:agentShown(x).name}:{withheld:true}),type:x.type,relation:k.kind,label:k.label,...(meta?.standby?{standby:true}:{}),...(meta?.proxied?{proxied:true}:{})};});
  const money=moneyOn(a,localDay()),change=priceChange(a),charges=pendingChargesAsked([a]);
- return {...rest,...agentRepository(a),typeName:cats[a.type]?.name||a.type,billingType:billingTypeOf(a),billingTypeSet:BILLING_TYPES.includes(a.billingType),...(money?{currentPrice:{amount:money.value,currency:money.currency,months:money.months,basis:money.basis}}:{}),...(change?{priceChange:change}:{}),...(charges.length?{unconfirmedCharges:charges.map(c=>c.due)}:{}),hidden:isHidden(a),hasCustomIcon:!!customIconSrc(a),hasSiteIcon:!!siteIconSrc(a),relations,...(risks.length?{risks:risks.map(agentRiskText)}:{}),...(masked.length?{masked}:{}),...(status?{iconStatus:status}:{})};
+ return {...rest,...agentRepository(a),typeName:cats[a.type]?.name||a.type,billingType:billingTypeOf(a),billingTypeSet:BILLING_TYPES.includes(a.billingType),...(money?{currentPrice:{amount:money.value,currency:money.currency,months:money.months,basis:money.basis}}:{}),...(change?{priceChange:change}:{}),...(charges.length?{unconfirmedCharges:charges.map(c=>c.due)}:{}),hidden:isHidden(a),hasCustomIcon:!!customIconSrc(a),hasSiteIcon:!!siteIconSrc(a),relations,...(risks.length?{risks:risks.map(agentRiskText)}:{}),...(masked.length?{masked}:{}),...(status?{iconStatus:status}:{}),...(a.type==='ai'&&typeof aiQuotaAgent==='function'?aiQuotaAgent(a):{})};
 }
 // linkTo / unlinkFrom: ids of records to link or unlink, under the same rules as the picker (legal pairs, one account per server).
 function agentLinkIds(input,key){
@@ -1454,6 +1455,8 @@ function agentFields(input,type,base=null){
   if(key==='projectId')continue;
   if(key==='visibility'){if(type!=='repository')return {error:'visibility 只用于代码仓库'};if(base&&PLATFORM_SOURCES.includes(base.source))return {error:'这个仓库从 GitHub 同步，可见性以 GitHub 为准'};const text=raw==null?'':String(raw).trim();if(text&&!REPO_VISIBILITY[text])return {error:'visibility 只能是 public、private、archived 或留空'};fields.event=REPO_VISIBILITY[text]||'';continue;}
   if(key==='billingType'){const text=raw==null?'':String(raw).trim();if(text&&!BILLING_TYPES.includes(text))return {error:`billingType 只能是 ${BILLING_TYPES.join('、')} 或留空`};fields.billingType=text;continue;}
+  // AI 额度: which tool's usage an AI subscription shows (a vendor id), none for no usage, empty to match by vendor (ai-usage.js aiVendorOf).
+  if(key==='usageSource'){if(type!=='ai')return {error:'usageSource 只用于 AI 订阅'};const text=raw==null?'':String(raw).trim();if(text&&text!=='none'&&!Object.hasOwn(AI_USAGE_VENDORS,text))return {error:`usageSource 只能是 ${[...Object.keys(AI_USAGE_VENDORS),'none'].join('、')} 或留空（按服务商自动对应）`};fields.usageSource=text;continue;}
   const value=raw===null||raw===undefined?'':typeof raw==='number'?String(raw):key==='ips'&&Array.isArray(raw)?raw.join(', '):raw;
   if(typeof value!=='string')return {error:`${key} 需要是文字`};
   const text=value.trim();
@@ -1829,15 +1832,15 @@ document.addEventListener('submit',e=>{
 // for a write, each record it added, changed or removed with the fields before and after (assetChanges: cut short, images named,
 // anything that looks like a token or key replaced). The Mac app keeps the rows in its database, on this Mac only (AgentLog in
 // LocalDatabase.swift); the page holds the recent ones. hello (sent when an MCP client starts) only marks the tool as seen.
-const AGENT_READS=new Set(['types','list','get','totals','forecast','costHistory','projects','charges','actions','action','iconPlatforms','cloudflareStatus','syncBlocklist','activity','agents','connectPending','hello']);
-const AGENT_TOOL_NAMES={types:'list_asset_types',list:'list_assets',get:'get_asset',add:'add_assets',update:'update_asset',updateMany:'update_assets',delete:'delete_asset',deleteMany:'request_delete_assets',totals:'get_cost_totals',forecast:'get_cost_forecast',costHistory:'get_cost_history',projects:'list_projects',updateProject:'update_project',charges:'list_unconfirmed_charges',recordPayment:'record_payment',renew:'renew_asset',actions:'list_pending_actions',action:'get_action_status',iconPlatforms:'list_icon_platforms',iconSite:'set_icon_site',iconFetch:'fetch_icons',cloudflareStatus:'get_cloudflare_sync_status',cloudflareSync:'sync_cloudflare',syncBlocklist:'list_sync_blocklist',syncUnblock:'unblock_sync_item',activity:'list_agent_activity',agents:'list_agents',connectPending:'list_import_candidates',connectImport:'import_candidates'};
+const AGENT_READS=new Set(['types','list','get','totals','forecast','costHistory','projects','charges','actions','action','iconPlatforms','cloudflareStatus','syncBlocklist','activity','agents','connectPending','aiUsage','hello']);
+const AGENT_TOOL_NAMES={types:'list_asset_types',list:'list_assets',get:'get_asset',add:'add_assets',update:'update_asset',updateMany:'update_assets',delete:'delete_asset',deleteMany:'request_delete_assets',totals:'get_cost_totals',forecast:'get_cost_forecast',costHistory:'get_cost_history',projects:'list_projects',updateProject:'update_project',charges:'list_unconfirmed_charges',recordPayment:'record_payment',renew:'renew_asset',actions:'list_pending_actions',action:'get_action_status',iconPlatforms:'list_icon_platforms',iconSite:'set_icon_site',iconFetch:'fetch_icons',cloudflareStatus:'get_cloudflare_sync_status',cloudflareSync:'sync_cloudflare',syncBlocklist:'list_sync_blocklist',syncUnblock:'unblock_sync_item',activity:'list_agent_activity',agents:'list_agents',connectPending:'list_import_candidates',connectImport:'import_candidates',aiUsage:'list_ai_usage',aiUsageSet:'set_ai_usage_source'};
 const AGENT_LOG_KEEP=1000;
 let agentLogRows=Array.isArray(nativeStore?.agentLog)?nativeStore.agentLog.slice(0,AGENT_LOG_KEEP):demoMode&&typeof window.assetboardDemoAgentLog==='function'?window.assetboardDemoAgentLog():[];
 let agentSeen=Object.fromEntries((Array.isArray(nativeStore?.agentClients)?nativeStore.agentClients:demoMode&&typeof window.assetboardDemoAgentClients==='function'?window.assetboardDemoAgentClients():[]).filter(c=>c&&c.id).map(c=>[c.id,c]));
 let agentConfigs=Array.isArray(nativeStore?.agentConfigs)?nativeStore.agentConfigs:demoMode&&typeof window.assetboardDemoAgentConfigs==='function'?window.assetboardDemoAgentConfigs():[];
 // What a read asked for, in a few words; the arguments of writes show in their changes instead.
 function agentLogParams(method,params){
- const keep=['type','query','id','project','status','currency','groupBy','from','to','source','client','kind','name','platform','key'],out={};
+ const keep=['type','query','id','project','status','currency','groupBy','from','to','source','client','kind','name','platform','key','vendor','local'],out={};
  for(const key of keep)if(params&&params[key]!=null&&params[key]!==''&&typeof params[key]!=='object')out[key]=activityValue(params[key]);
  for(const key of ['items','updates','ids'])if(Array.isArray(params?.[key]))out[key]=String(params[key].length);
  return out;
@@ -2804,6 +2807,7 @@ function prefsDialog(section){
   full&&featureOn('agent')?link(tr('MCP 接入'),null,'agent-setup',tr('给外部工具的配置')):'',
   full&&typeof probeOn==='function'&&probeOn()?link(tr('探针数据源'),null,'probe-sources',tr('监控面板的地址和账号')):'',
   full&&typeof sshOn==='function'&&sshOn()?link(tr('SSH 直读'),null,'ssh-probe-open',tr('逐台开启、读取间隔')):'',
+  featureOn('aiUsage')&&typeof aiUsageDialog==='function'?link(tr('AI 额度'),null,'ai-usage-open',tr('本机 AI 工具的用量和订阅额度；用登录凭据读额度接口默认关')):'',
   full&&typeof platformOn==='function'&&platformOn()?link(tr('平台状态'),platform.sources.length>0,'platform-sources',tr('Supabase、Vercel、Render、Upstash 上的项目状态')):''].join(''):'';
  const edition=row(tr('版本类型'),`<span class="prefs-edition">${esc(typeof proEditionText==='function'&&proBuilt()?proEditionText():tr('免费版'))}</span>`);
  const about=[edition,nativeStore?row(tr('版本'),`<span class="prefs-version">${esc(nativeStore.version||'')}${mac?`<button class="button" data-action="check-updates">${tr('检查更新…')}</button>`:''}</span>`):'',
@@ -2836,6 +2840,7 @@ function prefsChanged(){if($('#modal').open&&$('#modal').dataset.view==='prefs')
 function setFeatureNow(key,on){
  setFeature(key,on);
  if(key==='panorama'&&!on&&typeof panoOpen!=='undefined'&&panoOpen)panoramaOpen(false);
+ if(key==='aiUsage'&&typeof aiUsageSwitch==='function')aiUsageSwitch(on);
  if(key==='probe'&&on){if(typeof probeStart==='function')probeStart();if(typeof sshStart==='function')sshStart();if(typeof platformStart==='function')platformStart();}
  drawTopnavActions();render();prefsChanged();toast(on?tr('{name}：已打开',{name:FEATURES[key].name}):tr('{name}：已关闭',{name:FEATURES[key].name}));
 }

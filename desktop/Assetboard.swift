@@ -1221,6 +1221,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         if let action = body["action"] as? String, action.hasPrefix("probe") { handleProbe(action, body); return }
         if let action = body["action"] as? String, action.hasPrefix("sshProbe") { handleSshProbe(action, body); return }
         if let action = body["action"] as? String, action.hasPrefix("platform") { handlePlatform(action, body); return }
+        // AI 额度与用量 (AIUsage.swift): local reading of the AI tools' files, and their usage endpoints once turned on per tool.
+        if let action = body["action"] as? String, action.hasPrefix("aiUsage") { handleAIUsage(action, body); return }
         // Cloudflare, GitHub and AI are Pro: the free edition has no bridge for them, so their messages are ignored.
         // 从注册商导入 (RegistrarImport.swift): Namecheap and Porkbun domain lists, read-only.
         if let action = body["action"] as? String, action == "registrarSync" || action == "registrarDisconnect" { handleRegistrar(action, body); return }
@@ -1403,6 +1405,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
             initial["agentClients"] = (try? store.database.listAgentClients()) ?? []
             initial["agentConfigs"] = AgentClients.scan()
         }
+        // AI 额度: which tools are read locally and which endpoints are on; the demo makes up its readings in the page.
+        initial["aiUsage"] = demoMode ? NSNull() as Any : ["sources": aiUsageMonitor.settings.summary] as Any
         #endif
         // Screenshots (the window can only be captured, not clicked): `--demo --open-asset=<id>` opens that record's detail,
         // `--demo --panorama` opens 全景, `--demo --probe-sources` the probe settings (探针数据源). Only the demo reads them.
@@ -2487,6 +2491,12 @@ if CommandLine.arguments.contains(Updater.launchCheckFlag) {
     testSSHHosts()
     #else
     print("PASS: SSH probe is not in the free edition")
+    #endif
+} else if CommandLine.arguments.contains("--test-ai-usage") {
+    #if !ASSETBOARD_FREE
+    testAIUsage()
+    #else
+    print("PASS: AI usage is not in the free edition")
     #endif
 } else if CommandLine.arguments.contains("--test-platform") {
     #if !ASSETBOARD_FREE

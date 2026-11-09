@@ -1,0 +1,9 @@
+{
+  "sessionId": "sess-0001",
+  "updatedAt": "2026-11-06T15:10:00Z",
+  "session": {"inputTokens": 61000, "outputTokens": 2100, "cachedReadTokens": 40000, "cacheCreationTokens": 0, "reasoningTokens": 300, "totalTokens": 63100, "modelCalls": 4, "costUsdTicks": 512000000, "turnCount": 2, "primaryModelId": "grok-code-fast-1"},
+  "turns": [
+    {"turnNumber": 1, "endedAt": "2026-11-06T15:00:00Z", "inputTokens": 21000, "outputTokens": 900, "cachedReadTokens": 10000, "cacheCreationTokens": 0, "reasoningTokens": 100, "totalTokens": 21900, "modelCalls": 2, "costUsdTicks": 212000000, "primaryModelId": "grok-code-fast-1"},
+    {"turnNumber": 2, "endedAt": "2026-11-06T15:10:00Z", "inputTokens": 40000, "outputTokens": 1200, "cachedReadTokens": 30000, "cacheCreationTokens": 0, "reasoningTokens": 200, "totalTokens": 41200, "modelCalls": 2, "costUsdTicks": 300000000, "costIsPartial": true, "primaryModelId": "grok-code-fast-1"}
+  ]
+}
