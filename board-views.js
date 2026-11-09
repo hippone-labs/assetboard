@@ -62,14 +62,14 @@ function timelineHtml(groups){
    const dates=s.days<0?[s.date]:occurrencesBetween({...a,date:s.date},Math.max(lo,dayNumber(s.date)),hi);if(!dates.length)return '';
    rows++;const tone=s.level==='overdue'?' overdue':s.level==='soon'?' soon':'',cost=costText(a);
    const marks=dates.map((d,i)=>`<i class="tl-mark${i?' later':tone}" style="left:${at(dayNumber(d))}"></i>`).join('');
-   const label=`<span class="tl-label${tone}" style="left:${at(dayNumber(dates[0]))}">${esc(s.days<0?s.label:shortDate(dates[0]))}${cost?` · ${esc(cost)}`:''}</span>`;
+   const first=(dayNumber(dates[0])-lo)/span,label=`<span class="tl-label${tone}${first>2/3?' before':''}" style="left:${at(dayNumber(dates[0]))}">${esc(s.days<0?s.label:shortDate(dates[0]))}${cost?` · ${esc(cost)}`:''}</span>`;
    return `<div class="tl-row" data-asset="${esc(a.id)}"><button class="item-open tl-name" data-action="detail" data-id="${esc(a.id)}" aria-label="${esc([displayName(a),s.label,cost].filter(Boolean).join(tr('，')))}">${tile(a,'sm')}<span class="r-text">${esc(displayName(a))}</span></button><div class="tl-track">${marks}${label}</div></div>`;
   }).join('');
   return lines?`<section class="tl-group" data-group="${esc(id)}" aria-label="${esc(title)}"><h2 class="tl-cat">${esc(title)}</h2>${lines}</section>`:'';
  }).join('');
  if(!rows)return {html:viewEmpty(ui('clock'),tr('还没有到期或扣款日期')),count:0};
  const head=`<div class="tl-head" aria-hidden="true"><span></span><div class="tl-months">${months.map(m=>`<span>${esc(m)}</span>`).join('')}</div></div>`;
- return {html:`<div class="timeline" style="--tl-at:${((today-lo)/span).toFixed(4)}">${head}${body}<div class="tl-today" aria-hidden="true"><span>${tr('今天',null,'hero')}</span></div></div>${undated?`<p class="tl-note">${tr('另有 {n} 项没有日期，没画在上面',{n:formatCount(undated)})}</p>`:''}`,count:rows};
+ return {html:`<div class="timeline"><div class="tl-chart" style="--tl-at:${((today-lo)/span).toFixed(4)}">${head}${body}<div class="tl-today" aria-hidden="true"><span>${tr('今天',null,'hero')}</span></div></div></div>${undated?`<p class="tl-note">${tr('另有 {n} 项没有日期，没画在上面',{n:formatCount(undated)})}</p>`:''}`,count:rows};
 }
 function shortDate(value){return new Date(dayNumber(value)*DAY_MS).toLocaleDateString(trLocale(),{month:'short',day:'numeric',timeZone:'UTC'});}
 
