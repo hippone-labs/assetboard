@@ -184,7 +184,9 @@ jobs:
           // The download buttons offer the disk image, byte for byte the one this run notarized.
           const { readFileSync } = await import('node:fs');
           const image = `Assetboard-macOS-arm64-${manifest.version}.dmg`;
-          for (const page of ['https://assetboard.app/', 'https://assetboard.app/en/']) {
+          // English at the root, Chinese under /zh/ (before that move, English under /en/: the site answers 404 for /zh/).
+          const second = (await fetch(`https://assetboard.app/zh/?release=${process.env.GITHUB_RUN_ID}`)).ok ? 'zh' : 'en';
+          for (const page of ['https://assetboard.app/', `https://assetboard.app/${second}/`]) {
             const html = await (await fetch(`${page}?release=${process.env.GITHUB_RUN_ID}`)).text();
             assert.ok(html.includes(`/downloads/${image}`), `${page} links ${image}`);
           }

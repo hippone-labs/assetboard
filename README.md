@@ -8,10 +8,10 @@
 
 [![build](https://github.com/hippone-labs/assetboard/actions/workflows/build.yml/badge.svg)](https://github.com/hippone-labs/assetboard/actions/workflows/build.yml)
 [![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
-[![macOS 15+](https://img.shields.io/badge/macOS-15%2B%20arm64-lightgrey)](https://assetboard.app/)
-[![Version](https://img.shields.io/badge/version-2026.11.5-lightgrey)](https://assetboard.app/)
+[![macOS 15+](https://img.shields.io/badge/macOS-15%2B%20arm64-lightgrey)](https://assetboard.app/zh/)
+[![Version](https://img.shields.io/badge/version-2026.11.5-lightgrey)](https://assetboard.app/zh/)
 
-[官网](https://assetboard.app) · [使用手册](GUIDE.md) · [English](README.en.md) · [问题反馈](https://github.com/hippone-labs/assetboard/issues/new/choose)
+[官网](https://assetboard.app/zh/) · [使用手册](GUIDE.md) · [English](README.en.md) · [问题反馈](https://github.com/hippone-labs/assetboard/issues/new/choose)
 
 </div>
 
@@ -37,7 +37,7 @@
 
 Assetboard 是一个本地 App：每条资产记下一个日期（到期、自动续费扣款、试用结束或取消截止，可以按月或按年重复）、费用、平台、账号和管理链接，资产之间可以建立关联。App 按这些日期排出待办、发系统通知，按费用算出合计。
 
-数据存在本机的 SQLite 文件里，不需要账号。界面是一套 HTML/CSS/JS，Mac App 用 WKWebView 加载它，同一套页面也能直接在浏览器里运行（功能少一些）。界面有简体中文和英文。
+数据存在本机的 SQLite 文件里，不需要账号。界面是一套 HTML/CSS/JS，Mac App 用 WKWebView 加载它，同一套页面也能直接在浏览器里运行（功能少一些）。界面默认英文，可在「设置」里换成简体中文。
 
 ## 记录什么
 
@@ -126,7 +126,7 @@ Assetboard 是一个本地 App：每条资产记下一个日期（到期、自�
 
 ## 安装
 
-从 [assetboard.app](https://assetboard.app/) 下载 `.dmg`，把 Assetboard 拖进「应用程序」。需要 macOS 15 或更高、Apple Silicon。安装包已签名并公证，App 内置更新。
+从 [assetboard.app](https://assetboard.app/zh/) 下载 `.dmg`，把 Assetboard 拖进「应用程序」。需要 macOS 15 或更高、Apple Silicon。安装包已签名并公证，App 内置更新。
 
 用演示数据启动（不读写你的数据，不联网）：
 

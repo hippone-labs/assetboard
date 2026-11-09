@@ -269,7 +269,7 @@ window.assetboardFxRates=r=>{
  render();if($('#modal').open&&$('#modal').dataset.view==='cost')costDialog();
 };
 function costScope(v){return query?liveAssets().filter(matches):cats[v]?liveAssets().filter(a=>a.type===v):v==='all'?liveAssets():projectViewName(v)?projectAssets(state.assets,projectViewName(v)):null;}
-function ratesNote(){return fx.fallback?`${fx.source} ${fx.date}${nativeStore&&!demoMode?tr('（还没取到今天的汇率）'):''}`:`${fx.source} ${fx.date}${fx.ok?'':tr('（今天没有取到，用的是上次的）')}`;}
+function ratesNote(){return fx.fallback?`${tr(fx.source)} ${fx.date}${nativeStore&&!demoMode?tr('（还没取到今天的汇率）'):''}`:`${tr(fx.source)} ${fx.date}${fx.ok?'':tr('（今天没有取到，用的是上次的）')}`;}
 function costDialog(){
  const v=currentView(),scope=costScope(v)||liveAssets(),cur=totalCurrency(),t=costTotals(scope,{currency:cur,rates:fx.rates});
  const label=query?tr('搜索“{query}”',{query}):cats[v]?cats[v].name:tr('全部资产');
@@ -1308,7 +1308,7 @@ function linksNote(a){
 // arrive while the list is open join it. Deleting is one undo step; keeping (or Esc) answers every listed request.
 let agentDeleteOpen=false,agentConfirmOpen=false;
 function agentDeleteDialog(){
- for(const item of intake.filter(i=>i.deleteId&&!state.assets.some(a=>a.id===i.deleteId))){answerAgentAction(item.actionId,item.deleteId,'deleted','确认前已删除');finishIntake(item.id);save();}
+ for(const item of intake.filter(i=>i.deleteId&&!state.assets.some(a=>a.id===i.deleteId))){answerAgentAction(item.actionId,item.deleteId,'deleted',tr('确认前已删除'));finishIntake(item.id);save();}
  const items=intake.filter(i=>i.deleteId);
  if(!items.length){if(agentDeleteOpen){agentDeleteDone();$('#modal').close();}return;}
  const dialog=$('#modal'),content=$('#modal-content');
@@ -1335,7 +1335,7 @@ document.addEventListener('submit',e=>{
  if(e.target.id!=='agent-delete')return;e.preventDefault();
  const chosen=new Set([...e.target.querySelectorAll('input[name="agent-delete"]:checked')].map(input=>input.value));
  const picked=intake.filter(i=>i.deleteId&&chosen.has(i.id)),ids=picked.map(i=>i.deleteId),listed=intake.filter(i=>i.deleteId).length;
- for(const item of picked)answerAgentAction(item.actionId,item.deleteId,state.assets.some(a=>a.id===item.deleteId)?'deleted':'failed',state.assets.some(a=>a.id===item.deleteId)?'':'记录已不存在');
+ for(const item of picked)answerAgentAction(item.actionId,item.deleteId,state.assets.some(a=>a.id===item.deleteId)?'deleted':'failed',state.assets.some(a=>a.id===item.deleteId)?'':tr('记录已不存在'));
  agentDeleteDone();$('#modal').close();
  const count=deleteAssets(ids);
  if(count)toast(count===listed?tr('已删除 {n} 项',{n:formatCount(count)}):tr('已删除 {n} 项，保留 {kept} 项',{n:formatCount(count),kept:formatCount(listed-count)}),true);
@@ -1378,33 +1378,33 @@ function agentAsset(a){
 function agentLinkIds(input,key){
  if(!(key in input))return [];
  const v=input[key];
- if(!Array.isArray(v)||v.length>50||v.some(id=>typeof id!=='string'))throw new Error(`${key} 需要是资产 id 数组（最多 50 个）`);
+ if(!Array.isArray(v)||v.length>50||v.some(id=>typeof id!=='string'))throw new Error(tr('{key} 需要是资产 id 数组（最多 50 个）',{key}));
  return [...new Set(v)];
 }
 function agentLinkProblem(a,id,linking){
  const x=state.assets.find(item=>item.id===id);
- if(!agentSees(x))return `找不到要${linking?'关联':'解除'}的资产 ${id.slice(0,100)}`;
+ if(!agentSees(x))return linking?tr('找不到要关联的资产 {id}',{id:id.slice(0,100)}):tr('找不到要解除的资产 {id}',{id:id.slice(0,100)});
  const linked=linkedAssets(state.assets,a).some(item=>item.id===id);
- if(linking&&!linked&&!linkAllowed(a,x))return `${cats[a.type].name}「${a.name}」不能关联${cats[x.type].name}「${x.name}」`;
- if(!linking&&!linked)return `「${a.name}」和「${x.name}」没有关联`;
+ if(linking&&!linked&&!linkAllowed(a,x))return tr('{type}「{name}」不能关联{other}「{otherName}」',{type:cats[a.type].one,name:a.name,other:cats[x.type].one,otherName:x.name});
+ if(!linking&&!linked)return tr('「{name}」和「{other}」没有关联',{name:a.name,other:x.name});
  return '';
 }
 // Icons from agents. iconHost: a domain the app fetches the site icon from (like 获取网站图标, recorded in 网络记录), applied
 // when it arrives; icon: an image the agent already has, held to the same rules as an uploaded custom icon. Empty clears either.
 const AGENT_ICON_BASE=1e9;let agentIconSequence=AGENT_ICON_BASE;const agentIconRequests=new Map(),agentIconStatus=new Map();
 function agentIconFetch(id,host){
- if(!nativeStore||demoMode){agentIconStatus.set(id,'failed: 网站图标只能在 Mac App 里获取');return 'failed';}
+ if(!nativeStore||demoMode){agentIconStatus.set(id,'failed: '+tr('网站图标只能在 Mac App 里获取'));return 'failed';}
  const platform=iconPlatformOf(iconSites(),host);if(Object.prototype.hasOwnProperty.call(iconSites(),platform))host=iconSiteFor(iconSites(),platform);
  const requestId=++agentIconSequence;agentIconRequests.set(requestId,{id,host});agentIconStatus.set(id,'fetching');
  window.webkit.messageHandlers.assetboard.postMessage({action:'iconFetch',requestId,host});
- setTimeout(()=>{if(agentIconRequests.delete(requestId))agentIconStatus.set(id,'failed: 超时');},30000);
+ setTimeout(()=>{if(agentIconRequests.delete(requestId))agentIconStatus.set(id,'failed: '+tr('超时'));},30000);
  return 'fetching';
 }
 function agentIconReply(result){
  const request=agentIconRequests.get(result.requestId);agentIconRequests.delete(result.requestId);
  const a=state.assets.find(x=>x.id===request.id);if(!a)return;
  const src=result.ok&&siteIconSrc({siteIcon:result.dataUrl});
- if(!src){agentIconStatus.set(a.id,`failed: ${String(result.error||'没有获取到可用的图标').slice(0,120)}`);return;}
+ if(!src){agentIconStatus.set(a.id,`failed: ${String(result.error||tr('没有获取到可用的图标')).slice(0,120)}`);return;}
  agentIconStatus.delete(a.id);
  a.siteIcon=src;a.siteIconHost=String(result.host||request.host);save();render();if(activeAsset===a.id)showDetail(a.id);
 }
@@ -1413,14 +1413,14 @@ function agentIconFields(input){
  const out={};
  if('icon' in input){
   const v=input.icon==null?'':input.icon;
-  if(typeof v!=='string')return {error:'icon 需要是 data:image/png、jpeg 或 webp 的 base64 文字'};
-  if(v&&!customIconSrc({iconData:v}))return {error:'icon 需要是 data:image/png、jpeg 或 webp 的 base64，且不超过 256 KB'};
-  if(v&&Math.floor(v.split(',')[1].length*3/4)>256*1024)return {error:'icon 不能超过 256 KB'};
+  if(typeof v!=='string')return {error:tr('icon 需要是 data:image/png、jpeg 或 webp 的 base64 文字')};
+  if(v&&!customIconSrc({iconData:v}))return {error:tr('icon 需要是 data:image/png、jpeg 或 webp 的 base64，且不超过 256 KB')};
+  if(v&&Math.floor(v.split(',')[1].length*3/4)>256*1024)return {error:tr('icon 不能超过 256 KB')};
   out.icon=v;
  }
  if('iconHost' in input){
   const v=input.iconHost==null?'':input.iconHost;
-  if(typeof v!=='string'||v.length>300)return {error:'iconHost 需要是域名或网址，例如 wise.com'};
+  if(typeof v!=='string'||v.length>300)return {error:tr('iconHost 需要是域名或网址，例如 wise.com')};
   out.iconHost=v.trim();
  }
  return out;
@@ -1432,57 +1432,57 @@ function agentApplyIcon(a,icon){
 function agentEvent(fields){if(fields.type==='repository'&&Object.values(REPO_VISIBILITY).includes(fields.event))return fields.event;return fields.date?`${fields.date} ${dateKinds[fields.dateKind||'expire'].future}`:'日期待补充';}
 // Checks fields sent from outside for one asset of the given type: the fields to write, or the first problem found.
 function agentFields(input,type,base=null){
- if(!input||typeof input!=='object'||Array.isArray(input))return {error:'字段需要是对象'};
+ if(!input||typeof input!=='object'||Array.isArray(input))return {error:tr('字段需要是对象')};
  const fields={},ignored=[],after=[],actions=ACTION_FIELDS[type]||[];
  for(const [key,raw] of Object.entries(input)){
   // A masked value (as reads return addresses and contact details, maskAsset's agent set) is never written back: sent back as it
   // was read it leaves the field as it is, any other value holding the mask mark is refused.
-  if(hasMask(raw)){if(base&&JSON.stringify(raw)===JSON.stringify(agentMask(base)[key]))continue;return {error:`${key} 里有遮蔽符号 ${MASK_MARK}，是读取时遮住的值，不能写回；不改就不要传这个字段，要改请给出完整的值`};}
+  if(hasMask(raw)){if(base&&JSON.stringify(raw)===JSON.stringify(agentMask(base)[key]))continue;return {error:tr('{key} 里有遮蔽符号 {mark}，是读取时遮住的值，不能写回；不改就不要传这个字段，要改请给出完整的值',{key,mark:MASK_MARK})};}
   if(['type','id','icon','iconHost','linkTo','unlinkFrom','amount','currency','promotion'].includes(key))continue;
   // Updates only: hidden and stopped (true or false, like 隐藏 and 已停用), and fields a Pro script adds.
   if(key==='hidden'||key==='stopped'||Object.hasOwn(proSlots.agentFields,key)){
    if(!base){ignored.push(key);continue;}
-   if(key==='hidden'){if(typeof raw!=='boolean')return {error:'hidden 需要是 true 或 false'};fields.hiddenAt=raw?base.hiddenAt||new Date().toISOString():null;continue;}
-   if(key==='stopped'){if(typeof raw!=='boolean')return {error:'stopped 需要是 true 或 false'};if(raw&&!STOPPABLE.includes(type))return {error:`只有${STOPPABLE.map(t=>cats[t].name).join('、')}可以标为停用`};fields.stopped=raw||null;continue;}
+   if(key==='hidden'){if(typeof raw!=='boolean')return {error:tr('hidden 需要是 true 或 false')};fields.hiddenAt=raw?base.hiddenAt||new Date().toISOString():null;continue;}
+   if(key==='stopped'){if(typeof raw!=='boolean')return {error:tr('stopped 需要是 true 或 false')};if(raw&&!STOPPABLE.includes(type))return {error:tr('只有{types}可以标为停用',{types:STOPPABLE.map(t=>cats[t].name).join(tr('、'))})};fields.stopped=raw||null;continue;}
    const pro=proSlots.agentFields[key](raw,{...base,type});if(pro.error)return {error:pro.error};fields[key]=pro.value;if(pro.after)after.push(pro.after);continue;
   }
   // A project name, several separated by commas, or a list: a record can serve more than one project.
-  if(key==='project'||key==='projectId'&&!('project' in input)){if(raw!=null&&typeof raw!=='string'&&!(Array.isArray(raw)&&raw.every(x=>typeof x==='string')))return {error:`${key} 需要是文字或文字列表`};const names=parseProjects(raw);fields.project=names.length>1?names:names[0]||'';continue;}
+  if(key==='project'||key==='projectId'&&!('project' in input)){if(raw!=null&&typeof raw!=='string'&&!(Array.isArray(raw)&&raw.every(x=>typeof x==='string')))return {error:tr('{key} 需要是文字或文字列表',{key})};const names=parseProjects(raw);fields.project=names.length>1?names:names[0]||'';continue;}
   if(key==='projectId')continue;
-  if(key==='visibility'){if(type!=='repository')return {error:'visibility 只用于代码仓库'};if(base&&PLATFORM_SOURCES.includes(base.source))return {error:'这个仓库从 GitHub 同步，可见性以 GitHub 为准'};const text=raw==null?'':String(raw).trim();if(text&&!REPO_VISIBILITY[text])return {error:'visibility 只能是 public、private、archived 或留空'};fields.event=REPO_VISIBILITY[text]||'';continue;}
-  if(key==='billingType'){const text=raw==null?'':String(raw).trim();if(text&&!BILLING_TYPES.includes(text))return {error:`billingType 只能是 ${BILLING_TYPES.join('、')} 或留空`};fields.billingType=text;continue;}
+  if(key==='visibility'){if(type!=='repository')return {error:tr('visibility 只用于代码仓库')};if(base&&PLATFORM_SOURCES.includes(base.source))return {error:tr('这个仓库从 GitHub 同步，可见性以 GitHub 为准')};const text=raw==null?'':String(raw).trim();if(text&&!REPO_VISIBILITY[text])return {error:tr('{key} 只能是 {values} 或留空',{key:'visibility',values:Object.keys(REPO_VISIBILITY).join(tr('、'))})};fields.event=REPO_VISIBILITY[text]||'';continue;}
+  if(key==='billingType'){const text=raw==null?'':String(raw).trim();if(text&&!BILLING_TYPES.includes(text))return {error:tr('{key} 只能是 {values} 或留空',{key:'billingType',values:BILLING_TYPES.join(tr('、'))})};fields.billingType=text;continue;}
   const value=raw===null||raw===undefined?'':typeof raw==='number'?String(raw):key==='ips'&&Array.isArray(raw)?raw.join(', '):raw;
-  if(typeof value!=='string')return {error:`${key} 需要是文字`};
+  if(typeof value!=='string')return {error:tr('{key} 需要是文字',{key})};
   const text=value.trim();
   // The import gate's row check (`secretKinds`): no field of a record takes a full card number, a private key, a token or a TOTP secret.
   const found=secretKinds(text);
-  if(found.includes('card'))return {error:`${key} 像是完整卡号；Assetboard 只保存卡号后 4 位（last4）`};
-  if(found.length)return {error:`${key} 里像是私钥、访问令牌或 TOTP 密钥；Assetboard 不保存密钥`};
+  if(found.includes('card'))return {error:tr('{key} 像是完整卡号；Assetboard 只保存卡号后 4 位（last4）',{key})};
+  if(found.length)return {error:tr('{key} 里像是私钥、访问令牌或 TOTP 密钥；Assetboard 不保存密钥',{key})};
   // 找回 and 备份 (research round 4): only for the types they apply to, places only.
   if(['mfa','mfaWhere','recoveryCodes','vault','legacy','backup','backupNote','restoreTestedOn','importance'].includes(key)){
    const types=key==='importance'?null:key==='legacy'?Object.keys(LEGACY_WORDS):['mfa','mfaWhere','recoveryCodes','vault'].includes(key)?RECOVERY_TYPES:BACKUP_TYPES;
-   if(types&&!types.includes(type))return {error:`${key} 只用于${types.map(t=>cats[t].name).join('、')}`};
+   if(types&&!types.includes(type))return {error:tr('{key} 只用于{types}',{key,types:types.map(t=>cats[t].name).join(tr('、'))})};
    const words={mfa:MFA_KINDS,legacy:LEGACY_STATES,backup:BACKUP_KINDS,importance:IMPORTANCE}[key];
-   if(words){if(text&&!words[text])return {error:`${key} 只能是 ${Object.keys(words).join('、')} 或留空`};fields[key]=text;continue;}
-   if(key==='restoreTestedOn'){const day=text?parseLooseDate(text):'';if(text&&!day)return {error:'restoreTestedOn 无法识别，请用 2026-05-01'};fields[key]=day;continue;}
-   if(text.length>(key==='backupNote'?100:60))return {error:`${key} 最多 ${key==='backupNote'?100:60} 字`};
-   if(looksLikeSecret(text)||looksLikeCardNumber(text))return {error:`${key} 像是验证码、恢复码或密钥；这里只记它放在哪`};
+   if(words){if(text&&!words[text])return {error:tr('{key} 只能是 {values} 或留空',{key,values:Object.keys(words).join(tr('、'))})};fields[key]=text;continue;}
+   if(key==='restoreTestedOn'){const day=text?parseLooseDate(text):'';if(text&&!day)return {error:tr('{key} 无法识别，请用 {example}',{key:'restoreTestedOn',example:'2026-05-01'})};fields[key]=day;continue;}
+   if(text.length>(key==='backupNote'?100:60))return {error:tr('{key} 最多 {n} 字',{key,n:key==='backupNote'?100:60})};
+   if(looksLikeSecret(text)||looksLikeCardNumber(text))return {error:tr('{key} 像是验证码、恢复码或密钥；这里只记它放在哪',{key})};
    fields[key]=text;continue;
   }
   if(key in AGENT_TEXT_FIELDS){
-   if(text.length>AGENT_TEXT_FIELDS[key])return {error:`${key} 最多 ${AGENT_TEXT_FIELDS[key]} 字`};
+   if(text.length>AGENT_TEXT_FIELDS[key])return {error:tr('{key} 最多 {n} 字',{key,n:AGENT_TEXT_FIELDS[key]})};
    fields[key]=text;
-  }else if(key==='date'){const date=text?parseLooseDate(text):'';if(text&&!date)return {error:'date 无法识别，请用 2027-03-01'};fields.date=date;}
-  else if(key==='dateKind'){if(!dateKinds[text])return {error:`dateKind 只能是 ${Object.keys(dateKinds).join('、')}`};fields.dateKind=text;}
-  else if(key==='cycle'){if(text&&!billingCycles[text])return {error:`cycle 只能是 ${Object.keys(billingCycles).join('、')} 或留空`};fields.cycle=text;}
-  else if(key==='url'){const url=text?safeManagementUrl(text):'';if(text&&!url)return {error:'url 需要是不含账号密码的 http 或 https 链接'};fields.url=url;}
-  else if(key==='region'){const code=text.toUpperCase();if(code&&!regionName(code))return {error:'region 需要是国家或地区代码，例如 US、HK、GB'};fields.region=code;}
-  else if(key==='last4'){if(text&&!/^\d{4}$/.test(text))return {error:'last4 只能是 4 位数字'};fields.last4=text;}
-  else if(key==='network'){if(text&&!cardNetworks.includes(text))return {error:`network 只能是 ${cardNetworks.join('、')}`};fields.network=text;}
-  else if(key==='cardStatus'){if(text&&!CARD_STATUSES[text])return {error:`cardStatus 只能是 ${Object.keys(CARD_STATUSES).join('、')} 或留空（正常）`};fields.cardStatus=text;}
-  else if(key==='phoneStatus'){if(text&&!PHONE_STATUSES[text])return {error:`phoneStatus 只能是 ${Object.keys(PHONE_STATUSES).join('、')} 或留空（正常）`};fields.phoneStatus=text;}
-  else if(key==='phone'){if(text.length>30)return {error:'phone 最多 30 字'};fields.phone=text;}
-  else if(actions.some(([name])=>name===key)){if(!validActionField(key,text))return {error:`${key} 格式不对`};fields[key]=key==='ips'?parseIps(text).ips.map(x=>x.ip):text;}
+  }else if(key==='date'){const date=text?parseLooseDate(text):'';if(text&&!date)return {error:tr('{key} 无法识别，请用 {example}',{key:'date',example:'2027-03-01'})};fields.date=date;}
+  else if(key==='dateKind'){if(!dateKinds[text])return {error:tr('{key} 只能是 {values}',{key:'dateKind',values:Object.keys(dateKinds).join(tr('、'))})};fields.dateKind=text;}
+  else if(key==='cycle'){if(text&&!billingCycles[text])return {error:tr('{key} 只能是 {values} 或留空',{key:'cycle',values:Object.keys(billingCycles).join(tr('、'))})};fields.cycle=text;}
+  else if(key==='url'){const url=text?safeManagementUrl(text):'';if(text&&!url)return {error:tr('url 需要是不含账号密码的 http 或 https 链接')};fields.url=url;}
+  else if(key==='region'){const code=text.toUpperCase();if(code&&!regionName(code))return {error:tr('region 需要是国家或地区代码，例如 US、HK、GB')};fields.region=code;}
+  else if(key==='last4'){if(text&&!/^\d{4}$/.test(text))return {error:tr('last4 只能是 4 位数字')};fields.last4=text;}
+  else if(key==='network'){if(text&&!cardNetworks.includes(text))return {error:tr('{key} 只能是 {values}',{key:'network',values:cardNetworks.join(tr('、'))})};fields.network=text;}
+  else if(key==='cardStatus'){if(text&&!CARD_STATUSES[text])return {error:tr('{key} 只能是 {values} 或留空（正常）',{key:'cardStatus',values:Object.keys(CARD_STATUSES).join(tr('、'))})};fields.cardStatus=text;}
+  else if(key==='phoneStatus'){if(text&&!PHONE_STATUSES[text])return {error:tr('{key} 只能是 {values} 或留空（正常）',{key:'phoneStatus',values:Object.keys(PHONE_STATUSES).join(tr('、'))})};fields.phoneStatus=text;}
+  else if(key==='phone'){if(text.length>30)return {error:tr('{key} 最多 {n} 字',{key:'phone',n:30})};fields.phone=text;}
+  else if(actions.some(([name])=>name===key)){if(!validActionField(key,text))return {error:tr('{key} 格式不对',{key})};fields[key]=key==='ips'?parseIps(text).ips.map(x=>x.ip):text;}
   else ignored.push(key);
  }
  // amount + currency write the cost text together with the cycle; currency alone corrects the currency of the amount already there.
@@ -1492,8 +1492,8 @@ function agentFields(input,type,base=null){
   if(raw===null||raw===''){fields.cost='未知';}
   else if(value===0){fields.cost='免费';if(!('billingType' in fields))fields.billingType='free';}
   else{
-   if(typeof value!=='number'||!Number.isFinite(value)||value<0||value>1e9)return {error:'amount 需要是不小于 0 的数字（0 表示免费）'};
-   if(!/^[A-Z]{3}$/.test(code)||!(code in FALLBACK_RATES.rates))return {error:`currency 需要是 ${Object.keys(FALLBACK_RATES.rates).join('、')} 之一`};
+   if(typeof value!=='number'||!Number.isFinite(value)||value<0||value>1e9)return {error:tr('amount 需要是不小于 0 的数字（0 表示免费）')};
+   if(!/^[A-Z]{3}$/.test(code)||!(code in FALLBACK_RATES.rates))return {error:tr('{key} 需要是 {values} 之一',{key:'currency',values:Object.keys(FALLBACK_RATES.rates).join(tr('、'))})};
    const cycle='cycle' in fields?fields.cycle:base?.cycle||'';
    fields.cost=formatCost({currency:code,value:String(Math.round(value*100)/100)},cycle);
    if(fields.billingType===undefined&&base?.billingType==='free')fields.billingType='';
@@ -1504,23 +1504,23 @@ function agentFields(input,type,base=null){
   const raw=input.promotion;
   if(raw===null||raw===''||(raw&&typeof raw==='object'&&!Object.keys(raw).length))fields.promotion=null;
   else{
-   if(typeof raw!=='object'||Array.isArray(raw))return {error:'promotion 需要是对象 {start, end, amount, regularAmount, currency}'};
+   if(typeof raw!=='object'||Array.isArray(raw))return {error:tr('promotion 需要是对象 {start, end, amount, regularAmount, currency}')};
    const date=key=>{const t=raw[key]==null?'':String(raw[key]).trim();return t?parseLooseDate(t):'';};
    const fresh=fields.cost?costParts(fields.cost):null,own=fresh?{value:Number(fresh.value),currency:fresh.currency}:base?costAmount(base):null,start=date('start'),end=date('end');
-   if(raw.start&&!start)return {error:'promotion.start 无法识别，请用 2026-11-01'};
-   if(!end)return {error:'promotion.end 必填，例如 2026-12-31'};
+   if(raw.start&&!start)return {error:tr('{key} 无法识别，请用 {example}',{key:'promotion.start',example:'2026-11-01'})};
+   if(!end)return {error:tr('promotion.end 必填，例如 2026-12-31')};
    const promo=validPromotion({start,end,amount:raw.amount,regularAmount:raw.regularAmount??own?.value,currency:raw.currency||own?.currency||defaultCurrency()});
-   if(!promo)return {error:'promotion 需要 end、不小于 0 的 amount、大于 0 的 regularAmount，start 不晚于 end，币种为三位代码'};
+   if(!promo)return {error:tr('promotion 需要 end、不小于 0 的 amount、大于 0 的 regularAmount，start 不晚于 end，币种为三位代码')};
    fields.promotion=promo;
   }
  }
  return {fields,ignored,after};
 }
-function agentFind(id){const a=state.assets.find(x=>x.id===id);if(!a)throw new Error(`找不到资产 ${String(id).slice(0,100)}`);if(!agentSees(a))throw new Error(`资产 ${String(id).slice(0,100)} 是银行卡或手机号，不交给外部工具；要交给它们，在 Assetboard 的 设置 › 功能 里打开「把银行卡和手机号交给 AI 工具」`);return a;}
+function agentFind(id){const a=state.assets.find(x=>x.id===id);if(!a)throw new Error(tr('找不到资产 {id}',{id:String(id).slice(0,100)}));if(!agentSees(a))throw new Error(tr('资产 {id} 是银行卡或手机号，不交给外部工具；要交给它们，在 Assetboard 的 设置 › 功能 里打开「把银行卡和手机号交给 AI 工具」',{id:String(id).slice(0,100)}));return a;}
 const agentMethods={
  types:()=>Object.entries(cats).map(([id,c])=>({id,name:c.name,hint:c.hint,...(assetProfiles[id]?.fixedProvider?{provider:assetProfiles[id].fixedProvider}:{providers:providerPresets(id)}),...(id==='ai'?{plans:AI_PLANS.map(p=>({name:p.name,provider:p.provider,cost:aiPlanFields(p).cost,...(p.yearly?{yearlyCost:aiPlanFields(p,'yearly').cost}:{}),checked:p.checked}))}:{})})),
  list:({type='',query:text='',includeHidden=false,limit=100,offset=0,project='',billingType=''})=>{
-  if(billingType&&!BILLING_TYPES.includes(billingType))throw new Error(`billingType 只能是 ${BILLING_TYPES.join('、')}`);
+  if(billingType&&!BILLING_TYPES.includes(billingType))throw new Error(tr('{key} 只能是 {values}',{key:'billingType',values:BILLING_TYPES.join(tr('、'))}));
   const needle=String(text||'').trim().toLowerCase();
   const scope=agentScope({type,project,includeHidden}),withheld=agentWithheldCount(agentScope({type,project,includeHidden},true));
   const hits=scope.filter(a=>(!billingType||billingTypeOf(a)===billingType)&&(!needle||`${searchText(a)} ${[a.notes,a.host,a.sshUser].filter(Boolean).join(' ').toLowerCase()}`.includes(needle)));
@@ -1531,11 +1531,11 @@ const agentMethods={
  // Recurring cost in one currency (records keep their own), by category and largest first, with what could not be counted.
  totals:({currency='',type='',project='',groupBy=''})=>{
   const cur=agentCurrency(currency);
-  if(groupBy&&!['project','type'].includes(groupBy))throw new Error('groupBy 只能是 project、type');
+  if(groupBy&&!['project','type'].includes(groupBy))throw new Error(tr('{key} 只能是 {values}',{key:'groupBy',values:['project','type'].join(tr('、'))}));
   const scope=agentScope({type,project}),t=costTotals(scope,{currency:cur,rates:fx.rates}),round=n=>Math.round(n*100)/100;
   const keysOf=a=>groupBy==='project'?(projectsOf(a).length?projectsOf(a):['']):[a[groupBy]||''];
   const groups=groupBy?[...new Set(scope.flatMap(keysOf))].map(key=>{const g=costTotals(scope.filter(a=>keysOf(a).includes(key)),{currency:cur,rates:fx.rates});return {[groupBy]:key||null,monthly:round(g.monthly),yearly:round(g.yearly),oneOff:round(g.oneOffTotal),count:g.items.length};}).sort((x,y)=>y.monthly-x.monthly):null;
-  return {currency:cur,monthly:round(t.monthly),yearly:round(t.yearly),rates:{date:fx.date,source:fx.source,current:!fx.fallback&&fx.ok},
+  return {currency:cur,monthly:round(t.monthly),yearly:round(t.yearly),rates:{date:fx.date,source:tr(fx.source),current:!fx.fallback&&fx.ok},
    byType:t.byType.map(([id,m])=>({type:id,typeName:cats[id]?.name||id,monthly:round(m)})),
    items:t.items.map(({asset,monthly})=>({id:asset.id,name:asset.name,cost:asset.cost,monthly:round(monthly)})),
    oneOffTotal:round(t.oneOffTotal),...(groups?{groups}:{}),
@@ -1543,24 +1543,24 @@ const agentMethods={
  },
  add:({items})=>{
   const list=Array.isArray(items)?items:items&&typeof items==='object'?[items]:null;
-  if(!list?.length)throw new Error('items 需要是资产数组');
-  if(list.length>AGENT_LIMIT)throw new Error(`一次最多 ${AGENT_LIMIT} 项`);
+  if(!list?.length)throw new Error(tr('items 需要是资产数组'));
+  if(list.length>AGENT_LIMIT)throw new Error(tr('一次最多 {n} 项',{n:AGENT_LIMIT}));
   const now=new Date().toISOString(),planned=[],skipped=[],errors=[],warnings=[],iconHosts=new Map(),linkPlans=[];
   list.forEach((item,index)=>{
    // A plan name ("Claude Max") fills name, vendor, price, cycle and link; fields given beside it win.
    if(item&&typeof item==='object'&&!Array.isArray(item)&&item.plan!=null){
-    const plan=findAiPlan(item.plan);if(!plan){errors.push({index,error:`未知套餐 ${String(item.plan).slice(0,60)}，可用：${AI_PLANS.map(p=>p.name).join('、')}`});return;}
+    const plan=findAiPlan(item.plan);if(!plan){errors.push({index,error:tr('未知套餐 {plan}，可用：{names}',{plan:String(item.plan).slice(0,60),names:AI_PLANS.map(p=>p.name).join(tr('、'))})});return;}
     const {plan:_,cycle,...rest}=item;item={type:'ai',...aiPlanFields(plan,cycle==='yearly'?'yearly':'monthly'),...rest};
    }
    const name=typeof item?.name==='string'?item.name.trim():'';
-   if(!name){errors.push({index,error:'缺少 name'});return;}
+   if(!name){errors.push({index,error:tr('缺少 name')});return;}
    const type=item.type?String(item.type):inferTypeFromName(name)||'subscription';
-   if(!cats[type]){errors.push({index,error:`未知类别 ${type}，可用：${Object.keys(cats).join('、')}`});return;}
+   if(!cats[type]){errors.push({index,error:tr('未知类别 {type}，可用：{types}',{type,types:Object.keys(cats).join(tr('、'))})});return;}
    const checked=agentFields(item,type),icon=agentIconFields(item);
    if(checked.error||icon.error){errors.push({index,error:checked.error||icon.error});return;}
    let linkTo;try{linkTo=agentLinkIds(item,'linkTo');}catch(error){errors.push({index,error:error.message});return;}
    const same=[...state.assets,...planned].find(a=>a.type===type&&String(a.name).trim().toLowerCase()===name.toLowerCase());
-   if(same){skipped.push({index,...(agentSees(same)?{id:same.id}:{}),name:same.name,reason:agentSees(same)?'同类别已有同名资产，要修改请用 update':'同类别已有同名资产'});return;}
+   if(same){skipped.push({index,...(agentSees(same)?{id:same.id}:{}),name:same.name,reason:agentSees(same)?tr('同类别已有同名资产，要修改请用 update'):tr('同类别已有同名资产')});return;}
    const profile=assetProfiles[type]||{};
    const fields={provider:'',account:'',purpose:'',reason:'',date:'',dateKind:profile.dateKind||'expire',cycle:'',cost:'未知',notes:'',url:'',...checked.fields};
    if(profile.fixedProvider)fields.provider=profile.fixedProvider;
@@ -1590,8 +1590,8 @@ const agentMethods={
  },
  // Batch edit: every item is checked first; the valid ones are written together as one undo step, the rest say why not.
  updateMany:({updates})=>{
-  if(!Array.isArray(updates)||!updates.length)throw new Error('updates 需要是 [{id, fields}] 数组');
-  if(updates.length>AGENT_LIMIT)throw new Error(`一次最多 ${AGENT_LIMIT} 项`);
+  if(!Array.isArray(updates)||!updates.length)throw new Error(tr('updates 需要是 [{id, fields}] 数组'));
+  if(updates.length>AGENT_LIMIT)throw new Error(tr('一次最多 {n} 项',{n:AGENT_LIMIT}));
   const plans=[],results=[];
   updates.forEach((item,index)=>{try{plans.push({index,plan:agentPrepareUpdate(item?.id,item?.fields)});}catch(error){results[index]={index,id:item?.id??null,ok:false,error:String(error?.message||error)};}});
   if(plans.length){
@@ -1605,24 +1605,24 @@ const agentMethods={
  // Never deletes by itself: the request waits for the person, who confirms every listed record in one list. The returned
  // actionId can be looked up with action / actions. Asking again for a record that already waits is folded into that request.
  delete:({id,reason=''})=>agentRequestDelete([id],reason),
- deleteMany:({ids,reason=''})=>{if(!Array.isArray(ids)||!ids.length)throw new Error('ids 需要是资产 id 数组');if(ids.length>AGENT_LIMIT)throw new Error(`一次最多 ${AGENT_LIMIT} 项`);return agentRequestDelete(ids,reason);},
+ deleteMany:({ids,reason=''})=>{if(!Array.isArray(ids)||!ids.length)throw new Error(tr('ids 需要是资产 id 数组'));if(ids.length>AGENT_LIMIT)throw new Error(tr('一次最多 {n} 项',{n:AGENT_LIMIT}));return agentRequestDelete(ids,reason);},
  actions:({status='',limit=50})=>{
-  const want=String(status||'');if(want&&!['pending','done','cancelled','failed'].includes(want))throw new Error('status 只能是 pending、done、cancelled、failed 或留空');
+  const want=String(status||'');if(want&&!['pending','done','cancelled','failed'].includes(want))throw new Error(tr('{key} 只能是 {values} 或留空',{key:'status',values:['pending','done','cancelled','failed'].join(tr('、'))}));
   const list=agentActionList().filter(a=>!want||a.status===want).slice(-Math.min(Math.max(Number(limit)||50,1),200)).reverse();
   return {total:list.length,pending:agentActionList().filter(a=>a.status==='pending').length,actions:list};
  },
- action:({id})=>{const a=agentActionList().find(x=>x.id===id);if(!a)throw new Error(`找不到请求 ${String(id).slice(0,60)}`);return a;},
+ action:({id})=>{const a=agentActionList().find(x=>x.id===id);if(!a)throw new Error(tr('找不到请求 {id}',{id:String(id).slice(0,60)}));return a;},
  // Charges: what was paid, and automatic charges that came due and wait for an answer.
  recordPayment:({id,paidOn='',amount,currency='',covers='',months=null,note='',missed=false})=>{
   const a=agentFind(id),day=paidOn?parseLooseDate(String(paidOn)):isoDay(localDay());
-  if(!day)throw new Error('paidOn 无法识别，请用 2026-10-01');
-  const coverDay=covers?parseLooseDate(String(covers)):'';if(covers&&!coverDay)throw new Error('covers 无法识别');
+  if(!day)throw new Error(tr('{key} 无法识别，请用 {example}',{key:'paidOn',example:'2026-10-01'}));
+  const coverDay=covers?parseLooseDate(String(covers)):'';if(covers&&!coverDay)throw new Error(tr('{key} 无法识别',{key:'covers'}));
   const own=moneyOn(a,dayNumber(coverDay||day)),value=amount===undefined||amount===null?own?.value:Number(amount),code=String(currency||own?.currency||'').toUpperCase();
-  if(!missed&&!(value>0))throw new Error('amount 需要是大于 0 的数字');
-  if(!missed&&!(code in FALLBACK_RATES.rates))throw new Error(`currency 需要是 ${Object.keys(FALLBACK_RATES.rates).join('、')} 之一`);
+  if(!missed&&!(value>0))throw new Error(tr('amount 需要是大于 0 的数字'));
+  if(!missed&&!(code in FALLBACK_RATES.rates))throw new Error(tr('{key} 需要是 {values} 之一',{key:'currency',values:Object.keys(FALLBACK_RATES.rates).join(tr('、'))}));
   checkpoint();
   const payment=recordPayment(a,{paidOn:day,amount:value,currency:code,months:months||billingCycles[a.cycle]?.months||own?.months||null,covers:coverDay,via:'agent',status:missed?'missed':'paid',note});
-  if(!payment){history.pop();throw new Error('付款记录无效');}
+  if(!payment){history.pop();throw new Error(tr('付款记录无效'));}
   touchAsset(a);save();render();if(activeAsset===a.id)showDetail(a.id,{focus:false});
   toast(missed?tr('外部工具记下了「{name}」的未扣款',{name:a.name}):tr('外部工具记下了「{name}」的付款',{name:a.name}),true);
   return {payment,asset:agentAsset(a)};
@@ -1630,8 +1630,8 @@ const agentMethods={
  // 待确认扣款 is Pro: the free edition answers with an empty list.
  charges:()=>({charges:pendingChargesAsked(state.assets.filter(agentSees)).map(c=>({id:c.asset.id,name:c.asset.name,due:c.due,daysAgo:c.days,...(c.money?{amount:c.money.value,currency:c.money.currency}:{})}))}),
  renew:({id,until,amount,currency='',paidOn='',updateCost=true})=>{
-  const a=agentFind(id),date=until?parseLooseDate(String(until)):'';if(!date)throw new Error('until 需要是新的到期或扣款日期，例如 2027-03-01');
-  if(!canRenew(a))throw new Error('这项资产没有可续费的日期（需要到期、扣款或保号日期）');
+  const a=agentFind(id),date=until?parseLooseDate(String(until)):'';if(!date)throw new Error(tr('until 需要是新的到期或扣款日期，例如 2027-03-01'));
+  if(!canRenew(a))throw new Error(tr('这项资产没有可续费的日期（需要到期、扣款或保号日期）'));
   const own=costAmount(a),day=paidOn?parseLooseDate(String(paidOn)):'';
   checkpoint();
   const result=renewAsset(a,{until:date,paidOn:day||undefined,amount:amount??0,currency:String(currency||own?.currency||'').toUpperCase(),updateCost:!!updateCost});
@@ -1642,8 +1642,8 @@ const agentMethods={
  },
  forecast:({from='',to='',months=12,currency='',type='',project=''})=>{
   const cur=agentCurrency(currency),lo=from?parseLooseDate(String(from)):isoDay(localDay()),hi=to?parseLooseDate(String(to)):isoDay(dayNumber(addMonths(lo||isoDay(localDay()),Math.min(Math.max(Number(months)||12,1),60)))-1);
-  if(!lo||!hi||dayNumber(hi)<dayNumber(lo))throw new Error('from / to 需要是日期，且 to 不早于 from');
-  if(dayNumber(hi)-dayNumber(lo)>366*5)throw new Error('最多预测 5 年');
+  if(!lo||!hi||dayNumber(hi)<dayNumber(lo))throw new Error(tr('from / to 需要是日期，且 to 不早于 from'));
+  if(dayNumber(hi)-dayNumber(lo)>366*5)throw new Error(tr('最多预测 5 年'));
   return costForecast(agentScope({type,project}),{from:lo,to:hi,currency:cur,rates:fx.rates});
  },
  costHistory:({id='',from='',limit=200})=>{
@@ -1662,24 +1662,24 @@ const agentMethods={
  // revenue null or '' clears it; a share entry's shares null goes back to an equal split. Returns the project as projects lists it.
  updateProject:({name,revenue,shares,currency=''}={})=>{
   const want=cleanProject(name),cur=agentCurrency(currency||PROJECT_CURRENCY);
-  if(!want)throw new Error('name 需要是项目名');
-  if(!projectsOn()||!projectNames(state.assets.filter(agentSees)).some(p=>p.name===want))throw new Error(`找不到项目 ${want}；项目要先有资产在用（update_asset 的 project）`);
-  if(revenue===undefined&&shares===undefined)throw new Error('没有要修改的内容：给 revenue 或 shares');
+  if(!want)throw new Error(tr('name 需要是项目名'));
+  if(!projectsOn()||!projectNames(state.assets.filter(agentSees)).some(p=>p.name===want))throw new Error(tr('找不到项目 {name}；项目要先有资产在用（update_asset 的 project）',{name:want}));
+  if(revenue===undefined&&shares===undefined)throw new Error(tr('没有要修改的内容：给 revenue 或 shares'));
   let projects=null;
   if(revenue!==undefined){
-   if(revenue&&typeof revenue==='object'&&!(String(revenue.currency||'').toUpperCase() in FALLBACK_RATES.rates))throw new Error(`revenue.currency 需要是 ${Object.keys(FALLBACK_RATES.rates).join('、')} 之一`);
-   const r=setProjectRevenue(state.projects,want,revenue);if(!r.ok)throw new Error(`revenue：${r.error}`);projects=r.projects;
+   if(revenue&&typeof revenue==='object'&&!(String(revenue.currency||'').toUpperCase() in FALLBACK_RATES.rates))throw new Error(tr('{key} 需要是 {values} 之一',{key:'revenue.currency',values:Object.keys(FALLBACK_RATES.rates).join(tr('、'))}));
+   const r=setProjectRevenue(state.projects,want,revenue);if(!r.ok)throw new Error(tr('revenue：{error}',{error:r.error}));projects=r.projects;
   }
   const splits=[];
   if(shares!==undefined){
-   if(!Array.isArray(shares)||!shares.length)throw new Error('shares 需要是 [{id, shares}] 数组');
-   if(shares.length>AGENT_LIMIT)throw new Error(`一次最多 ${AGENT_LIMIT} 项`);
+   if(!Array.isArray(shares)||!shares.length)throw new Error(tr('shares 需要是 [{id, shares}] 数组'));
+   if(shares.length>AGENT_LIMIT)throw new Error(tr('一次最多 {n} 项',{n:AGENT_LIMIT}));
    for(const item of shares){
     const a=agentFind(item?.id);
-    if(splits.some(s=>s.asset===a))throw new Error(`资产 ${a.id} 写了两次`);
-    if(!inProject(a,want))throw new Error(`资产 ${a.id} 不在项目 ${want} 里`);
-    if(!item||!('shares' in item))throw new Error(`资产 ${a.id}：缺少 shares（null 表示平分）`);
-    const check=checkProjectShares(projectsOf(a),item.shares);if(!check.ok)throw new Error(`资产 ${a.id}：${check.error}`);
+    if(splits.some(s=>s.asset===a))throw new Error(tr('资产 {id} 写了两次',{id:a.id}));
+    if(!inProject(a,want))throw new Error(tr('资产 {id} 不在项目 {name} 里',{id:a.id,name:want}));
+    if(!item||!('shares' in item))throw new Error(tr('资产 {id}：缺少 shares（null 表示平分）',{id:a.id}));
+    const check=checkProjectShares(projectsOf(a),item.shares);if(!check.ok)throw new Error(tr('资产 {id}：{error}',{id:a.id,error:check.error}));
     splits.push({asset:a,shares:check.shares});
    }
   }
@@ -1701,10 +1701,10 @@ function agentProjectFigures(cur,name=''){
    ...(p.invalidShares.length?{invalidShares:p.invalidShares}:{})};
  });
 }
-function agentCurrency(currency){const cur=currency?String(currency).toUpperCase():totalCurrency();if(!(cur in FALLBACK_RATES.rates))throw new Error(`currency 需要是 ${Object.keys(FALLBACK_RATES.rates).join('、')} 之一`);return cur;}
+function agentCurrency(currency){const cur=currency?String(currency).toUpperCase():totalCurrency();if(!(cur in FALLBACK_RATES.rates))throw new Error(tr('{key} 需要是 {values} 之一',{key:'currency',values:Object.keys(FALLBACK_RATES.rates).join(tr('、'))}));return cur;}
 // Live records agents are given (with all: every record), narrowed by category or project (both optional).
 function agentScope({type='',project='',includeHidden=false}={},all=false){
- if(type&&!cats[type])throw new Error(`未知类别 ${type}`);
+ if(type&&!cats[type])throw new Error(tr('未知类别 {type}',{type}));
  const want=cleanProject(project);
  return state.assets.filter(a=>(all||agentSees(a))&&(includeHidden||!isHidden(a))&&(!type||a.type===type)&&(!want||inProject(a,want)));
 }
@@ -1712,14 +1712,14 @@ function agentScope({type='',project='',includeHidden=false}={},all=false){
 function agentPrepareUpdate(id,input){
  const a=agentFind(id),synced=PLATFORM_SOURCES.includes(a.source);
  const type=input?.type?String(input.type):a.type;
- if(!cats[type])throw new Error(`未知类别 ${type}`);
- if(synced&&(type!==a.type||('name' in (input||{})&&String(input.name).trim()!==a.name)))throw new Error(`这条记录由 ${SYNC_SOURCE_NAMES[a.source]||a.source} 同步，名称和类别以同步为准，不能改`);
+ if(!cats[type])throw new Error(tr('未知类别 {type}',{type}));
+ if(synced&&(type!==a.type||('name' in (input||{})&&String(input.name).trim()!==a.name)))throw new Error(tr('这条记录由 {source} 同步，名称和类别以同步为准，不能改',{source:SYNC_SOURCE_NAMES[a.source]||a.source}));
  const checked=agentFields(input,type,a),icon=agentIconFields(input||{}),linkTo=agentLinkIds(input||{},'linkTo'),unlinkFrom=agentLinkIds(input||{},'unlinkFrom');
  if(checked.error||icon.error)throw new Error(checked.error||icon.error);
  const linkProblem=[...linkTo.map(id=>agentLinkProblem({...a,type},id,true)),...unlinkFrom.map(id=>agentLinkProblem(a,id,false))].find(Boolean);
  if(linkProblem)throw new Error(linkProblem);
- if('name' in checked.fields&&!checked.fields.name)throw new Error('name 不能为空');
- if(!Object.keys(checked.fields).length&&!Object.keys(icon).length&&!linkTo.length&&!unlinkFrom.length&&type===a.type)throw new Error(checked.ignored.length?`没有可修改的字段（已忽略：${checked.ignored.join('、')}）`:'没有要修改的字段');
+ if('name' in checked.fields&&!checked.fields.name)throw new Error(tr('name 不能为空'));
+ if(!Object.keys(checked.fields).length&&!Object.keys(icon).length&&!linkTo.length&&!unlinkFrom.length&&type===a.type)throw new Error(checked.ignored.length?tr('没有可修改的字段（已忽略：{fields}）',{fields:checked.ignored.join(tr('、'))}):tr('没有要修改的字段'));
  return {apply(){
   Object.assign(a,checked.fields);clearEmptyFields(a);agentApplyIcon(a,icon);for(const fn of checked.after)fn(a);
   if('project' in checked.fields)pruneProjectShares(a);
@@ -1741,7 +1741,7 @@ function agentActionList(){if(!Array.isArray(state.agentActions))state.agentActi
 function agentRequestDelete(ids,reason){
  const assets=[],missing=[];
  for(const id of [...new Set(ids.map(String))]){const a=state.assets.find(x=>x.id===id);if(agentSees(a))assets.push(a);else missing.push(id);}
- if(!assets.length)throw new Error(`找不到资产 ${missing.slice(0,5).join('、').slice(0,200)}`);
+ if(!assets.length)throw new Error(tr('找不到资产 {id}',{id:missing.slice(0,5).join(tr('、')).slice(0,200)}));
  const waiting=new Map(intake.filter(item=>item.deleteId).map(item=>[item.deleteId,item.actionId]));
  const fresh=assets.filter(a=>!waiting.has(a.id)),list=agentActionList();
  let action=null;
@@ -1754,7 +1754,7 @@ function agentRequestDelete(ids,reason){
   agentDeleteNudge();
  }
  const already=assets.filter(a=>waiting.has(a.id)).map(a=>({id:a.id,actionId:waiting.get(a.id)}));
- return {status:'pending',...(action?{actionId:action.id}:{}),requested:fresh.map(a=>a.id),...(already.length?{alreadyPending:already}:{}),...(missing.length?{notFound:missing}:{}),message:'已请求删除，等待在 Assetboard 里确认；用 get_action_status 查询结果'};
+ return {status:'pending',...(action?{actionId:action.id}:{}),requested:fresh.map(a=>a.id),...(already.length?{alreadyPending:already}:{}),...(missing.length?{notFound:missing}:{}),message:tr('已请求删除，等待在 Assetboard 里确认；用 get_action_status 查询结果')};
 }
 // One record of a request answered: deleted, kept or failed. The request settles once every record has an answer.
 function answerAgentAction(actionId,assetId,status,error=''){
@@ -1770,7 +1770,7 @@ function answerAgentAction(actionId,assetId,status,error=''){
 // the request waits in 待确认 and in state.agentActions; the person ticks what to allow, and only then does the kind's apply() run.
 // Items end applied, declined or failed; asking again for one that already waits is folded into that request.
 function agentRequestConfirm(kind,targets,reason=''){
- const def=proSlots.agentConfirms[kind];if(!def)throw new Error(`不支持的请求 ${kind}`);
+ const def=proSlots.agentConfirms[kind];if(!def)throw new Error(tr('不支持的请求 {kind}',{kind}));
  const waiting=new Map(intake.filter(i=>i.confirmKind===kind).map(i=>[i.confirmId,i.actionId]));
  const fresh=targets.filter(t=>!waiting.has(t.id)),list=agentActionList();
  let action=null;
@@ -1783,7 +1783,7 @@ function agentRequestConfirm(kind,targets,reason=''){
   agentDeleteNudge();
  }
  const already=targets.filter(t=>waiting.has(t.id)).map(t=>({id:t.id,actionId:waiting.get(t.id)}));
- return {status:'pending',...(action?{actionId:action.id}:{}),requested:fresh.map(t=>t.id),...(already.length?{alreadyPending:already}:{}),message:'已请求，等待在 Assetboard 里确认；用 get_action_status 查询结果'};
+ return {status:'pending',...(action?{actionId:action.id}:{}),requested:fresh.map(t=>t.id),...(already.length?{alreadyPending:already}:{}),message:tr('已请求，等待在 Assetboard 里确认；用 get_action_status 查询结果')};
 }
 function agentConfirmEntry(action,t){return {source:'agent',name:proSlots.agentConfirms[action.kind].label(t),confirmKind:action.kind,confirmId:t.id,confirmName:t.name,actionId:action.id,note:action.reason};}
 // The list: every waiting request with a checkbox (ticked), each kind's warning once; requests that arrive meanwhile join it.
@@ -1832,11 +1832,11 @@ function agentProRefusal(call){
 }
 window.assetboardAgent=call=>{
  const send=body=>{if(nativeStore&&call?.requestId)window.webkit.messageHandlers.assetboard.postMessage({action:'agentReply',requestId:String(call.requestId),reply:JSON.stringify(body)});return body;};
- if(demoMode)return send({ok:false,error:'演示模式不接受外部调用'});
- if(!featureOn('agent'))return send({ok:false,error:'外部工具接入已在 Assetboard 的设置里关闭'});
+ if(demoMode)return send({ok:false,error:tr('演示模式不接受外部调用')});
+ if(!featureOn('agent'))return send({ok:false,error:tr('外部工具接入已在 Assetboard 的设置里关闭')});
  const refused=agentProRefusal(call);if(refused)return send({ok:false,error:refused});
  const handler=Object.hasOwn(agentMethods,call?.method)?agentMethods[call.method]:Object.hasOwn(proSlots.agentMethods,call?.method)?proSlots.agentMethods[call.method]:null;
- if(!handler)return send({ok:false,error:`未知方法 ${String(call?.method).slice(0,40)}，可用：${[...Object.keys(agentMethods),...Object.keys(proSlots.agentMethods)].join('、')}`});
+ if(!handler)return send({ok:false,error:tr('未知方法 {method}，可用：{methods}',{method:String(call?.method).slice(0,40),methods:[...Object.keys(agentMethods),...Object.keys(proSlots.agentMethods)].join(tr('、'))})});
  try{return send({ok:true,result:handler(call.params&&typeof call.params==='object'&&!Array.isArray(call.params)?call.params:{})});}
  catch(error){return send({ok:false,error:String(error?.message||error)});}
 };
@@ -2996,8 +2996,8 @@ function selectFirstOnce(){if(!inspectorDocked()||!$('#detail').hidden||query)re
 selectFirstOnce();
 installImportDropPaste();
 // Delete requests still waiting from an earlier run come back to the confirmation list.
-if(!demoMode){const back=[];for(const action of agentActionList().filter(a=>a.status==='pending'&&(a.kind||'delete')!=='delete'))for(const item of action.items.filter(x=>x.status==='pending')){if(proSlots.agentConfirms[action.kind])back.push(agentConfirmEntry(action,item));else answerAgentAction(action.id,item.id,'failed','这个版本不支持');}
- for(const action of agentActionList().filter(a=>a.status==='pending'&&(a.kind||'delete')==='delete'))for(const item of action.items.filter(x=>x.status==='pending')){if(state.assets.some(a=>a.id===item.id))back.push({source:'agent',name:tr('删除「{name}」',{name:item.name}),deleteId:item.id,actionId:action.id,note:action.reason});else answerAgentAction(action.id,item.id,'deleted','确认前已删除');}if(back.length)queueIntake(back);}
+if(!demoMode){const back=[];for(const action of agentActionList().filter(a=>a.status==='pending'&&(a.kind||'delete')!=='delete'))for(const item of action.items.filter(x=>x.status==='pending')){if(proSlots.agentConfirms[action.kind])back.push(agentConfirmEntry(action,item));else answerAgentAction(action.id,item.id,'failed',tr('这个版本不支持'));}
+ for(const action of agentActionList().filter(a=>a.status==='pending'&&(a.kind||'delete')==='delete'))for(const item of action.items.filter(x=>x.status==='pending')){if(state.assets.some(a=>a.id===item.id))back.push({source:'agent',name:tr('删除「{name}」',{name:item.name}),deleteId:item.id,actionId:action.id,note:action.reason});else answerAgentAction(action.id,item.id,'deleted',tr('确认前已删除'));}if(back.length)queueIntake(back);}
 if(nativeStore){document.documentElement.classList.add('native-app');if(!demoMode){requestEvidence();syncReminders();setInterval(syncReminders,3600000);rdapAutoRun();setInterval(rdapAutoRun,6*3600000);}document.querySelectorAll('.form-note').forEach(el=>{el.textContent=el.textContent.replaceAll(tr('当前浏览器'),tr('此 Mac')).replaceAll(tr('此浏览器'),tr('此 Mac'));});if(!nativeStore.data||migratedLegacyData)save();}
 else if(migratedLegacyData)save();
 if(demoMode){document.documentElement.classList.add('demo-mode');const badge=document.createElement('span');badge.className='demo-badge';badge.setAttribute('role','note');badge.setAttribute('aria-label',tr('演示模式：全部为虚构数据，不会保存'));badge.title=tr('演示模式：全部为虚构数据，不会保存');badge.textContent=tr('演示');document.querySelector('#topbar .view-head').append(badge);}
