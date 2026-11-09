@@ -17,7 +17,7 @@ for(const file of dictFiles){
   seen.set(k,{v,file});I18N.en[k]=v;
  }
 }
-const sources=['app.js','asset-data.js','money-view.js','board-views.js','board-wall.js','ai-usage-view.js','panorama-view.js','panorama.js','demo-data.js','features.js','theme.js','pro-slots.js','pro-load.js',
+const sources=['app.js','asset-data.js','money-view.js','money-ledger.js','project-money.js','board-views.js','board-wall.js','ai-usage-view.js','panorama-view.js','panorama.js','demo-data.js','features.js','theme.js','pro-slots.js','pro-load.js',
  ...(fs.existsSync(path.join(root,'pro/web'))?fs.readdirSync(path.join(root,'pro/web')).filter(f=>f.endsWith('.js')&&f!=='en.js').map(f=>'pro/web/'+f):[])].filter(f=>fs.existsSync(path.join(root,f)));
 const cjk=/[㐀-鿿＀-￯　-〿]/;
 // The first argument of every tr( call that is a plain literal.

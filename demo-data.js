@@ -50,8 +50,7 @@ window.assetboardDemoBoard=function(){
  const base={account:'',source:'manual',art:'generic',cost:'未知',url:'',notes:t('演示数据')};
  const repos=['atlas-ui','notes-api','pixel-kit','studio-site','ledger-cli','orbit-bot','paper-docs','glass-theme','tiny-queue','sample-ml','mock-store','field-guide','plain-auth','zen-timer'];
  const ago=days=>new Date(Date.now()-days*86400000).toISOString();
- // The free edition has no GitHub sync, so its demo does not pretend to: five repositories written down by hand, no account tag,
- // and the board's first screen stays on domains, servers and costs.
+ // 实时状态 is Pro: without the Pro modules no server carries a probe link.
  const free=typeof proLoaded==='function'&&!proLoaded();
  // 仓库分支和 Actions as a sync with that feature on leaves them: one new branch, one failed run, one running; the run links are
  // never opened from the demo.
@@ -59,8 +58,7 @@ window.assetboardDemoBoard=function(){
  const repoDetails=(name,i)=>i>5?{}:{defaultBranch:'main',branches:['main','dev',...(i===0?['feat-grid']:[]),...(i===1?['fix-auth','release-2.1']:[])].sort(),branchesFrom:ago(40),
   branchSeen:Object.fromEntries(['main','dev','feat-grid','fix-auth','release-2.1'].map(b=>[b,b==='feat-grid'?ago(2):ago(40)])),repoDenied:[],
   ciRun:{state:['success','failure','running'][i]||'success',name:'CI',branch:i===1?'fix-auth':'main',event:'push',at:runAt([5,3,0.1][i]??30),url:`https://github.com/acme-labs/${name}/actions/runs/${1000+i}`}};
- const repoRecord=(name,i)=>free?{...base,id:'demo-r'+i,type:'repository',name,provider:'GitHub',purpose:t('代码仓库'),updatedAt:new Date(Date.now()-i*86400000*3).toISOString(),pushedAt:new Date(Date.now()-i*86400000*3).toISOString()}
-  :{...base,id:'demo-r'+i,type:'repository',name:'acme-labs/'+name,provider:'GitHub',account:'acme-labs',purpose:t('代码仓库'),source:'github',externalId:'demo-'+i,syncStatus:i%3?'私有仓库':'公开仓库',event:i%3?'私有仓库':'公开仓库',updatedAt:new Date(Date.now()-i*86400000*3).toISOString(),pushedAt:new Date(Date.now()-i*86400000*5).toISOString(),...repoDetails(name,i)};
+ const repoRecord=(name,i)=>({...base,id:'demo-r'+i,type:'repository',name:'acme-labs/'+name,provider:'GitHub',account:'acme-labs',purpose:t('代码仓库'),source:'github',externalId:'demo-'+i,syncStatus:i%3?'私有仓库':'公开仓库',event:i%3?'私有仓库':'公开仓库',updatedAt:new Date(Date.now()-i*86400000*3).toISOString(),pushedAt:new Date(Date.now()-i*86400000*5).toISOString(),...repoDetails(name,i)});
  const assets=[
   {...base,id:'demo-d1',updatedAt:ago(3),type:'domain',name:'studio.example.com',provider:'Namecheap',purpose:t('工作室主站'),date:day(12),dateKind:'expire',cycle:'yearly'},
   {...base,id:'demo-d2',updatedAt:ago(1),type:'domain',name:'notes.example.org',provider:'Namecheap',purpose:t('笔记站点'),date:day(160),dateKind:'expire',cycle:'yearly',cost:t('$12 / 年')},
@@ -87,7 +85,7 @@ window.assetboardDemoBoard=function(){
   // 平台状态 (实时状态): a free Supabase project that paused, with its sleep rule and a keep-alive in its detail. platform-data.js
   // platformDemo answers for it. A database is no card in 全景, so the demo's panorama stays as it is.
   {...base,id:'demo-db2',updatedAt:ago(20),type:'database',name:'notes-auth',provider:'Supabase',purpose:t('登录与用户'),cost:t('免费'),keepAlive:{url:'https://notes-api.example.com/health',every:1440}},
-  ...(free?repos.slice(0,5):repos).map(repoRecord)
+  ...repos.map(repoRecord)
  ];
  // Server relations: two VPS, one account, domains and repositories mounted on them, two orphans (v13).
  const wire=(child,server,meta)=>{const c=assets.find(a=>a.id===child),s=assets.find(a=>a.id===server);c.links=[...(c.links||[]),server];s.links=[...(s.links||[]),child];if(meta)c.linkMeta={...(c.linkMeta||{}),[server]:meta};};

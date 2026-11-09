@@ -1,7 +1,6 @@
 import Foundation
 import Security
 
-#if !ASSETBOARD_FREE
 /// 从注册商导入: the domains of a Namecheap or Porkbun account, read-only. Only the documented list endpoints are called, always with
 /// GET; the credentials the person pasted are kept in the Keychain (one item per registrar) once a read with them worked, and never go
 /// back to the page. Every request is in 网络记录 under the registrar's name with its path only, so Namecheap's credentials (which its
@@ -389,4 +388,3 @@ func testRegistrars() {
     guard JSONSerialization.isValidJSONObject(listed), JSONSerialization.isValidJSONObject(pork) else { fatalError("The answers are not JSON") }
     print("PASS: Namecheap getList and Porkbun ping/listAll, GET only, documented paths, pagination, credentials where each API takes them, errors in words, malformed replies refused, credential checks")
 }
-#endif

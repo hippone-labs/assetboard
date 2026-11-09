@@ -1,8 +1,8 @@
 // Run with the browser tool's filename option. MCP 操作记录 and the connected tools, with a fake Mac host: every call is logged with
 // the tool that made it (from clientInfo, parent programs or environment names, else 未知客户端), writes with each field before and
 // after, never a token; the host gets each row to keep; agents read the log masked; 设置 › MCP lists the tools (configured, called,
-// last used, a config to copy) and the log with filters by tool, time and kind, newest first; the demo shows made-up rows; ?free has
-// no MCP page. Never writes data.
+// last used, a config to copy) and the log with filters by tool, time and kind, newest first; the demo shows made-up rows, with and
+// without the Pro modules (?free). Never writes data.
 async (page) => {
  const check=(ok,message)=>{if(!ok)throw new Error(message);};
  const until=async(p,fn,arg,{timeout=10000}={})=>{const end=Date.now()+timeout;for(;;){const value=await p.evaluate(fn,arg);if(value)return value;if(Date.now()>end)throw new Error('Timed out waiting for '+String(fn).slice(0,80));await new Promise(r=>setTimeout(r,40));}};
@@ -104,14 +104,13 @@ async (page) => {
   await p.click('#prefs-pane-mcp [data-action="agent-log-clear"]');await p.click('#confirm-yes');
   check(await p.evaluate(()=>agentLogRows.length===0&&__sent.some(m=>m.action==='agentLogClear')),'Clearing empties the log here and in the app');
  } finally { await p.close(); }
- // The demo shows the page with made-up rows and calls nothing; ?free has no MCP page.
+ // The demo shows the page with made-up rows and calls nothing, with or without the Pro modules.
  for(const url of ['/?demo','/?demo&free']){
   const q=await page.context().newPage();
   try{
    await q.goto('http://127.0.0.1:4317'+url);await until(q,()=>typeof prefsDialog==='function');
    const r=await q.evaluate(()=>{prefsDialog('mcp');return {tab:!!document.querySelector('#prefs-tab-mcp'),rows:document.querySelectorAll('#prefs-pane-mcp .act-row').length,tools:document.querySelectorAll('#prefs-pane-mcp .agent-row').length};});
-   if(url==='/?demo')check(r.tab&&r.rows>=5&&r.tools>=4,'The demo shows tools and a log: '+JSON.stringify(r));
-   else check(!r.tab,'?free has no MCP page');
+   check(r.tab&&r.rows>=5&&r.tools>=4,`${url} shows tools and a log: ${JSON.stringify(r)}`);
   } finally { await q.close(); }
  }
  return 'ok';

@@ -73,7 +73,7 @@ function wallBoardHtml(live){
 }
 // What a connected platform read and the board does not hold yet (待引入): one quiet line under the wall, a button per platform.
 function wallPendingHtml(){
- const sources=typeof heldSources==='function'&&!proFree?heldSources(state):[];if(!sources.length)return '';
+ const sources=typeof heldSources==='function'?heldSources(state):[];if(!sources.length)return '';
  return `<p class="wall-empty wall-pending"><span>${tr('待引入')}</span>${sources.map(s=>`<button class="wall-add" data-action="connect-pending" data-id="${esc(s.source)}" title="${tr('还没在大板里，点开挑选')}">${ui('download')}${esc(s.name)} ${formatCount(s.count)}</button>`).join('')}</p>`;
 }
 // A panel's tilt under a skin that tilts: a steady -1…1 from its category, so a panel keeps its angle from one drawing to the next.

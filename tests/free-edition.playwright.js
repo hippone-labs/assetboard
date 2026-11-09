@@ -1,9 +1,11 @@
 // Run with the browser tool's filename option. Uses an isolated page and never saves.
-// ?free shows the free edition from any checkout: no Pro panels or menu items, even when the Pro scripts are loaded. That includes
-// 待确认扣款 (in 即将到来, the detail and the menu bar summary) and the MCP / GitHub / Cloudflare / Gmail ways in.
+// ?free shows the board without the Pro modules from any checkout (what building this repository alone gives): the payment ledger,
+// 待确认扣款, projects with revenue and splits, the shutdown list and 定期清理, the connectors, AI recognition, MCP and the command line
+// are all there. External tools look up, add (a name the board already has is skipped, never overwritten) and import from 待引入; changing
+// or deleting a record that is there is refused. No licence panel, no Pro hint, no live status.
 async (page) => {
- const p=await page.context().newPage();
  const check=(ok,message)=>{if(!ok)throw new Error(message);};
+ const p=await page.context().newPage();
  try {
   await p.goto('http://127.0.0.1:4317/?free');
   const seen=await p.evaluate(()=>{
@@ -11,75 +13,64 @@ async (page) => {
    state={...state,assets:[{id:'sub',type:'subscription',name:'Editor Pro',provider:'Editor',account:'',purpose:'',date:isoDay(localDay()+6),dateKind:'renew',cycle:'monthly',cost:'$10 / 月',art:'generic',source:'manual',
     payments:[{id:'m1',paidOn:isoDay(localDay()-30),covers:isoDay(localDay()-30),amount:10,currency:'USD'}]}]};
    render();costDialog();
-   const cost=document.querySelector('#modal').innerHTML;
-   // The agent interface keeps only the core methods (asked through MCP, whose lookups are free): the probe, SSH 直读, icon and
-   // Cloudflare tools are Pro.
-   const agent=['probeSources','probeSourceAdd','sshHosts','sshSet','iconPlatforms','iconFetch','cloudflareSync','syncBlocklist'].map(method=>assetboardAgent({requestId:'f',via:'mcp',method,params:{}}));
-   return {slots:Object.entries(proSlots).filter(([k,v])=>Array.isArray(v)?v.length:['actions','agentMethods','agentConfirms','agentFields'].includes(k)?Object.keys(v).length:v).map(([k])=>k),
-    agent:agent.every(r=>!r.ok&&/未知方法/.test(r.error))&&!/probe|ssh|icon|cloudflare|sync/i.test(agent[0].error.split('可用：')[1]??'probe'),
-    costMore:cost.includes('cost-more'),menu:assetMenuItems(state.assets[0],true).map(x=>x.action).filter(Boolean)};
+   const cost=document.querySelector('#modal').innerHTML;$('#modal').close();
+   const call=(method,params={},via='mcp')=>assetboardAgent({requestId:'f',via,method,params});
+   // Pro's methods are not there at all; the free reads answer.
+   const missing=['probeSources','sshHosts','iconSite','iconFetch','syncUnblock'].map(m=>call(m));
+   const reads=['iconPlatforms','cloudflareStatus','syncBlocklist','forecast','costHistory','projects','charges','list'].map(m=>call(m));
+   return {pro:{probe:proSlots.serverProbe,platform:proSlots.platformProbe,methods:Object.keys(proSlots.agentMethods)},
+    missing:missing.every(r=>!r.ok&&/未知方法/.test(r.error)),reads:reads.map(r=>r.ok),cli:call('list',{},'cli').ok,
+    costMore:cost.includes('cost-more'),menu:assetMenuItems(state.assets[0],true).map(x=>x.action).filter(Boolean),
+    licence:proBuilt(),hint:proHint('x')+proTag()};
   });
-  check(!seen.slots.length,'Pro slots filled in ?free: '+seen.slots.join(', '));
-  check(seen.agent,'Pro agent methods answer in ?free');
-  check(!seen.costMore,'the cost panel shows the Pro part in ?free');
-  check(!seen.menu.includes('payment-add'),'the asset menu offers 记一笔付款 in ?free');
-  check(seen.menu.includes('renew'),'the asset menu lost 已续费 in ?free');
-  // A monthly charge that came due five days ago: the free edition does not ask about it anywhere.
+  check(!seen.pro.probe&&!seen.pro.platform&&!seen.pro.methods.length,'Pro filled something in ?free: '+JSON.stringify(seen.pro));
+  check(seen.missing,'Pro agent methods answer in ?free');
+  check(seen.reads.every(Boolean),'a free read is refused in ?free: '+seen.reads.join());
+  check(seen.cli,'the command line is refused in ?free');
+  check(seen.costMore,'the cost panel lost paid / forecast in ?free');
+  check(seen.menu.includes('payment-add')&&seen.menu.includes('renew'),'the asset menu lost 记一笔 or 已续费: '+seen.menu.join());
+  check(!seen.licence&&!seen.hint,'?free shows the licence panel or a Pro hint');
+  // Adding is free and never overwrites: a name the category already has is skipped and the record stays as it was. Changing,
+  // deleting, payments and project figures wait for Pro.
+  const agent=await p.evaluate(()=>{
+   state={...state,assets:[{id:'d1',type:'domain',name:'keep.example',provider:'Registrar',account:'',purpose:'old',date:'2027-01-01',dateKind:'expire',cost:'$10 / 年',art:'generic',source:'manual'},
+    {id:'s1',type:'server',name:'box-one',provider:'Hosting',account:'',purpose:'',date:'',dateKind:'expire',cost:'未知',art:'generic',source:'manual',links:['a1']},
+    {id:'a1',type:'subscription',name:'Hosting account',provider:'Hosting',account:'',purpose:'',date:'',dateKind:'expire',cost:'未知',art:'generic',source:'manual',links:['s1']}]};
+   const before=JSON.stringify(state.assets.find(a=>a.id==='d1'));
+   const call=(method,params={},via='mcp')=>assetboardAgent({requestId:'f',via,method,params});
+   const same=call('add',{items:[{name:'Keep.example',type:'domain',purpose:'new',date:'2030-01-01'},{name:'fresh.example',type:'domain'}]},'cli');
+   const swap=call('add',{items:[{name:'Other account',type:'subscription',linkTo:['s1']}]});
+   const writes=['update','updateMany','updateProject','delete','deleteMany','recordPayment','renew'].map(m=>call(m,{id:'d1',fields:{purpose:'x'}}));
+   const s1=state.assets.find(a=>a.id==='s1');
+   return {same:same.result,kept:JSON.stringify(state.assets.find(a=>a.id==='d1'))===before,fresh:state.assets.some(a=>a.name==='fresh.example'),
+    swap:swap.result,links:s1.links,writes:writes.map(r=>r.ok?'ok':r.error)};
+  });
+  check(agent.same?.added.length===1&&agent.same.skipped.length===1&&agent.same.skipped[0].id==='d1'&&agent.kept&&agent.fresh,'add overwrote or lost a record: '+JSON.stringify(agent.same));
+  check(agent.swap?.added.length===1&&agent.swap.warnings.some(w=>w.link==='s1'&&/Pro/.test(w.error))&&agent.links.join()==='a1','add took another account off a server: '+JSON.stringify(agent));
+  check(agent.writes.every(e=>/修改和删除已有资产在 Assetboard Pro 里/.test(e)),'a change went through without Pro: '+agent.writes.join(' | '));
+  // A monthly charge that came due five days ago is asked about in 即将到来 and the detail.
   const charges=await p.evaluate(()=>{
    state={...state,assets:[{id:'u1',type:'subscription',name:'Notes Pro',provider:'Notes',account:'',purpose:'',date:isoDay(localDay()-5),dateKind:'renew',cycle:'monthly',cost:'$8 / 月',art:'generic',source:'manual',createdAt:'2025-01-01T00:00:00Z'}],paymentsSince:isoDay(localDay()-40)};
    setView('upcoming');render();
-   return {due:pendingCharges(state.assets,{since:state.paymentsSince}).length,asked:pendingChargesAsked(state.assets).length,
-    band:!!document.querySelector('#board [data-group="charges"]'),rows:document.querySelectorAll('#board [data-action="charge-paid"]').length,
-    detail:paymentsSection(state.assets[0]).includes('charge-paid'),board:document.querySelector('#board').innerText};
+   return {band:!!document.querySelector('#board [data-group="charges"]'),detail:paymentsSection(state.assets[0]).includes('charge-paid')};
   });
-  check(charges.due===1,'the sample charge is not due, so the check proves nothing');
-  check(!charges.asked&&!charges.band&&!charges.rows&&!charges.board.includes('待确认扣款'),'?free shows 待确认扣款 in 即将到来');
-  check(!charges.detail,'?free asks about the charge in the detail');
-  // 添加资产: only the free ways in, and no Pro names.
-  const capture=await p.evaluate(()=>{captureDialog();const box=document.querySelector('#capture .capture-links');
-   return {actions:[...box.querySelectorAll('[data-action]')].map(el=>el.dataset.action),text:box.textContent};});
-  check(!capture.actions.includes('agent-setup'),'?free 添加资产 links to MCP 接入');
-  check(!/MCP|GitHub|Cloudflare|Gmail/.test(capture.text),'?free 添加资产 names a Pro source: '+capture.text);
-  check(capture.actions.includes('import-hub'),'?free 添加资产 lost its import link');
-  // 项目 is Pro: no sidebar group, form field, project view or 全景 按项目; the label a record has shows in the detail as plain
-  // text (read-only) and survives editing, a table import over it, a backup restore and the exports.
+  check(charges.band&&charges.detail,'?free does not ask about 待确认扣款: '+JSON.stringify(charges));
+  // Projects: the sidebar group, the field in the form, the project view with its figures and 全景 按项目.
   const projects=await p.evaluate(()=>{
    if(typeof panoramaOpen==='function')panoramaOpen(false);
-   state={...state,assets:[{id:'pr1',type:'domain',name:'notes-lab.example',provider:'Registrar',account:'',purpose:'',date:'',dateKind:'expire',cost:'未知',art:'generic',source:'manual',project:'notes-lab'},
-    {id:'pr2',type:'server',name:'box-one',provider:'Hosting',account:'',purpose:'',date:'',dateKind:'expire',cost:'未知',art:'generic',source:'csv',externalId:'server:box-one',project:'notes-lab'}]};
-   // A project view remembered from the full edition falls back to 全部资产.
+   state={...state,assets:[{id:'pr1',type:'domain',name:'notes-lab.example',provider:'Registrar',account:'',purpose:'',date:'',dateKind:'expire',cost:'$12 / 年',art:'generic',source:'manual',project:'notes-lab'},
+    {id:'pr2',type:'server',name:'box-one',provider:'Hosting',account:'',purpose:'',date:'',dateKind:'expire',cost:'$5 / 月',art:'generic',source:'manual',project:'notes-lab',links:['pr1']}]};
    view='project:notes-lab';render();
-   const sidebar=document.querySelector('#sidebar').innerText,shown=currentView();
-   showDetail('pr1');const detail=document.querySelector('#detail')?.innerText||'',projectLink=!!document.querySelector('#detail [data-id^="project:"]');
-   assetForm('domain','pr1');const form=document.querySelector('#asset-form'),field=!!form.elements.project,summary=form.querySelector('.more-fields .section-title').textContent;
-   form.elements.purpose.value='site';form.requestSubmit();
-   return {view:shown,sidebar,detail,projectLink,field,summary};
+   const sidebar=document.querySelector('#sidebar').innerText,shown=currentView(),bar=!!document.querySelector('#board .pj-bar');
+   assetForm('domain','pr1');const field=!!document.querySelector('#asset-form').elements.project;$('#modal').close();
+   return {view:shown,sidebar,bar,field,lens:panoramaLenses(state.assets),agent:assetboardAgent({requestId:'t',via:'mcp',method:'projects',params:{}}).result?.projects?.map(x=>x.name)};
   });
-  await p.waitForTimeout(100);
-  Object.assign(projects,await p.evaluate(()=>{
-   const afterEdit=state.assets.find(a=>a.id==='pr1');
-   const plan=planImport(state,[{name:'box-one',type:'server',provider:'Hosting',account:'',date:'2027-01-01',dateKind:'expire',cycle:'',cost:'',url:'',notes:'',purpose:'',source:'csv',externalId:'server:box-one'}]);
-   const imported=applyImport(state,plan,{applySame:plan.skippedSame.map(r=>r.assetId)}).assets.find(a=>a.id==='pr2');
-   const backup=parseBoardBackup(JSON.stringify({blocks:[],assets:[{...afterEdit,purpose:'restored'}]}));
-   const restored=applyBoardBackup(state,planBoardBackup(state,backup,{mode:'merge'}),{take:['pr1']}).assets.find(a=>a.id==='pr1');
-   const handover=handoverHtml(state,{types:Object.fromEntries(Object.entries(cats).map(([id,c])=>[id,c.name])),order:categoryIds()});
-   panoramaOpen(true);const lenses=[...document.querySelectorAll('.pano-lens .seg')].map(b=>b.dataset.lens);panoramaOpen(false);
-   return {on:projectsOn(),edited:afterEdit.project+'|'+afterEdit.purpose,imported:imported.project+'|'+imported.date,restored:restored.project+'|'+restored.purpose,
-    handover:handover.includes('notes-lab'),lens:panoramaLenses(state.assets,panoSkip()),lenses,agent:assetboardAgent({requestId:'t',via:'mcp',method:'projects',params:{}}).result?.projects};
-  }));
-  check(!projects.on,'?free has projects switched on');
-  check(projects.view==='all','?free opened a project view: '+projects.view);
-  check(!projects.sidebar.includes('项目'),'?free shows 项目 in the sidebar');
-  check(projects.detail.includes('项目')&&projects.detail.includes('notes-lab')&&!projects.projectLink,'?free does not show the stored project read-only in the detail');
-  check(!projects.field&&!projects.summary.includes('项目'),'?free 编辑 offers a project field: '+projects.summary);
-  check(!projects.lens.includes('project')&&!projects.lenses.includes('project'),'?free 全景 offers 按项目: '+projects.lenses.join());
-  check(Array.isArray(projects.agent)&&!projects.agent.length,'?free agent lists projects');
-  check(projects.edited==='notes-lab|site','editing in ?free dropped the project: '+projects.edited);
-  check(projects.imported==='notes-lab|2027-01-01','a table import over it dropped the project: '+projects.imported);
-  check(projects.restored==='notes-lab|restored','a backup restore dropped the project: '+projects.restored);
-  check(projects.handover,'the handover export lost the project');
+  check(projects.view==='project:notes-lab'&&projects.sidebar.includes('notes-lab')&&projects.bar&&projects.field,'?free projects: '+JSON.stringify(projects));
+  check(projects.lens.includes('project'),'?free 全景 lost 按项目: '+projects.lens.join());
+  check(projects.agent?.join()==='notes-lab','?free agent projects: '+JSON.stringify(projects.agent));
  } finally { await p.close(); }
- // The import window as the free Mac app shows it (native, gh detected): no GitHub, MCP, Cloudflare, registrar, cloud or Gmail entry.
+ // The import window of the Mac app without the Pro modules (native, gh detected): gh, MCP 接入, Cloudflare, the registrars and the
+ // cloud platforms; 添加资产 names them and offers 配置 AI; no 探针 or SSH 直读.
  const context=await page.context().browser().newContext(),m=await context.newPage();
  try {
   await m.addInitScript(()=>{
@@ -88,36 +79,31 @@ async (page) => {
     if(msg.action==='evidenceList')setTimeout(()=>window.assetboardEvidenceList?.([]),5);
     if(msg.action==='localCliDetect')setTimeout(()=>window.assetboardLocalCliDetect?.({gh:true,ghAccounts:['alice'],sshConfig:true}),5);
    }}}};
-   window.__ASSETBOARD_NATIVE__={data:{blocks:[],assets:[]},cloudflareConnected:false,githubConnected:false,gmailConfigured:false};
+   window.__ASSETBOARD_NATIVE__={data:{blocks:[],assets:[]},cloudflareConnected:false,githubConnected:false};
   });
   await m.goto('http://127.0.0.1:4317/?free');
   const hub=async()=>m.evaluate(()=>{window.__localCli={gh:true,ghAccounts:['alice'],sshConfig:true};importHub();
    return [...document.querySelectorAll('#modal[data-view="import"] [data-action]')].map(el=>el.dataset.action);});
   let actions=await hub();
   await m.waitForTimeout(40);actions=[...actions,...await hub()];
-  const pro=['agent-setup','cloudflare-import','gmail-import','github-local-sync','github-import','registrar-import','cloud-import'].filter(a=>actions.includes(a));
-  check(!pro.length,'the free import window offers Pro entries: '+pro.join(', '));
-  check(!await m.evaluate(()=>/\bgh\b|alice/.test(document.querySelector('#modal .import-cli')?.textContent||'')),'the free import window names gh');
-  check(actions.includes('ssh-import')&&actions.includes('ocr-import'),'the free import window lost ~/.ssh/config or 截图: '+actions.join(', '));
-  const capture=await m.evaluate(()=>{captureDialog();const box=document.querySelector('#capture .capture-links');
-   return {actions:[...box.querySelectorAll('[data-action]')].map(el=>el.dataset.action),text:box.textContent};});
-  check(!capture.actions.includes('agent-setup')&&!/MCP|GitHub|Cloudflare|Gmail/.test(capture.text),'the free Mac app\'s 添加资产 offers a Pro source: '+capture.text);
-  check(/截图/.test(capture.text)&&/ssh/.test(capture.text),'the free Mac app\'s 添加资产 should name its own sources: '+capture.text);
-  // AI recognition is Pro: no 配置 AI under 添加资产.
-  const note=await m.evaluate(()=>{captureDialog();const el=document.querySelector('#capture .capture-note');return {ai:!!el.querySelector('[data-action="ai-settings"]'),text:el.textContent};});
-  check(!note.ai&&!/AI/.test(note.text),'the free Mac app\'s 添加资产 offers 配置 AI: '+note.text);
-  // The page's agent interface reports no charges waiting.
-  const agent=await m.evaluate(()=>{state.assets=[{id:'u1',type:'subscription',name:'Notes Pro',provider:'Notes',account:'',purpose:'',date:isoDay(localDay()-5),dateKind:'renew',cycle:'monthly',cost:'$8 / 月',art:'generic',source:'manual',createdAt:'2025-01-01T00:00:00Z'}];state.paymentsSince=isoDay(localDay()-40);
-   return {due:pendingCharges(state.assets,{since:state.paymentsSince}).length,list:assetboardAgent({requestId:'t',via:'mcp',method:'charges',params:{}}).result?.charges,asset:agentAsset(state.assets[0])};});
-  check(agent.due===1&&Array.isArray(agent.list)&&!agent.list.length&&!('unconfirmedCharges' in agent.asset),'the free agent interface reports charges: '+JSON.stringify(agent));
+  const want=['agent-setup','cloudflare-import','github-local-sync','registrar-import','cloud-import','ssh-import','ocr-import'].filter(a=>!actions.includes(a));
+  check(!want.length,'the import window without Pro lacks: '+want.join(', '));
+  check(!actions.includes('probe-sources')&&!actions.includes('ssh-probe-open'),'the import window without Pro offers live status: '+actions.join(', '));
+  const capture=await m.evaluate(()=>{captureDialog();const box=document.querySelector('#capture');
+   return {actions:[...box.querySelectorAll('.capture-links [data-action]')].map(el=>el.dataset.action),text:box.querySelector('.capture-links').textContent,ai:!!box.querySelector('.capture-note [data-action="ai-settings"]')};});
+  check(capture.actions.includes('agent-setup')&&/GitHub/.test(capture.text)&&capture.ai,'添加资产 without Pro: '+JSON.stringify(capture));
+  check(await m.evaluate(()=>!!document.querySelector('#topnav-actions [data-action="agent-setup"]')),'the top bar lost its MCP button');
+  const prefs=await m.evaluate(()=>{prefsDialog('connections');const tabs=[...document.querySelectorAll('#modal [role="tab"]')].map(t=>t.id);
+   return {tabs,rows:[...document.querySelectorAll('#modal [data-action]')].map(el=>el.dataset.action)};});
+  check(prefs.tabs.includes('prefs-tab-mcp')&&!prefs.tabs.includes('prefs-tab-pro'),'设置 without Pro: '+prefs.tabs.join());
+  check(['cloudflare-import','github-import','ai-settings','agent-setup'].every(a=>prefs.rows.includes(a)),'设置 › 连接 without Pro: '+prefs.rows.join());
  } finally { await context.close(); }
- // The free demo does not show a GitHub sync it does not have: a few repositories written down by hand, no account tag.
+ // The demo without the Pro modules shows the GitHub sync like the full one, and no live status.
  const d=await page.context().newPage();
  try {
   await d.goto('http://127.0.0.1:4317/?demo&free');
-  const repos=await d.evaluate(()=>state.assets.filter(a=>a.type==='repository').map(a=>({name:a.name,source:a.source,account:a.account})));
-  check(repos.length>0&&repos.length<=5&&repos.every(r=>r.source==='manual'&&!r.account&&!r.name.includes('/')),'the free demo repositories: '+JSON.stringify(repos));
-  check(!await d.evaluate(()=>!!document.querySelector('#board .account-tag')),'the free demo shows an account tag');
+  const demo=await d.evaluate(()=>({repos:state.assets.filter(a=>a.type==='repository').map(a=>a.source),probe:state.assets.some(a=>a.probeLink)}));
+  check(demo.repos.length>5&&demo.repos.every(s=>s==='github')&&!demo.probe,'the demo without Pro: '+JSON.stringify(demo));
  } finally { await d.close(); }
  return 'ok';
 }

@@ -1,7 +1,6 @@
 import Foundation
 import Security
 
-#if !ASSETBOARD_FREE
 /// Probe data sources (Pro): monitoring panels whose servers are shown on the matching server cards. Read-only by construction:
 /// the fetcher only ever sends a GET without a body, and never calls a panel's login or admin endpoints.
 ///
@@ -644,4 +643,3 @@ func testProbeSources() {
     precondition(seen.allSatisfy { ($0.method == "POST" && $0.path == "/admin/api" && $0.body["action"] as? String == "login") || ($0.method == "GET" && ProbeKind.allowedPaths.contains($0.path) && $0.path != "/admin/api") })
     print("PASS: probe sources: addresses, accounts in the Keychain only, allow-list (login POST + three reads), session login/reuse/renewal, 401 → login → retry, rate limit, wrong account and Turnstile stop, history rows, live subscription and messages")
 }
-#endif

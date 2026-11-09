@@ -1,5 +1,6 @@
-# Tests every push and pull request: the web tests on a GitHub-hosted Ubuntu runner, and the Swift build and self-tests of both
-# editions on the self-hosted Mac labelled mac-build (it holds no signing keychain; signing and releases stay on assetboard-mini).
+# Tests every push and pull request: the web tests on a GitHub-hosted Ubuntu runner, and the Swift build and self-tests, with the Pro
+# modules when the runner's checkout has them and without (ASSETBOARD_EDITION=free), on the self-hosted Mac labelled mac-build (it
+# holds no signing keychain; signing and releases stay on assetboard-mini).
 # Before a release, run it by hand with "Minimum system" ticked: the Swift job then runs on GitHub-hosted macOS 15, the oldest
 # system the app supports (LSMinimumSystemVersion), so the WebKit and system libraries under test are the ones a user at the minimum has.
 name: build

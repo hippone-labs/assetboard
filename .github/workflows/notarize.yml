@@ -10,11 +10,6 @@ on:
         description: Branch, tag or commit to build
         default: main
         required: true
-      edition:
-        description: Which edition to sign and notarize
-        type: choice
-        options: [full, free, both]
-        default: full
 
 permissions:
   contents: read
@@ -84,41 +79,31 @@ jobs:
       - name: Build, sign, notarize, staple
         env:
           INPUT_REF: ${{ inputs.ref }}
-          EDITION: ${{ inputs.edition }}
         run: |
           set -euo pipefail
           version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' desktop/Info.plist)"
           short="$(git rev-parse --short HEAD)"
           out="$RUNNER_TEMP/release"; mkdir -p "$out"
-          case "$EDITION" in full) editions=(full) ;; free) editions=(free) ;; *) editions=(full free) ;; esac
+          zsh desktop/package.sh
+          app=dist/Assetboard.app; name="Assetboard-macOS-arm64-$version.zip"
+          codesign --verify --deep --strict --verbose=2 "$app"
+          submit="$RUNNER_TEMP/submit.zip"
+          ditto -c -k --keepParent "$app" "$submit"
+          xcrun notarytool submit "$submit" --keychain-profile "$NOTARY_PROFILE" ${NOTARY_KEYCHAIN:+--keychain "$NOTARY_KEYCHAIN"} --wait 2>&1 | tee "$out/notary.log"
+          grep -q 'status: Accepted' "$out/notary.log" || { echo "::error::notarization not accepted"; exit 1; }
+          xcrun stapler staple "$app"
+          xcrun stapler validate "$app"
+          spctl -a -vv "$app"
+          rm -f "$submit"
+          ditto -c -k --keepParent "$app" "$out/$name"
+          sum="$(shasum -a 256 "$out/$name" | cut -d' ' -f1)"
           {
             echo "### Notarized build of \`$INPUT_REF\` ($short), version $version"
             echo
-            echo "| edition | zip | sha256 |"
-            echo "|---|---|---|"
+            echo "| zip | sha256 |"
+            echo "|---|---|"
+            echo "| $name | \`$sum\` |"
           } >> "$GITHUB_STEP_SUMMARY"
-          for edition in "${editions[@]}"; do
-            if [ "$edition" = full ]; then
-              zsh desktop/package.sh
-              app=dist/Assetboard.app; name="Assetboard-macOS-arm64-$version.zip"
-            else
-              # package.sh only knows the full edition; build.sh signs with SIGNING_IDENTITY itself.
-              ASSETBOARD_EDITION=free zsh desktop/build.sh
-              app=dist/free/Assetboard.app; name="Assetboard-Free-macOS-arm64-$version.zip"
-            fi
-            codesign --verify --deep --strict --verbose=2 "$app"
-            submit="$RUNNER_TEMP/submit-$edition.zip"
-            ditto -c -k --keepParent "$app" "$submit"
-            xcrun notarytool submit "$submit" --keychain-profile "$NOTARY_PROFILE" ${NOTARY_KEYCHAIN:+--keychain "$NOTARY_KEYCHAIN"} --wait 2>&1 | tee "$out/notary-$edition.log"
-            grep -q 'status: Accepted' "$out/notary-$edition.log" || { echo "::error::notarization of $edition not accepted"; exit 1; }
-            xcrun stapler staple "$app"
-            xcrun stapler validate "$app"
-            spctl -a -vv "$app"
-            rm -f "$submit"
-            ditto -c -k --keepParent "$app" "$out/$name"
-            sum="$(shasum -a 256 "$out/$name" | cut -d' ' -f1)"
-            echo "| $edition | $name | \`$sum\` |" >> "$GITHUB_STEP_SUMMARY"
-          done
 
       - name: Lock the signing keychain
         if: ${{ always() && env.SIGNING_KEYCHAIN_PASSWORD != '' }}
@@ -127,6 +112,6 @@ jobs:
       - name: Upload notarized zips
         uses: actions/upload-artifact@v4
         with:
-          name: notarized-${{ inputs.edition }}-${{ github.run_number }}
+          name: notarized-${{ github.run_number }}
           path: ${{ runner.temp }}/release/
           retention-days: 30

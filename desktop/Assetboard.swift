@@ -281,13 +281,6 @@ final class BoardStore {
 /// Application Support, never reads the Keychain and refuses network/Keychain imports, sync, AI, OCR and export. In-page CSV/JSON demo samples still run in JS without saving.
 let demoMode = CommandLine.arguments.contains("--demo")
 
-/// The free edition (`ASSETBOARD_EDITION=free desktop/build.sh`): no MCP, Cloudflare, GitHub or AI.
-#if ASSETBOARD_FREE
-let freeEdition = true
-#else
-let freeEdition = false
-#endif
-
 final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WKNavigationDelegate, NSWindowDelegate {
     var window: NSWindow!
     var webView: WKWebView!
@@ -302,7 +295,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
     var agentCalls: [String: (method: String, started: Date)] = [:]
     let cloudflare = CloudflareConnector()
     let github = GitHubConnector()
-    #if !ASSETBOARD_FREE
     let probes = ProbeSources()
     /// Sources being read now: a refresh asked again while one runs is dropped, not queued.
     var probeLoading: Set<String> = []
@@ -314,7 +306,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         live.emit = { [weak self] message in self?.probeResult(message) }
         return live
     }()
-    #endif
     let icons = IconFetcher()
     let updater = Updater()
     var localRoot: URL!
@@ -459,8 +450,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
             recordAgentCall(method, ok: false, started: Date(), note: L("App 正在启动")); reply(AgentSocketServer.failure(L("Assetboard 正在启动，请稍后再试"))); return
         }
         let id = UUID().uuidString
-        // `via` says which client called: "mcp" from assetboard-cli's MCP server, anything else is the command line (the page keeps the
-        // MCP lookups free and the rest for Pro).
+        // `via` says which client called: "mcp" from assetboard-cli's MCP server, anything else is the command line (for 操作记录).
         // `client` is what assetboard-cli could tell about the tool that started it (ClientSignals), for 操作记录.
         let call: [String: Any] = ["requestId": id, "method": method, "params": request["params"] as? [String: Any] ?? [:],
                                    "via": request["via"] as? String == "mcp" ? "mcp" : "cli", "client": ClientSignals.sanitized(request["client"])]
@@ -531,14 +521,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
                           let json = String(data: data, encoding: .utf8) else { return }
                     self.webView.evaluateJavaScript("window.assetboardNetworkEntry?.(\(json))")
                 }
-                #if !ASSETBOARD_FREE
                 let server = AgentSocketServer(path: store.directory.appendingPathComponent("agent.sock").path)
                 server.onRequest = { [weak self] request, reply in
                     guard let self else { reply(AgentSocketServer.failure(L("Assetboard 正在退出"))); return }
                     self.handleAgentRequest(request, reply: reply)
                 }
                 do { try server.start(); agentServer = server } catch { NSLog("Assetboard agent socket unavailable: %@", "\(error)") }
-                #endif
             }
             let saved: [String: Any]? = demoMode ? nil : try store.load()
             guard let root = Bundle.main.resourceURL?.appendingPathComponent("Board", isDirectory: true) else { return }
@@ -632,16 +620,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
             #if ASSETBOARD_PRO
             if let key = pendingLicenseKey { pendingLicenseKey = nil; activateLicense(key, confirm: true) }
             #endif
-            if demoMode || freeEdition {
-                // The free edition has no connectors or AI, so it never reads their tokens from the Keychain.
+            if demoMode {
                 connectionStateJSON = "{\"cloudflareChecking\":false,\"githubChecking\":false,\"cloudflareConnected\":false,\"githubConnected\":false,\"aiKeySaved\":false}"
             } else { DispatchQueue.global(qos: .utility).async {
                 var connections: [String: Any] = ["cloudflareConnected": self.cloudflare.token() != nil, "githubConnected": self.github.token() != nil,
                                                   "aiKeySaved": self.ai.key() != nil, "cloudflareChecking": false, "githubChecking": false]
-                #if !ASSETBOARD_FREE
                 connections["registrars"] = RegistrarImport.shared.connections()
                 connections["cloudImports"] = CloudImport.shared.connections()
-                #endif
                 guard let bytes = try? JSONSerialization.data(withJSONObject: connections),
                       let json = String(data: bytes, encoding: .utf8) else { return }
                 DispatchQueue.main.async { self.connectionStateJSON = json; self.publishConnectionState() }
@@ -866,7 +851,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         webView.evaluateJavaScript("window.assetboardOCRResult(\(json))")
     }
 
-    #if !ASSETBOARD_FREE
     func probeResult(_ result: [String: Any]) {
         DispatchQueue.main.async {
             guard let data = try? JSONSerialization.data(withJSONObject: result),
@@ -950,7 +934,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
     }
 
     @objc func openProbes() { webView.evaluateJavaScript("window.probeDialog?.()") }
-    #endif
 
     func cloudflareResult(_ result: [String: Any]) {
         DispatchQueue.main.async {
@@ -1232,13 +1215,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
             }
             return
         }
-        #if !ASSETBOARD_FREE
         if let action = body["action"] as? String, action.hasPrefix("probe") { handleProbe(action, body); return }
         if let action = body["action"] as? String, action.hasPrefix("sshProbe") { handleSshProbe(action, body); return }
         if let action = body["action"] as? String, action.hasPrefix("platform") { handlePlatform(action, body); return }
         // AI 额度与用量 (AIUsage.swift): local reading of the AI tools' files, and their usage endpoints once turned on per tool.
         if let action = body["action"] as? String, action.hasPrefix("aiUsage") { handleAIUsage(action, body); return }
-        // Cloudflare, GitHub and AI are Pro: the free edition has no bridge for them, so their messages are ignored.
         // 从注册商导入 (RegistrarImport.swift): Namecheap and Porkbun domain lists, read-only.
         if let action = body["action"] as? String, action == "registrarSync" || action == "registrarDisconnect" { handleRegistrar(action, body); return }
         // 从云平台导入 (CloudImport.swift): Hetzner, DigitalOcean and Vercel lists, read-only.
@@ -1280,7 +1261,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
             syncGitHubWithLocalCLI(users: users, details: body["details"] as? Bool == true)
             return
         }
-        #endif
         if body["action"] as? String == "localCliDetect" {
             publishLocalCliDetect()
             return
@@ -1293,7 +1273,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
             sshConfigHosts()
             return
         }
-        #if !ASSETBOARD_FREE
         if body["action"] as? String == "aiSave" {
             saveAISettings(body)
             return
@@ -1304,7 +1283,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
             else { aiResult(["kind": "settings", "ok": false, "error": L("无法从 macOS 钥匙串删除 API key，请重试。")]) }
             return
         }
-        #endif
         if body["action"] as? String == "iconFetch" {
             let requestId = body["requestId"] as? Int ?? 0
             icons.fetch(input: String((body["host"] as? String ?? "").prefix(300))) { result in
@@ -1320,12 +1298,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
             }
             return
         }
-        #if !ASSETBOARD_FREE
         if body["action"] as? String == "aiRecognize" {
             recognizeWithAI(body)
             return
         }
-        #endif
         if body["action"] as? String == "evidenceList" {
             sendEvidenceList()
             return
@@ -1338,7 +1314,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
             importDroppedOCR(body)
             return
         }
-        #if !ASSETBOARD_FREE
         if body["action"] as? String == "githubSync" {
             let supplied = (body["token"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             guard supplied.isEmpty || (supplied.count <= 256 && !supplied.contains(where: { $0.isWhitespace })) else {
@@ -1360,7 +1335,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
             }
             return
         }
-        #endif
         guard body["action"] as? String == "save", let sequence = body["sequence"] as? Int, let data = body["data"] else { return }
         do {
             try store.save(data)
@@ -1382,15 +1356,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
     /// What the page finds as `window.__ASSETBOARD_NATIVE__` when it loads: the board, the settings the app keeps, the language and
     /// Pro's state. Built at launch, and again when the language changes and the page is loaded afresh.
     func nativeInitial(saved: [String: Any]?) -> [String: Any] {
-        #if ASSETBOARD_FREE
-        var initial: [String: Any] = ["data": saved as Any? ?? NSNull(), "cloudflareConnected": false, "githubConnected": false,
-                                      "cloudflareChecking": false, "githubChecking": false, "ai": NSNull(), "demo": demoMode]
-        #else
         var initial: [String: Any] = ["data": saved as Any? ?? NSNull(), "cloudflareConnected": false, "githubConnected": false,
                                       "cloudflareChecking": true, "githubChecking": true,
                                       "ai": demoMode ? NSNull() : ai.loadSettings()?.summary ?? NSNull(), "demo": demoMode,
                                       "cliPath": Bundle.main.bundleURL.appendingPathComponent("Contents/MacOS/assetboard-cli").path]
-        #endif
         // The theme is a viewer preference (theme.js); the demo starts from the default and keeps nothing.
         initial["themePref"] = demoMode ? NSNull() : ThemePreference.stored as Any? ?? NSNull()
         initial["systemAccent"] = ThemePreference.systemAccentHex
@@ -1407,7 +1376,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         // and `--sidebar-tip` shows the tip on 域名. For screenshots only: demo mode, never remembered.
         if demoMode, let rail = [("--sidebar-collapsed", "rail"), ("--sidebar-more", "more"), ("--sidebar-tip", "tip")]
             .last(where: { CommandLine.arguments.contains($0.0) })?.1 { initial["demoRail"] = rail }
-        #if !ASSETBOARD_FREE
         // Probe sources without their credentials; the demo shows made-up probe readings from the page and reads no panel.
         initial["probeSources"] = demoMode ? [] : probes.summary()
         // SSH 直读: which aliases are on and how often; the demo makes up its own hosts.
@@ -1422,7 +1390,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         }
         // AI 额度: which tools are read locally and which endpoints are on; the demo makes up its readings in the page.
         initial["aiUsage"] = demoMode ? NSNull() as Any : ["sources": aiUsageMonitor.settings.summary] as Any
-        #endif
         // Screenshots (the window can only be captured, not clicked): `--demo --open-asset=<id>` opens that record's detail,
         // `--demo --panorama` opens 全景, `--demo --probe-sources` the probe settings (探针数据源). Only the demo reads them.
         if demoMode {
@@ -1486,7 +1453,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         let evidenceItem = NSMenuItem(title: L("待确认…"), action: #selector(showImportedEvidence), keyEquivalent: "")
         evidenceItem.target = self
         fileMenu.addItem(evidenceItem)
-        #if !ASSETBOARD_FREE
         // Re-reading Cloudflare (new zones and Registrar domains) is a menu item too, not only a button inside 导入.
         let cloudflareItem = NSMenuItem(title: L("同步 Cloudflare…"), action: #selector(openCloudflare), keyEquivalent: "")
         cloudflareItem.target = self
@@ -1509,7 +1475,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         let agentItem = NSMenuItem(title: L("MCP 接入…"), action: #selector(openAgentSetup), keyEquivalent: "")
         agentItem.target = self
         fileMenu.addItem(agentItem)
-        #endif
         let networkItem = NSMenuItem(title: L("网络记录…"), action: #selector(openNetworkLog), keyEquivalent: "")
         networkItem.target = self
         fileMenu.addItem(networkItem)
@@ -2551,44 +2516,20 @@ if CommandLine.arguments.contains(Updater.launchCheckFlag) {
 } else if CommandLine.arguments.contains("--test-cloudflare") {
     testCloudflare()
 } else if CommandLine.arguments.contains("--test-ssh-probe") {
-    #if !ASSETBOARD_FREE
     testSSHProbe()
     testSSHHosts()
-    #else
-    print("PASS: SSH probe is not in the free edition")
-    #endif
 } else if CommandLine.arguments.contains("--test-ai-usage") {
-    #if !ASSETBOARD_FREE
     testAIUsage()
-    #else
-    print("PASS: AI usage is not in the free edition")
-    #endif
 } else if CommandLine.arguments.contains("--test-platform") {
-    #if !ASSETBOARD_FREE
     testPlatformStatus()
-    #else
-    print("PASS: platform status is not in the free edition")
-    #endif
 } else if CommandLine.arguments.contains("--test-probe") {
-    #if !ASSETBOARD_FREE
     testProbeSources()
-    #else
-    print("PASS: probe sources are not in the free edition")
-    #endif
 } else if CommandLine.arguments.contains("--test-github") {
     testGitHub()
 } else if CommandLine.arguments.contains("--test-registrar") {
-    #if !ASSETBOARD_FREE
     testRegistrars()
-    #else
-    print("PASS: registrar imports are not in the free edition")
-    #endif
 } else if CommandLine.arguments.contains("--test-cloud-import") {
-    #if !ASSETBOARD_FREE
     testCloudImports()
-    #else
-    print("PASS: cloud imports are not in the free edition")
-    #endif
 } else if CommandLine.arguments.contains("--test-cloudflare-inventory") {
     testCloudflareInventory()
 } else if CommandLine.arguments.contains("--test-ai") {

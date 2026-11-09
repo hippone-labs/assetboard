@@ -1,7 +1,6 @@
 // Project revenue (state.projects) and the per-project figures: cleaned at load, read by agents (list_projects, USD by default)
 // with shared records split, written by agents (update_project: checked first, one ⌘Z step, refused without Pro), kept by ⌘Z and a
-// rename, carried by the backup and listed in its restore preview. Pro draws the project page; here its project slot is faked so
-// projects count as shown. Saves go to a fake host and never to disk.
+// rename, carried by the backup and listed in its restore preview. Saves go to a fake host and never to disk.
 async (page) => {
  const check=(ok,message)=>{if(!ok)throw new Error(message);};
  // Polls from the test side: the page's CSP forbids the eval that page.waitForFunction relies on.
@@ -24,15 +23,12 @@ async (page) => {
   check(await p.evaluate(()=>JSON.stringify(state.projects))==='{"web":{"revenue":{"amount":30,"currency":"USD"}}}','Load keeps only valid revenue');
 
   const call=(method,params={})=>p.evaluate(([method,params])=>assetboardAgent({requestId:'t',via:'mcp',method,params}),[method,params]);
-  // The free edition refuses the write like any other, and nothing changes.
+  // Without Pro update_project is refused like every change to a record that is there, and nothing changes.
   const refused=await call('updateProject',{name:'web',revenue:{amount:40,currency:'USD'}});
-  check(refused.ok===false&&/Pro/.test(refused.error)&&await p.evaluate(()=>state.projects.web.revenue.amount)===30,'The free edition refuses update_project: '+JSON.stringify(refused));
-  // Agents: nothing while projects are not shown (free edition), then the figures once Pro's project slot is there.
-  await p.evaluate(()=>{proEnable();proSlots.projectNav=null;});
+  check(refused.ok===false&&/Pro/.test(refused.error)&&await p.evaluate(()=>state.projects.web.revenue.amount)===30,'Without Pro update_project is refused: '+JSON.stringify(refused));
+  // Reading the figures is free; the writes below turn Pro on in place, as an activation does.
   let reply=await call('projects',{currency:'USD'});
-  check(reply.ok&&reply.result.projects.length===0,'No projects without the project slot: '+JSON.stringify(reply));
-  await p.evaluate(()=>{proSlots.projectNav=()=>'';render();});
-  reply=await call('projects',{currency:'USD'});
+  await p.evaluate(()=>proEnable());
   const web=reply.result?.projects?.find(x=>x.name==='web'),blog=reply.result?.projects?.find(x=>x.name==='blog');
   check(reply.ok&&reply.result.currency==='USD'&&web&&blog,'Both projects are listed: '+JSON.stringify(reply));
   check(web.monthly===20&&web.monthlyCost===14&&web.revenueMonthly===30&&web.net===16&&web.complete===true,'web: full 12+6+2, split 6+6+2, net 16: '+JSON.stringify(web));

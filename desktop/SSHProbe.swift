@@ -1,6 +1,5 @@
 import Foundation
 
-#if !ASSETBOARD_FREE
 /// SSH 直读 (Pro): a probe data source for servers without a monitoring panel. The app runs the system's /usr/bin/ssh with the
 /// person's own ~/.ssh/config, ssh-agent and keys, and one fixed read-only command; the page parses what it prints
 /// (pro/web/probe-ssh-data.js) and shows it on the matching server card like any probe. Nothing is installed, written or run
@@ -331,4 +330,3 @@ func testSSHProbe() {
     precondition(settings.setInterval(45) && settings.interval == 45 && settings.setInterval(3600) && settings.interval == 3600, "any whole number of seconds in the range")
     print("PASS: SSH probe: aliases, batch-mode command line with the fixed read-only command, failure reasons, per-alias settings")
 }
-#endif

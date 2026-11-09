@@ -47,8 +47,9 @@ async (page) => {
   await p.keyboard.press('s');await p.waitForTimeout(200);
   check(!(await stopped('demo-s2')),'S on the hero toggles the server');
   await p.keyboard.press('Escape');await p.keyboard.press('Escape');await p.waitForTimeout(150);
-  // Honest: nothing in the UI claims a live state for it, except what a probe (Pro, 探针数据源) reports, which is set aside here.
-  const words=await p.evaluate(()=>{const s=document.createElement('style');s.textContent='.r-probe,.pano-probe,.probe-facts{display:none!important}';document.head.append(s);const t=document.body.innerText;s.remove();return t;});check(!/运行中|在线|已下线|宕机/.test(words),'No live-state wording');
+  // Honest: nothing in the UI claims a live state for it, except what a probe (Pro, 探针数据源) reports, which is set aside here, and a
+  // repository's last GitHub Actions run (Actions 运行中), which is about the run, not a server.
+  const words=await p.evaluate(()=>{const s=document.createElement('style');s.textContent='.r-probe,.pano-probe,.probe-facts{display:none!important}';document.head.append(s);const t=document.body.innerText;s.remove();return t.replaceAll('Actions 运行中','');});check(!/运行中|在线|已下线|宕机/.test(words),'No live-state wording: '+(words.match(/.{0,40}(运行中|在线|已下线|宕机).{0,40}/)||[''])[0]);
   // Persisted with the asset, so backups carry it.
   check(await p.evaluate(()=>JSON.stringify(state).includes('"stopped":true')),'Stored on the asset');
   check(!errors.length,'No page errors: '+errors.join());

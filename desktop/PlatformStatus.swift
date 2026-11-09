@@ -1,7 +1,6 @@
 import Foundation
 import Security
 
-#if !ASSETBOARD_FREE
 /// 实时状态 › 平台状态 (Pro): the state of a person's projects as their own platform's API reports it (Supabase paused, a Vercel
 /// deployment failed, a Render service suspended, an Upstash database suspended). Read-only by construction: every request is a GET
 /// of a fixed path on the platform's own API host, built here from an allow-list; the page never names a host, a path or a method.
@@ -545,4 +544,3 @@ func testPlatformStatus() {
     }
     print("PASS: platform status: fixed GETs on the platforms' API hosts (ids and cursors checked), wide tokens, sources without tokens for the page, answers cut down (no emails, hosts, env, passwords or REST tokens), pages, Render deploys, Basic for Upstash, 401")
 }
-#endif

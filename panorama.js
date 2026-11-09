@@ -60,7 +60,7 @@
   return {id:asset.id,asset,type:asset.type,group,tone:toneOf(status.level),days:status.days,stopped:!!asset.stopped,standby:meta.standby,proxied:meta.proxied,alsoOn:hubId?hubs.filter(s=>s.id!==hubId).length:0};
  }
  // Lenses with at least one visible hub; the switch only offers those.
- // skip leaves lenses out whatever they hold (the free edition has no 按项目).
+ // skip leaves lenses out whatever they hold.
  function panoramaLenses(assets,{skip=[]}={}){return LENSES.filter(lens=>!skip.includes(lens.key)&&hubList(lens,assets).some(h=>!h.hiddenAt)).map(l=>l.key);}
  // The lens to open on: the remembered one while it still has hubs, else the one where the most things are linked (ties go to host).
  function pickLens(assets,saved,{skip=[]}={}){
