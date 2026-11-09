@@ -1,12 +1,13 @@
 // Renders the draft app icons in desktop/icon-drafts/ to 1024 px PNGs, and one comparison sheet: the drafts beside the present
 // icon (desktop/icon.svg), masked and shadowed the way the Dock shows them, on a light and a dark Dock at 128, 64 and 32 px.
+// Prints each draft's white share: pure white pixels over the whole 1024 px square and inside the Dock mask.
 // Drafts only: desktop/icon-1024.png and the build are untouched.
 //   NODE_PATH=<playwright>/node_modules node tools/icon-drafts.js <out-dir>
 const fs=require('fs'),path=require('path');
 const {chromium}=require('playwright');
-const root=path.join(__dirname,'..'),drafts=path.join(root,'desktop/icon-drafts');
+const root=path.join(__dirname,'..');
 // [file, label]; the present icon comes first on the sheet.
-const ICONS=[['desktop/icon.svg','现有'],['desktop/icon-drafts/screen.svg','A · 屏幕'],['desktop/icon-drafts/dots.svg','B · 点阵'],['desktop/icon-drafts/bento.svg','C · 拼板']];
+const ICONS=[['desktop/icon.svg','现有'],['desktop/icon-drafts/lit-tile.svg','A · 亮格'],['desktop/icon-drafts/one-row.svg','B · 一行'],['desktop/icon-drafts/rise.svg','C · 升起']];
 const svgUrl=file=>'data:image/svg+xml;base64,'+fs.readFileSync(path.join(root,file)).toString('base64');
 
 // The Dock shape: a continuous-corner rounded square inset to 824 / 1024 of the tile, as macOS draws a full-bleed icon.
@@ -26,6 +27,15 @@ const sheet=`<!doctype html><meta charset="utf-8"><style>
  figcaption{font-size:14px}
 </style>${dock('light')}${dock('dark')}`;
 
+// Share of pure white pixels (each channel ≥ 250), over the square and inside the rounded-square mask (radius 22.5%).
+const whiteShare=url=>new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>{
+ const n=1024,c=document.createElement('canvas');c.width=c.height=n;const g=c.getContext('2d');g.drawImage(img,0,0,n,n);
+ const d=g.getImageData(0,0,n,n).data,mask=new Path2D();mask.roundRect(0,0,n,n,n*.225);
+ let white=0,inside=0,whiteInside=0;
+ for(let y=0;y<n;y++)for(let x=0;x<n;x++){const i=(y*n+x)*4,w=d[i]>=250&&d[i+1]>=250&&d[i+2]>=250,m=g.isPointInPath(mask,x+.5,y+.5);
+  white+=w;inside+=m;whiteInside+=w&&m;}
+ resolve({square:white/(n*n),mask:whiteInside/inside});};img.onerror=reject;img.src=url;});
+
 (async()=>{
  const out=process.argv[2];
  if(!out){console.error('usage: node tools/icon-drafts.js <out-dir>');process.exit(2);}
@@ -33,9 +43,12 @@ const sheet=`<!doctype html><meta charset="utf-8"><style>
  const browser=await chromium.launch(process.env.PLAYWRIGHT_CHROMIUM?{executablePath:process.env.PLAYWRIGHT_CHROMIUM}:{}),page=await browser.newPage();
  try{
   await page.setViewportSize({width:1024,height:1024});
-  for(const file of fs.readdirSync(drafts).filter(f=>f.endsWith('.svg')).sort()){
-   await page.setContent(`<style>body{margin:0}</style><img src="${svgUrl('desktop/icon-drafts/'+file)}" width="1024" height="1024" style="display:block">`);
-   await page.screenshot({path:path.join(out,`icon-${file.replace(/\.svg$/,'')}.png`),omitBackground:true});
+  for(const [file] of ICONS.slice(1)){
+   const name=path.basename(file,'.svg');
+   await page.setContent(`<style>body{margin:0}</style><img src="${svgUrl(file)}" width="1024" height="1024" style="display:block">`);
+   await page.screenshot({path:path.join(out,`icon-${name}.png`),omitBackground:true});
+   const share=await page.evaluate(whiteShare,svgUrl(file));
+   console.log(`${name}: white ${(share.square*100).toFixed(1)}% of the square, ${(share.mask*100).toFixed(1)}% inside the Dock mask`);
   }
   await page.setViewportSize({width:1200,height:600});
   await page.setContent(sheet);

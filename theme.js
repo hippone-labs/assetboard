@@ -124,6 +124,7 @@ function legacyPref(){
 }
 function applyBoardTheme(theme=themeFor(themePref)){
  const scheme=currentScheme(),p=themePalette(theme,scheme),key=JSON.stringify(theme)+scheme;if(appliedTheme===key&&appliedScheme===scheme)return;appliedTheme=key;appliedScheme=scheme;
+ if(scheme==='dark'&&document.documentElement.dataset.contrast)Object.assign(p,CONTRAST_DARK);
  document.documentElement.dataset.scheme=scheme;
  for(const role of ['canvas','category','card','ink','muted','primary'])document.documentElement.style.setProperty('--tone-'+role,p[role].join(','));
  if(window.__ASSETBOARD_NATIVE__)window.webkit.messageHandlers.assetboard.postMessage({action:'themeColor',rgb:p.canvas});
@@ -160,7 +161,9 @@ document.addEventListener('DOMContentLoaded',()=>{
  applyBoardTheme();
  schemeQuery?.addEventListener?.('change',()=>applyBoardTheme());
 });
-// 撞色 (an experiment, off by default): warm grey surfaces, one black panel, white only on the one figure that matters
-// (material.css, last layer). On with ?contrast in the page address or localStorage assetboard-contrast-v1 = 1; it is not a theme
-// and is never saved with the board.
+// 撞色 (an experiment, off by default), after the Grok Bot icon: large areas dark, pure white only on the one figure that matters
+// (material.css, last layer). Dark: a pure black window, neutral greys from the icon's #313131 → #141414, text one step below
+// white and a grey accent, so the main figure is the only #fff. Light keeps the theme; only the overview turns black.
+// On with ?contrast in the page address or localStorage assetboard-contrast-v1 = 1; it is not a theme and is never saved.
+const CONTRAST_DARK={canvas:[0,0,0],category:[20,20,20],card:[20,20,20],ink:[200,200,200],muted:[136,136,136],primary:[176,176,176]};
 try{if(new URLSearchParams(location.search).has('contrast')||localStorage.getItem('assetboard-contrast-v1')==='1')document.documentElement.dataset.contrast='on';}catch{}

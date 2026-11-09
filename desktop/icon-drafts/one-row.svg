@@ -1,0 +1,15 @@
+<!-- Draft icon · 一行: the list on pure black; four records are dark Grok Bot gradient bars of different lengths, the one that
+     needs you is a full-width pure white bar with its record mark cut out in black. White meets black only.
+     Full-bleed 1024 × 1024 like desktop/icon.svg. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+<defs><linearGradient id="dim" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#313131"/><stop offset="1" stop-color="#141414"/></linearGradient></defs>
+<rect width="1024" height="1024" fill="#000"/>
+<g fill="url(#dim)">
+<rect x="212" y="212" width="460" height="80" rx="40"/>
+<rect x="212" y="452" width="380" height="80" rx="40"/>
+<rect x="212" y="572" width="520" height="80" rx="40"/>
+<rect x="212" y="692" width="300" height="80" rx="40"/>
+</g>
+<rect x="212" y="322" width="600" height="100" rx="50" fill="#fff"/>
+<circle cx="262" cy="372" r="22" fill="#000"/>
+</svg>

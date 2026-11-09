@@ -2291,48 +2291,21 @@ body::before,.native-app body::before{background:radial-gradient(70vw 65vh at 0%
 #board[data-size=l] .row .r-cost,:root .r-cost{color:var(--ink);font-weight:500}
 #board[data-size=l] .row .r-cost{font-size:13px}
 
-/* 撞色 · experiment (theme.js, data-contrast; off by default). After the Grok Bot icon: warm grey for the large areas, pure black for
-   one block, white as the single highlight. Light: a warm grey window, a lighter warm grey card (no white surfaces), the chosen
-   sidebar item and the CTA as black pills with warm grey text, and the overview as one black panel whose first figure (本月还要付)
-   is the only white on screen. Dark: a black window and the same panel, the pills turned warm grey with black text. Status keeps
-   its red and amber, brightened on the black panel. */
-:root[data-contrast]{--ct-shell:#d7d2c8;--ct-card:#e8e4dc;--ct-black:#0a0a0a;--ct-dim:#8f897e;--ct-mid:#aaa498;--ct-on-black:#d7d2c8;--ct-white:#fff;
- --surface-card:#efece6;
- --surface-content:var(--ct-card);--cta:var(--ct-black);--on-cta:var(--ct-on-black);--cta-ring:rgba(10,10,10,.2);
- --selected:rgba(10,10,10,.075);--selected-strong:rgba(10,10,10,.12);--hairline:rgba(10,10,10,.09);--card-shadow:none;--glass:rgba(232,228,220,.86)}
-:root[data-contrast][data-scheme=dark]{--ct-card:#1b1a18;--ct-dim:#7c766b;--surface-card:#26241f;--ink:#d7d2c8;
- --cta:var(--ct-shell);--on-cta:var(--ct-black);--cta-ring:rgba(215,210,200,.25);
- --selected:rgba(215,210,200,.09);--selected-strong:rgba(215,210,200,.14);--hairline:rgba(215,210,200,.08);--glass:rgba(27,26,24,.86)}
-:root[data-contrast] body::before,:root.native-app[data-contrast] body::before{background:var(--ct-shell)}
-:root[data-contrast][data-scheme=dark] body::before,:root.native-app[data-contrast][data-scheme=dark] body::before{background:var(--ct-black)}
-:root[data-contrast] .topnav .search{background:rgba(10,10,10,.07)}
-:root[data-contrast][data-scheme=dark] .topnav .search{background:rgba(215,210,200,.08)}
-/* no white chips: the chosen segment is a warm grey step, secondary buttons are outlines */
-:root[data-contrast] .seg-button[aria-pressed=true]{background:var(--ct-shell);box-shadow:none}
-:root[data-contrast][data-scheme=dark] .seg-button[aria-pressed=true]{background:#33312c}
-:root[data-contrast] #detail-content .main-actions .button:not(.primary){background:transparent;border-color:rgba(10,10,10,.18)}
-:root[data-contrast][data-scheme=dark] #detail-content .main-actions .button:not(.primary){border-color:rgba(215,210,200,.2)}
-/* grid cards: a warm grey step below the card surface, not a white sheet */
-:root[data-contrast] .gcard{background:rgba(10,10,10,.035)}
-:root[data-contrast][data-scheme=dark] .gcard{background:#23211e}
-/* the sidebar: ink on warm grey; the chosen item is the one black pill */
-:root[data-contrast] #sidebar .nav-item{color:rgba(10,10,10,.62)}
-:root[data-contrast] #sidebar .nav-item:hover{color:var(--ct-black)}
-:root[data-contrast] #sidebar .nav-item.active{background:var(--ct-black);color:var(--ct-on-black)}
-:root[data-contrast] #sidebar .nav-item.active .ui-icon,:root[data-contrast] #sidebar .nav-item.active .nav-icon svg,:root[data-contrast] #sidebar .nav-item.active .nav-count{color:var(--ct-on-black)}
-:root[data-contrast][data-scheme=dark] #sidebar .nav-item{color:rgba(215,210,200,.62)}
-:root[data-contrast][data-scheme=dark] #sidebar .nav-item:hover{color:var(--ct-shell)}
-:root[data-contrast][data-scheme=dark] #sidebar .nav-item.active{background:var(--ct-shell);color:var(--ct-black)}
-:root[data-contrast][data-scheme=dark] #sidebar .nav-item.active :is(.ui-icon,.nav-icon svg,.nav-count){color:var(--ct-black)}
-/* the overview: one black panel; white only on the first figure */
-:root[data-contrast] .overview{margin:12px 0 10px;padding:14px 16px 14px;border-radius:16px;background:var(--ct-black);box-shadow:none}
-:root[data-contrast][data-scheme=dark] .overview{background:#000;box-shadow:inset 0 0 0 1px rgba(215,210,200,.1)}
-:root[data-contrast] .ov-tile:hover{background:rgba(215,210,200,.07)}
-:root[data-contrast] .ov-label,:root[data-contrast] .ov-note{color:var(--ct-dim)}
-:root[data-contrast] .ov-value{color:var(--ct-mid)}
-:root[data-contrast] .ov-tile:first-child .ov-value{color:var(--ct-white);font-size:34px;line-height:40px;margin-top:0}
-:root[data-contrast] .ov-tile:first-child .ov-note{color:var(--ct-on-black)}
+/* 撞色 · experiment (theme.js, data-contrast; off by default). After the Grok Bot icon: large areas dark, black meets pure white
+   with no step between, and white only on the one figure that matters. The overview is one pure black panel; its first figure
+   (本月还要付) is #fff, the other figures and labels are greys, status keeps its red and amber. Dark: theme.js turns the window
+   pure black with #141414 surfaces and greyscale text and accent; the CTA becomes a grey outline so it does not compete with the
+   white. Light keeps the theme around the panel. */
+:root[data-contrast] .overview{margin:10px 0 8px;padding:14px 16px;border-radius:16px;background:#000;box-shadow:none}
+:root[data-contrast] .ov-tile:hover{background:rgba(255,255,255,.06)}
+:root[data-contrast] .ov-label,:root[data-contrast] .ov-note{color:#8a8a8a}
+:root[data-contrast] .ov-value{color:#9a9a9a}
+:root[data-contrast] .ov-tile:first-child .ov-value{color:#fff;font-size:36px;line-height:42px;margin-top:2px}
 :root[data-contrast] .ov-tile.soon .ov-value{color:#f0b35c}
 :root[data-contrast] .ov-tile.overdue .ov-value{color:#ff8b7d}
-:root[data-contrast] .ov-cells i{background:rgba(215,210,200,.18)}
-:root[data-contrast] .ov-cells i.on{background:var(--ct-dim)}
+:root[data-contrast] .ov-cells i{background:rgba(255,255,255,.16)}
+:root[data-contrast] .ov-cells i.on{background:#8a8a8a}
+:root[data-contrast][data-scheme=dark] .overview{box-shadow:inset 0 0 0 1px rgba(255,255,255,.09)}
+:root[data-contrast][data-scheme=dark]{--cta:transparent;--on-cta:rgb(var(--tone-ink));--cta-ring:rgba(255,255,255,.18)}
+:root[data-contrast][data-scheme=dark] :is(.button.primary,#add-block){box-shadow:inset 0 0 0 1px rgba(255,255,255,.28)}
+:root[data-contrast]:not([data-scheme=dark]){--on-cta:#e4e4e4}

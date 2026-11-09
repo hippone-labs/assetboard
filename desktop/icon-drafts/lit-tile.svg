@@ -1,0 +1,14 @@
+<!-- Draft icon · 亮格: the present icon's four tiles on pure black; three tiles are the dark Grok Bot gradient (#313131 → #141414),
+     the accent tile is pure white with the due dot cut out of it in black. White meets black only; no grey touches it.
+     Full-bleed 1024 × 1024 like desktop/icon.svg. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+<defs><linearGradient id="dim" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#313131"/><stop offset="1" stop-color="#141414"/></linearGradient></defs>
+<rect width="1024" height="1024" fill="#000"/>
+<g fill="url(#dim)">
+<rect x="212" y="212" width="340" height="270" rx="54"/>
+<rect x="582" y="212" width="230" height="270" rx="54"/>
+<rect x="212" y="512" width="230" height="300" rx="54"/>
+</g>
+<rect x="472" y="512" width="340" height="300" rx="54" fill="#fff"/>
+<circle cx="742" cy="582" r="30" fill="#000"/>
+</svg>

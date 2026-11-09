@@ -1,0 +1,10 @@
+<!-- Draft icon · 升起: two colours only, #000 and #fff. The board is the black field; one record rises out of it as a white card,
+     tilted and running off the bottom edge, with the due dot cut out in black.
+     Full-bleed 1024 × 1024 like desktop/icon.svg. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+<rect width="1024" height="1024" fill="#000"/>
+<g transform="rotate(-9 512 760)">
+<rect x="262" y="520" width="500" height="560" rx="72" fill="#fff"/>
+<circle cx="680" cy="602" r="36" fill="#000"/>
+</g>
+</svg>
