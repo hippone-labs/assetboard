@@ -1,5 +1,6 @@
-<!-- The app icon source: full-bleed 1024×1024, no baked mask or shadow (macOS masks it and adds the shadow). desktop/icon-1024.png is
-     rendered from it at 1024 px; the site (assets/icon.webp, favicon.svg) and the purchase pages use the same drawing. -->
+<!-- The app icon source: full-bleed 1024×1024, no baked mask or shadow. desktop/icon-1024.png is rendered from it at 1024 px, and
+     tools/app-icon.py makes the Mac app's icon from that (desktop/AppIcon.icon for Assets.car, desktop/icon-macos-1024.png for
+     AppIcon.icns); the site (assets/icon.webp, favicon.svg) and the purchase pages use the same drawing. -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
 <defs><linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2a2d35"/><stop offset="1" stop-color="#101114"/></linearGradient>
 <linearGradient id="t" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fbfbfd"/><stop offset="1" stop-color="#dfe2e8"/></linearGradient>

@@ -83,16 +83,21 @@ jobs:
           persist-credentials: false
 
       - name: Prepare logs
-        run: mkdir -p "$RUNNER_TEMP/logs" && { sw_vers; xcrun swiftc --version; } 2>&1 | tee "$RUNNER_TEMP/logs/env.log"
+        run: mkdir -p "$RUNNER_TEMP/logs" && { sw_vers; xcrun swiftc --version; xcrun actool --version; } 2>&1 | tee "$RUNNER_TEMP/logs/env.log"
 
-      # build.sh compiles with -target arm64-apple-macos<LSMinimumSystemVersion> and fails when a binary's minos differs.
+      # build.sh compiles with -target arm64-apple-macos<LSMinimumSystemVersion> and fails when a binary's minos differs. Its
+      # --test-app-icon checks Assets.car, CFBundleIconName and the icons the system draws, and leaves them as PNG in the logs.
       - name: Swift build + self-tests (full)
         id: full
+        env:
+          ASSETBOARD_ICON_PREVIEW: ${{ runner.temp }}/logs/icon-full
         run: zsh desktop/build.sh 2>&1 | tee "$RUNNER_TEMP/logs/build-full.log"
 
       - name: Swift build + self-tests (free)
         id: free
         if: ${{ !cancelled() }}
+        env:
+          ASSETBOARD_ICON_PREVIEW: ${{ runner.temp }}/logs/icon-free
         run: ASSETBOARD_EDITION=free zsh desktop/build.sh 2>&1 | tee "$RUNNER_TEMP/logs/build-free.log"
 
       - name: Zip apps
@@ -104,6 +109,7 @@ jobs:
           [ -d dist/free/Assetboard.app ] && ditto -c -k --keepParent dist/free/Assetboard.app "$RUNNER_TEMP/apps/Assetboard-free-$short.zip"
           # The drag-to-Applications disk image, unsigned here; release.sh signs and notarizes it.
           [ -d dist/Assetboard.app ] && zsh desktop/dmg.sh dist/Assetboard.app "$RUNNER_TEMP/apps/Assetboard-full-$short.dmg"
+          [ -d dist/free/Assetboard.app ] && zsh desktop/dmg.sh dist/free/Assetboard.app "$RUNNER_TEMP/apps/Assetboard-free-$short.dmg"
           ls -la "$RUNNER_TEMP/apps"
           {
             echo "### Build $short"

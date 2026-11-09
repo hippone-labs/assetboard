@@ -38,6 +38,8 @@
 	<string>Assetboard</string>
 	<key>CFBundleIconFile</key>
 	<string>AppIcon</string>
+	<key>CFBundleIconName</key>
+	<string>AppIcon</string>
 	<key>CFBundleIdentifier</key>
 	<string>studio.assetboard.local</string>
 	<key>CFBundleName</key>

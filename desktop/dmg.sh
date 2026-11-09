@@ -30,5 +30,8 @@ trap 'hdiutil detach -quiet "$mount" 2>/dev/null || true; rm -rf "$work"' EXIT
 [[ -d "$mount/$(basename "$app")" && -L "$mount/Applications" && "$(readlink "$mount/Applications")" == /Applications && -f "$mount/.DS_Store" ]] \
   || { print -u2 "The disk image lacks the app, the Applications link or its layout"; exit 1; }
 codesign --verify --deep --strict "$mount/$(basename "$app")"
+# The window shows the app's icon from its Assets.car (macOS 26 and later) and the volume its AppIcon.icns.
+[[ -f "$mount/$(basename "$app")/Contents/Resources/Assets.car" ]] && cmp -s "$mount/.VolumeIcon.icns" "$app/Contents/Resources/AppIcon.icns" \
+  || { print -u2 "The disk image lacks the app's Assets.car or the volume icon"; exit 1; }
 hdiutil detach -quiet "$mount"
 printf '%s\n' "$out"

@@ -1874,6 +1874,55 @@ func testAgentInbox() {
     print("PASS: Inbox folder hands files over once, keeps them until finished, prunes handled/")
 }
 
+// The app's own icon as the built bundle carries it: AppIcon.icns on the macOS grid, and on macOS 26 and later the icon the system
+// draws from Assets.car, which must show the drawing up to its rounded edge rather than a grey plate around it.
+// ASSETBOARD_ICON_PREVIEW=<folder> also writes both as PNG there to look at.
+func testAppIcon() {
+    func check(_ ok: Bool, _ message: @autoclosure () -> String) { if !ok { fputs("App icon test failed: \(message())\n", stderr); exit(1) } }
+    let bundle = Bundle.main
+    check(bundle.object(forInfoDictionaryKey: "CFBundleIconName") as? String == "AppIcon", "Info.plist needs CFBundleIconName AppIcon")
+    check(bundle.object(forInfoDictionaryKey: "CFBundleIconFile") as? String == "AppIcon", "Info.plist needs CFBundleIconFile AppIcon")
+    let resources = bundle.resourceURL!
+    check(FileManager.default.fileExists(atPath: resources.appendingPathComponent("Assets.car").path), "Assets.car is missing")
+    func render(_ image: NSImage, _ side: Int) -> NSBitmapImageRep {
+        let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: side, pixelsHigh: side, bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true,
+                                   isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
+        rep.size = NSSize(width: side, height: side)
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
+        image.draw(in: NSRect(x: 0, y: 0, width: side, height: side), from: .zero, operation: .copy, fraction: 1)
+        NSGraphicsContext.restoreGraphicsState()
+        return rep
+    }
+    // x and y as fractions of the side, from the top left.
+    func pixel(_ rep: NSBitmapImageRep, _ x: Double, _ y: Double) -> NSColor {
+        rep.colorAt(x: Int(x * Double(rep.pixelsWide)), y: Int(y * Double(rep.pixelsHigh)))!.usingColorSpace(.deviceRGB)!
+    }
+    let preview = ProcessInfo.processInfo.environment["ASSETBOARD_ICON_PREVIEW"].map { URL(fileURLWithPath: $0) }
+    func save(_ rep: NSBitmapImageRep, _ name: String) {
+        guard let preview else { return }
+        try? FileManager.default.createDirectory(at: preview, withIntermediateDirectories: true)
+        try? rep.representation(using: .png, properties: [:])?.write(to: preview.appendingPathComponent(name))
+    }
+    guard let icns = NSImage(contentsOf: resources.appendingPathComponent("AppIcon.icns")) else { return check(false, "AppIcon.icns does not load") }
+    let flat = render(icns, 1024)
+    save(flat, "AppIcon.icns.png")
+    // 100 px of transparent margin, the body opaque from there; the drawing's ground is a dark blue-grey.
+    for (x, y) in [(0.01, 0.01), (0.5, 0.05), (0.05, 0.5), (0.95, 0.5), (0.11, 0.11)] { check(pixel(flat, x, y).alphaComponent < 0.05, "AppIcon.icns must be transparent at \(x), \(y)") }
+    for (x, y) in [(0.5, 0.11), (0.11, 0.5), (0.89, 0.5), (0.5, 0.88)] { check(pixel(flat, x, y).alphaComponent > 0.98, "AppIcon.icns must be opaque at \(x), \(y)") }
+    let ground = pixel(flat, 0.5, 0.14)
+    check(ground.blueComponent - ground.redComponent > 0.05 && ground.brightnessComponent < 0.5, "AppIcon.icns must show the drawing's ground near its top edge: \(ground)")
+    let system = render(NSWorkspace.shared.icon(forFile: bundle.bundlePath), 512)
+    save(system, "system.png")
+    if ProcessInfo.processInfo.isOperatingSystemAtLeast(OperatingSystemVersion(majorVersion: 26, minorVersion: 0, patchVersion: 0)) {
+        check(pixel(system, 0.01, 0.01).alphaComponent < 0.05, "The system icon must have transparent corners")
+        // On a grey plate the drawing sits shrunk in the middle and this point, just inside the rounded edge, is neutral grey.
+        let edge = pixel(system, 0.5, 0.14)
+        check(edge.alphaComponent > 0.9 && edge.blueComponent - edge.redComponent > 0.05, "The system icon must show the drawing up to its edge, not a grey plate: \(edge)")
+    }
+    print("PASS: app icon in Assets.car (CFBundleIconName) and AppIcon.icns on the macOS grid")
+}
+
 func testIcons() {
     precondition(IconFetcher.host(from: " Wise.com ") == "wise.com")
     precondition(IconFetcher.host(from: "https://www.hsbc.com.hk/zh-hk/") == "www.hsbc.com.hk")
@@ -2463,6 +2512,8 @@ if CommandLine.arguments.contains(Updater.launchCheckFlag) {
     testAgentSocket()
 } else if CommandLine.arguments.contains("--test-icons") {
     testIcons()
+} else if CommandLine.arguments.contains("--test-app-icon") {
+    testAppIcon()
 } else if CommandLine.arguments.contains("--test-webview") {
     testWebView()
 } else if CommandLine.arguments.contains("--test-reminders") {
