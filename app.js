@@ -99,6 +99,19 @@ function undo(){if(!history.length){toast(tr('没有可撤销的'));return;}futu
 function redo(){if(!future.length){toast(tr('没有可重做的'));return;}history.push(JSON.stringify(state));if(history.length>25)history.shift();restoreSnapshot(future.pop());toast(tr('已重做'),true);}
 // A close event from the dialog this one replaced arrives after it opens; only a close that leaves the dialog shut cancels.
 function confirmDialog(title,message,confirmLabel,danger=false){return new Promise(resolve=>{modal(title,`<p class="form-note confirm-message">${esc(message).replaceAll('\n','<br>')}</p><div class="confirm-actions"><button class="button ${danger?'danger':'primary'}" id="confirm-yes">${esc(confirmLabel)}</button><button class="button" id="confirm-no">${tr('取消')}</button></div>`,'confirm');const dialog=$('#modal');let settled=false;const finish=value=>{if(settled)return;settled=true;dialog.removeEventListener('close',cancel);resolve(value);},cancel=()=>{if(!dialog.open)finish(false);};dialog.addEventListener('close',cancel);$('#confirm-yes').onclick=()=>{finish(true);dialog.close();};$('#confirm-no').onclick=()=>dialog.close();$('#confirm-no').focus();});}
+// Release notes, a Markdown list: "- " starts an item, an indented line goes on with it, heading marks are dropped.
+function releaseNotesHtml(text){const blocks=[];for(const raw of String(text||'').split('\n')){const line=raw.trim();if(!line)continue;const item=line.match(/^(?:[-*+]|\d+[.)])\s+(.*)$/);if(item)blocks.push({li:true,text:item[1]});else if(/^#/.test(line)||!blocks.length)blocks.push({li:false,text:line.replace(/^#+\s*/,'')});else blocks[blocks.length-1].text+=' '+line;}
+ let html='',list=false;for(const b of blocks){if(b.li!==list){html+=list?'</ul>':'<ul>';list=b.li;}html+=b.li?`<li>${esc(b.text)}</li>`:`<p>${esc(b.text)}</p>`;}return html+(list?'</ul>':'');}
+// 检查更新 (desktop/Updater.swift) offers a newer version here: {version, notes:{en,zh}}. The notes in the interface language come
+// first; the other language stays folded under its own name. False while another dialog is open, and the app asks in an alert.
+window.assetboardUpdateOffer=offer=>{
+ const dialog=$('#modal');if(dialog.open||!offer?.version)return false;
+ const notes=offer.notes||{},langs=Object.keys(LANGS).filter(l=>String(notes[l]||'').trim()),main=langs.includes(appLang)?appLang:langs[0],other=langs.find(l=>l!==main);
+ const block=l=>`<div class="update-notes" lang="${LANGS[l].html}">${releaseNotesHtml(notes[l])}</div>`;
+ modal(`Assetboard ${offer.version}`,`<div class="update-offer">${nativeStore?.version?`<p class="form-note">${tr('当前版本 {version}',{version:esc(nativeStore.version)})}</p>`:''}${main?block(main):''}${other?`<details class="update-other"><summary lang="${LANGS[other].html}">${LANGS[other].name}</summary>${block(other)}</details>`:''}<div class="confirm-actions"><button class="button primary" id="update-install">${tr('下载并安装')}</button><button class="button" id="update-later">${tr('稍后')}</button></div></div>`,'update');
+ let answered=false;const answer=install=>{if(answered)return;answered=true;dialog.removeEventListener('close',later);window.webkit?.messageHandlers?.assetboard?.postMessage({action:'updateChoice',install,version:offer.version});},later=()=>{if(!dialog.open)answer(false);};
+ dialog.addEventListener('close',later);$('#update-install').onclick=()=>{answer(true);dialog.close();};$('#update-later').onclick=()=>dialog.close();
+ return true;};
 
 function isHidden(a){return !!(a&&a.hiddenAt);}
 function rememberDeleted(a){if(!a)return;const key=assetSyncKey(a);if(!key){addTombstone(state,a.id);return;}if(!Array.isArray(state.deletedExternalIds))state.deletedExternalIds=[];if(!state.deletedExternalIds.includes(key))state.deletedExternalIds.push(key);if(a.id&&!state.deletedExternalIds.includes(a.id))state.deletedExternalIds.push(a.id);}

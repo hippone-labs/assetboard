@@ -610,7 +610,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
                 window.center()
             }
             createMenu()
-            if !demoMode { updater.window = window; updater.reportRollback(); updater.startAutomaticChecks() }
+            if !demoMode {
+                updater.window = window
+                // The offer opens in the board's own dialog (window.assetboardUpdateOffer); an alert when the page cannot show it.
+                updater.showInPage = { [weak self] json, shown in
+                    guard let self, self.boardLoaded else { shown(false); return }
+                    self.webView.evaluateJavaScript("typeof window.assetboardUpdateOffer==='function'&&window.assetboardUpdateOffer(\(json))?'ok':'busy'") { result, error in
+                        shown(error == nil && (result as? String) == "ok")
+                    }
+                }
+                updater.reportRollback(); updater.startAutomaticChecks()
+            }
             DispatchQueue.main.async { [weak self] in AppLocation.offerIfNeeded(window: self?.window) }
             webView.loadFileURL(root.appendingPathComponent("index.html"), allowingReadAccessTo: root)
             window.makeKeyAndOrderFront(nil)
@@ -1097,6 +1107,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         }
         // 设置 › 版本: the same check as the app menu's 检查更新…, with its answer in an alert.
         if body["action"] as? String == "checkUpdates" { checkForUpdates(); return }
+        // The page's update dialog: 下载并安装 or 稍后.
+        if body["action"] as? String == "updateChoice" {
+            if !demoMode { updater.answerOffer(install: body["install"] as? Bool == true, version: body["version"] as? String) }
+            return
+        }
         // 设置 (prefsDialog): the menu bar summary and automatic update checks. The page never sends it in demo mode.
         if body["action"] as? String == "preference" {
             if !demoMode, let on = body["on"] as? Bool {

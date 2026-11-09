@@ -20,7 +20,8 @@ final class Updater {
 
     struct Release: Equatable {
         let version: String
-        let notes: String
+        /// The notes by interface language, "en" and "zh"; a language the release has no notes in is missing.
+        let notes: [String: String]
         let asset: String
         let download: URL
         /// SHA-256 of the archive, hex, when the version file gives one.
@@ -110,7 +111,8 @@ final class Updater {
         return now.timeIntervalSince(last) >= interval || now < last
     }
 
-    /// The site's version file, {"version", "minimumSystemVersion", "notes", "assets": [{"name", "url", "sha256"}]}, with this edition's
+    /// The site's version file, {"version", "minimumSystemVersion", "notes", "notesByLanguage": {"en", "zh"}, "assets": [{"name", "url",
+    /// "sha256"}]}, with this edition's
     /// archive; nil for an unknown version, a minimum system that is not a macOS version, a checksum that is not SHA-256 hex, or an
     /// archive that is missing or not under https://assetboard.app/downloads/.
     static func parse(_ data: Data, free: Bool) -> Release? {
@@ -124,8 +126,51 @@ final class Updater {
         if let digest, digest.range(of: "^[0-9a-f]{64}$", options: .regularExpression) == nil { return nil }
         let minimum = json["minimumSystemVersion"]
         if let minimum, !((minimum as? String).map { isSystemVersion($0) } ?? false) { return nil }
-        return Release(version: version, notes: String((json["notes"] as? String ?? "").prefix(20_000)), asset: name, download: url, sha256: digest,
-                       minimumSystem: minimum as? String)
+        // notesByLanguage (tools/release_notes.py); without it, the notes are sorted into the two languages.
+        let byLanguage = (json["notesByLanguage"] as? [String: Any] ?? [:]).compactMapValues { $0 as? String }
+            .filter { AppLanguage.all.contains($0.key) && !$0.value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        let notes = (byLanguage.isEmpty ? splitNotes(json["notes"] as? String ?? "") : byLanguage).mapValues { String($0.prefix(20_000)) }
+        return Release(version: version, notes: notes, asset: name, download: url, sha256: digest, minimumSystem: minimum as? String)
+    }
+
+    /// Notes by language, the rule of tools/release_notes.py: a "## English" and a "## 中文" section; lines before either (all of them
+    /// in notes written one English line and its Chinese line in turn) go to the language they are written in, Chinese when an item
+    /// has at least as many Chinese characters as Latin words. An item is a list line with the lines that go on from it.
+    static func splitNotes(_ notes: String) -> [String: String] {
+        func items(_ lines: [String]) -> [String] {
+            var out: [String?] = []
+            for line in lines {
+                let stripped = line.trimmingCharacters(in: .whitespaces)
+                if stripped.isEmpty { out.append(nil) }
+                else if let last = out.last, let last, stripped.range(of: #"^([-*+]\s|\d+[.)]\s|#)"#, options: .regularExpression) == nil {
+                    out[out.count - 1] = last + "\n" + line.replacingOccurrences(of: #"\s+$"#, with: "", options: .regularExpression)
+                } else { out.append(line.replacingOccurrences(of: #"\s+$"#, with: "", options: .regularExpression)) }
+            }
+            return out.compactMap { $0 }
+        }
+        var sections: [String: [String]] = ["en": [], "zh": []], loose: [String] = [], section: String?
+        for line in notes.components(separatedBy: .newlines) {
+            let stripped = line.trimmingCharacters(in: .whitespaces)
+            if stripped.range(of: #"^#{1,6}\s*(english|中文|简体中文|chinese)\s*$"#, options: [.regularExpression, .caseInsensitive]) != nil {
+                section = stripped.lowercased().hasSuffix("english") ? "en" : "zh"
+            } else if let section { sections[section]?.append(line) } else { loose.append(line) }
+        }
+        var out: [String: String] = [:]
+        for lang in ["en", "zh"] {
+            let found = items(loose).filter { languageOf($0) == lang } + items(sections[lang] ?? [])
+            if !found.isEmpty { out[lang] = found.joined(separator: "\n") }
+        }
+        return out
+    }
+    static func languageOf(_ text: String) -> String {
+        let cjk = text.unicodeScalars.filter { (0x3400...0x9FFF).contains($0.value) || (0xF900...0xFAFF).contains($0.value) }.count
+        let words = text.components(separatedBy: CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ").inverted)
+            .filter { !$0.isEmpty }.count
+        return cjk > 0 && cjk >= words ? "zh" : "en"
+    }
+    /// The notes to show: the interface language's, or the other language's when the release has none in it.
+    static func notes(_ release: Release, language: String) -> String {
+        release.notes[language] ?? release.notes.values.first ?? ""
     }
     static func trustedDownload(_ url: URL) -> Bool {
         url.scheme == "https" && url.host == site && url.user == nil && url.password == nil && url.query == nil && url.path.hasPrefix("/downloads/")
@@ -170,6 +215,10 @@ final class Updater {
     /// Which edition's archive to look for: this build's own, or either one in --test-update.
     let free: Bool
     weak var window: NSWindow?
+    /// Set by the app: shows an offer, {"version", "notes"}, in the board's own dialog and answers whether it could (the page may be
+    /// loading or have another dialog open); the person's choice comes back through answerOffer.
+    var showInPage: ((String, @escaping (Bool) -> Void) -> Void)?
+    private var offered: Release?
     private var checking = false
     private var installing = false
     private var timer: Timer?
@@ -237,9 +286,22 @@ final class Updater {
         present(alert) { _ in }
     }
     private func offer(_ release: Release) {
+        guard let showInPage, let window, window.isVisible, window.attachedSheet == nil,
+              let data = try? JSONSerialization.data(withJSONObject: ["version": release.version, "notes": release.notes]),
+              let json = String(data: data, encoding: .utf8) else { offerInAlert(release); return }
+        offered = release
+        showInPage(json) { [weak self] shown in if !shown { self?.offered = nil; self?.offerInAlert(release) } }
+    }
+    /// 下载并安装 or 稍后 in the page's dialog, for the version it showed.
+    func answerOffer(install: Bool, version: String?) {
+        guard let release = offered, release.version == version else { return }
+        offered = nil
+        if install { self.install(release) }
+    }
+    private func offerInAlert(_ release: Release) {
         let alert = NSAlert()
         alert.messageText = "Assetboard \(release.version)"
-        alert.informativeText = Updater.excerpt(release.notes)
+        alert.informativeText = Updater.excerpt(Updater.notes(release, language: AppLanguage.current))
         alert.addButton(withTitle: L("下载并安装"))
         alert.addButton(withTitle: L("稍后"))
         present(alert) { response in if response == .alertFirstButtonReturn { self.install(release) } }
@@ -504,7 +566,23 @@ func testUpdate() {
     check(full?.version == "0.4.7" && full?.asset == "Assetboard-macOS-arm64-0.4.7.zip" && full?.download.lastPathComponent == full?.asset && full?.sha256 == sum,
           "Full edition picks its archive and checksum: \(String(describing: full))")
     check(free?.asset == "Assetboard-Free-macOS-arm64-0.4.7.zip" && free?.download.lastPathComponent == free?.asset && free?.sha256 == nil, "Free edition picks its archive: \(String(describing: free))")
-    check(Updater.excerpt(full?.notes ?? "") == "What's new\n- Faster panorama\n- Fixes", "Notes excerpt: \(Updater.excerpt(full?.notes ?? ""))")
+    check(full?.notes == ["en": "## What's new\n- Faster panorama\n- Fixes"], "English-only notes: \(String(describing: full?.notes))")
+    check(Updater.excerpt(Updater.notes(full!, language: "zh")) == "What's new\n- Faster panorama\n- Fixes", "Notes excerpt: \(Updater.excerpt(Updater.notes(full!, language: "zh")))")
+    // Notes by language: notesByLanguage first; notes in two sections, or one English line and its Chinese line in turn, are sorted.
+    let sorted = ["en": "- Importing ~/.ssh/config skips code hosting entries: the server picker and SSH 直读 skip them too.\n- Import domains from Namecheap and Porkbun.",
+                  "zh": "- 导入 ~/.ssh/config 时跳过代码托管条目（github.com、gitlab.com、User git），它们不是服务器。\n- 从 Namecheap、Porkbun 导入域名，从 Hetzner、DigitalOcean、Vercel 导入服务器。"]
+    let alternating = "- Importing ~/.ssh/config skips code hosting entries: the server picker and SSH 直读 skip them too.\n- 导入 ~/.ssh/config 时跳过代码托管条目（github.com、gitlab.com、User git），它们不是服务器。\n"
+        + "- Import domains from Namecheap and Porkbun.\n- 从 Namecheap、Porkbun 导入域名，从 Hetzner、DigitalOcean、Vercel 导入服务器。\n"
+    check(Updater.splitNotes(alternating) == sorted, "Alternating notes are sorted by language: \(Updater.splitNotes(alternating))")
+    check(Updater.splitNotes("## English\n\n- Faster panorama,\n  and fewer clicks\n- Fixes\n\n### 中文\n- 全景更快\n")
+          == ["en": "- Faster panorama,\n  and fewer clicks\n- Fixes", "zh": "- 全景更快"], "Notes in two sections, an item with its next line")
+    release["notes"] = alternating
+    check(parse(false)?.notes == sorted, "A version file without notesByLanguage is sorted")
+    release["notesByLanguage"] = ["en": "- Faster", "zh": "- 更快", "fr": "- Plus vite", "de": 3] as [String: Any]
+    let byLanguage = parse(false)
+    check(byLanguage?.notes == ["en": "- Faster", "zh": "- 更快"] && Updater.notes(byLanguage!, language: "zh") == "- 更快"
+          && Updater.notes(byLanguage!, language: "en") == "- Faster", "notesByLanguage is read, for the two interface languages")
+    release.removeValue(forKey: "notesByLanguage")
     release["assets"] = [["name": "Assetboard-macOS-arm64-0.4.7.zip", "url": base + "Assetboard-macOS-arm64-0.4.7.zip"]]
     check(parse(true) == nil && parse(false) != nil, "A version file without the free archive offers nothing to the free edition")
     release["assets"] = [["name": "Assetboard-macOS-arm64-0.4.7.zip", "url": "https://downloads.example.com/Assetboard-macOS-arm64-0.4.7.zip"]]

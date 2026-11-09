@@ -1,7 +1,8 @@
 # Signs, notarizes and publishes on the self-hosted Mac labelled mac-build, which holds the signing keychain and the notary profile.
 # That runner is attached to this public repository: no workflow that runs on it has a pull_request trigger, and a pull request
 # from outside must not be approved to run workflows while it stays attached. Ordinary builds and tests run on GitHub-hosted
-# runners (build.yml). Push an annotated vX.Y.Z tag on main, with the release notes as its message.
+# runners (build.yml). Push an annotated vX.Y.Z tag on main, with the release notes as its message: a "## English" and a "## 中文"
+# section, each a list of changes (tools/release_notes.py).
 name: release-app
 
 on:
@@ -10,7 +11,7 @@ on:
   workflow_dispatch:
     inputs:
       notes:
-        description: Release notes (required for a manual run)
+        description: Release notes, a "## English" and a "## 中文" section (required for a manual run)
         required: true
         type: string
 
@@ -89,6 +90,8 @@ jobs:
             printf '%s\n' "$MANUAL_NOTES" > "$RUNNER_TEMP/release-notes.md"
           fi
           test -s "$RUNNER_TEMP/release-notes.md"
+          # One section per language, for the GitHub Release, docs/releases and the version file; lines in turn are sorted too.
+          python3 tools/release_notes.py "$RUNNER_TEMP/release-notes.md"
           # Reuse the runner's existing GitHub login; never copy its personal token into repository secrets.
           gh api repos/hippone/assetboard-site --jq '.permissions.push' | grep -qx true
           site="$(mktemp -d "$RUNNER_TEMP/assetboard-site.XXXXXX")"
