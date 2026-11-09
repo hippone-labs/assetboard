@@ -160,3 +160,7 @@ document.addEventListener('DOMContentLoaded',()=>{
  applyBoardTheme();
  schemeQuery?.addEventListener?.('change',()=>applyBoardTheme());
 });
+// 撞色 (an experiment, off by default): warm grey surfaces, one black panel, white only on the one figure that matters
+// (material.css, last layer). On with ?contrast in the page address or localStorage assetboard-contrast-v1 = 1; it is not a theme
+// and is never saved with the board.
+try{if(new URLSearchParams(location.search).has('contrast')||localStorage.getItem('assetboard-contrast-v1')==='1')document.documentElement.dataset.contrast='on';}catch{}
