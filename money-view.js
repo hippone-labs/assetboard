@@ -1,6 +1,6 @@
-// The money side of the free board: 已续费, charges and renewals waiting for an answer, money facts in the detail and the form,
-// project views, exports (calendar, handover), the registry check and the menu bar summary. The Pro edition adds the bookkeeping and
-// analysis through pro-slots.js. Loaded before app.js; nothing here runs at load time except event listeners, so every helper and
+// The money side of the board: 已续费, charges and renewals waiting for an answer, money facts in the detail and the form,
+// project views, exports (calendar, handover), the registry check and the menu bar summary. money-ledger.js and project-money.js add
+// the bookkeeping and the project figures through pro-slots.js. Loaded before app.js; nothing here runs at load time except event listeners, so every helper and
 // the state from app.js are there when these functions are called.
 
 const PAYMENT_VIA={renew:tr('续费'),confirm:tr('确认扣款'),manual:tr('手动记录'),agent:tr('外部工具'),evidence:tr('账单')};
@@ -16,7 +16,7 @@ function afterMoneyChange(id,message){save();render();if(id&&activeAsset===id)sh
 function ownPayments(a){return !(assetProfiles[a.type]&&a.type!=='ai');}
 function renewable(a){return canRenew(a)&&a.type!=='bankcard';}
 function renewWord(a){return a.dateKind==='keep'?tr('已保号'):tr('已续费');}
-// ---- 已续费 (R): the new date (Pro adds what was paid).
+// ---- 已续费 (R): the new date (money-ledger.js adds what was paid).
 function renewDialog(id){
  const a=state.assets.find(x=>x.id===id);if(!a)return;
  if(!renewable(a)){toast(a.hiddenAt?tr('先恢复显示，再续费'):a.type==='bankcard'?tr('换了新卡就在资料里改有效期'):tr('这项没有到期、扣款或保号日期，先在资料里填上'));return;}
@@ -75,21 +75,22 @@ function renewalAnswer(action,id,due){
  a.event=`${a.date} ${dateKinds[keep?'keep':'expire'].future}`;
  afterMoneyChange(id,result.renewed?(keep?tr('下次保号 {date}，从 {due} 起算；更早做的话改一下日期',{date:result.date,due}):tr('已续到 {date}',{date:result.date})+(result.payment?tr(' · 记下 {amount}',{amount:formatMoney(result.payment.amount,result.payment.currency)}):'')):(keep?tr('记下了：{due} 已过期，不再按周期保号算',{due}):tr('记下了：{due} 已过期，不再按自动续费算',{due})));
 }
-// Charges waiting for an answer are Pro: without proSlots.chargesBand only renewals are asked about.
-function pendingChargesAsked(assets){return proSlots.chargesBand?pendingCharges(assets,{since:state.paymentsSince}):[];}
+// Charges waiting for an answer (the band is chargesBandList in money-ledger.js).
+function pendingChargesAsked(assets){return pendingCharges(assets,{since:state.paymentsSince});}
 function chargesBandHtml(){
  const renewals=renewalsBandHtml(),list=pendingChargesAsked(state.assets);
- return list.length?renewals+proSlots.chargesBand(list):renewals;
+ return list.length?renewals+chargesBandList(list):renewals;
 }
 function chargeAnswer(action,id,due){
  const a=state.assets.find(x=>x.id===id);if(!a)return;
  checkpoint();
  const payment=confirmCharge(a,due,{missed:action==='charge-missed'});
- if(!payment){history.pop();toast(proAction('charge-edit')?tr('金额未知，点“金额不同”填上'):tr('金额未知：先在资料里填上费用'));return;}
+ if(!payment){history.pop();toast(tr('金额未知，点“金额不同”填上'));return;}
  afterMoneyChange(id,action==='charge-missed'?tr('记下了：{due} 没有扣款',{due}):tr('已确认 {amount}',{amount:formatMoney(payment.amount,payment.currency)}));
 }
 
-// ---- The inspector: billing, promotion, lifecycle and registry facts (Pro adds the project), and what is waiting for an answer.
+// ---- The inspector: billing, promotion, lifecycle and registry facts (money-ledger.js and project-money.js add the price change and
+// the project), and what is waiting for an answer.
 // Within 30 days of a promotion's end the mark says the price that follows, not just 惠: renewals at several times the first price are
 // found out on the day (research S5).
 function priceMark(a){
@@ -125,29 +126,21 @@ function extraFacts(a){
  else if(a.registryExpires&&['differs','missing'].includes(rdapCompare(a,{expires:a.registryExpires}).state))out.push(row(tr('注册局'),`${tr('{date} 到期',{date:esc(a.registryExpires)})}${a.registryCheckedAt?' · '+tr('{date} 查询',{date:esc(String(a.registryCheckedAt).slice(0,10))}):''} <button class="text-button" data-action="rdap-apply" data-id="${esc(a.id)}">${tr('改成这个')}</button>`));
  // A check that agreed leaves only its date (research D4); after 30 days it is said as an age, quietly, so a new check looks due.
  else if(a.type==='domain'&&!hold&&Date.parse(a.registryCheckedAt||'')){const days=Math.floor((Date.now()-Date.parse(a.registryCheckedAt))/86400000);out.push(row(tr('注册局'),days>30?`<span class="quiet-fact">${tr('{n} 天前核对',{n:days})}</span>`:`${tr('核对一致')} · ${esc(String(a.registryCheckedAt).slice(0,10))}`));}
- // Without Pro what it wrote stays readable: the project and the last price change.
- if(proOff){if(projectsOf(a).length)out.push(row(tr('项目'),esc(projectsOf(a).join(tr('、')))));const c=priceChange(a);if(c)out.push(row(c.up?tr('涨价'):tr('降价'),`<span class="price-delta ${c.up?'up':'down'}">${esc(formatMoney(c.before,c.currency))} → ${esc(formatMoney(c.after,c.currency))}</span>`));}
  return out.join('')+(a.type==='ai'&&typeof aiQuotaFactsHtml==='function'?aiQuotaFactsHtml(a,row):'')+slotHtml('facts',a,row);
 }
 function paymentsSection(a){
  if(a.hiddenAt)return '';
  // Cards, numbers and accounts have no payments of their own, but a keep-alive deadline that came due still asks here.
  const own=ownPayments(a),renewals=pendingRenewals([a],{since:state.paymentsSince}),charges=own?pendingChargesAsked([a]):[];
- if(own&&proSlots.paymentsSection)return proSlots.paymentsSection(a,{renewals,charges});
- // Payments recorded with Pro stay listed without it, read-only (the latest five).
- const paid=own?paymentList(a).slice().reverse():[],shown=paid.slice(0,5);
- if(!renewals.length&&!charges.length&&!paid.length)return '';
- const list=shown.length?`<ul class="pay-list">${shown.map(p=>`<li class="${p.status==='missed'?'missed':''}"><span class="pay-date">${esc(p.paidOn)}</span><span class="pay-amount">${p.status==='missed'?tr('未扣款'):esc(formatMoney(p.amount,p.currency))}</span><span class="pay-via">${esc([PAYMENT_VIA[p.via]||'',p.note].filter(Boolean).join(' · '))}</span></li>`).join('')}</ul>${paid.length>shown.length?`<p class="pay-more">${tr('另有 {n} 条',{n:formatCount(paid.length-shown.length)})}</p>`:''}`:'';
- const title=paid.length?tr('付款'):tr('待确认');
- return `<section class="pay-section" aria-label="${title}"><div class="pay-head"><h3>${title}</h3>${paid.length?proTag():''}</div>${renewals.map(c=>renewalRow(c)).join('')}${charges.map(c=>chargeRow(c)).join('')}${list}</section>`;
+ return own?paymentsSectionFull(a,{renewals,charges}):renewals.length?`<section class="pay-section" aria-label="${tr('待确认')}"><div class="pay-head"><h3>${tr('待确认')}</h3></div>${renewals.map(c=>renewalRow(c)).join('')}</section>`:'';
 }
 
-// ---- The form: billing type (inside 更多); Pro adds the project, promotion, owner and person in charge.
+// ---- The form: billing type (inside 更多); money-ledger.js and project-money.js add the promotion and the project.
 function moneyFormFields(v){
  return `<div class="field billing-field"><span class="field-label" title="${tr('自动：金额为 0 算免费，有周期算周期付费')}">${tr('计费方式')}</span>${chipGroup('billingType',[['',tr('自动')],['recurring',billingLabels.recurring],['one_off',billingLabels.one_off],['free',billingLabels.free]],BILLING_TYPES.includes(v.billingType)&&v.billingType!=='unknown'?v.billingType:'',tr('计费方式'))}</div>${slotHtml('formFields',v)}`;
 }
 // Reads those fields back; null (after pointing at the field) when something cannot be saved. Fields without a form field here are
-// left out, so what the Pro edition wrote (a project, a promotion, an owner) stays as it was.
+// left out, so they stay as they were.
 function moneyFromForm(form,data,current){
  const out={billingType:String(data.get('billingType')||'')};
  if(!BILLING_TYPES.includes(out.billingType))out.billingType='';
@@ -155,10 +148,9 @@ function moneyFromForm(form,data,current){
  return out;
 }
 
-// ---- Projects are Pro: its script draws the sidebar group, the detail row, the form field and the head of a project view.
-// Without it a project view is no view at all, so a remembered one falls back to 全部资产.
-function projectViewName(v){return projectsOn()&&typeof v==='string'&&v.startsWith('project:')?v.slice(8):'';}
-function projectNavHtml(){return proSlots.projectNav?.()||'';}
+// ---- Projects: money-ledger.js draws the sidebar group, project-money.js the detail row, the form field and the head of a project view.
+function projectViewName(v){return typeof v==='string'&&v.startsWith('project:')?v.slice(8):'';}
+function projectNavHtml(){return projectNavGroup();}
 function toolsNavHtml(){
  if(!state.assets.length)return '';
  return `${slotHtml('toolsNav')}<button class="nav-item" data-action="export" data-id="export">${ui('download')}<span class="nav-label">${tr('导出')}</span></button>`;
@@ -170,7 +162,7 @@ function projectBoardHtml(name){
  const groups=categoryIds().map(id=>{const own=list.filter(a=>a.type===id);return own.length?groupHtml({id,title:cats[id].name,glyph:`<span class="g-icon">${icon(id)}</span>`,list:own,summary:groupSummary(own)}):'';}).join('');
  return {html:head+groups,count:list.length};
 }
-// ---- Exports: files the person keeps or hands on (Pro adds the payment ledger). In the Mac app a save panel writes them; in the browser they download.
+// ---- Exports: files the person keeps or hands on (money-ledger.js adds the payment ledger). In the Mac app a save panel writes them; in the browser they download.
 // Only the backup comes back in (导入 or 从备份恢复 here); the others are read-only copies, marked 只读, and the import names them when dropped.
 function saveFile(name,text,mime){
  if(nativeStore){if(demoMode){toast(tr('演示模式下不可用'));return;}window.webkit.messageHandlers.assetboard.postMessage({action:'saveFile',name,text,mime});return;}
@@ -196,7 +188,7 @@ function exportRun(kind){
  if(kind==='handover'){const mask=!!$('#handover-mask')?.checked;try{localStorage.setItem(HANDOVER_KEY,new Date().toISOString());}catch{}saveFile(tr('Assetboard-交接清单-{day}.html',{day}),handoverHtml(state,{mask,types,order:categoryIds()}),'text/html');}
 }
 
-// ---- Cost panel extras: Pro adds paid this year, the next 12 months, and splits by project and owner.
+// ---- Cost panel extras: paid this year, the next 12 months, and the split by project (money-ledger.js), then any Pro additions.
 function costExtrasHtml(scope,cur){return slotHtml('costExtras',scope,cur);}
 
 // ---- 核对注册局日期: RDAP through the Mac app (recorded in 网络记录); the answer can correct the stored expiry.
@@ -369,7 +361,7 @@ function syncStatusItem(){
  }catch{}
 }
 
-// Clicks for everything above, delegated once; actions this file does not know go to the Pro edition's handlers.
+// Clicks for everything above, delegated once; actions this file does not know go to the handlers in proSlots.actions.
 document.addEventListener('click',e=>{
  const el=e.target.closest?.('[data-action]');if(!el)return;
  const action=el.dataset.action,id=el.dataset.id;

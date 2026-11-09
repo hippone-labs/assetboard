@@ -11,7 +11,6 @@ import Security
 final class Updater {
     static let site = "assetboard.app"
     static let latestURL = URL(string: "https://\(site)/downloads/latest.json")!
-    static let free = freeEdition
     static let automaticKey = "updateAutomatic"
     static let lastCheckKey = "updateLastCheck"
     static let interval: TimeInterval = 86_400
@@ -50,9 +49,9 @@ final class Updater {
 
     // MARK: Rules (covered by --test-update)
 
-    /// The archive desktop/package.sh makes for each edition; a release carries both.
-    static func assetName(version: String, free: Bool) -> String {
-        "Assetboard-\(free ? "Free-" : "")macOS-arm64-\(version).zip"
+    /// The archive desktop/package.sh makes.
+    static func assetName(version: String) -> String {
+        "Assetboard-macOS-arm64-\(version).zip"
     }
 
     /// A semantic version without its leading "v" and build metadata: the numbers and the pre-release identifiers.
@@ -110,14 +109,14 @@ final class Updater {
         return now.timeIntervalSince(last) >= interval || now < last
     }
 
-    /// The site's version file, {"version", "minimumSystemVersion", "notes", "assets": [{"name", "url", "sha256"}]}, with this edition's
+    /// The site's version file, {"version", "minimumSystemVersion", "notes", "assets": [{"name", "url", "sha256"}]}, with the app's
     /// archive; nil for an unknown version, a minimum system that is not a macOS version, a checksum that is not SHA-256 hex, or an
     /// archive that is missing or not under https://assetboard.app/downloads/.
-    static func parse(_ data: Data, free: Bool) -> Release? {
+    static func parse(_ data: Data) -> Release? {
         guard data.count <= 2_000_000, let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
               let tag = json["version"] as? String, parts(tag) != nil else { return nil }
         let version = tag.hasPrefix("v") || tag.hasPrefix("V") ? String(tag.dropFirst()) : tag
-        let name = assetName(version: version, free: free)
+        let name = assetName(version: version)
         guard let assets = json["assets"] as? [[String: Any]], let asset = assets.first(where: { $0["name"] as? String == name }),
               let raw = asset["url"] as? String, let url = URL(string: raw), trustedDownload(url) else { return nil }
         let digest = (asset["sha256"] as? String)?.lowercased()
@@ -167,14 +166,12 @@ final class Updater {
     // MARK: Checking
 
     let session: URLSession
-    /// Which edition's archive to look for: this build's own, or either one in --test-update.
-    let free: Bool
     weak var window: NSWindow?
     private var checking = false
     private var installing = false
     private var timer: Timer?
 
-    init(session: URLSession = Updater.makeSession(), free: Bool = Updater.free) { self.session = session; self.free = free }
+    init(session: URLSession = Updater.makeSession()) { self.session = session }
 
     static func makeSession() -> URLSession {
         let configuration = URLSessionConfiguration.ephemeral
@@ -202,10 +199,9 @@ final class Updater {
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         // A fixed name instead of the default, which would carry the macOS and CFNetwork versions.
         request.setValue("Assetboard", forHTTPHeaderField: "User-Agent")
-        let free = self.free
         session.dataTask(with: request) { data, response, error in
             guard error == nil, (response as? HTTPURLResponse)?.statusCode == 200, let data else { completion(nil); return }
-            completion(Updater.parse(data, free: free))
+            completion(Updater.parse(data))
         }.resume()
     }
 
@@ -491,86 +487,83 @@ func testUpdate() {
         check(Updater.compare(broken, "0.4.6") == nil && !Updater.isNewer(broken, than: "0.0.1"), "Not a version: \(broken)")
     }
     // Asset names, the same rule as desktop/package.sh
-    check(Updater.assetName(version: "0.4.7", free: false) == "Assetboard-macOS-arm64-0.4.7.zip", "Full edition archive name")
-    check(Updater.assetName(version: "0.4.7", free: true) == "Assetboard-Free-macOS-arm64-0.4.7.zip", "Free edition archive name")
+    check(Updater.assetName(version: "0.4.7") == "Assetboard-macOS-arm64-0.4.7.zip", "Archive name")
     // The version file on the site
     let base = "https://\(Updater.site)/downloads/"
     let sum = String(repeating: "ab", count: 32)
     var release: [String: Any] = ["version": "v0.4.7", "notes": "## What's new\n\n- Faster panorama\n- Fixes",
-                                  "assets": [["name": "Assetboard-Free-macOS-arm64-0.4.7.zip", "url": base + "Assetboard-Free-macOS-arm64-0.4.7.zip"],
+                                  "assets": [["name": "Assetboard-Other-macOS-arm64-0.4.7.zip", "url": base + "Assetboard-Other-macOS-arm64-0.4.7.zip"],
                                              ["name": "Assetboard-macOS-arm64-0.4.7.zip", "url": base + "Assetboard-macOS-arm64-0.4.7.zip", "sha256": sum.uppercased()]]]
-    func parse(_ free: Bool) -> Updater.Release? { Updater.parse(try! JSONSerialization.data(withJSONObject: release), free: free) }
-    let full = parse(false), free = parse(true)
+    func parse() -> Updater.Release? { Updater.parse(try! JSONSerialization.data(withJSONObject: release)) }
+    let full = parse()
     check(full?.version == "0.4.7" && full?.asset == "Assetboard-macOS-arm64-0.4.7.zip" && full?.download.lastPathComponent == full?.asset && full?.sha256 == sum,
-          "Full edition picks its archive and checksum: \(String(describing: full))")
-    check(free?.asset == "Assetboard-Free-macOS-arm64-0.4.7.zip" && free?.download.lastPathComponent == free?.asset && free?.sha256 == nil, "Free edition picks its archive: \(String(describing: free))")
+          "The app's archive and checksum are picked: \(String(describing: full))")
     check(Updater.excerpt(full?.notes ?? "") == "What's new\n- Faster panorama\n- Fixes", "Notes excerpt: \(Updater.excerpt(full?.notes ?? ""))")
-    release["assets"] = [["name": "Assetboard-macOS-arm64-0.4.7.zip", "url": base + "Assetboard-macOS-arm64-0.4.7.zip"]]
-    check(parse(true) == nil && parse(false) != nil, "A version file without the free archive offers nothing to the free edition")
+    release["assets"] = [["name": "Assetboard-Other-macOS-arm64-0.4.7.zip", "url": base + "Assetboard-Other-macOS-arm64-0.4.7.zip"]]
+    check(parse() == nil, "A version file without the app's archive offers nothing")
     release["assets"] = [["name": "Assetboard-macOS-arm64-0.4.7.zip", "url": "https://downloads.example.com/Assetboard-macOS-arm64-0.4.7.zip"]]
-    check(parse(false) == nil, "An archive on another host is refused")
+    check(parse() == nil, "An archive on another host is refused")
     release["assets"] = [["name": "Assetboard-macOS-arm64-0.4.7.zip", "url": "https://\(Updater.site)/other/Assetboard-macOS-arm64-0.4.7.zip"]]
-    check(parse(false) == nil, "An archive outside /downloads/ is refused")
+    check(parse() == nil, "An archive outside /downloads/ is refused")
     release["assets"] = [["name": "Assetboard-macOS-arm64-0.4.7.zip", "url": "http://\(Updater.site)/downloads/Assetboard-macOS-arm64-0.4.7.zip"]]
-    check(parse(false) == nil, "A plain http archive is refused")
+    check(parse() == nil, "A plain http archive is refused")
     release["assets"] = [["name": "Assetboard-macOS-arm64-0.4.7.zip", "url": base + "Assetboard-macOS-arm64-0.4.7.zip?x=1"]]
-    check(parse(false) == nil, "A query string is refused")
+    check(parse() == nil, "A query string is refused")
     release["assets"] = [["name": "Assetboard-macOS-arm64-0.4.7.zip", "url": base + "Assetboard-macOS-arm64-0.4.7.zip", "sha256": "nope"]]
-    check(parse(false) == nil, "A checksum that is not SHA-256 hex is refused")
+    check(parse() == nil, "A checksum that is not SHA-256 hex is refused")
     release["assets"] = [["name": "Assetboard-macOS-arm64-0.4.7.zip", "url": base + "Assetboard-macOS-arm64-0.4.7.zip"]]
     release["version"] = "nightly"
-    check(parse(false) == nil, "A version that is not a version is not offered")
+    check(parse() == nil, "A version that is not a version is not offered")
     // The version file's minimum macOS: kept when it is one, the release refused when it is anything else
     release["version"] = "v0.4.7"
-    check(parse(false) != nil && parse(false)?.minimumSystem == nil, "A version file without a minimum system has none")
+    check(parse() != nil && parse()?.minimumSystem == nil, "A version file without a minimum system has none")
     release["minimumSystemVersion"] = "15.0"
-    check(parse(false)?.minimumSystem == "15.0", "The minimum system is read: \(String(describing: parse(false)))")
+    check(parse()?.minimumSystem == "15.0", "The minimum system is read: \(String(describing: parse()))")
     for broken in ["15.0-beta", "v15", "fifteen", "", 15, NSNull()] as [Any] {
         release["minimumSystemVersion"] = broken
-        check(parse(false) == nil, "A minimum system that is not a macOS version is refused: \(broken)")
+        check(parse() == nil, "A minimum system that is not a macOS version is refused: \(broken)")
     }
     release["minimumSystemVersion"] = "28.0"
-    let tooNew = parse(false)
+    let tooNew = parse()
     check(tooNew != nil && Updater.systemProblem(tooNew!, system: "27.1.0")?.contains("28.0") == true && Updater.systemProblem(tooNew!, system: "28.0.0") == nil
           && Updater.systemProblem(tooNew!, system: "28.1") == nil, "A release for a newer macOS is skipped on an older Mac only")
     release.removeValue(forKey: "minimumSystemVersion")
-    check(parse(false).map { Updater.systemProblem($0, system: "15.0.0") == nil } == true, "A version file without a minimum system is offered")
-    check(Updater.parse(Data("<html>".utf8), free: false) == nil, "Not JSON")
+    check(parse().map { Updater.systemProblem($0, system: "15.0.0") == nil } == true, "A version file without a minimum system is offered")
+    check(Updater.parse(Data("<html>".utf8)) == nil, "Not JSON")
     check(Updater.digest(Data("abc".utf8)) == "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", "SHA-256 of a download, lower-case hex")
     // Signatures and timing
     check(Updater.teamIdentifier(codesignOutput: "Executable=/Applications/Assetboard.app/Contents/MacOS/Assetboard\nIdentifier=studio.assetboard.local\nTeamIdentifier=ABCDE12345\n") == "ABCDE12345", "TeamIdentifier is read")
     check(Updater.teamIdentifier(codesignOutput: "Identifier=studio.assetboard.local\nTeamIdentifier=not set\n") == nil && Updater.teamIdentifier(codesignOutput: "") == nil, "Ad-hoc signing has no team")
     let now = Date()
     check(Updater.isDue(last: nil, now: now) && Updater.isDue(last: now.addingTimeInterval(-86_400), now: now) && !Updater.isDue(last: now.addingTimeInterval(-3600), now: now), "At most once a day")
-    // The request: one GET to the site's version file, with nothing about this Mac. Both editions are fetched whichever this build is.
+    // The request: one GET to the site's version file, with nothing about this Mac.
     let configuration = URLSessionConfiguration.ephemeral
     configuration.protocolClasses = [MockCloudflareProtocol.self]
     let mocked = URLSession(configuration: configuration)
-    check(Updater(session: mocked).free == Updater.free, "An updater looks for this build's own archive by default")
     release["version"] = "v0.4.7"
-    release["assets"] = [false, true].map { free -> [String: String] in ["name": Updater.assetName(version: "0.4.7", free: free), "url": base + Updater.assetName(version: "0.4.7", free: free)] }
+    release["assets"] = [["name": Updater.assetName(version: "0.4.7"), "url": base + Updater.assetName(version: "0.4.7")]]
     var seen: [URLRequest] = []
     var status = 200
     MockCloudflareProtocol.reply = { request in seen.append(request); return (status, release) }
-    func fetch(free: Bool) -> Updater.Release?? {
+    func fetch() -> Updater.Release?? {
         var result: Updater.Release??
-        Updater(session: mocked, free: free).fetchLatest { result = .some($0) }
+        Updater(session: mocked).fetchLatest { result = .some($0) }
         let deadline = Date().addingTimeInterval(5)
         while result == nil && Date() < deadline { RunLoop.main.run(until: Date().addingTimeInterval(0.02)) }
         return result
     }
-    for free in [false, true] {
+    do {
         seen = []
-        let fetched = fetch(free: free)
-        check(fetched??.version == "0.4.7" && fetched??.asset == Updater.assetName(version: "0.4.7", free: free),
-              "The latest release is read for the \(free ? "free" : "full") edition: \(String(describing: fetched))")
+        let fetched = fetch()
+        check(fetched??.version == "0.4.7" && fetched??.asset == Updater.assetName(version: "0.4.7"),
+              "The latest release is read: \(String(describing: fetched))")
         let request = seen.first
         check(seen.count == 1 && request?.httpMethod == "GET" && request?.url == Updater.latestURL && request?.httpBody == nil && request?.httpBodyStream == nil
               && request?.value(forHTTPHeaderField: "Authorization") == nil && request?.value(forHTTPHeaderField: "Cookie") == nil
               && request?.value(forHTTPHeaderField: "User-Agent") == "Assetboard", "One plain GET: \(String(describing: request?.allHTTPHeaderFields))")
     }
     status = 404
-    let missing = fetch(free: Updater.free)
+    let missing = fetch()
     check(missing != nil && missing! == nil, "A failed request gives no release")
     let session = Updater.makeSession().configuration
     check(!session.httpShouldSetCookies && session.httpCookieAcceptPolicy == .never && session.urlCache == nil, "No cookies or cache")

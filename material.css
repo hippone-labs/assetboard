@@ -2278,7 +2278,7 @@ body::before,.native-app body::before{background:radial-gradient(70vw 65vh at 0%
 :root #asset-form .profile-fields{grid-template-columns:minmax(0,1fr)}
 @media(max-width:760px){:root #asset-form.asset-form{grid-template-columns:minmax(0,1fr)}}
 
-/* 项目改名: the field that takes a project's place in the sidebar while it is renamed (pro/web/money-pro.js). */
+/* 项目改名: the field that takes a project's place in the sidebar while it is renamed (money-ledger.js). */
 :root #sidebar .nav-item.nav-renaming{cursor:text;color:var(--ink)}
 :root #sidebar .nav-rename{flex:1;min-width:0;height:24px;margin:-3px 0;padding:0 6px;border:1px solid rgb(var(--tone-primary));border-radius:var(--radius-sm);background:var(--surface-content);color:var(--ink);font:inherit;outline:none}
 /* 仓库分支和 Actions: a failed run reads in the danger colour in the inspector; counts use the numeric face. */
@@ -2450,3 +2450,45 @@ body.drag-active #board .wall .row .r-actions{display:none}
 .aq-hot{color:var(--warning)}
 .aq-hot .live-meter::after{background:var(--dot-amber)}
 .aq-sep{white-space:pre}
+
+/* A project's figures (project-money.js): the head of a project view, the revenue bar and the share editor. */
+:root .pj-bar{display:block;margin:8px -4px 6px;padding:8px 4px 14px;border:0;border-radius:0;background:none;box-shadow:0 1px 0 var(--hairline)}
+.pj-figs{display:flex;align-items:flex-end;flex-wrap:wrap;gap:6px 26px}
+.pj-fig{display:flex;flex-direction:column;align-items:flex-start;gap:1px;min-width:0;padding:4px;border:0;border-radius:8px;background:none;color:var(--ink);font:inherit;text-align:left}
+.pj-fig b{font-family:var(--num);font-size:15px;line-height:22px;font-weight:600;font-variant-numeric:tabular-nums}
+.pj-label{font-size:12px;line-height:16px;color:var(--muted)}
+.pj-main b{font-size:27px;line-height:34px;letter-spacing:-.02em}
+.pj-main.loss b{color:var(--danger)}
+.pj-minor b{font-weight:500;color:var(--muted)}
+button.pj-fig{cursor:pointer;transition:background-color var(--motion-fast) var(--ease)}
+button.pj-fig:hover{background:var(--hover)}
+.pj-add{display:inline-flex;align-items:center;gap:4px;font-family:inherit;font-size:13px;font-weight:500;color:var(--muted)}
+.pj-add .ui-icon{width:12px;height:12px}
+.pj-mark{display:inline-flex;align-items:center;gap:4px;margin:0 0 6px;font-size:12px;line-height:16px;color:var(--warning);cursor:help}
+.pj-mark .ui-icon{width:12px;height:12px}
+.pj-shutdown{margin:0 0 4px auto}
+.pj-meter{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:4px 6px;margin:10px 4px 0}
+.pj-in{grid-column:1}.pj-out{grid-column:1}.pj-gaps{grid-column:2;display:flex;gap:3px;height:6px}.pj-gaps:empty{display:none}
+.pj-track{position:relative;display:flex;gap:2px;height:6px;border-radius:3px;background:rgba(var(--tone-ink),.06);overflow:visible}
+.pj-in i{display:block;height:100%;border-radius:3px;background:rgba(var(--tone-ink),.7)}
+.pj-seg{flex:none;min-width:3px;height:100%;padding:0;border:0;border-radius:2px;background:rgba(var(--tone-ink),.34);cursor:pointer;transition:background-color var(--motion-fast) var(--ease)}
+.pj-seg.shared{background:repeating-linear-gradient(135deg,rgba(var(--tone-ink),.34) 0 2px,rgba(var(--tone-ink),.12) 2px 4px)}
+.pj-seg:hover,.pj-seg:focus-visible{background:rgb(var(--tone-primary))}
+.pj-unk{flex:none;width:10px;height:100%;box-sizing:border-box;border:1px dashed var(--warning);border-radius:2px}
+.pj-over{position:absolute;top:-2px;bottom:-2px;border-left:1.5px solid var(--danger);border-radius:0 3px 3px 0;background:var(--danger-soft);pointer-events:none}
+.pj-pct{margin-left:4px;font-family:var(--num);font-size:12px;color:var(--muted)}
+.share-field{display:grid;gap:8px}
+.share-bar{display:flex;gap:2px;height:6px}
+.share-bar i{min-width:2px;border-radius:2px;background:rgba(var(--tone-ink),.34)}
+.share-bar i:nth-child(2n){background:rgba(var(--tone-ink),.16)}
+.share-field.off .share-bar i{background:var(--warning)}
+.share-list{display:flex;flex-wrap:wrap;gap:6px 14px}
+:root .form .share-item{display:inline-flex;align-items:center;gap:6px;margin:0;font-size:13px}
+.share-name{max-width:12em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted)}
+:root .form .share-item input{width:5em;padding:5px 8px;font-family:var(--num);text-align:right}
+:root .form .share-item input{-moz-appearance:textfield;appearance:textfield}
+.share-item input::-webkit-inner-spin-button,.share-item input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+:root .form .share-field.equal .share-item input{color:var(--muted);background:none}
+.share-unit{color:var(--muted);font-family:var(--num)}
+@media(prefers-reduced-motion:reduce){button.pj-fig,.pj-seg{transition:none}}
+@media(max-width:760px){.pj-figs{gap:4px 16px}.pj-shutdown{margin-left:0}}

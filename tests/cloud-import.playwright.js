@@ -2,7 +2,7 @@
 // cloudImportSync itself: the import window and 设置 › 连接 open it, the token is checked before anything is sent and never kept in the
 // page, Vercel's wide token needs a tick, the answer becomes server, deployment, database and domain records (same-name ones asked
 // about), agents read, add, update and delete them under the platform rules, a sync again sends no token, disconnecting keeps the
-// records; the browser, the demo and ?free have no way in. Light and dark contrast of the dialog. Never writes data.
+// records; the Mac app has a way in without the Pro modules too (?free), the browser none. Light and dark contrast of the dialog. Never writes data.
 async (page) => {
  const check=(ok,message)=>{if(!ok)throw new Error(message);};
  const until=async(p,fn,arg,{timeout=10000}={})=>{const end=Date.now()+timeout;for(;;){const value=await p.evaluate(fn,arg);if(value)return value;if(Date.now()>end)throw new Error('Timed out waiting for '+String(fn).slice(0,80));await new Promise(r=>setTimeout(r,40));}};
@@ -150,14 +150,16 @@ async (page) => {
   check(await p.evaluate(()=>state.assets.some(a=>a.source==='hetzner')&&$('#cloud-status').textContent==='未连接'),'Disconnecting keeps the records');
  } finally { await p.close(); }
 
- // ?free (the edition without connectors) and the browser have no way in; the demo answers with made-up resources (demo-data.js).
+ // Without the Pro modules (?free) the Mac app still offers the platforms; the browser has no way in; the demo answers with made-up
+ // resources (demo-data.js).
  for(const [url,native] of [['/?free',true],['/',false]]){
   const q=await page.context().newPage();
   try{
    if(native)await q.addInitScript(`(${host.toString()})();`);
    await q.goto('http://127.0.0.1:4317'+url);await until(q,()=>typeof importHub==='function');
    const r=await q.evaluate(()=>{importHub();const hub=!!document.querySelector('#modal [data-action="cloud-import"]');prefsDialog('connections');const prefs=!!document.querySelector('#modal [data-action="cloud-import"]');$('#modal').close();cloudDialog();return {hub,prefs,open:!!document.querySelector('#cloud-form'),toast:$('#toast').textContent};});
-   check(!r.hub&&!r.prefs,`${url}: no cloud entry (${JSON.stringify(r)})`);
+   if(native)check(r.hub&&r.prefs&&r.open,`${url}: the cloud platforms are there (${JSON.stringify(r)})`);
+   else check(!r.hub&&!r.prefs,`${url}: no cloud entry (${JSON.stringify(r)})`);
    if(!native)check(!r.open&&/Mac App|演示/.test(r.toast),`${url}: cloudDialog explains instead of opening: ${r.toast}`);
   } finally { await q.close(); }
  }

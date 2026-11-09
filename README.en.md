@@ -46,7 +46,7 @@ Data is kept in a SQLite file on the Mac; there is no account. The interface is 
 - A server can hold up to 4 IPs and an SSH host, user and port.
 - A bank card holds only the last four digits, network and expiry; the form refuses full card numbers.
 - A link's meaning follows from the two categories: a domain points to a server or deployment, a repository deploys to a deployment, a bank card pays for a subscription, an Apple ID or Google account is used to sign in, a phone number receives verification codes.
-- An asset can belong to one or more projects, and a project's assets add up to what the whole project costs: per month, by category, over the next 12 months (Pro).
+- An asset can belong to one or more projects, and a project's assets add up to what the whole project costs: per month, by category, over the next 12 months; with a monthly revenue it shows the net, and an asset shared by several projects is split between them.
 
 ## Interface
 
@@ -73,7 +73,7 @@ The panorama has four lenses: where it runs, who pays, which login, by project. 
 | `~/.ssh/config`: Host, HostName, User, Port; code hosting such as github.com (or `User git`) is not taken as a server | App |
 | An AI model you configure (Claude, OpenAI-compatible or Ollama) for screenshots, mail and text | App |
 
-Scripts can put JSON in this format into `~/Library/Application Support/Assetboard/Inbox/` (Pro) or drop it on the window; each file is confirmed in the import preview. Write it under a temporary name, then rename it to `.json`; at most 100 items and 1 MB; other fields are ignored:
+Scripts can put JSON in this format into `~/Library/Application Support/Assetboard/Inbox/` or drop it on the window; each file is confirmed in the import preview. Write it under a temporary name, then rename it to `.json`; at most 100 items and 1 MB; other fields are ignored:
 
 ```json
 {"assetboard": 1, "items": [
@@ -102,15 +102,14 @@ The free edition has no time or record limit. Pro is a US$10 one-time licence, v
 
 | Free | Pro |
 | --- | --- |
-| Asset board, Upcoming, local reminders | Payment ledger, 12-month forecast, price changes |
-| Links, risk chains, panorama | Weekly automatic registry check |
-| Renewal confirmations, hold alerts, manual registry check | Cloudflare sync every 12 hours |
-| Every local import (CSV, backup, .eml, screenshots, ssh config, pasted domains), manual Cloudflare, GitHub, Namecheap, Porkbun, Hetzner, DigitalOcean and Vercel sync, AI plan picker | Project totals, shutdown list, periodic review |
-| AI recognition with your own key | Live status (SSH read, monitoring panels) |
-| Cost totals, currencies, JSON backup, .ics export, basic handover list | MCP write tools (add, edit, delete), `assetboard-cli`, Inbox folder |
-| Privacy mode, network log, read-only MCP tools | Planned: Reminders, encrypted snapshots, a handover pack |
+| Asset board, Upcoming, local reminders, renewal and charge confirmations | External AI tools changing and deleting existing assets (MCP and the command line) |
+| Payment ledger, 12-month forecast, price changes | Weekly automatic registry check |
+| Projects, revenue and shared costs, shutdown list, periodic review | Cloudflare sync every 12 hours, with a note when new assets appear |
+| Every import; connecting Cloudflare, GitHub, Namecheap, Porkbun, Hetzner, DigitalOcean and Vercel, then picking and syncing by hand; AI recognition with your own key | Live status (SSH reads, monitoring panels, platform status) |
+| MCP and the `assetboard-cli` command line: look up, add (same names skipped), import what waits; the Inbox folder | Planned: encrypted snapshots, a handover pack |
+| Links, panorama, AI usage, privacy mode, network log, backups and exports | |
 
-This repository is the whole code of the free edition; building it gives the free edition. The Pro modules are not in this repository, only in the official build.
+This repository is the whole code of the free part; what you build from it works like the official build without a licence. The Pro modules are not in this repository, only in the official build.
 
 ## Data and network
 

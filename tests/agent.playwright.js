@@ -120,12 +120,10 @@ async (page) => {
   await call('delete',{id:'h1'});await call('delete',{id:'h1'});
   check(await p.evaluate(()=>!!$('#asset-form')&&intake.filter(i=>i.deleteId==='h1').length===1),'With a form open the request queues once in 待确认');
   await p.evaluate(()=>{assetFormSnapshot=null;$('#modal').close();intake=[];});
-  // The add panel leads to Agent 接入 (a Pro link, pro/web/import-pro.js); in the browser it explains that the interface lives in the Mac app.
-  if(await p.evaluate(()=>proSlots.captureLinks.length)){
-   await p.evaluate(()=>captureDialog());await p.click('#capture [data-action="agent-setup"]');
-   check(await p.evaluate(()=>$('#modal').dataset.view==='agent'&&/Mac App/.test($('#modal-content').textContent)),'The add panel opens Agent 接入');
-   await p.evaluate(()=>$('#modal').close());
-  }
+  // The add panel leads to MCP 接入; in the browser it explains that the interface lives in the Mac app.
+  await p.evaluate(()=>captureDialog());await p.click('#capture [data-action="agent-setup"]');
+  check(await p.evaluate(()=>$('#modal').dataset.view==='agent'&&/Mac App/.test($('#modal-content').textContent)),'The add panel opens MCP 接入');
+  await p.evaluate(()=>$('#modal').close());
   // Categories carry their common vendors for agents to choose from; fixed-vendor categories name theirs.
   const kinds=(await p.evaluate(()=>assetboardAgent({requestId:'t',method:'types',params:{}}))).result;
   check(kinds.find(k=>k.id==='server').providers.includes('Hetzner')&&kinds.find(k=>k.id==='appleid').provider==='Apple'&&!('providers' in kinds.find(k=>k.id==='appleid')),'types lists vendors per category');

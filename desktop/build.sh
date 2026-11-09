@@ -1,15 +1,14 @@
 #!/bin/zsh
 set -euo pipefail
 project_dir="${0:A:h:h}"
-# ASSETBOARD_EDITION=free builds into dist/free/, so a full and a free build can sit side by side.
+# ASSETBOARD_EDITION=free builds without the Pro modules even when this checkout has pro/ (what building the public repository alone
+# gives), into dist/free/, so both builds can sit side by side.
 out_dir="$project_dir/dist"
 free=0
 [[ "${ASSETBOARD_EDITION:-}" == free ]] && free=1
 (( free )) && out_dir="$out_dir/free"
-# The free edition compiles without MCP, the connectors and AI (#if !ASSETBOARD_FREE) and ships no assetboard-cli.
 swift_flags=()
-(( free )) && swift_flags=(-D ASSETBOARD_FREE)
-# Pro's Swift (pro/desktop/: the offline licence check) when this checkout has it; the free edition leaves it out.
+# Pro's Swift (pro/desktop/: the offline licence check) when this checkout has it; ASSETBOARD_EDITION=free leaves it out.
 pro_swift=()
 if [[ -d "$project_dir/pro/desktop" ]] && (( ! free )); then pro_swift=("$project_dir"/pro/desktop/*.swift); swift_flags+=(-D ASSETBOARD_PRO); fi
 # ASSETBOARD_PRO_DEV=1: a developer build for this Mac that counts as licensed without a licence (pro/desktop/License.swift). Its
@@ -26,9 +25,7 @@ rm -rf "$app_dir"
 mkdir -p "$app_dir/Contents/MacOS" "$app_dir/Contents/Resources/Board"
 xcrun swiftc "${target[@]}" "$project_dir/desktop/Assetboard.swift" "$project_dir/desktop/Localization.swift" "$project_dir/desktop/LocalizationEN.swift" "$project_dir/desktop/CloudflareInventory.swift" "$project_dir/desktop/RegistrarImport.swift" "$project_dir/desktop/CloudImport.swift" "$project_dir/desktop/ProbeSource.swift" "$project_dir/desktop/PlatformStatus.swift" "$project_dir/desktop/AIUsage.swift" "$project_dir/desktop/SSHProbe.swift" "$project_dir/desktop/SSHHosts.swift" "$project_dir/desktop/LocalDatabase.swift" "$project_dir/desktop/OCRImporter.swift" "$project_dir/desktop/AIRecognizer.swift" "$project_dir/desktop/IconFetcher.swift" "$project_dir/desktop/LocalCLI.swift" "$project_dir/desktop/AgentInbox.swift" "$project_dir/desktop/AgentSocket.swift" "$project_dir/desktop/AgentClients.swift" "$project_dir/desktop/NetworkLog.swift" "$project_dir/desktop/ExchangeRates.swift" "$project_dir/desktop/Reminders.swift" "$project_dir/desktop/MoneyBridge.swift" "$project_dir/desktop/Updater.swift" "$project_dir/desktop/WindowChrome.swift" "${pro_swift[@]}" "${swift_flags[@]}" -o "$app_dir/Contents/MacOS/Assetboard" -framework Cocoa -framework WebKit -framework JavaScriptCore -framework UserNotifications -framework PDFKit -framework Vision -lsqlite3 -O
 # The command line and MCP server for agents; it only talks to the running app over its local socket.
-if (( ! free )); then
-  xcrun swiftc "${target[@]}" -parse-as-library "$project_dir/desktop/AssetboardCLI.swift" "$project_dir/desktop/Localization.swift" "$project_dir/desktop/LocalizationEN.swift" "$project_dir/desktop/AgentSocket.swift" "$project_dir/desktop/AgentClients.swift" -o "$app_dir/Contents/MacOS/assetboard-cli" -O
-fi
+xcrun swiftc "${target[@]}" -parse-as-library "$project_dir/desktop/AssetboardCLI.swift" "$project_dir/desktop/Localization.swift" "$project_dir/desktop/LocalizationEN.swift" "$project_dir/desktop/AgentSocket.swift" "$project_dir/desktop/AgentClients.swift" -o "$app_dir/Contents/MacOS/assetboard-cli" -O
 cp "$project_dir/desktop/Info.plist" "$app_dir/Contents/Info.plist"
 (( dev )) && /usr/libexec/PlistBuddy -c 'Add :AssetboardDeveloperBuild bool true' "$app_dir/Contents/Info.plist"
 # Every binary must be built for exactly that system (15.0 and 15 are the same).
@@ -41,14 +38,13 @@ for bin in "$app_dir"/Contents/MacOS/*; do
 done
 # The localizations macOS reads itself: Info.plist text (document type, Services menu); the rest is Localization.swift.
 cp -R "$project_dir/desktop/en.lproj" "$project_dir/desktop/zh-Hans.lproj" "$app_dir/Contents/Resources/"
-cp "$project_dir/index.html" "$project_dir/styles.css" "$project_dir/material.css" "$project_dir/app.js" "$project_dir/money-view.js" "$project_dir/board-views.js" "$project_dir/board-wall.js" "$project_dir/ai-usage.js" "$project_dir/ai-usage-view.js" "$project_dir/pro-load.js" "$app_dir/Contents/Resources/Board/"
+cp "$project_dir/index.html" "$project_dir/styles.css" "$project_dir/material.css" "$project_dir/app.js" "$project_dir/money-view.js" "$project_dir/money-ledger.js" "$project_dir/project-money.js" "$project_dir/board-views.js" "$project_dir/board-wall.js" "$project_dir/ai-usage.js" "$project_dir/ai-usage-view.js" "$project_dir/pro-load.js" "$app_dir/Contents/Resources/Board/"
 cp "$project_dir/theme.js" "$project_dir/asset-data.js" "$project_dir/demo-data.js" "$project_dir/features.js" "$project_dir/panorama.js" "$project_dir/panorama-view.js" "$project_dir/pro-slots.js" "$app_dir/Contents/Resources/Board/"
 cp "$project_dir/i18n.js" "$app_dir/Contents/Resources/Board/"
 mkdir -p "$app_dir/Contents/Resources/Board/i18n"
 cp "$project_dir"/i18n/en-*.js "$app_dir/Contents/Resources/Board/i18n/"
-# The Pro edition's web scripts, when this checkout has them; ASSETBOARD_EDITION=free builds the free edition from a full checkout,
-# dropping the private block of index.html that loads them.
-if [[ -d "$project_dir/pro/web" && "${ASSETBOARD_EDITION:-}" != free ]]; then
+# The Pro modules' web scripts, when this checkout has them and ASSETBOARD_EDITION is not free.
+if [[ -d "$project_dir/pro/web" ]] && (( ! free )); then
   mkdir -p "$app_dir/Contents/Resources/Board/pro/web"
   cp "$project_dir"/pro/web/*.js "$app_dir/Contents/Resources/Board/pro/web/"
 else
@@ -69,10 +65,10 @@ done
 iconutil -c icns "$icon_dir" -o "$app_dir/Contents/Resources/AppIcon.icns"
 # assetboard-cli is nested code: it is signed on its own first, then the bundle seals it.
 if [[ -n "${SIGNING_IDENTITY:-}" ]]; then
-  (( free )) || codesign --force --options runtime --timestamp --sign "$SIGNING_IDENTITY" "$app_dir/Contents/MacOS/assetboard-cli"
+  codesign --force --options runtime --timestamp --sign "$SIGNING_IDENTITY" "$app_dir/Contents/MacOS/assetboard-cli"
   codesign --force --options runtime --timestamp --sign "$SIGNING_IDENTITY" "$app_dir"
 else
-  (( free )) || codesign --force --sign - "$app_dir/Contents/MacOS/assetboard-cli"
+  codesign --force --sign - "$app_dir/Contents/MacOS/assetboard-cli"
   codesign --force --sign - "$app_dir"
 fi
 codesign --verify --deep --strict "$app_dir"
@@ -100,9 +96,9 @@ codesign --verify --deep --strict "$app_dir"
 "$app_dir/Contents/MacOS/Assetboard" --test-agent-log
 "$app_dir/Contents/MacOS/Assetboard" --test-update
 (( ${#pro_swift} == 0 )) || "$app_dir/Contents/MacOS/Assetboard" --test-license
-(( free )) || "$app_dir/Contents/MacOS/assetboard-cli" --self-test
+"$app_dir/Contents/MacOS/assetboard-cli" --self-test
 if (( free )); then
-  leftovers="$(find "$app_dir" -name assetboard-cli)"
-  if [[ -n "$leftovers" ]]; then print -u2 "free edition must not contain:"; print -u2 -- "$leftovers"; exit 1; fi
+  leftovers="$(find "$app_dir/Contents/Resources/Board" -maxdepth 1 -name pro)"
+  if [[ -n "$leftovers" ]]; then print -u2 "a build without the Pro modules must not contain:"; print -u2 -- "$leftovers"; exit 1; fi
 fi
 printf '%s\n' "$app_dir"

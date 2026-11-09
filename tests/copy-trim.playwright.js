@@ -46,7 +46,7 @@ async (page) => {
   // Undetected ssh config: no greyed-out button.
   await p.evaluate(()=>{window.__localCli={gh:false,ghAccounts:[],sshConfig:false};importHub();});
   check(await p.locator('[data-action="ssh-import"]').count()===0,'Missing ssh config shows nothing instead of a disabled button');
-  if(await p.evaluate(()=>proSlots.importCli.length))check(await p.locator('#modal [data-action="github-import"]').count()===1,'Missing gh falls back to the token button');
+  check(await p.locator('#modal [data-action="github-import"]').count()===1,'Missing gh falls back to the token button');
 
   // Preview: counts and tone instead of sentences; deleted/unreadable remain visible; replace note short.
   await p.evaluate(()=>{$('#modal').close();state.blocks=[{id:'domain',width:50,height:null,density:'full',folded:false}];state.assets=[{id:'d1',type:'domain',name:'keep.dev',provider:'Reg',account:'',art:'generic',source:'manual',createdAt:'2026-01-01T00:00:00Z'}];state.deletedExternalIds=['csv:domain:gone.com'];render();});

@@ -1,6 +1,5 @@
 import Foundation
 
-#if !ASSETBOARD_FREE
 
 /// The SSH hosts Assetboard writes for the person: one block per server record that asked for it (sshManaged on the record),
 /// in its own file ~/.ssh/assetboard.conf, which one `Include assetboard.conf` line at the top of ~/.ssh/config brings in. The
@@ -176,4 +175,3 @@ func testSSHHosts() {
     precondition(store.list() == [SSHHosts.Entry(id: "s5", alias: "fine", host: "fine.example.net", user: "", port: "22")], "\(store.list())")
     print("PASS: SSH hosts: blocks written and read back, the include line once, 0600, refused values, removal")
 }
-#endif

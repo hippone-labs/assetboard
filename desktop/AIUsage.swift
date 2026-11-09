@@ -3,7 +3,6 @@ import JavaScriptCore
 import Security
 import SQLite3
 
-#if !ASSETBOARD_FREE
 /// AI 额度与用量: what the AI tools signed in on this Mac have used, and how much of their plans' limits is left, shown on the
 /// person's AI subscription records. The readers are the page's own ai-usage.js, run here in a JavaScriptCore context of their
 /// own: this file only finds the tools' files, reads what was appended since the last pass, runs fixed read-only SQLite queries and,
@@ -618,4 +617,3 @@ func testAIUsage() {
     precondition(AntigravityLocal.request(port: 61230, https: true, csrf: "x", method: "RetrieveUserQuotaSummary")?.url?.host == "127.0.0.1" && AntigravityLocal.request(port: 1, https: true, csrf: "x", method: "Delete") == nil)
     print("PASS: AI usage: readers in JavaScriptCore on made-up Claude Code, Codex, Grok and Cursor files, appended lines read once, nothing but numbers in the snapshot (no prompt, token or path), endpoints off by default and then a fixed GET with the tool's own login, the wait between reads, a 429, Antigravity's local server found from ps and lsof output")
 }
-#endif

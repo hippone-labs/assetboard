@@ -1,7 +1,6 @@
 import Foundation
 import Security
 
-#if !ASSETBOARD_FREE
 /// 从云平台导入: the servers, deployments, databases and domains of a Hetzner Cloud project, a DigitalOcean account or a Vercel account
 /// or team, read-only. Only the documented list endpoints are called, always with GET; the token the person pasted is kept in the
 /// Keychain (one item per platform) once a read with it worked, and never goes back to the page. Every request is in 网络记录 under the
@@ -532,4 +531,3 @@ func testCloudImports() {
     guard JSONSerialization.isValidJSONObject(hetzner), JSONSerialization.isValidJSONObject(ocean), JSONSerialization.isValidJSONObject(vercel) else { fatalError("The answers are not JSON") }
     print("PASS: Hetzner servers, DigitalOcean droplets/apps/databases and Vercel projects/domains, GET only, documented paths, every page, Bearer token never in the address, unreadable kinds skipped, errors in words, malformed replies refused, token checks")
 }
-#endif

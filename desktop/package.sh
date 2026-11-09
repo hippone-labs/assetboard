@@ -7,13 +7,18 @@ if [[ "${SIGNING_IDENTITY:-}" != 'Developer ID Application:'* ]]; then
 fi
 
 project_dir="${0:A:h:h}"
+# One package: the official build (free without a licence). A build without the Pro modules is for building from source, never published.
+if [[ "${ASSETBOARD_EDITION:-}" == free ]]; then
+  print -u2 'ASSETBOARD_EDITION=free is not packaged: only the official build is published. Unset it.'
+  exit 1
+fi
 # A developer build (ASSETBOARD_PRO_DEV=1, Pro without a licence) is for one Mac only and is never packaged.
 if [[ -n "${ASSETBOARD_PRO_DEV:-}" ]]; then
   print -u2 'ASSETBOARD_PRO_DEV is set: developer builds are not packaged. Unset it and build again.'
   exit 1
 fi
-# A signed full build must carry the production licence key: with the placeholder in pro/desktop/License.swift no licence verifies.
-if [[ "${ASSETBOARD_EDITION:-}" != free && -f "$project_dir/pro/desktop/License.swift" ]] && grep -q 'PRODUCTION_PUBLIC_KEY_PLACEHOLDER' "$project_dir/pro/desktop/License.swift"; then
+# A signed build must carry the production licence key: with the placeholder in pro/desktop/License.swift no licence verifies.
+if [[ -f "$project_dir/pro/desktop/License.swift" ]] && grep -q 'PRODUCTION_PUBLIC_KEY_PLACEHOLDER' "$project_dir/pro/desktop/License.swift"; then
   print -u2 'Put the production public key into ProLicense.publicKeyBase64 (pro/desktop/License.swift) first: node pro/worker/keygen.mjs'
   exit 1
 fi
@@ -23,10 +28,8 @@ if /usr/libexec/PlistBuddy -c 'Print :AssetboardDeveloperBuild' "$project_dir/di
   exit 1
 fi
 
-# ASSETBOARD_EDITION=free packages dist/free/ as Assetboard-Free-…; the in-app update picks its archive by this name
-# (Updater.assetName in desktop/Updater.swift), so the two must change together.
+# The in-app update picks its archive by this name (Updater.assetName in desktop/Updater.swift), so the two must change together.
 out_dir="$project_dir/dist" prefix=Assetboard
-[[ "${ASSETBOARD_EDITION:-}" == free ]] && { out_dir="$out_dir/free"; prefix=Assetboard-Free; }
 app_dir="$out_dir/Assetboard.app"
 version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app_dir/Contents/Info.plist")"
 min_macos="$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "$app_dir/Contents/Info.plist")"
@@ -50,7 +53,7 @@ notes = open(os.environ["NOTES_FILE"], encoding="utf-8").read() if os.path.exist
 folder = os.path.join(site, "downloads")
 assets = []
 for name in sorted(os.listdir(folder)):
-    if re.fullmatch(r"Assetboard(-Free)?-macOS-arm64-" + re.escape(version) + r"\.zip", name):
+    if re.fullmatch(r"Assetboard-macOS-arm64-" + re.escape(version) + r"\.zip", name):
         with open(os.path.join(folder, name), "rb") as f: digest = hashlib.sha256(f.read()).hexdigest()
         assets.append({"name": name, "url": "https://assetboard.app/downloads/" + name, "sha256": digest})
 with open(os.path.join(folder, "latest.json"), "w", encoding="utf-8") as f:

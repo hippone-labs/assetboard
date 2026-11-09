@@ -14,8 +14,6 @@ const panoPrefs=(()=>{try{const p=JSON.parse(localStorage.getItem(PANO_PREFS)||'
 let panoLens=panoPrefs.lens;
 const panoHide=panoPrefs.hide;
 function panoSaveLens(){try{localStorage.setItem(PANO_PREFS,JSON.stringify({lens:panoLens,hide:panoHide}));}catch{}}
-// 按项目 is Pro: without it the lens is left out, so a remembered one falls back.
-const panoSkip=()=>({skip:projectsOn()?[]:['project']});
 const panoLensDef=()=>PANORAMA_LENSES.find(l=>l.key===panoLens)||PANORAMA_LENSES[0];
 const panoHidden=()=>Array.isArray(panoHide[panoLens])?panoHide[panoLens]:[];
 const panoModel=()=>buildPanorama(state.assets,{lens:panoLens,cardOrder:state.cardOrder||{},hide:panoHidden()});
@@ -114,7 +112,7 @@ function panoToggle(key){
  const name=PANO_TYPE_LABEL[key]||cats[key]?.name||key;panoSay(on?tr('已隐藏{name}',{name}):tr('已显示{name}',{name}));
 }
 function panoLensSwitch(){
- const open=panoramaLenses(state.assets,panoSkip());if(open.length<2)return '';
+ const open=panoramaLenses(state.assets);if(open.length<2)return '';
  return `<div class="pano-lens" role="group" aria-label="${tr('视角')}">${PANORAMA_LENSES.filter(l=>open.includes(l.key)).map(l=>`<button class="seg" data-lens="${l.key}" aria-pressed="${l.key===panoLens}">${tr(l.name)}</button>`).join('')}</div>`;
 }
 
@@ -184,7 +182,7 @@ function panoramaHtml(model){
 function panoramaRender(){
  const root=$('#panorama');if(!panoOpen||!root)return;
  if(panoDrag)panoDragEnd(true);if(panoLink)panoLinkEnd();
- if(!panoramaLenses(state.assets,panoSkip()).includes(panoLens))panoLens=pickLens(state.assets,panoLens,panoSkip());
+ if(!panoramaLenses(state.assets).includes(panoLens))panoLens=pickLens(state.assets,panoLens);
  const model=panoModel();panoShared=model.shared;
  const keep=document.activeElement?.closest?.('#panorama')?document.activeElement:null,saved=keep&&{lens:keep.dataset.lens,pick:keep.dataset.pick,hero:'heroHead' in keep.dataset,open:keep.dataset.open,chip:keep.dataset.chip,lane:keep.dataset.laneHead,more:keep.dataset.more,loose:'looseMore' in keep.dataset,add:keep.dataset.add,toggle:keep.dataset.toggle,close:keep.classList.contains('pano-close')};
  const draw=()=>{root.innerHTML=panoramaHtml(model);const z=panoZoom(),body=root.querySelector('.pano-body');if(body&&z!==1)body.style.zoom=z;};
@@ -202,7 +200,7 @@ function panoramaOpen(show=!panoOpen,serverId=null){
   if(!$('#detail').hidden)closeDetail();
   // Opening on a server (P on a board card) shows it where it runs; otherwise the remembered lens, or the one with the most links.
   const server=serverId&&state.assets.find(a=>a.id===serverId&&a.type==='server'&&!a.hiddenAt);
-  panoLens=server?'host':pickLens(state.assets,panoLens,panoSkip());
+  panoLens=server?'host':pickLens(state.assets,panoLens);
   panoReturn=document.activeElement;panoOpen=true;panoShow=panoNative;panoFocus=server?serverId:null;panoLooseOpen=false;panoExpanded.clear();
   root.hidden=false;document.body.classList.add('pano-open');$('main').inert=true;
   renderSidebar();panoramaRender();(root.querySelector(panoFocus?'.ph-head':'[data-nav]')||root.querySelector('.pano-close')).focus({preventScroll:true});

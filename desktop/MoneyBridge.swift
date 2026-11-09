@@ -217,15 +217,13 @@ final class StatusMenu: NSObject {
         let menu = NSMenu()
         func label(_ title: String) { let entry = NSMenuItem(title: title, action: nil, keyEquivalent: ""); entry.isEnabled = false; menu.addItem(entry) }
         if let monthly = summary["monthly"] as? String, !monthly.isEmpty { label(L("周期费用 {amount}", ["amount": monthly])); menu.addItem(.separator()) }
-        #if !ASSETBOARD_FREE
-        // 待确认扣款 is Pro, as on the page (proSlots.chargesBand).
+        // 待确认扣款, as in 即将到来.
         if let charges = summary["charges"] as? Int, charges > 0 {
             let entry = NSMenuItem(title: L("{n} 笔扣款待确认…", ["n": charges]), action: #selector(openUpcoming), keyEquivalent: "")
             entry.target = self
             menu.addItem(entry)
             menu.addItem(.separator())
         }
-        #endif
         let items = summary["items"] as? [[String: Any]] ?? []
         if items.isEmpty { label(L("30 天内没有到期或扣款")) } else {
             label(L("30 天内"))

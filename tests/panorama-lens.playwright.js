@@ -9,9 +9,7 @@ async (page) => {
   await p.keyboard.press('p');await p.waitForTimeout(250);
   // The demo has more hosting links than payments, so it opens on where things run.
   const first=await p.evaluate(()=>({lens:panoLens,segs:[...document.querySelectorAll('.pano-lens .seg')].map(b=>b.textContent+':'+b.getAttribute('aria-pressed'))}));
-  // 按项目 is Pro: the free edition (the public copy, ?free) has no such lens.
-  const projects=await p.evaluate(()=>projectsOn());
-  check(first.lens==='host'&&first.segs.join()==='运行在哪:true,谁在付钱:false,用什么登录:false'+(projects?',按项目:false':''),'Opens on host; every lens with cards is on the switch: '+JSON.stringify(first));
+  check(first.lens==='host'&&first.segs.join()==='运行在哪:true,谁在付钱:false,用什么登录:false,按项目:false','Opens on host; every lens with cards is on the switch: '+JSON.stringify(first));
   // Who pays: one card per bank card, its masked number, what it pays for; recurring things without a card wait in the loose card.
   await p.click('.pano-lens [data-lens="pay"]');await p.waitForTimeout(200);
   const pay=await p.evaluate(()=>({cards:[...document.querySelectorAll('.pano-card')].map(c=>c.dataset.lane+'='+[...c.querySelectorAll('.pano-chip')].map(x=>x.dataset.chip).join('+')),sub:document.querySelector('.pano-card[data-lane="demo-c1"] .pl-prov')?.textContent,tone:document.querySelector('.pano-card[data-lane="demo-c2"]').classList.contains('amber'),loose:document.querySelector('.pano-loose')?.getAttribute('aria-label'),looseIds:[...document.querySelectorAll('.pano-loose .pano-chip')].map(c=>c.dataset.chip),focus:document.activeElement?.dataset.lens}));
@@ -52,7 +50,6 @@ async (page) => {
   const login=await p.evaluate(()=>({cards:[...document.querySelectorAll('.pano-card')].map(c=>c.dataset.lane+'='+[...c.querySelectorAll('.pano-chip')].map(x=>x.dataset.chip).sort().join('+')),sub:document.querySelector('.pano-card[data-lane="demo-g1"] .pl-prov')?.textContent,loose:!!document.querySelector('.pano-loose')}));
   check(login.cards.join()==='demo-g1=demo-a1+demo-u1'&&/^s.*@example\.com$/.test(login.sub)&&login.sub!=='someone@example.com'&&!login.loose,'Login cards, masked address, nothing loose: '+JSON.stringify(login));
   // By project: one card per project label; dragging a thing to another project relabels it; the hero opens the project view.
-  if(projects){
   await p.click('.pano-lens [data-lens="project"]');await p.waitForTimeout(200);
   const proj=await p.evaluate(()=>({cards:[...document.querySelectorAll('.pano-card')].map(c=>c.dataset.lane+':'+c.querySelectorAll('.pano-chip').length),hub:document.querySelector('.pano-card').dataset.hub,totals:[...document.querySelectorAll('.pano-total')].map(t=>t.dataset.toggle).join()}));
   check(proj.cards.join()==='project:notes-lab:5,project:studio:3'&&proj.hub==='project'&&proj.totals.startsWith('project,'),'A card per project, bigger first: '+JSON.stringify(proj));
@@ -65,7 +62,6 @@ async (page) => {
   check(await p.evaluate(()=>document.querySelector('.pano-here')?.textContent==='studio'),'A project can be focused');
   await p.click('.pano-hero [data-hero-head]');await p.waitForTimeout(250);
   check(await p.evaluate(()=>!panoOpen&&currentView()==='project:studio'),'Its hero opens the project on the board');
-  }
   check(!errors.length,'No page errors: '+errors.join());
   return 'PASS: login and project lenses, host by default, switch, pay cards with masked numbers and expiry tone, loose recurring costs, remembered, drag sets the payment, undo, deployment card, drop to deploy, lens-bound targets, focus any hub';
  }finally{await context.close();}

@@ -27,8 +27,7 @@ async (page) => {
   await p.evaluate(()=>{window.__localCli={gh:true,ghAccounts:['alice','bob'],sshConfig:true};importHub();});
   await p.waitForTimeout(50);
   const hub=await p.locator('#modal[data-view="import"]').textContent();
-  // gh in the hub is Pro (pro/web/import-pro.js); the free copy only offers SSH here.
-  if(await p.evaluate(()=>proSlots.importCli.length))check(hub.includes('alice')&&hub.includes('bob'),'Hub lists gh accounts: '+hub.slice(0,200));
+  check(hub.includes('alice')&&hub.includes('bob'),'Hub lists gh accounts: '+hub.slice(0,200));
   check(hub.includes('~/.ssh/config'),'Hub offers ssh import');
   check((await p.locator('#import-file').getAttribute('accept')||'').includes('.eml'),'File picker accepts eml');
   check((await p.locator('#import-file').getAttribute('multiple'))!==null,'File picker allows multiple');
