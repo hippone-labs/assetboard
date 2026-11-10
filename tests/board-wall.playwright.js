@@ -5,7 +5,7 @@
 // long for its place is cut on its line (a domain, an address or a long identifier in the middle) with the whole of it in its title
 // and the peek, the day count, state and price never cut. Panels move by drag and ⌥ + arrows and keep their order after a reload;
 // rows keep the list's ⌥↑↓ and click; three densities by ⌘−/⌘= and the switch, kept on this device, the line at the top of the view
-// staying put; the peek and 详细 list the facts (masked in privacy mode); the skin is a setting that changes no layout. AI plans
+// staying put; the peek and 详细 list the facts (masked in privacy mode); the skin is a setting that keeps the columns, the order and the tiles. AI plans
 // show their readings and 待引入 is a line under the wall.
 async (page) => {
  const p=await page.context().newPage();
@@ -167,8 +167,9 @@ async (page) => {
   check(!/203\.0\.113\.10/.test(masked),'Privacy mode masks an IP in the facts: '+masked);
   await p.evaluate(()=>{setPrivacy(false);setDensity('standard');});
 
-  // The skin: a setting that changes how panels look, not where they are.
-  const boxes=()=>p.locator('#board .wall > .group').evaluateAll(els=>els.map(e=>[e.style.left,e.style.top,e.style.width].join()).join('|'));
+  // The skin: a setting that changes how panels look and how they are placed (冰箱贴 freely, board-free.playwright.js), never the
+  // columns, the order or the tiles.
+  const boxes=()=>p.locator('#board .wall > .group').evaluateAll(els=>{const xs=[...new Set(els.map(e=>Math.round(parseFloat(e.style.left))))].sort((a,b)=>a-b);return els.map(e=>[e.dataset.group,xs.indexOf(Math.round(parseFloat(e.style.left))),e.querySelectorAll('[data-asset]').length].join()).join('|');});
   const quietBoxes=await boxes();
   await p.evaluate(()=>prefsDialog());await settle();
   await p.locator('#modal [data-action="prefs-section"][data-id="look"]').click();await settle();
@@ -176,7 +177,8 @@ async (page) => {
   await p.locator('#modal [data-action="prefs-skin"][data-id="magnet"]').click();await settle();
   check(await p.evaluate(()=>document.documentElement.dataset.skin==='magnet'&&localStorage.getItem('assetboard-skin-v1')==='magnet'),'设置 › 外观 sets the 冰箱贴 skin, kept on this device');
   await p.evaluate(()=>$('#modal').close());await settle();
-  check(await boxes()===quietBoxes,'A skin moves no panel');
+  check(await boxes()===quietBoxes,'A skin keeps the columns, the order and the tiles: '+await boxes()+' vs '+quietBoxes);
+  check(await p.locator('#board .wall.free').count()===1,'冰箱贴 places the panels freely');
   check(await p.locator('#board .wall > .group').first().evaluate(e=>getComputedStyle(e).rotate!=='none'&&getComputedStyle(e).rotate!=='0deg'||e.style.getPropertyValue('--tilt')==='0.00'),'冰箱贴 tilts the panels a little');
   await p.evaluate(()=>setSkin('quiet'));
 

@@ -16,7 +16,7 @@ const args=process.argv.slice(2),option=name=>{const at=args.indexOf(name);retur
 const root=path.resolve(option('--root')||path.join(__dirname,'..'));
 const port=Number(option('--port')||4318),base=`http://127.0.0.1:${port}`;
 const listed=args.length?args:['tests','pro/tests'].flatMap(dir=>fs.existsSync(path.join(root,dir))?fs.readdirSync(path.join(root,dir)).filter(f=>f.endsWith('.playwright.js')).sort().map(f=>`${dir}/${f}`):[]);
-const types={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png','.svg':'image/svg+xml','.json':'application/json'};
+const types={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png','.gif':'image/gif','.webp':'image/webp','.svg':'image/svg+xml','.json':'application/json'};
 
 const server=http.createServer((req,res)=>{
  const file=path.join(root,decodeURIComponent(new URL(req.url,'http://x').pathname).replace(/\/$/,'/index.html'));

@@ -24,7 +24,8 @@ const THEME_FIELDS=['name','accent','accentDark','tint'];
 function themeChoicesOpen(){return true;}
 let appliedTheme='',appliedScheme='',themePreview=false,themePref=null,systemAccentHex='';
 const schemeQuery=window.matchMedia?.('(prefers-color-scheme: dark)');
-function currentScheme(){return schemeQuery?.matches?'dark':'light';}
+// A 冰箱贴 door has its own light or dark (fridgeSceneScheme, below); otherwise the system's.
+function currentScheme(){return fridgeSceneScheme()||(schemeQuery?.matches?'dark':'light');}
 
 const HEX=/^#[0-9a-f]{6}$/i;
 function themeOklch(input){
@@ -152,23 +153,34 @@ function themeDialog(){
   status.textContent=tr('已预览「{name}」',{name:checked.theme.name==='自定义'?tr('自定义'):checked.theme.name});picker.value=checked.theme.accent;preview({id:'custom',custom:checked.theme});};
  document.querySelector('#save-theme').onclick=()=>{writeThemePref(pending);themePreview=false;document.querySelector('#modal').close();applyBoardTheme();};
 }
-// Skins (设置 › 外观 › 风格): how the tile wall looks, never what it shows or where. A skin is a name on <html data-skin>; material.css
-// gives it its tokens (a panel's tilt, edge, corner and thickness, how a dragged panel lifts and lands) and at most a thin decoration
-// layer. Layout, density and data are the same in every skin, so a new one is a row here and a block of tokens there.
-//  quiet   the quiet instrument: hairlines, no tilt, the default
-//  magnet  fridge magnets: a slight tilt that straightens under the pointer, a sticker's inner rim, a 2px edge of thickness; a dragged
-//          panel is picked up (a little turned) and snaps onto its place
-const BOARD_SKINS=[['quiet',tr('安静'),tr('细线和留白')],['magnet',tr('冰箱贴'),tr('轻微倾角，拖动像拿起一块磁贴')]];
+// Skins (设置 › 外观 › 风格): how the tile wall looks and how its panels are placed, never what it shows. A skin is a name on
+// <html data-skin>; material.css gives it its tokens (a panel's tilt, edge, corner and thickness, how a dragged panel lifts and
+// lands) and its decoration. Tiles, fields and density are the same in every skin.
+//  quiet   the quiet instrument: hairlines, no tilt, packed columns; the default
+//  magnet  冰箱贴: each panel a magnet on a fridge door (one of FRIDGE_SCENES): a slight tilt that straightens under the pointer, a
+//          shadow and an edge of thickness, a pin or a strip of tape, now and then a sticker; panels are placed freely and stay
+//          where they are put (board-free.js)
+const BOARD_SKINS=[['quiet',tr('安静'),tr('细线和留白，面板按列排好')],['magnet',tr('冰箱贴'),tr('面板像冰箱门上的磁贴：轻微倾角、阴影、小贴纸，可以拖到任意位置')]];
 const SKIN_KEY='assetboard-skin-v1';
 let boardSkin=(()=>{try{const v=localStorage.getItem(SKIN_KEY);return BOARD_SKINS.some(([id])=>id===v)?v:'quiet';}catch{return 'quiet';}})();
-function applySkin(){document.documentElement.dataset.skin=boardSkin;}
-function setSkin(id){if(!BOARD_SKINS.some(([s])=>s===id))return false;boardSkin=id;try{localStorage.setItem(SKIN_KEY,id);}catch{}applySkin();return true;}
+// 冰箱贴's doors: [id, name, dark, note]. The scene stays behind the wall, softened so the panels lead (material.css, .fridge-scene,
+// with one small figure in a corner that holds still when the system asks for less motion). A dark door takes the dark scheme and a
+// light one the light, whatever the system's, so the panels, the bars and the sidebar read on it.
+const FRIDGE_SCENES=[['kitchen',tr('像素厨房'),false,tr('像素风的厨房冰箱门')],['city',tr('像素夜景'),true,tr('像素风的城市夜景')],['handdrawn',tr('手绘冰箱门'),false,tr('手绘的冰箱门')],['server',tr('像素机房'),true,tr('像素风的机房')]];
+const SCENE_KEY='assetboard-fridge-scene-v1';
+let fridgeScene=(()=>{try{const v=localStorage.getItem(SCENE_KEY);return FRIDGE_SCENES.some(([id])=>id===v)?v:'kitchen';}catch{return 'kitchen';}})();
+function fridgeSceneScheme(){if(boardSkin!=='magnet')return '';const s=FRIDGE_SCENES.find(([id])=>id===fridgeScene);return s?s[2]?'dark':'light':'';}
+function applySkin(){const root=document.documentElement;root.dataset.skin=boardSkin;if(boardSkin==='magnet')root.dataset.scene=fridgeScene;else delete root.dataset.scene;}
+function setSkin(id){if(!BOARD_SKINS.some(([s])=>s===id))return false;boardSkin=id;try{localStorage.setItem(SKIN_KEY,id);}catch{}applySkin();applyBoardTheme();return true;}
+function setScene(id){if(!FRIDGE_SCENES.some(([s])=>s===id))return false;fridgeScene=id;try{localStorage.setItem(SCENE_KEY,id);}catch{}applySkin();applyBoardTheme();return true;}
 applySkin();
 // Read once everything above exists (checkTheme needs HEX, declared below the state).
 themePref=readThemePref();
 document.addEventListener('DOMContentLoaded',()=>{
  const button=document.createElement('button');button.id='theme';button.className='button icon-only';button.onclick=themeDialog;(document.querySelector('#inbox-button')||document.querySelector('#add-block')).after(button);if(typeof setIconButton==='function'){setIconButton(button,'palette',tr('主题'));}else{button.textContent=tr('主题');button.title=tr('主题');}
  document.querySelector('#modal').addEventListener('close',()=>{if(themePreview){themePreview=false;applyBoardTheme();}});
+ // The door behind the wall (shown by material.css under 冰箱贴 while the wall is on screen).
+ const scene=document.createElement('div');scene.className='fridge-scene';scene.setAttribute('aria-hidden','true');scene.innerHTML='<i class="scene-figure"></i>';document.querySelector('#main')?.prepend(scene);
  applyBoardTheme();
  schemeQuery?.addEventListener?.('change',()=>applyBoardTheme());
 });

@@ -2300,9 +2300,10 @@ body::before,.native-app body::before{background:radial-gradient(70vw 65vh at 0%
 #board[data-size=l] .row .r-cost,:root .r-cost{color:var(--ink);font-weight:500}
 #board[data-size=l] .row .r-cost{font-size:13px}
 
-/* 全部资产 as a tile wall (board-wall.js, the default on 全部资产): a panel per category, packed into columns by script (absolute
-   positions). Layout, densities and the peek are the same under every skin; a skin (theme.js, html[data-skin]) only sets the
-   --wall-* tokens below and at most one thin decoration layer. The quiet skin is the instrument's: hairlines, no tilt, no shadow. */
+/* 全部资产 as a tile wall (board-wall.js, the default on 全部资产): a panel per category, at absolute positions set by script: packed
+   into columns, or placed freely under 冰箱贴 (board-free.js). Tiles, densities and the peek are the same under every skin; a skin
+   (theme.js, html[data-skin]) sets the --wall-* tokens below and its decoration. The quiet skin is the instrument's: hairlines, no
+   tilt, no shadow. */
 :root{--wall-radius:12px;--wall-border:var(--hairline);--wall-fill:var(--surface-content);--wall-tilt:0deg;--wall-rim:0 0 0 transparent;--wall-thick:0 0 0 transparent;--wall-lift-turn:0deg;--wall-lift-scale:1.01;--wall-lift-shadow:var(--shadow-hover);--wall-snap:0}
 #board .wall{position:relative;margin-top:14px}
 #board .wall>.group,#board .wall>.drop-slot{position:absolute;top:0;left:0}
@@ -2413,12 +2414,78 @@ body.drag-active #board .wall .row .r-actions{display:none}
 .peek-name .tile{flex:none}
 .peek-sub{margin:2px 0 4px 28px;font-size:11.5px;color:var(--muted)}
 .wall-peek .peek-facts{margin:6px 0 0}
-/* 冰箱贴: each panel a magnet on the door. A steady small tilt that straightens under the pointer, a sticker's inner rim, a hard
-   2px edge for thickness (no blur); a dragged panel is picked up a little turned and settles with a small snap. No colour. */
-:root[data-skin=magnet]{--wall-radius:14px;--wall-border:var(--border);--wall-tilt:.45deg;--wall-rim:inset 0 0 0 3px var(--surface-content),inset 0 0 0 4px var(--hairline);--wall-thick:0 2px 0 rgba(var(--tone-ink),.09);--wall-lift-turn:-1.2deg;--wall-lift-scale:1.025;--wall-lift-shadow:0 2px 0 rgba(var(--tone-ink),.08),0 10px 22px -12px rgba(16,24,40,.3);--wall-snap:.012}
-:root[data-skin=magnet][data-scheme=dark]{--wall-thick:0 2px 0 rgba(0,0,0,.55);--wall-lift-shadow:0 2px 0 rgba(0,0,0,.5),0 10px 22px -12px rgba(0,0,0,.7)}
-:root[data-skin=magnet] #board .wall .group-head{box-shadow:0 1px 0 var(--hairline);margin-inline:-5px;padding-inline:7px 3px}
-@media(prefers-reduced-motion:reduce){#board .wall>.group,#board .wall>.group.is-dragging.settling{transition:none}:root[data-skin=magnet]{--wall-lift-turn:0deg}}
+/* 冰箱贴: each panel a magnet on a fridge door (html[data-scene], theme.js). The door is a picture behind the wall, washed toward its
+   own colour so it stays behind; one small figure stands in a corner and holds still for less motion. A panel tilts a little and
+   straightens under the pointer, has an edge of thickness and a shadow, a pin or a strip of tape, now and then a sticker; its ink
+   is the door's. Panels are placed freely (board-free.js): touched ones are nudged, give way after a rest (--free-yield) and a
+   dropped one settles (--free-drop). */
+:root[data-skin=magnet]{--wall-radius:14px;--wall-border:transparent;--wall-fill:var(--mag-fill);--wall-tilt:1deg;--wall-rim:inset 0 0 0 1px rgba(255,255,255,.3);--wall-thick:0 1px 0 var(--mag-edge),0 2px 0 var(--mag-edge),0 3px 0 var(--mag-edge),var(--mag-shadow);--wall-lift-turn:-1deg;--wall-lift-scale:1.025;--wall-lift-shadow:0 1px 0 var(--mag-edge),0 2px 0 var(--mag-edge),0 3px 0 var(--mag-edge),var(--mag-lift);--wall-snap:.012;--free-yield:420ms;--free-drop:380ms;--free-nudge:220ms;--figure-x:28px;--figure-y:10px;--figure-render:pixelated;--scene-render:pixelated}
+:root[data-scene=kitchen]{--scene-color:#cfe3d8;--scene-bg:image-set(url("art/fridge/bg-kitchen.webp") 1x,url("art/fridge/bg-kitchen@2x.webp") 2x);--scene-veil:rgba(214,232,222,.34);
+ --mag-fill:rgba(255,253,247,.93);--mag-ink:#1f2a28;--mag-faint:#5f6f6b;--mag-line:rgba(30,50,45,.12);--mag-edge:#c9d6cf;--mag-shadow:0 4px 0 rgba(0,0,0,.14),0 14px 24px -10px rgba(0,0,0,.38);--mag-lift:0 6px 0 rgba(0,0,0,.12),0 26px 36px -14px rgba(0,0,0,.4);
+ --tape:rgba(255,214,140,.75);--pin-0:#e4574c;--pin-1:#3f8ed8;--pin-2:#f2b632;--pin-3:#45b07a;
+ --stk-0:image-set(url("art/fridge/stk-px-star.png") 1x,url("art/fridge/stk-px-star@2x.png") 2x);--stk-1:image-set(url("art/fridge/stk-px-heart.png") 1x,url("art/fridge/stk-px-heart@2x.png") 2x);--stk-2:image-set(url("art/fridge/stk-px-check.png") 1x,url("art/fridge/stk-px-check@2x.png") 2x);--stk-3:image-set(url("art/fridge/stk-px-coffee.png") 1x,url("art/fridge/stk-px-coffee@2x.png") 2x);--stk-4:image-set(url("art/fridge/stk-px-catface.png") 1x,url("art/fridge/stk-px-catface@2x.png") 2x);--stk-5:var(--stk-0);
+ --figure:image-set(url("art/fridge/chef.gif") 1x,url("art/fridge/chef@2x.gif") 2x);--figure-still:image-set(url("art/fridge/chef.png") 1x,url("art/fridge/chef@2x.png") 2x);--figure-w:31px;--figure-h:49px}
+:root[data-scene=city]{--scene-color:#1b1b33;--scene-bg:image-set(url("art/fridge/bg-city.webp") 1x,url("art/fridge/bg-city@2x.webp") 2x);--scene-veil:rgba(20,20,40,.36);
+ --mag-fill:rgba(30,30,52,.9);--mag-ink:#eceaf6;--mag-faint:#a7a4c2;--mag-line:rgba(255,255,255,.09);--mag-edge:#0f0f1e;--mag-shadow:0 4px 0 rgba(0,0,0,.3),0 14px 24px -10px rgba(0,0,0,.55);--mag-lift:0 6px 0 rgba(0,0,0,.28),0 28px 38px -14px rgba(0,0,0,.7);
+ --tape:rgba(170,150,255,.5);--pin-0:#b26ad6;--pin-1:#3f8ed8;--pin-2:#f2b632;--pin-3:#b26ad6;
+ --stk-0:image-set(url("art/fridge/stk-px-star.png") 1x,url("art/fridge/stk-px-star@2x.png") 2x);--stk-1:image-set(url("art/fridge/stk-px-rocket.png") 1x,url("art/fridge/stk-px-rocket@2x.png") 2x);--stk-2:image-set(url("art/fridge/stk-px-globe.png") 1x,url("art/fridge/stk-px-globe@2x.png") 2x);--stk-3:image-set(url("art/fridge/stk-px-check.png") 1x,url("art/fridge/stk-px-check@2x.png") 2x);--stk-4:image-set(url("art/fridge/stk-px-server.png") 1x,url("art/fridge/stk-px-server@2x.png") 2x);--stk-5:var(--stk-1);
+ --figure:image-set(url("art/fridge/engineer.gif") 1x,url("art/fridge/engineer@2x.gif") 2x);--figure-still:image-set(url("art/fridge/engineer.png") 1x,url("art/fridge/engineer@2x.png") 2x);--figure-w:28px;--figure-h:53px;--figure-x:24px;--figure-y:8px}
+:root[data-scene=handdrawn]{--scene-color:#efe4cc;--scene-bg:image-set(url("art/fridge/bg-handdrawn.webp") 1x,url("art/fridge/bg-handdrawn@2x.webp") 2x);--scene-veil:rgba(244,236,218,.36);--scene-render:auto;--figure-render:auto;--wall-tilt:1.2deg;
+ --mag-fill:rgba(255,252,240,.94);--mag-ink:#2b2418;--mag-faint:#6d604c;--mag-line:rgba(60,40,10,.12);--mag-edge:#d9ccb2;--mag-shadow:0 4px 0 rgba(0,0,0,.12),0 14px 24px -10px rgba(60,40,10,.36);--mag-lift:0 6px 0 rgba(0,0,0,.1),0 26px 36px -14px rgba(60,40,10,.4);
+ --tape:rgba(140,200,190,.7);--pin-0:#d9534f;--pin-1:#4f8fd9;--pin-2:#e9b23c;--pin-3:#5aa86b;
+ --stk-0:image-set(url("art/fridge/stk-hand-lemon.png") 1x,url("art/fridge/stk-hand-lemon@2x.png") 2x);--stk-1:image-set(url("art/fridge/stk-hand-strawberry.png") 1x,url("art/fridge/stk-hand-strawberry@2x.png") 2x);--stk-2:image-set(url("art/fridge/stk-hand-sun.png") 1x,url("art/fridge/stk-hand-sun@2x.png") 2x);--stk-3:image-set(url("art/fridge/stk-hand-cup.png") 1x,url("art/fridge/stk-hand-cup@2x.png") 2x);--stk-4:image-set(url("art/fridge/stk-hand-cloud.png") 1x,url("art/fridge/stk-hand-cloud@2x.png") 2x);--stk-5:image-set(url("art/fridge/stk-hand-plane.png") 1x,url("art/fridge/stk-hand-plane@2x.png") 2x);
+ --figure:image-set(url("art/fridge/hedgehog.gif") 1x,url("art/fridge/hedgehog@2x.gif") 2x);--figure-still:image-set(url("art/fridge/hedgehog.png") 1x,url("art/fridge/hedgehog@2x.png") 2x);--figure-w:38px;--figure-h:50px;--figure-x:26px;--figure-y:8px}
+:root[data-scene=server]{--scene-color:#1f2a2a;--scene-bg:image-set(url("art/fridge/bg-server.webp") 1x,url("art/fridge/bg-server@2x.webp") 2x);--scene-veil:rgba(18,26,26,.38);
+ --mag-fill:rgba(28,36,36,.92);--mag-ink:#e6efec;--mag-faint:#9fb2ad;--mag-line:rgba(255,255,255,.08);--mag-edge:#0c1212;--mag-shadow:0 4px 0 rgba(0,0,0,.3),0 14px 24px -10px rgba(0,0,0,.55);--mag-lift:0 6px 0 rgba(0,0,0,.28),0 28px 38px -14px rgba(0,0,0,.7);
+ --tape:rgba(120,220,180,.45);--pin-0:#45b07a;--pin-1:#f2b632;--pin-2:#3f8ed8;--pin-3:#45b07a;
+ --stk-0:image-set(url("art/fridge/stk-px-server.png") 1x,url("art/fridge/stk-px-server@2x.png") 2x);--stk-1:image-set(url("art/fridge/stk-px-rocket.png") 1x,url("art/fridge/stk-px-rocket@2x.png") 2x);--stk-2:image-set(url("art/fridge/stk-px-check.png") 1x,url("art/fridge/stk-px-check@2x.png") 2x);--stk-3:image-set(url("art/fridge/stk-px-coffee.png") 1x,url("art/fridge/stk-px-coffee@2x.png") 2x);--stk-4:var(--stk-0);--stk-5:var(--stk-2);
+ --figure:image-set(url("art/fridge/cat.gif") 1x,url("art/fridge/cat@2x.gif") 2x);--figure-still:image-set(url("art/fridge/cat.png") 1x,url("art/fridge/cat@2x.png") 2x);--figure-w:32px;--figure-h:32px;--figure-x:30px}
+/* the door: behind everything in #main while the wall is on screen; the figure in its corner (left or right by scene), clear of an
+   open inspector, gone in a narrow window */
+.fridge-scene{display:none}
+:root[data-skin=magnet] body.wall-shown #main{background:var(--scene-color)}
+:root[data-skin=magnet] body.wall-shown .fridge-scene{display:block;position:absolute;inset:0;z-index:0;border-radius:inherit;overflow:hidden;pointer-events:none;background:var(--scene-color) var(--scene-bg) center bottom/cover no-repeat;image-rendering:var(--scene-render)}
+:root[data-skin=magnet] body.wall-shown .fridge-scene::after{content:"";position:absolute;inset:0;background:var(--scene-veil)}
+:root[data-skin=magnet] body.wall-shown #main>:not(.fridge-scene){position:relative;z-index:1}
+:root[data-skin=magnet] body.wall-shown #main>#board{z-index:1}
+.scene-figure{position:absolute;z-index:1;bottom:var(--figure-y);right:var(--figure-x);width:var(--figure-w);height:var(--figure-h);background:var(--figure) center/contain no-repeat;image-rendering:var(--figure-render);opacity:.92}
+:root[data-scene=city] .scene-figure,:root[data-scene=handdrawn] .scene-figure{right:auto;left:var(--figure-x)}
+@media(min-width:1180px){:root:is([data-scene=kitchen],[data-scene=server]) body.inspecting .scene-figure{right:calc(var(--inspector-w) + var(--figure-x))}}
+@media(max-width:899px){.scene-figure{display:none}}
+@media(prefers-reduced-motion:reduce){.scene-figure{background-image:var(--figure-still)}}
+/* what sits on the door besides the panels has the panels' paper under it */
+:root[data-skin=magnet] body.wall-shown #board .overview{margin:14px 0 6px;padding:10px 16px 14px;border-radius:14px;background:var(--mag-fill);box-shadow:0 1px 0 var(--mag-edge),0 2px 0 var(--mag-edge),var(--mag-shadow)}
+:root[data-skin=magnet] body.wall-shown #board :is(.wall-empty,.wall-pending){width:fit-content;max-width:100%;padding:6px 10px;border-radius:12px;background:var(--mag-fill);color:var(--mag-faint)}
+:root[data-skin=magnet] #board .wall{margin-top:24px}
+:root[data-skin=magnet] #board .wall>.group{--ink:var(--mag-ink);--muted:var(--mag-faint);--faint:var(--mag-faint);--hairline:var(--mag-line);--border:var(--mag-line);color:var(--ink)}
+:root[data-skin=magnet] #board .wall .group-head{padding-top:6px;box-shadow:none;border-bottom:1px dashed var(--mag-line);margin-inline:-5px;padding-inline:7px 3px}
+:root[data-skin=magnet] #board .wall>.group.has-sticker .group-head{padding-right:30px}
+:root[data-skin=magnet] #board .wall>.group.has-sticker .g-actions{right:30px}
+/* the pin, the tape and the sticker turn with their panel and never take the pointer */
+.wall-pin,.wall-tape,.wall-sticker{display:none}
+:root[data-skin=magnet] #board .wall :is(.wall-pin,.wall-tape,.wall-sticker){display:block;position:absolute;z-index:2;pointer-events:none}
+:root[data-skin=magnet] #board .wall .wall-pin{--pin:var(--pin-0);top:-9px;left:50%;width:22px;height:22px;margin-left:-11px;border-radius:50%;background:radial-gradient(circle at 35% 30%,rgba(255,255,255,.85) 0 3px,transparent 4px),radial-gradient(circle at 50% 50%,var(--pin) 0 62%,color-mix(in srgb,var(--pin),#000 35%) 100%);box-shadow:0 3px 0 color-mix(in srgb,var(--pin),#000 45%),0 5px 8px rgba(0,0,0,.3)}
+:root[data-skin=magnet] #board .wall .wall-pin[data-n="1"]{--pin:var(--pin-1)}
+:root[data-skin=magnet] #board .wall .wall-pin[data-n="2"]{--pin:var(--pin-2)}
+:root[data-skin=magnet] #board .wall .wall-pin[data-n="3"]{--pin:var(--pin-3)}
+:root[data-skin=magnet] #board .wall .wall-tape{top:-11px;left:50%;width:76px;height:22px;margin-left:-38px;background:var(--tape);box-shadow:0 1px 2px rgba(0,0,0,.15);rotate:var(--tape-turn,0deg)}
+:root[data-skin=magnet] #board .wall .wall-sticker{--stk:var(--stk-0);top:-14px;right:-12px;width:40px;height:40px;background:var(--stk) center/contain no-repeat;filter:drop-shadow(0 2px 2px rgba(0,0,0,.3));image-rendering:var(--scene-render)}
+:root[data-skin=magnet] #board .wall .wall-sticker[data-n="1"]{--stk:var(--stk-1)}
+:root[data-skin=magnet] #board .wall .wall-sticker[data-n="2"]{--stk:var(--stk-2)}
+:root[data-skin=magnet] #board .wall .wall-sticker[data-n="3"]{--stk:var(--stk-3)}
+:root[data-skin=magnet] #board .wall .wall-sticker[data-n="4"]{--stk:var(--stk-4)}
+:root[data-skin=magnet] #board .wall .wall-sticker[data-n="5"]{--stk:var(--stk-5)}
+/* free placement: the panels that give way slide, a touched one is nudged, the dragged one is lifted above the rest and settles
+   on release; nothing slides while the window is resized */
+#board .wall.free>.group{transition:rotate var(--motion-slow) var(--ease),left var(--free-yield) cubic-bezier(.45,.05,.25,1),top var(--free-yield) cubic-bezier(.45,.05,.25,1),translate var(--free-nudge) cubic-bezier(.3,.1,.3,1),box-shadow .24s ease,scale .24s ease;touch-action:none}
+#board .wall.free.free-still>.group{transition:none}
+#board .wall.free>.group.free-drag{z-index:70;transition:rotate .24s ease,box-shadow .24s ease,scale .24s ease;rotate:calc(var(--tilt,0) * var(--wall-tilt) * .5);scale:var(--wall-lift-scale);box-shadow:var(--wall-rim),var(--wall-lift-shadow);cursor:grabbing}
+#board .wall.free>.group.free-top{z-index:2}
+#board .wall.free>.group.free-drop{animation:free-drop var(--free-drop) cubic-bezier(.35,.1,.3,1)}
+@keyframes free-drop{0%{rotate:calc(var(--tilt,0) * var(--wall-tilt) * .5);scale:var(--wall-lift-scale)}65%{rotate:calc(var(--tilt,0) * var(--wall-tilt) * .95);scale:.998}100%{rotate:calc(var(--tilt,0) * var(--wall-tilt));scale:1}}
+#board .wall.free-dragging>.group:not(.free-drag){rotate:calc(var(--tilt,0) * var(--wall-tilt))}
+@media(hover:hover){#board .wall.free>.group:not(.free-drag) .group-head{cursor:grab}}
+@media(prefers-reduced-motion:reduce){#board .wall>.group,#board .wall>.group.is-dragging.settling,#board .wall.free>.group,#board .wall.free>.group.free-drag{transition:none;animation:none}:root[data-skin=magnet]{--wall-lift-turn:0deg}}
 /* 连接后挑选: the pick list right after a platform answers, the sidebar's 待引入 and the add form's pick from a connected platform. */
 .connect-pick{display:grid;gap:12px}
 .connect-summary{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px;color:var(--ink)}
