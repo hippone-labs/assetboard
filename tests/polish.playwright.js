@@ -10,9 +10,9 @@ async (page) => {
   // Wide: the inspector is there from the start with the first row selected; focus did not move into it.
   const s=await p.evaluate(()=>({open:!document.querySelector('#detail').hidden,first:document.querySelector('#board [data-asset]').dataset.asset,selected:document.querySelector('#board .row.selected')?.dataset.asset,docked:document.body.classList.contains('inspecting'),focusIn:!!document.activeElement?.closest('#detail')}));
   check(s.open&&s.selected===s.first&&s.docked&&!s.focusIn,'Wide window opens with the first item in the docked inspector, focus untouched: '+JSON.stringify(s));
-  // Wide list: the date and the amount are their own columns on one line, the amount right of the date (v17 calm board).
-  const r=await p.evaluate(()=>{const row=document.querySelector('#board .row[data-asset="demo-s1"]'),d=row.querySelector('.r-date').getBoundingClientRect(),m=row.querySelector('.r-cost').getBoundingClientRect();return {line:Math.abs(m.top-d.top)<4,after:m.left>=d.right-1};});
-  check(r.line&&r.after,'Date and amount are two columns on one line: '+JSON.stringify(r));
+  // The wall's tile: the day count beside the name, the amount at the end of the second line, both at the tile's right edge.
+  const r=await p.evaluate(()=>{const row=document.querySelector('#board .row[data-asset="demo-s1"]'),d=row.querySelector('.r-date').getBoundingClientRect(),m=row.querySelector('.r-cost').getBoundingClientRect(),n=row.querySelector('.r-name').getBoundingClientRect(),sub=row.querySelector('.r-sub').getBoundingClientRect();return {first:Math.abs(d.top-n.top)<4,second:Math.abs(m.top-sub.top)<4&&m.top>d.top+10,edge:Math.abs(m.right-d.right)<2};});
+  check(r.first&&r.second&&r.edge,'The day count is on the name\'s line, the amount at the end of the second: '+JSON.stringify(r));
   // Group heads lead the rhythm by weight, not size (安静的仪器, 2026-11-06): as large as a row name and heavier.
   check(await p.evaluate(()=>{const t=getComputedStyle(document.querySelector('.group-title')),n=getComputedStyle(document.querySelector('#board .r-name'));return parseFloat(t.fontSize)>=parseFloat(n.fontSize)&&parseInt(t.fontWeight)>parseInt(n.fontWeight);}),'Group titles are as large as row names and heavier');
   // Sidebar entry opens the panorama in the middle column; the sidebar stays.
