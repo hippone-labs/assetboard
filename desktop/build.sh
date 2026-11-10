@@ -28,6 +28,10 @@ xcrun swiftc "${target[@]}" "$project_dir/desktop/Assetboard.swift" "$project_di
 xcrun swiftc "${target[@]}" -parse-as-library "$project_dir/desktop/AssetboardCLI.swift" "$project_dir/desktop/Localization.swift" "$project_dir/desktop/LocalizationEN.swift" "$project_dir/desktop/AgentSocket.swift" "$project_dir/desktop/AgentClients.swift" -o "$app_dir/Contents/MacOS/assetboard-cli" -O
 cp "$project_dir/desktop/Info.plist" "$app_dir/Contents/Info.plist"
 (( dev )) && /usr/libexec/PlistBuddy -c 'Add :AssetboardDeveloperBuild bool true' "$app_dir/Contents/Info.plist"
+# ASSETBOARD_BUILD_STAMP (desktop/release.sh) makes each release build's code directory hash its own: a rebuild of a commit that
+# was already notarized has that notarized hash, Gatekeeper treats the unstapled bundle as a notarized app, and App Management
+# then refuses the runner's stapler the write of Contents/CodeResources (stapler Error 73, "CodeResources couldn't be removed").
+[[ -n "${ASSETBOARD_BUILD_STAMP:-}" ]] && /usr/libexec/PlistBuddy -c "Add :AssetboardBuildStamp string $ASSETBOARD_BUILD_STAMP" "$app_dir/Contents/Info.plist"
 # Every binary must be built for exactly that system (15.0 and 15 are the same).
 version_core() { local v="$1"; while [[ "$v" == *.0 ]]; do v="${v%.0}"; done; print -r -- "$v"; }
 for bin in "$app_dir"/Contents/MacOS/*; do
