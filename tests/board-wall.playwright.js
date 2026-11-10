@@ -22,7 +22,7 @@ async (page) => {
     {id:'d3',type:'domain',name:'third.example.org',provider:'Namecheap',date:day(200),dateKind:'expire',source:'manual'},
     {id:'s1',type:'server',name:'edge-vps',provider:'Host',ips:['203.0.113.10'],host:'203.0.113.10',date:day(5),dateKind:'renew',cycle:'monthly',cost:'$6 / 月',source:'manual'},
     {id:'r1',type:'repository',name:'atlas-ui',provider:'GitHub',source:'manual'},
-    {id:'s2',type:'server',name:'production-kubernetes-worker-node-eu-central-1a',provider:'A Hosting Company With A Long Name',ips:['2001:0db8:85a3:0000:0000:8a2e:0370:7334'],date:day(40),dateKind:'renew',cycle:'monthly',cost:'€49.90 / 月',source:'manual',notes:'A note long enough that it does not fit on one line of a tile in any of the usual window widths, so it is cut there.'},
+    {id:'s2',type:'server',name:'production-kubernetes-worker-node-pool-b-eu-central-1a-replica-set-0042',provider:'A Hosting Company With A Long Name',ips:['2001:0db8:85a3:0000:0000:8a2e:0370:7334'],date:day(40),dateKind:'renew',cycle:'monthly',cost:'€49.90 / 月',source:'manual',notes:'A note long enough that it does not fit on one line of a tile in any of the usual window widths, so it is cut there.'},
     {id:'n1',type:'server',name:'bare-box',cost:'$3 / 月',source:'manual'},
     {id:'n2',type:'server',name:'一台名字很长很长很长很长很长很长很长很长很长很长很长很长的服务器',source:'manual'},
     {id:'h1',type:'domain',name:'gone.example.org',provider:'Registrar',hiddenAt:'2026-01-01T00:00:00Z',source:'manual'}
@@ -47,7 +47,7 @@ async (page) => {
   const d2name='a-very-long-domain-name-that-does-not-fit-in-a-panel.example.net';
   check(long.d2.text===d2name&&long.d2.title===d2name&&long.d2.cut&&long.d2.oneLine&&long.d2.inside&&long.d2.dateWhole,'A long name stays on one line inside its panel, cut, the whole of it its text and title, the day count whole: '+JSON.stringify(long.d2));
   check(long.d2.mid&&long.d2.head==='a-very-long-domain-name-that-does-not-fit-in-a-panel'&&long.d2.tail==='.example.net'&&long.d2.tailWhole,'A long domain is cut in the middle and keeps its registered name: '+JSON.stringify(long.d2));
-  check(long.s2.mid&&long.s2.tail==='ral-1a'&&long.s2.cut&&long.s2.oneLine,'A long identifier is cut in the middle and keeps its end: '+JSON.stringify(long.s2));
+  check(long.s2.mid&&long.s2.tail==='t-0042'&&long.s2.cut&&long.s2.oneLine,'A long identifier is cut in the middle and keeps its end: '+JSON.stringify(long.s2));
   check(!long.n2.mid&&long.n2.cut&&long.n2.oneLine&&long.n2.inside&&/很长/.test(long.n2.title),'A long name in words is cut at its end: '+JSON.stringify(long.n2));
   check(long.d1.mid&&!long.d1.cut&&long.d1.text==='soon.example.com','A name that fits is whole: '+JSON.stringify(long.d1));
   const overlap=await p.evaluate(()=>{const r=[...document.querySelectorAll('#board .wall > .group')].map(n=>n.getBoundingClientRect());return r.some((a,i)=>r.some((b,j)=>i<j&&a.left<b.right-1&&b.left<a.right-1&&a.top<b.bottom-1&&b.top<a.bottom-1));});
@@ -158,7 +158,7 @@ async (page) => {
   await p.mouse.move(5,5);await p.mouse.down();await p.mouse.up();
   await p.locator('#board [data-asset="s2"] .r-name').hover();await p.waitForTimeout(650);
   const peek=await p.locator('#wall-peek').innerText();
-  check(/production-kubernetes-worker-node-eu-central-1a/.test(peek)&&/A Hosting Company With A Long Name/.test(peek)&&/so it is cut there\./.test(peek)&&await p.locator('#wall-peek').evaluate(e=>![...e.querySelectorAll('*')].some(n=>n.scrollWidth>n.clientWidth+1)),'The peek has the whole of what a tile cuts: '+peek);
+  check(/production-kubernetes-worker-node-pool-b-eu-central-1a-replica-set-0042/.test(peek)&&/A Hosting Company With A Long Name/.test(peek)&&/so it is cut there\./.test(peek)&&await p.locator('#wall-peek').evaluate(e=>![...e.querySelectorAll('*')].some(n=>n.scrollWidth>n.clientWidth+1)),'The peek has the whole of what a tile cuts: '+peek);
   await p.mouse.move(5,5);await p.mouse.down();await p.mouse.up();
   check(await p.locator('#wall-peek[hidden]').count()===1,'The peek goes on a press');
   // Privacy mode masks the facts too.

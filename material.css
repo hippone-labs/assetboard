@@ -2355,6 +2355,7 @@ body::before,.native-app body::before{background:radial-gradient(70vw 65vh at 0%
 #board .wall .row .r-fields .f-3{flex:0 1 auto}
 #board .wall .row .r-fields :is(.flag,.ip-inner){flex:none}
 #board .wall .row .r-fields .flag{font-size:12px}
+#board .wall .row .r-fields .account-tag{flex:0 1 auto;max-width:100%;color:var(--muted);font-size:11.5px;line-height:16px}
 #board .wall .row .r-fields .ip-text{flex:0 1 auto;color:var(--muted)}
 /* the count of further addresses goes before the address is cut */
 #board .wall .row .r-fields .ip-more{flex:0 9999 auto;min-width:0;overflow:hidden;font-style:normal;font-size:11px;color:var(--muted)}

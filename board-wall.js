@@ -111,7 +111,8 @@ function wallFields(a){
   const identity={bankcard:[a.network&&tr(a.network),a.last4&&`•••• ${a.last4}`].filter(Boolean).join(' '),phone:maskPhone(a.phone),appleid:maskEmail(a.account)||regionName(a.region),google:maskEmail(a.account)||regionName(a.region),ai:provider}[a.type]||'';
   return [identity?`${flagHtml}${text(identity)}`:'',text({bankcard:provider,phone:provider}[a.type]),hangs];
  }
- return [text(provider),text(veilAccount(a.account)),hangs];
+ // A synced record's account is its tag (two GitHub or Cloudflare accounts in one panel stay apart).
+ return [text(provider),text(veilAccount(a.account),[...PLATFORM_SOURCES,'ssh'].includes(a.source)?'account-tag':''),hangs];
 }
 // A tile's lines. The first is the same in every density: the name, cut when long, and the day count or state, which is never
 // cut for the name's sake. 标准 adds the fields with the price at the right end; a live reading (a probe's, an AI plan's limits)

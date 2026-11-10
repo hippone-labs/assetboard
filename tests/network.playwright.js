@@ -7,10 +7,11 @@ async (page) => {
  try{
   await p.goto('http://127.0.0.1:4317/?demo');await until(p,()=>typeof render==='function');await p.waitForTimeout(300);
   const card=id=>`#board [data-asset="${id}"]`;
-  const line=await p.evaluate(()=>{const sub=document.querySelector('#board [data-asset="demo-s1"] .ip-sub'),r=sub.getBoundingClientRect();return {text:sub.textContent.trim(),h:r.height,more:sub.querySelector('.ip-more')?.textContent,prov:sub.querySelector('.ip-prov')?.textContent,tabular:getComputedStyle(sub).fontVariantNumeric};});
-  check(/^203\.0\.113\.10\s*\+v6\s*·\s*Vultr$/.test(line.text.replace(/\s+/g,' ')),'Public v4 first, +v6 marker, provider last: '+line.text);
+  // On the wall the address and the provider are the two fields of the tile's second line.
+  const line=await p.evaluate(()=>{const sub=document.querySelector('#board [data-asset="demo-s1"] .r-fields'),r=sub.getBoundingClientRect();return {text:[sub.querySelector('.f-1').textContent.trim(),sub.querySelector('.f-2').textContent.trim()].join(' | '),h:r.height,tabular:getComputedStyle(sub).fontVariantNumeric};});
+  check(/^203\.0\.113\.10\s*\+v6 \| Vultr$/.test(line.text),'Public v4 first, +v6 marker, provider in its own field: '+line.text);
   check(line.h<18,'The address line never wraps: '+line.h);check(/tabular/.test(line.tabular),'Digits are tabular');
-  const nas=await p.evaluate(()=>{state.assets.find(a=>a.id==='demo-s3').ips=['10.0.0.20'];render();const sub=document.querySelector('#board [data-asset="demo-s3"] .ip-sub');return {text:sub.textContent.trim(),inner:!!sub.querySelector('.ip-inner'),title:sub.querySelector('.ip-inner')?.title};});
+  const nas=await p.evaluate(()=>{state.assets.find(a=>a.id==='demo-s3').ips=['10.0.0.20'];render();const sub=document.querySelector('#board [data-asset="demo-s3"] :is(.ip-sub,.r-fields)');return {text:sub.textContent.trim(),inner:!!sub.querySelector('.ip-inner'),title:sub.querySelector('.ip-inner')?.title};});
   check(nas.inner&&/10\.0\.0\.20/.test(nas.text)&&nas.title==='内网地址','Inner addresses carry a named 内 mark: '+JSON.stringify(nas));
   // No address, no line: a server without any keeps the provider text.
   await p.evaluate(()=>{state.assets.push({id:'bare',type:'server',name:'bare-vps',provider:'Linode',updatedAt:new Date().toISOString(),source:'manual'});render();});
@@ -45,7 +46,7 @@ async (page) => {
   check(await p.evaluate(()=>document.querySelector('#board [data-asset="demo-s1"] .ip-text').textContent==='198.51.100.7'),'Row shows the new address');
   // Narrow window: the provider is cut before the address.
   await p.setViewportSize({width:400,height:800});await p.waitForTimeout(250);
-  const narrow=await p.evaluate(()=>{const sub=document.querySelector('#board [data-asset="demo-s1"] .ip-sub'),t=sub.querySelector('.ip-text').getBoundingClientRect(),r=sub.getBoundingClientRect();return {h:r.height,ipFits:t.right<=r.right+0.5};});
+  const narrow=await p.evaluate(()=>{const sub=document.querySelector('#board [data-asset="demo-s1"] :is(.ip-sub,.r-fields .f-1)'),t=sub.querySelector('.ip-text').getBoundingClientRect(),r=sub.getBoundingClientRect();return {h:r.height,ipFits:t.right<=r.right+0.5};});
   check(narrow.h<18&&narrow.ipFits,'Narrow window keeps the address whole on one line: '+JSON.stringify(narrow));
   check(!errors.length,'No page errors: '+errors.join());
   return 'PASS: address line (public v4, +v6, inner mark, no wrap), copy action and pills, search by address, form validation and normalising, narrow window';
