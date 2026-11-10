@@ -2313,26 +2313,38 @@ body::before,.native-app body::before{background:radial-gradient(70vw 65vh at 0%
 #board .wall>.group.is-dragging{z-index:70;rotate:var(--wall-lift-turn);box-shadow:var(--wall-rim),var(--wall-lift-shadow)!important}
 #board .wall>.group.is-dragging.lifted{scale:var(--wall-lift-scale)}
 #board .wall>.group.is-dragging.settling{rotate:0deg;transition:translate .2s cubic-bezier(.3,1.2,.5,1),scale .2s ease,rotate .2s ease,box-shadow .2s ease}
-#board .wall .group-head{position:relative;top:auto;z-index:auto;min-height:38px;margin:0 -8px;padding:0 6px 0 10px;border-radius:var(--wall-radius) var(--wall-radius) 0 0;background:none;box-shadow:0 1px 0 var(--hairline);touch-action:none}
+#board .wall .group-head{position:relative;top:auto;z-index:auto;flex-wrap:wrap;row-gap:0;min-height:38px;margin:0 -8px;padding:5px 6px 5px 10px;border-radius:var(--wall-radius) var(--wall-radius) 0 0;background:none;box-shadow:0 1px 0 var(--hairline);touch-action:none}
 #board .wall>.group.folded .group-head{box-shadow:none}
-#board .wall .group-title{flex:none;max-width:62%}
-#board .wall .group-head .g-cost{min-width:0;padding-left:8px;overflow:hidden;text-overflow:ellipsis}
+#board .wall .group-title{flex:0 1 auto;max-width:100%}
+/* the monthly sum goes under the title when the two do not fit on one line */
+#board .wall .group-head .g-cost{flex:none;padding-left:8px;line-height:18px}
 #board .wall .g-actions{position:absolute;top:50%;right:6px;translate:0 -50%;margin:0;padding-left:6px;border-radius:7px;background:var(--wall-fill)}
 @media(hover:hover){#board .wall .group-head:not(:hover,:focus-within) .g-actions{visibility:hidden}}
 #board .wall .group-body.list{padding:3px 0 2px}
 /* a line: icon, name (and its second line), then the day count and the price at the right */
 #board .wall .row{margin:0 -4px;border-radius:7px}
 #board .wall .row+.row::before{left:36px;right:6px}
-#board .wall .row .item-open{grid-template-columns:18px minmax(6em,1fr) minmax(0,auto);column-gap:10px;min-height:34px;padding:3px 6px 3px 8px;border-radius:7px}
+/* a tile: the mark, then lines. The name with the day count (and the price, when there is no second line); the second line with
+   the price at its end; a reading or the facts under them. A name, a second line or a reading that does not fit wraps inside the
+   panel, and a day count or state too long to sit beside the name goes under it. */
+#board .wall .row .item-open{grid-template-columns:18px minmax(0,1fr);column-gap:10px;align-items:start;min-height:34px;padding:7px 6px 7px 8px;border-radius:7px}
 #board .wall .row .r-main{display:flex;flex-direction:column;gap:1px;min-width:0}
-#board .wall .row .r-when{display:flex;grid-column:auto;grid-row:auto;flex-direction:row;align-items:center;gap:10px;min-width:0}
+#board .wall .row .r-line{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:1px 10px;min-width:0}
+#board .wall .row .r-name{flex:1 1 auto;align-items:flex-start;max-width:100%;min-height:18px}
+#board .wall .row .r-name>:not(.r-text){flex:none;align-self:flex-start;min-height:18px}
+#board .wall .row .r-text{white-space:normal;overflow:visible;overflow-wrap:anywhere}
+#board .wall .row .r-when{display:flex;flex:0 1 auto;margin-left:auto;justify-content:flex-end;max-width:100%;grid-column:auto;grid-row:auto;flex-direction:row;align-items:center;gap:10px;min-width:0;min-height:18px;max-width:none}
 #board .wall .row :is(.r-date,.r-cost){grid-column:auto;grid-row:auto}
-#board .wall .row .r-date{max-width:13em;white-space:nowrap;text-align:left}
-#board .wall .row .r-date.warn,#board .wall .row .r-date.overdue{border-radius:999px}
-#board .wall .row .r-cost{min-width:5.2em;font-size:12px}
-#board .wall .r-sub{font-size:11.5px;line-height:15px;color:var(--faint)}
-#board .wall .row .r-probe{margin:0}
-#board .wall .r-sub .account-tag{color:var(--faint);font-size:11.5px}
+#board .wall .row .r-date{max-width:100%;overflow:visible;white-space:normal;text-align:left}
+#board .wall .row .r-date.warn,#board .wall .row .r-date.overdue{border-radius:10px;margin-block:-1px}
+#board .wall .row .r-cost{flex:none;margin-left:auto;font-size:12px}
+#board .wall .row .r-second .r-cost{line-height:15px}
+#board .wall .r-sub{flex:1 1 9em;flex-wrap:wrap;row-gap:0;font-size:11.5px;line-height:15px;color:var(--muted);white-space:normal;overflow:visible;overflow-wrap:anywhere}
+#board .wall .r-sub :is(.ip-prov,.account-tag){max-width:100%;overflow:visible;white-space:normal}
+#board .wall .row .live-line{display:flex;align-items:flex-start;white-space:normal}
+#board .wall .row .live-line .live-text{overflow:visible;white-space:normal}
+#board .wall .row .r-probe{grid-column:auto;grid-row:auto;margin:0;overflow:visible}
+#board .wall .r-sub .account-tag{color:var(--muted);font-size:11.5px}
 #board .wall .item-open .tile.sm{width:18px;height:18px}
 #board .wall .row .r-actions{position:absolute;top:50%;right:2px;translate:0 -50%;width:auto;padding:0 2px 0 8px;border-radius:7px;background:linear-gradient(var(--hover),var(--hover)),var(--wall-fill)}
 #board .wall .row.selected .r-actions{background:linear-gradient(var(--selected),var(--selected)),var(--wall-fill)}
@@ -2340,14 +2352,10 @@ body::before,.native-app body::before{background:radial-gradient(70vw 65vh at 0%
 #board .wall .row:focus-within .r-actions{display:flex}
 @media(hover:hover){#board .wall .row:hover .r-actions{display:flex}}
 body.drag-active #board .wall .row .r-actions{display:none}
-/* 全局: name, day count and dot; 标准: + the price, and the second line once the panel has the room; 详细: every fact, by weight */
-#board .wall[data-density=glance] .row .item-open{min-height:28px;padding-block:2px}
-#board .wall[data-density=glance] :is(.r-sub,.r-cost,.live-line,.card-hit,.g-cost),#board .wall[data-density=detail] .r-sub{display:none}
-@container (max-width:359px){#board .wall[data-density=standard] .r-sub{display:none}}
-#board .wall[data-density=detail] .row .item-open{align-items:start;padding-block:7px}
-#board .wall[data-density=detail] .row .r-main{display:contents}
-#board .wall[data-density=detail] .row :is(.tile,.r-name,.r-when){grid-row:1}
-#board .wall[data-density=detail] .row .r-main>:not(.r-name){grid-column:2/-1}
+/* 全局: name, day count and dot; 标准: + the second line with the price at its end, and a live reading under it; 详细: every fact,
+   by weight */
+#board .wall[data-density=glance] .row .item-open{min-height:28px;padding-block:5px}
+#board .wall[data-density=glance] :is(.r-sub,.r-cost,.live-line,.card-hit,.g-cost){display:none}
 .r-facts,.peek-facts{display:grid;grid-template-columns:fit-content(8.5em) minmax(0,1fr);gap:2px 12px;margin:5px 0 1px;font-size:11.5px;line-height:16px;font-variant-numeric:tabular-nums}
 .fact-k{color:var(--faint)}
 .fact-v{min-width:0;color:var(--ink);overflow-wrap:anywhere;white-space:pre-line}

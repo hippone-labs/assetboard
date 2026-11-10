@@ -1,5 +1,6 @@
 // Run with the browser tool's filename option. Uses an isolated page; saves only to its own localStorage.
-// Tile wall (board-wall.js): the default 全部资产 on a wide window, one column on a narrow one; panels move by drag and ⌥ + arrows
+// Tile wall (board-wall.js): the default 全部资产, three columns at the usual window widths (two, then one, on a narrower window; a
+// fourth on a very wide one), a tile of one to three lines with nothing cut in any density; panels move by drag and ⌥ + arrows
 // and keep their order after a reload; rows keep the list's ⌥↑↓ and click; three densities by ⌘−/⌘= and the switch, kept on this
 // device, the line at the top of the view staying put; the peek and 详细 list the facts (masked in privacy mode); the skin is a
 // setting that changes no layout. AI plans show their readings and 待引入 is a line under the wall.
@@ -18,6 +19,7 @@ async (page) => {
     {id:'d3',type:'domain',name:'third.example.org',provider:'Namecheap',date:day(200),dateKind:'expire',source:'manual'},
     {id:'s1',type:'server',name:'edge-vps',provider:'Host',ips:['203.0.113.10'],host:'203.0.113.10',date:day(5),dateKind:'renew',cycle:'monthly',cost:'$6 / 月',source:'manual'},
     {id:'r1',type:'repository',name:'atlas-ui',provider:'GitHub',source:'manual'},
+    {id:'n1',type:'server',name:'bare-box',cost:'$3 / 月',source:'manual'},
     {id:'h1',type:'domain',name:'gone.example.org',provider:'Registrar',hiddenAt:'2026-01-01T00:00:00Z',source:'manual'}
    ],deletedExternalIds:[]};
    localStorage.setItem(key,JSON.stringify(board));});
@@ -28,12 +30,12 @@ async (page) => {
   check(await p.evaluate(()=>layoutMode==='wall'&&!!document.querySelector('#board .wall')&&+document.querySelector('#board .wall').dataset.cols>1),'A wide window opens 全部资产 as the wall, in columns');
   check(await p.locator('#layout-toggle [data-id="wall"][aria-pressed="true"]').count()===1&&await p.locator('#density-toggle:not([hidden]) [data-action="density"]').count()===3,'The layout switch marks the wall; the density switch is shown');
   const ids=await p.locator('#board .wall [data-asset]').evaluateAll(els=>els.map(e=>e.dataset.asset).sort().join(','));
-  check(ids==='d1,d2,d3,r1,s1','Every live record once, the hidden one left out: '+ids);
+  check(ids==='d1,d2,d3,n1,r1,s1','Every live record once, the hidden one left out: '+ids);
   check(await panels()==='domain,server,repository','A panel per category with records, in category order: '+await panels());
   check(await p.locator('#board .wall-empty [data-action="add-asset"][data-id="license"]').count()===1,'An empty category is a quiet line that adds to it');
   check(await p.locator('#board .group[data-group="repository"] .g-cost').count()===0,'A one-record panel leaves out the monthly sum');
-  const long=await p.locator('#board [data-asset="d2"] .r-text').evaluate(e=>({cut:e.scrollWidth>e.clientWidth,inside:e.closest('.group').getBoundingClientRect().right>=e.getBoundingClientRect().right}));
-  check(long.cut&&long.inside,'A long name is cut inside its panel: '+JSON.stringify(long));
+  const long=await p.locator('#board [data-asset="d2"] .r-text').evaluate(e=>({cut:e.scrollWidth>e.clientWidth+1,lines:Math.round(e.offsetHeight/18),inside:e.closest('.group').getBoundingClientRect().right>=e.getBoundingClientRect().right}));
+  check(!long.cut&&long.lines>1&&long.inside,'A long name wraps inside its panel, nothing of it cut: '+JSON.stringify(long));
   const overlap=await p.evaluate(()=>{const r=[...document.querySelectorAll('#board .wall > .group')].map(n=>n.getBoundingClientRect());return r.some((a,i)=>r.some((b,j)=>i<j&&a.left<b.right-1&&b.left<a.right-1&&a.top<b.bottom-1&&b.top<a.bottom-1));});
   check(!overlap,'Panels never overlap');
   await p.locator('#board [data-asset="d1"] .item-open').click();
@@ -43,6 +45,33 @@ async (page) => {
   // Narrow: one column.
   await p.setViewportSize({width:560,height:900});await settle();
   check(await p.evaluate(()=>document.querySelector('#board .wall').dataset.cols==='1'),'A narrow window gets one column');
+  await p.setViewportSize({width:1500,height:900});await settle();
+
+  // Three columns are the wall in every density; a tile is one to three lines and nothing in it is cut, at the usual window widths.
+  const shown=()=>p.evaluate(()=>{const wall=document.querySelector('#board .wall'),seen=e=>getComputedStyle(e).display!=='none'&&e.getClientRects().length,cut=e=>e.scrollWidth>e.clientWidth+1;
+   const cutIn=[...wall.querySelectorAll('.g-name,.g-cost,.r-text,.r-sub,.r-sub *,.r-date,.r-cost,.live-line,.live-line *,.fact-v')].filter(e=>seen(e)&&cut(e)).map(e=>e.className+':'+e.textContent.slice(0,24));
+   const out=[...wall.querySelectorAll('.r-line>*,.r-facts,.live-line,.group-head>*')].filter(e=>seen(e)&&e.getBoundingClientRect().right>e.closest('.group').getBoundingClientRect().right+.5).map(e=>e.className);
+   return {cols:+wall.dataset.cols,width:Math.round(parseFloat(wall.firstElementChild.style.width)),cutIn,out};});
+  for(const width of [1280,1440,1728]){
+   await p.setViewportSize({width,height:900});await settle();
+   for(const id of ['glance','standard','detail']){
+    await p.evaluate(id=>setDensity(id),id);await settle();
+    const got=await shown();
+    check(got.cols===3&&got.width>=280&&!got.cutIn.length&&!got.out.length,`${width} wide, ${id}: three columns, every text whole and inside its panel: `+JSON.stringify(got));
+   }
+  }
+  await p.evaluate(()=>setDensity('standard'));await settle();
+  const lines=await p.evaluate(()=>{const top=(id,sel)=>Math.round(document.querySelector(`#board [data-asset="${id}"] ${sel}`).getBoundingClientRect().top),has=(id,sel)=>!!document.querySelector(`#board [data-asset="${id}"] ${sel}`);
+   return {sub:document.querySelector('#board [data-asset="s1"] .r-sub').innerText,second:top('s1','.r-sub')>top('s1','.r-name')+10&&Math.abs(top('s1','.r-cost')-top('s1','.r-sub'))<4,first:Math.abs(top('s1','.r-date')-top('s1','.r-name'))<4,
+    d1:top('d1','.r-cost')>top('d1','.r-name')+10,bare:has('n1','.r-second')||has('n1','.r-sub'),bareCost:Math.abs(top('n1','.r-cost')-top('n1','.r-name'))<4,one:document.querySelector('#board [data-asset="n1"]').offsetHeight<document.querySelector('#board [data-asset="s1"]').offsetHeight};});
+  check(/203\.0\.113\.10/.test(lines.sub)&&/Host/.test(lines.sub)&&lines.first&&lines.second&&lines.d1,'标准 in three columns: the day count beside the name, the IP and platform on a second line with the price at its end: '+JSON.stringify(lines));
+  check(!lines.bare&&lines.bareCost&&lines.one,'A record with nothing for the second line has none: one line, the price beside the name: '+JSON.stringify(lines));
+  // The window decides the columns: two when three do not fit, a fourth only when three would be wider than a tile reads well.
+  for(const [width,cols] of [[1040,2],[2400,4]]){
+   await p.setViewportSize({width,height:900});await settle();
+   const got=await shown();
+   check(got.cols===cols&&!got.cutIn.length&&!got.out.length,`${width} wide: ${cols} columns, nothing cut: `+JSON.stringify(got));
+  }
   await p.setViewportSize({width:1500,height:900});await settle();
 
   // A panel moves with ⌥ + arrows on its title, and keeps the place after a reload (saved with the board).
@@ -73,7 +102,7 @@ async (page) => {
   check(await density()==='standard','The wall starts at 标准');
   await p.locator('#board .group-title').first().focus();
   await p.keyboard.press('Control+Equal');await settle();
-  check(await density()==='detail'&&await p.locator('#board .r-facts').count()===5,'⌘= opens 详细: every line lists its facts');
+  check(await density()==='detail'&&await p.locator('#board .r-facts').count()===6,'⌘= opens 详细: every line lists its facts');
   const facts=await p.locator('#board [data-asset="d1"] .r-facts').innerText();
   check(/Cloudflare/.test(facts)&&/ops@example\.com/.test(facts)&&/keep/.test(facts)&&!/本机目录|DNS 托管|备案/.test(facts),'详细 lists the known facts and leaves the empty ones out: '+facts);
   await p.keyboard.press('Control+Minus');await p.keyboard.press('Control+Minus');await settle();
@@ -118,7 +147,7 @@ async (page) => {
 
   // The list is a choice in the layout switch, kept; a search, another view and the hidden pile are never the wall.
   await p.locator('#layout-toggle [data-id="list"]').click();await settle();
-  check(!(await p.locator('#board .wall').count())&&await p.locator('#board .group-body.list .row').count()===5,'The layout switch goes back to the list');
+  check(!(await p.locator('#board .wall').count())&&await p.locator('#board .group-body.list .row').count()===6,'The layout switch goes back to the list');
   check(await p.evaluate(()=>JSON.parse(localStorage.getItem('assetboard-view-v1')).board==='list'),'The list is kept as the choice');
   await p.locator('#layout-toggle [data-id="wall"]').click();await settle();
   await p.evaluate(()=>setView('domain'));await settle();
@@ -139,6 +168,6 @@ async (page) => {
   check(await p.locator('#modal .connect-pick').count()===1,'待引入 under the wall opens the pick');
   await p.evaluate(()=>{$('#modal').close();setDensity('standard');});
   if(errors.length)throw new Error(errors.join(' | '));
-  return 'PASS: tile wall default, narrow single column, panel moves kept, row moves, densities kept and anchored, peek, privacy, skin, AI readings, 待引入';
+  return 'PASS: tile wall default, three columns with whole lines at 1280/1440/1728 in every density, narrow single column, panel moves kept, row moves, densities kept and anchored, peek, privacy, skin, AI readings, 待引入';
  } finally { await p.close(); }
 }

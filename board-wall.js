@@ -1,18 +1,21 @@
 // Tile wall: 全部资产 as a wall of category panels, the default layout (列表, 网格 and 时间轴 stay in the layout switch). Each panel is a
-// category: its header, then one line per record (the same rows as the list, so ⌥↑↓, dragging, the quick actions and a click to the
-// inspector all work as there). The panels are packed into as many columns as the width holds, each into the shortest column, so
-// they read left to right; a narrow window gets one column. Dragging a panel by its header (or ⌥ + arrows on its title) moves the
-// category: the same order as the sidebar's.
-// Three densities say how much a line holds; ⌘− and ⌘= (a pinch on the trackpad) step through them, the view keeping its place:
+// category: its header, then a tile of one to three lines per record (the same rows as the list, so ⌥↑↓, dragging, the quick actions
+// and a click to the inspector all work as there). The panels are packed into columns, each into the shortest column, so they read
+// left to right. Three columns are the wall: a window too narrow for three at WALL_MIN_COL gets two, then one, and only a window
+// where three would each be wider than WALL_MAX_COL gets a fourth. The column count is the same in every density, and nothing in a
+// tile is cut: a line that does not fit wraps, so a tile grows taller instead of losing text.
+// Dragging a panel by its header (or ⌥ + arrows on its title) moves the category: the same order as the sidebar's.
+// Three densities say how much a tile holds; ⌘− and ⌘= (a pinch on the trackpad) step through them, the view keeping its place:
 //  glance    name, day count and the amber or red dot: as much of the board on one screen as fits
-//  standard  + price, and a faint second line (IP, account) when the panel is wide enough
+//  standard  + a second line (IP, account, platform) with the price at its end, and a live reading on a third; a record with
+//            nothing for the second line stays one line, its price beside the day count
 //  detail    + every known fact of the record inside the panel, by weight (wallFacts)
 // Hovering a line (or reaching it with the keyboard while the inspector is closed) shows the same facts in a card beside it.
 // How the panels look (tilt, edge, the lift of a dragged panel) is the skin's (theme.js, material.css); this file only lays out.
 // Loaded after board-views.js and before app.js; the app.js helpers used here are called only at render and event time.
 const WALL_DENSITIES=['glance','standard','detail'];
 const WALL_DENSITY_NAMES={glance:tr('全局'),standard:tr('标准'),detail:tr('详细')};
-const WALL_MIN_COL={glance:272,standard:320,detail:360},WALL_GAP=12;
+const WALL_MIN_COL=280,WALL_MAX_COL=560,WALL_COLS=3,WALL_GAP=12;
 let wallDensity='standard';
 
 // A dated line says only its day count (12 天, 过期 3 天); its full label stays in the item's name and the inspector. A line that is a
@@ -81,13 +84,17 @@ function wallTilt(id){let h=7;for(const c of String(id))h=(h*31+c.charCodeAt(0))
 
 // Packing: every panel (and a dragged panel's slot) gets the column width, then goes to the top of the shortest column. Positions are
 // absolute, so a panel that changes height (folding, fonts, a density) moves the ones under it at once; a ResizeObserver repacks.
+function wallColumns(width){
+ const fit=Math.max(1,Math.floor((width+WALL_GAP)/(WALL_MIN_COL+WALL_GAP)));
+ return fit<=WALL_COLS?fit:Math.max(WALL_COLS,Math.ceil((width+WALL_GAP)/(WALL_MAX_COL+WALL_GAP)));
+}
 let wallObserver=null,wallWidth=0;
 function packWall(){
  const wall=document.querySelector('#board .wall');if(!wall)return;
  if(!wallObserver)wallObserver=new ResizeObserver(entries=>{if(entries.some(en=>en.target!==wallObserver.wall||Math.abs(en.contentRect.width-wallWidth)>.5))packWall();});
  if(wallObserver.wall!==wall){wallObserver.disconnect();wallObserver.wall=wall;wallObserver.observe(wall);for(const n of wall.children)wallObserver.observe(n);}
  const items=[...wall.children].filter(n=>!n.classList.contains('is-dragging')),width=wall.clientWidth;if(!width)return;
- const cols=Math.max(1,Math.floor((width+WALL_GAP)/(WALL_MIN_COL[wallDensity]+WALL_GAP))),colW=Math.floor((width-WALL_GAP*(cols-1))/cols*100)/100;
+ const cols=wallColumns(width),colW=Math.floor((width-WALL_GAP*(cols-1))/cols*100)/100;
  wallWidth=width;wall.dataset.cols=cols;
  for(const n of items)n.style.width=colW+'px';
  const heights=items.map(n=>n.offsetHeight),tops=Array(cols).fill(0);
