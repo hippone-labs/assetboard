@@ -9,6 +9,8 @@ cd "${0:A:h:h}"
 mkdir -p "$RELEASE_DIR"
 # Publishing must use the final archive, after stapling, never package.sh's intermediate zip.
 unset SITE_DIR
+# One stamp per build, so a release run again for the same commit is not the bundle an earlier run already notarized (desktop/build.sh).
+export ASSETBOARD_BUILD_STAMP="${GITHUB_RUN_ID:-local}.${GITHUB_RUN_ATTEMPT:-1}.$(date -u +%Y%m%dT%H%M%SZ)"
 ./desktop/package.sh
 app=dist/Assetboard.app
 version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist")"
@@ -37,9 +39,13 @@ staple() {
     echo "stapler could not fetch the ticket yet (attempt $attempt of 6)" >&2
     (( attempt < 6 )) && sleep 30
   done
-  # Error 73 for minutes means the ticket service cannot be reached: show the request and where its host resolves
+  # Error 73 is also what a refused write gives: "Could not remove existing ticket from …/CodeResources" with a System Policy
+  # deny of stapler in the system log means App Management blocked the write (see ASSETBOARD_BUILD_STAMP in desktop/build.sh).
+  # Otherwise it means the ticket service cannot be reached: show the request and where its host resolves
   # (a 198.18.x address is a local proxy's fake IP).
   xcrun stapler staple -v "$target" 2>&1 | tail -40 || true
+  spctl -a -vv "$target" 2>&1 || true
+  /usr/bin/log show --last 5m --style compact --predicate 'eventMessage CONTAINS "System Policy: stapler"' 2>/dev/null | tail -5 || true
   curl -sS -o /dev/null -w 'api.apple-cloudkit.com: HTTP %{http_code} via %{remote_ip}\n' https://api.apple-cloudkit.com/ || true
   return 1
 }
