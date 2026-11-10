@@ -309,6 +309,7 @@ Object.assign(I18N.en,{
  '细线和留白，面板按列排好':'Hairlines and space, panels in columns',
  '面板像冰箱门上的磁贴：轻微倾角、阴影、小贴纸，可以拖到任意位置':'Panels like magnets on a fridge door: a slight tilt, a shadow, a sticker now and then; drag them anywhere',
  '冰箱门':'Fridge door',
+ '冰箱贴下整个窗口用冰箱门的配色；这里选的主题在安静风格下生效':'With fridge magnets the whole window takes the door\'s colours; the theme chosen here applies to the quiet style',
  '像素厨房':'Pixel Kitchen',
  '像素夜景':'Pixel Night City',
  '手绘冰箱门':'Sketchbook Fridge',

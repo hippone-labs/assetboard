@@ -123,11 +123,13 @@ function legacyPref(){
  const legacy=typeof state!=='undefined'&&typeof state.theme==='string'?state.theme.toLowerCase():'';
  return LEGACY_THEMES[legacy]?{id:LEGACY_THEMES[legacy]}:HEX.test(legacy)?{id:'custom',custom:{name:'自定义',accent:legacy,tint:.5}}:null;
 }
+// Under 冰箱贴 the door's palette (fridgePalette) stands in for the theme, so the whole window, its sidebar and bars included, is
+// of the door's colour; the chosen theme comes back with the quiet skin. The Mac app also takes the door's scheme for its own glass.
 function applyBoardTheme(theme=themeFor(themePref)){
- const scheme=currentScheme(),p=themePalette(theme,scheme),key=JSON.stringify(theme)+scheme;if(appliedTheme===key&&appliedScheme===scheme)return;appliedTheme=key;appliedScheme=scheme;
+ const scheme=currentScheme(),door=fridgePalette(),p=door||themePalette(theme,scheme),key=door?'door:'+fridgeScene:JSON.stringify(theme)+scheme;if(appliedTheme===key&&appliedScheme===scheme)return;appliedTheme=key;appliedScheme=scheme;
  document.documentElement.dataset.scheme=scheme;
  for(const role of ['canvas','category','card','ink','muted','primary'])document.documentElement.style.setProperty('--tone-'+role,p[role].join(','));
- if(window.__ASSETBOARD_NATIVE__)window.webkit.messageHandlers.assetboard.postMessage({action:'themeColor',rgb:p.canvas});
+ if(window.__ASSETBOARD_NATIVE__)window.webkit.messageHandlers.assetboard.postMessage({action:'themeColor',rgb:p.canvas,...(door?{scheme}:{})});
 }
 
 function themeDialog(){
@@ -139,7 +141,7 @@ function themeDialog(){
  modal(tr('主题'),`<div class="theme-options">${(open?themePresets:themePresets.slice(0,1)).map(([id,name,,,mood])=>swatch(id,name,mood,presetTheme(id))).join('')}${open?swatch('system',tr('跟随系统'),tr('系统强调色'),{accent:systemAccent(),tint:.45}):''}</div>
   ${open?`<div class="theme-custom"><label>${tr('自定义强调色')}<input id="theme-color" type="color" value="${current.accent}"></label></div>
   <details class="theme-json"><summary>${tr('粘贴主题 JSON')}</summary><textarea id="theme-json" rows="3" maxlength="2000" spellcheck="false" aria-label="${tr('主题 JSON')}" placeholder='{"name":"${tr('我的主题')}","accent":"#0a6fe8","accentDark":"#5ea4ff","tint":0.5}'></textarea><div class="theme-json-row"><button class="button" id="theme-json-apply" type="button">${tr('预览')}</button><span class="form-note" id="theme-json-status" role="status"></span></div></details>`:''}
-  <div class="theme-actions"><button class="button primary" id="save-theme" title="${tr('强调色用于按钮、选中和链接；底色跟随系统的浅色或深色。明度会自动调到文字对比度达标（WCAG AA），到期红、橙色保持不变。主题只存在这台设备上。')}">${tr('使用这个主题')}</button><span class="form-note">${tr('只存在这台设备上')}</span></div>`);
+  ${boardSkin==='magnet'?`<p class="form-note">${tr('冰箱贴下整个窗口用冰箱门的配色；这里选的主题在安静风格下生效')}</p>`:''}<div class="theme-actions"><button class="button primary" id="save-theme" title="${tr('强调色用于按钮、选中和链接；底色跟随系统的浅色或深色。明度会自动调到文字对比度达标（WCAG AA），到期红、橙色保持不变。主题只存在这台设备上。')}">${tr('使用这个主题')}</button><span class="form-note">${tr('只存在这台设备上')}</span></div>`);
  const mark=()=>document.querySelectorAll('[data-theme-id]').forEach(el=>el.setAttribute('aria-pressed',String(el.dataset.themeId===pending.id)));
  const preview=next=>{pending=next;applyBoardTheme(themeFor(next));mark();};
  mark();
@@ -169,6 +171,17 @@ let boardSkin=(()=>{try{const v=localStorage.getItem(SKIN_KEY);return BOARD_SKIN
 const FRIDGE_SCENES=[['kitchen',tr('像素厨房'),false,tr('像素风的厨房冰箱门')],['city',tr('像素夜景'),true,tr('像素风的城市夜景')],['handdrawn',tr('手绘冰箱门'),false,tr('手绘的冰箱门')],['server',tr('像素机房'),true,tr('像素风的机房')]];
 const SCENE_KEY='assetboard-fridge-scene-v1';
 let fridgeScene=(()=>{try{const v=localStorage.getItem(SCENE_KEY);return FRIDGE_SCENES.some(([id])=>id===v)?v:'kitchen';}catch{return 'kitchen';}})();
+// Each door's palette, taken from its picture (art/fridge/bg-*.webp): the canvas and the bars are the door's ground lifted (light) or
+// its darkest part (dark), the panels its paper, the ink and muted text its darkest or lightest lines, the accent its one colour
+// (the kitchen's mint, the night's lavender sky, the sketchbook's pencil, the server room's green lights). All text meets WCAG AA
+// (tests/theme.test.js), the accent also on rows tinted with it; the status reds and ambers stay those of material.css.
+const FRIDGE_PALETTES={
+ kitchen:{canvas:'#e3ebdf',category:'#eef2e8',card:'#fffdf7',ink:'#1f2a28',muted:'#4a5954',primary:'#225c47'},
+ city:{canvas:'#141a2e',category:'#1c2340',card:'#232a48',ink:'#eceaf6',muted:'#b4b3d2',primary:'#b9b5f8'},
+ handdrawn:{canvas:'#ede4cf',category:'#f4eddc',card:'#fffaef',ink:'#2b2418',muted:'#62563f',primary:'#46505f'},
+ server:{canvas:'#162021',category:'#1d2a2b',card:'#233233',ink:'#e4eeea',muted:'#a9bdb7',primary:'#6fd0a8'}
+};
+function fridgePalette(scene=boardSkin==='magnet'?fridgeScene:''){const p=FRIDGE_PALETTES[scene];return p&&Object.fromEntries(Object.entries(p).map(([role,hex])=>[role,[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16))]));}
 function fridgeSceneScheme(){if(boardSkin!=='magnet')return '';const s=FRIDGE_SCENES.find(([id])=>id===fridgeScene);return s?s[2]?'dark':'light':'';}
 function applySkin(){const root=document.documentElement;root.dataset.skin=boardSkin;if(boardSkin==='magnet')root.dataset.scene=fridgeScene;else delete root.dataset.scene;}
 function setSkin(id){if(!BOARD_SKINS.some(([s])=>s===id))return false;boardSkin=id;try{localStorage.setItem(SKIN_KEY,id);}catch{}applySkin();applyBoardTheme();return true;}

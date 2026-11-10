@@ -1117,6 +1117,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
             if let rgb = body["rgb"] as? [Double], rgb.count == 3, rgb.allSatisfy({ $0.isFinite && $0 >= 0 && $0 <= 255 }) {
                 window.backgroundColor = NSColor(calibratedRed: rgb[0]/255, green: rgb[1]/255, blue: rgb[2]/255, alpha: 0.92)
             }
+            // A 冰箱贴 door has its own scheme (theme.js): the window takes it, so the native glass behind the sidebar and the bars is
+            // as light or dark as the door; without one the window follows the system again.
+            let scheme = body["scheme"] as? String
+            let appearance = scheme == "dark" ? NSAppearance(named: .darkAqua) : scheme == "light" ? NSAppearance(named: .aqua) : nil
+            if window.appearance?.name != appearance?.name { window.appearance = appearance }
             return
         }
         // Demo mode answers saves as done without writing and refuses everything that would touch data, the Keychain or the network.

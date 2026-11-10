@@ -2891,7 +2891,7 @@ function prefsDialog(section){
   mac&&typeof platformOn==='function'&&platformOn()?link(tr('平台状态'),platform.sources.length>0,'platform-sources',tr('Supabase、Vercel、Render、Upstash 上的项目状态')):''].join(''):'';
  // 外观: the accent (the 主题 dialog), the wall's skin (theme.js) and its density (board-wall.js); all kept on this device only.
  const radios=(label,list,on,action)=>`<div class="chip-group" role="radiogroup" aria-label="${label}">${list.map(([id,name,note])=>`<button type="button" class="choice" role="radio" aria-checked="${id===on}" data-action="${action}" data-id="${id}"${note?` title="${esc(note)}"`:''}>${esc(name)}</button>`).join('')}</div>`;
- const look=[row(tr('主题'),`<span class="prefs-edition">${esc(tr(themeFor(themePref).name||'')||tr('墨蓝'))}</span><button class="button" data-action="prefs-theme">${tr('选择…')}</button>`,tr('强调色用于按钮、选中和链接；到期红、橙色保持不变')),
+ const look=[row(tr('主题'),`<span class="prefs-edition">${esc(tr(themeFor(themePref).name||'')||tr('墨蓝'))}</span><button class="button" data-action="prefs-theme">${tr('选择…')}</button>`,boardSkin==='magnet'?tr('冰箱贴下整个窗口用冰箱门的配色；这里选的主题在安静风格下生效'):tr('强调色用于按钮、选中和链接；到期红、橙色保持不变')),
   row(tr('风格'),radios(tr('风格'),BOARD_SKINS,boardSkin,'prefs-skin'),tr('只改磁贴墙的样子和摆法；内容、字段和密度不变')),
   boardSkin==='magnet'?row(tr('冰箱门'),radios(tr('冰箱门'),FRIDGE_SCENES.map(([id,name,,note])=>[id,name,note]),fridgeScene,'prefs-scene'),tr('冰箱贴下面板可以拖到任意位置，位置只存在这台设备上；顶栏的「排整齐」让它们回到列上')):'',
   row(tr('磁贴密度'),radios(tr('磁贴密度'),WALL_DENSITIES.map(id=>[id,WALL_DENSITY_NAMES[id]]),wallDensity,'prefs-density'),tr('全局只留名称和天数，详细把每条的属性都摊开；⌘− 和 ⌘= 或在触控板上捏合也能切换'))].join('');
