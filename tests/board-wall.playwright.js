@@ -1,9 +1,12 @@
 // Run with the browser tool's filename option. Uses an isolated page; saves only to its own localStorage.
 // Tile wall (board-wall.js): the default 全部资产, three columns at the usual window widths (two, then one, on a narrower window; a
-// fourth on a very wide one), a tile of one to three lines with nothing cut in any density; panels move by drag and ⌥ + arrows
-// and keep their order after a reload; rows keep the list's ⌥↑↓ and click; three densities by ⌘−/⌘= and the switch, kept on this
-// device, the line at the top of the view staying put; the peek and 详细 list the facts (masked in privacy mode); the skin is a
-// setting that changes no layout. AI plans show their readings and 待引入 is a line under the wall.
+// fourth on a very wide one). A tile is a fixed structure: one line in 全局, two in 标准 (the fields in columns that line up down a
+// panel, the price at the right end), a line per fact in 详细; every tile of a density is as tall as the others, and a text too
+// long for its place is cut on its line (a domain, an address or a long identifier in the middle) with the whole of it in its title
+// and the peek, the day count, state and price never cut. Panels move by drag and ⌥ + arrows and keep their order after a reload;
+// rows keep the list's ⌥↑↓ and click; three densities by ⌘−/⌘= and the switch, kept on this device, the line at the top of the view
+// staying put; the peek and 详细 list the facts (masked in privacy mode); the skin is a setting that changes no layout. AI plans
+// show their readings and 待引入 is a line under the wall.
 async (page) => {
  const p=await page.context().newPage();
  const check=(ok,message)=>{if(!ok)throw new Error(message);};
@@ -19,7 +22,9 @@ async (page) => {
     {id:'d3',type:'domain',name:'third.example.org',provider:'Namecheap',date:day(200),dateKind:'expire',source:'manual'},
     {id:'s1',type:'server',name:'edge-vps',provider:'Host',ips:['203.0.113.10'],host:'203.0.113.10',date:day(5),dateKind:'renew',cycle:'monthly',cost:'$6 / 月',source:'manual'},
     {id:'r1',type:'repository',name:'atlas-ui',provider:'GitHub',source:'manual'},
+    {id:'s2',type:'server',name:'production-kubernetes-worker-node-eu-central-1a',provider:'A Hosting Company With A Long Name',ips:['2001:0db8:85a3:0000:0000:8a2e:0370:7334'],date:day(40),dateKind:'renew',cycle:'monthly',cost:'€49.90 / 月',source:'manual',notes:'A note long enough that it does not fit on one line of a tile in any of the usual window widths, so it is cut there.'},
     {id:'n1',type:'server',name:'bare-box',cost:'$3 / 月',source:'manual'},
+    {id:'n2',type:'server',name:'一台名字很长很长很长很长很长很长很长很长很长很长很长很长的服务器',source:'manual'},
     {id:'h1',type:'domain',name:'gone.example.org',provider:'Registrar',hiddenAt:'2026-01-01T00:00:00Z',source:'manual'}
    ],deletedExternalIds:[]};
    localStorage.setItem(key,JSON.stringify(board));});
@@ -30,12 +35,21 @@ async (page) => {
   check(await p.evaluate(()=>layoutMode==='wall'&&!!document.querySelector('#board .wall')&&+document.querySelector('#board .wall').dataset.cols>1),'A wide window opens 全部资产 as the wall, in columns');
   check(await p.locator('#layout-toggle [data-id="wall"][aria-pressed="true"]').count()===1&&await p.locator('#density-toggle:not([hidden]) [data-action="density"]').count()===3,'The layout switch marks the wall; the density switch is shown');
   const ids=await p.locator('#board .wall [data-asset]').evaluateAll(els=>els.map(e=>e.dataset.asset).sort().join(','));
-  check(ids==='d1,d2,d3,n1,r1,s1','Every live record once, the hidden one left out: '+ids);
+  check(ids==='d1,d2,d3,n1,n2,r1,s1,s2','Every live record once, the hidden one left out: '+ids);
   check(await panels()==='domain,server,repository','A panel per category with records, in category order: '+await panels());
   check(await p.locator('#board .wall-empty [data-action="add-asset"][data-id="license"]').count()===1,'An empty category is a quiet line that adds to it');
   check(await p.locator('#board .group[data-group="repository"] .g-cost').count()===0,'A one-record panel leaves out the monthly sum');
-  const long=await p.locator('#board [data-asset="d2"] .r-text').evaluate(e=>({cut:e.scrollWidth>e.clientWidth+1,lines:Math.round(e.offsetHeight/18),inside:e.closest('.group').getBoundingClientRect().right>=e.getBoundingClientRect().right}));
-  check(!long.cut&&long.lines>1&&long.inside,'A long name wraps inside its panel, nothing of it cut: '+JSON.stringify(long));
+  // A name too long for its line is cut on it: a domain in the middle, its registered name kept; a name in words at its end. The
+  // whole name is the element's text and its title, and the day count beside it is whole.
+  const long=await p.evaluate(()=>{const of=id=>{const row=document.querySelector(`#board [data-asset="${id}"]`),e=row.querySelector('.r-text'),full=e.querySelector('.w-full')||e,date=row.querySelector('.r-date');
+   return {text:e.textContent,title:e.title,mid:e.classList.contains('w-mid'),head:e.dataset.head||'',tail:e.dataset.tail||'',cut:full.scrollWidth>full.clientWidth+1,oneLine:e.offsetHeight<=20,inside:e.getBoundingClientRect().right<=row.getBoundingClientRect().right,tailWhole:!e.dataset.tail||getComputedStyle(e,'::after').width!=='auto'&&e.getBoundingClientRect().width>=parseFloat(getComputedStyle(e,'::after').width),dateWhole:!date||date.scrollWidth<=date.clientWidth+1};};
+   return {d2:of('d2'),n2:of('n2'),s2:of('s2'),d1:of('d1')};});
+  const d2name='a-very-long-domain-name-that-does-not-fit-in-a-panel.example.net';
+  check(long.d2.text===d2name&&long.d2.title===d2name&&long.d2.cut&&long.d2.oneLine&&long.d2.inside&&long.d2.dateWhole,'A long name stays on one line inside its panel, cut, the whole of it its text and title, the day count whole: '+JSON.stringify(long.d2));
+  check(long.d2.mid&&long.d2.head==='a-very-long-domain-name-that-does-not-fit-in-a-panel'&&long.d2.tail==='.example.net'&&long.d2.tailWhole,'A long domain is cut in the middle and keeps its registered name: '+JSON.stringify(long.d2));
+  check(long.s2.mid&&long.s2.tail==='ral-1a'&&long.s2.cut&&long.s2.oneLine,'A long identifier is cut in the middle and keeps its end: '+JSON.stringify(long.s2));
+  check(!long.n2.mid&&long.n2.cut&&long.n2.oneLine&&long.n2.inside&&/很长/.test(long.n2.title),'A long name in words is cut at its end: '+JSON.stringify(long.n2));
+  check(long.d1.mid&&!long.d1.cut&&long.d1.text==='soon.example.com','A name that fits is whole: '+JSON.stringify(long.d1));
   const overlap=await p.evaluate(()=>{const r=[...document.querySelectorAll('#board .wall > .group')].map(n=>n.getBoundingClientRect());return r.some((a,i)=>r.some((b,j)=>i<j&&a.left<b.right-1&&b.left<a.right-1&&a.top<b.bottom-1&&b.top<a.bottom-1));});
   check(!overlap,'Panels never overlap');
   await p.locator('#board [data-asset="d1"] .item-open').click();
@@ -47,30 +61,43 @@ async (page) => {
   check(await p.evaluate(()=>document.querySelector('#board .wall').dataset.cols==='1'),'A narrow window gets one column');
   await p.setViewportSize({width:1500,height:900});await settle();
 
-  // Three columns are the wall in every density; a tile is one to three lines and nothing in it is cut, at the usual window widths.
+  // Three columns are the wall in every density. Every tile of a density is as tall as the others (详细: a line per fact, so as
+  // tall as its facts are many); nothing wraps or leaves its panel, and the day count, the state and the price are whole.
   const shown=()=>p.evaluate(()=>{const wall=document.querySelector('#board .wall'),seen=e=>getComputedStyle(e).display!=='none'&&e.getClientRects().length,cut=e=>e.scrollWidth>e.clientWidth+1;
-   const cutIn=[...wall.querySelectorAll('.g-name,.g-cost,.r-text,.r-sub,.r-sub *,.r-date,.r-cost,.live-line,.live-line *,.fact-v')].filter(e=>seen(e)&&cut(e)).map(e=>e.className+':'+e.textContent.slice(0,24));
-   const out=[...wall.querySelectorAll('.r-line>*,.r-facts,.live-line,.group-head>*')].filter(e=>seen(e)&&e.getBoundingClientRect().right>e.closest('.group').getBoundingClientRect().right+.5).map(e=>e.className);
-   return {cols:+wall.dataset.cols,width:Math.round(parseFloat(wall.firstElementChild.style.width)),cutIn,out};});
+   const keyCut=[...wall.querySelectorAll('.r-date,.r-cost,.g-cost,.g-count')].filter(e=>seen(e)&&cut(e)).map(e=>e.className+':'+e.textContent.slice(0,24));
+   const out=[...wall.querySelectorAll('.r-line>*,.r-fields .f,.r-facts,.live-line,.group-head>*')].filter(e=>seen(e)&&e.getBoundingClientRect().right>e.closest('.group').getBoundingClientRect().right+.5).map(e=>e.className);
+   const tall=[...wall.querySelectorAll('.r-line,.r-fields .f,.fact-k,.fact-v:not(.fact-lines)')].filter(e=>seen(e)&&e.offsetHeight>19).map(e=>e.className+':'+e.textContent.slice(0,24));
+   const rows=[...wall.querySelectorAll('.row')],facts=r=>r.querySelectorAll('.fact-k').length+r.querySelectorAll('.fact-k.gap').length*.5;
+   const heights=[...new Set(rows.map(r=>r.offsetHeight))],perFact=[...new Set(rows.map(r=>r.offsetHeight+'/'+facts(r)))].length===[...new Set(rows.map(facts))].length;
+   return {cols:+wall.dataset.cols,width:Math.round(parseFloat(wall.firstElementChild.style.width)),keyCut,out,tall,heights,perFact,heads:[...new Set([...wall.querySelectorAll('.group-head')].map(e=>e.offsetHeight))]};});
   for(const width of [1280,1440,1728]){
    await p.setViewportSize({width,height:900});await settle();
    for(const id of ['glance','standard','detail']){
     await p.evaluate(id=>setDensity(id),id);await settle();
     const got=await shown();
-    check(got.cols===3&&got.width>=280&&!got.cutIn.length&&!got.out.length,`${width} wide, ${id}: three columns, every text whole and inside its panel: `+JSON.stringify(got));
+    check(got.cols===3&&got.width>=280&&!got.keyCut.length&&!got.out.length&&!got.tall.length,`${width} wide, ${id}: three columns, every line one line inside its panel, the day counts and prices whole: `+JSON.stringify(got));
+    check(got.heads.length===1&&(id==='detail'?got.perFact:got.heights.length===1),`${width} wide, ${id}: every tile is as tall as the others${id==='detail'?' with as many facts':''}, every panel head too: `+JSON.stringify(got));
    }
   }
   await p.evaluate(()=>setDensity('standard'));await settle();
-  const lines=await p.evaluate(()=>{const top=(id,sel)=>Math.round(document.querySelector(`#board [data-asset="${id}"] ${sel}`).getBoundingClientRect().top),has=(id,sel)=>!!document.querySelector(`#board [data-asset="${id}"] ${sel}`);
-   return {sub:document.querySelector('#board [data-asset="s1"] .r-sub').innerText,second:top('s1','.r-sub')>top('s1','.r-name')+10&&Math.abs(top('s1','.r-cost')-top('s1','.r-sub'))<4,first:Math.abs(top('s1','.r-date')-top('s1','.r-name'))<4,
-    d1:top('d1','.r-cost')>top('d1','.r-name')+10,bare:has('n1','.r-second')||has('n1','.r-sub'),bareCost:Math.abs(top('n1','.r-cost')-top('n1','.r-name'))<4,one:document.querySelector('#board [data-asset="n1"]').offsetHeight<document.querySelector('#board [data-asset="s1"]').offsetHeight};});
-  check(/203\.0\.113\.10/.test(lines.sub)&&/Host/.test(lines.sub)&&lines.first&&lines.second&&lines.d1,'标准 in three columns: the day count beside the name, the IP and platform on a second line with the price at its end: '+JSON.stringify(lines));
-  check(!lines.bare&&lines.bareCost&&lines.one,'A record with nothing for the second line has none: one line, the price beside the name: '+JSON.stringify(lines));
+  // 标准: the day count beside the name; under them the fields in columns that start at the same place in every tile of a panel, and
+  // the price at the right end. A field the record has nothing for is left empty, the others keep their columns.
+  const lines=await p.evaluate(()=>{const q=(id,sel)=>document.querySelector(`#board [data-asset="${id}"] ${sel}`),box=(id,sel)=>q(id,sel)?.getBoundingClientRect(),near=(a,b)=>Math.abs(a-b)<1.5;
+   return {ip:q('s1','.f-1').textContent,platform:q('s1','.f-2').textContent,first:near(box('s1','.r-date').top+box('s1','.r-date').height/2,box('s1','.r-name').top+box('s1','.r-name').height/2),second:box('s1','.f-1').top>box('s1','.r-name').top+10&&Math.abs(box('s1','.r-cost').top-box('s1','.f-1').top)<3,
+    edge:near(box('s1','.r-cost').right,box('s1','.r-line').right)&&near(box('s2','.r-cost').right,box('s2','.r-line').right)&&near(box('n1','.r-cost').right,box('n1','.r-line').right),
+    columns:near(box('s1','.f-1').left,box('s2','.f-1').left)&&near(box('s1','.f-2').left,box('s2','.f-2').left)&&near(box('d1','.f-2').left,box('s1','.f-2').left-box('s1','.f-1').left+box('d1','.f-1').left),
+    s2:{ip:q('s2','.f-1 .ip-text').title,mid:q('s2','.f-1 .ip-text').classList.contains('w-mid'),platform:q('s2','.f-2 .w-text').title,cost:q('s2','.r-cost').textContent,costWhole:q('s2','.r-cost').scrollWidth<=q('s2','.r-cost').clientWidth+1},
+    bare:!q('n1','.f')&&!!q('n1','.r-fields'),same:q('n1','').offsetHeight===q('s1','').offsetHeight&&q('n2','').offsetHeight===q('s1','').offsetHeight,
+    d3:!q('d3','.f-2')&&near(box('d3','.f-1').left,box('d1','.f-1').left),account:q('d1','.f-2').textContent};});
+  check(/203\.0\.113\.10/.test(lines.ip)&&lines.platform==='Host'&&lines.first&&lines.second&&lines.edge,'标准: the day count beside the name, the IP and the platform under them, the price at the right end of the tile: '+JSON.stringify(lines));
+  check(lines.columns&&lines.d3&&lines.account==='ops@example.com','The fields are columns: each starts at the same place in every tile of a panel, with or without its neighbour: '+JSON.stringify(lines));
+  check(/7334$/.test(lines.s2.ip)&&lines.s2.mid&&lines.s2.platform==='A Hosting Company With A Long Name'&&/49\.90/.test(lines.s2.cost)&&lines.s2.costWhole,'A long address and a long platform are cut in their columns, whole in their titles; the price is whole: '+JSON.stringify(lines.s2));
+  check(lines.bare&&lines.same,'A record with nothing for the fields is as tall as the others: '+JSON.stringify(lines));
   // The window decides the columns: two when three do not fit, a fourth only when three would be wider than a tile reads well.
   for(const [width,cols] of [[1040,2],[2400,4]]){
    await p.setViewportSize({width,height:900});await settle();
    const got=await shown();
-   check(got.cols===cols&&!got.cutIn.length&&!got.out.length,`${width} wide: ${cols} columns, nothing cut: `+JSON.stringify(got));
+   check(got.cols===cols&&!got.keyCut.length&&!got.out.length&&!got.tall.length&&got.heights.length===1,`${width} wide: ${cols} columns, the tiles the same: `+JSON.stringify(got));
   }
   await p.setViewportSize({width:1500,height:900});await settle();
 
@@ -102,11 +129,15 @@ async (page) => {
   check(await density()==='standard','The wall starts at 标准');
   await p.locator('#board .group-title').first().focus();
   await p.keyboard.press('Control+Equal');await settle();
-  check(await density()==='detail'&&await p.locator('#board .r-facts').count()===6,'⌘= opens 详细: every line lists its facts');
+  check(await density()==='detail'&&await p.locator('#board .r-facts').count()===7,'⌘= opens 详细: every line with a fact lists its facts');
   const facts=await p.locator('#board [data-asset="d1"] .r-facts').innerText();
   check(/Cloudflare/.test(facts)&&/ops@example\.com/.test(facts)&&/keep/.test(facts)&&!/本机目录|DNS 托管|备案/.test(facts),'详细 lists the known facts and leaves the empty ones out: '+facts);
+  const note=await p.locator('#board [data-asset="s2"] .r-facts .fact-v').last().evaluate(e=>({cut:e.scrollWidth>e.clientWidth+1,oneLine:e.offsetHeight<=17,title:e.title}));
+  check(note.cut&&note.oneLine&&/so it is cut there\.$/.test(note.title),'A long fact is one line in 详细, cut, whole in its title: '+JSON.stringify(note));
+  const keys=await p.evaluate(()=>[...new Set([...document.querySelectorAll('#board .group[data-group="server"] .fact-v')].map(e=>Math.round(e.getBoundingClientRect().left)))]);
+  check(keys.length===1,'The facts\' values start at one place down a panel: '+keys);
   await p.keyboard.press('Control+Minus');await p.keyboard.press('Control+Minus');await settle();
-  check(await density()==='glance'&&!(await p.locator('#board .r-facts').count())&&await p.locator('#board [data-asset="s1"] .r-cost').evaluate(e=>getComputedStyle(e).display==='none'),'⌘− twice reaches 全局: no price, no facts');
+  check(await density()==='glance'&&!(await p.locator('#board .r-facts').count())&&!(await p.locator('#board .wall .row :is(.r-cost,.r-fields)').count()),'⌘− twice reaches 全局: no price, no facts');
   check(await p.evaluate(()=>JSON.parse(localStorage.getItem('assetboard-view-v1')).density==='glance'),'The density is kept in the view preferences');
   await p.reload();await settle();
   check(await density()==='glance','The density is kept after a reload');
@@ -114,7 +145,7 @@ async (page) => {
   check(await density()==='standard'&&await p.locator('#density-toggle [data-id="standard"][aria-checked="true"]').count()===1,'The switch sets a density');
   // The line at the top of the view stays where it was when the density changes.
   await p.setViewportSize({width:1500,height:420});await settle();
-  await p.evaluate(()=>boardScroller().scrollTo(0,260));await settle();
+  await p.evaluate(()=>boardScroller().scrollTo(0,170));await settle();
   const before=await p.evaluate(()=>{const top=document.querySelector('#topbar').getBoundingClientRect().bottom,el=[...document.querySelectorAll('#board .wall [data-asset]')].find(n=>n.getBoundingClientRect().top>=top-1);return {id:el.dataset.asset,y:el.getBoundingClientRect().top};});
   await p.evaluate(()=>setDensity('detail'));await settle();
   const after=await p.evaluate(id=>document.querySelector(`#board .wall [data-asset="${id}"]`).getBoundingClientRect().top,before.id);
@@ -124,6 +155,10 @@ async (page) => {
   // The peek: the facts of a line beside its panel, after a rest of the pointer; gone on a press.
   await p.locator('#board [data-asset="s1"] .r-name').hover();await p.waitForTimeout(650);
   check(await p.locator('#wall-peek:not([hidden])').count()===1&&/203\.0\.113\.10/.test(await p.locator('#wall-peek').innerText()),'Resting on a line shows its facts in the peek');
+  await p.mouse.move(5,5);await p.mouse.down();await p.mouse.up();
+  await p.locator('#board [data-asset="s2"] .r-name').hover();await p.waitForTimeout(650);
+  const peek=await p.locator('#wall-peek').innerText();
+  check(/production-kubernetes-worker-node-eu-central-1a/.test(peek)&&/A Hosting Company With A Long Name/.test(peek)&&/so it is cut there\./.test(peek)&&await p.locator('#wall-peek').evaluate(e=>![...e.querySelectorAll('*')].some(n=>n.scrollWidth>n.clientWidth+1)),'The peek has the whole of what a tile cuts: '+peek);
   await p.mouse.move(5,5);await p.mouse.down();await p.mouse.up();
   check(await p.locator('#wall-peek[hidden]').count()===1,'The peek goes on a press');
   // Privacy mode masks the facts too.
@@ -147,7 +182,7 @@ async (page) => {
 
   // The list is a choice in the layout switch, kept; a search, another view and the hidden pile are never the wall.
   await p.locator('#layout-toggle [data-id="list"]').click();await settle();
-  check(!(await p.locator('#board .wall').count())&&await p.locator('#board .group-body.list .row').count()===6,'The layout switch goes back to the list');
+  check(!(await p.locator('#board .wall').count())&&await p.locator('#board .group-body.list .row').count()===8,'The layout switch goes back to the list');
   check(await p.evaluate(()=>JSON.parse(localStorage.getItem('assetboard-view-v1')).board==='list'),'The list is kept as the choice');
   await p.locator('#layout-toggle [data-id="wall"]').click();await settle();
   await p.evaluate(()=>setView('domain'));await settle();
@@ -159,7 +194,8 @@ async (page) => {
   // platform read and the board does not hold yet is a quiet 待引入 line that opens the pick.
   await p.goto('http://127.0.0.1:4317/?demo');await settle();
   await p.evaluate(()=>{setView('all');setLayout('wall');state.connectPending={cloudflare:{at:new Date().toISOString(),items:[{id:'x',type:'domain',name:'x.example.com',source:'cloudflare'}]}};setDensity('standard');render();});await settle();
-  check(/本周 88%/.test(await p.locator('#board .wall [data-asset="demo-a2"] .ai-quota').innerText()),'An AI plan on the wall shows its reading');
+  const quota=await p.locator('#board .wall [data-asset="demo-a2"] .ai-quota').evaluate(e=>({text:e.textContent,said:e.title,field:!!e.closest('.f-2'),pct:e.querySelector('.aq-pct').scrollWidth<=e.querySelector('.aq-pct').clientWidth+1,same:e.closest('.row').offsetHeight===document.querySelector('#board .wall [data-asset="demo-a1"]').offsetHeight}));
+  check(/88%本周/.test(quota.text)&&/本周 88%/.test(quota.said)&&quota.field&&quota.pct&&quota.same,'An AI plan on the wall shows its reading as a field of its tile, the share whole, the tile as tall as the others: '+JSON.stringify(quota));
   await p.evaluate(()=>setDensity('detail'));await settle();
   const ai=await p.locator('#board .wall [data-asset="demo-a2"] .r-facts').innerText();
   check(/额度/.test(ai)&&/本周 88%/.test(ai)&&/本期用量/.test(ai),'详细 lists an AI plan\'s limits and period use: '+ai);
@@ -168,6 +204,6 @@ async (page) => {
   check(await p.locator('#modal .connect-pick').count()===1,'待引入 under the wall opens the pick');
   await p.evaluate(()=>{$('#modal').close();setDensity('standard');});
   if(errors.length)throw new Error(errors.join(' | '));
-  return 'PASS: tile wall default, three columns with whole lines at 1280/1440/1728 in every density, narrow single column, panel moves kept, row moves, densities kept and anchored, peek, privacy, skin, AI readings, 待引入';
+  return 'PASS: tile wall default, three columns of tiles of one height at 1280/1440/1728 in every density, long texts cut on their line and whole in the title and the peek, fields in columns, narrow single column, panel moves kept, row moves, densities kept and anchored, peek, privacy, skin, AI readings, 待引入';
  } finally { await p.close(); }
 }

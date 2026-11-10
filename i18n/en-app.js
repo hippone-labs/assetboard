@@ -224,6 +224,7 @@ Object.assign(I18N.en,{
  '过期 {n} 天':['{n} day overdue','{n} days overdue'],
  '明天':'tomorrow',
  '{n} 天':['{n} day','{n} days'],
+ '{stage} {n} 天':['{stage} · {n} day','{stage} · {n} days'],
  '内网地址':'Private address',
  '内':'LAN',
  '另有 IPv6':'Also IPv6',

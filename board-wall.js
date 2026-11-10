@@ -1,15 +1,16 @@
 // Tile wall: 全部资产 as a wall of category panels, the default layout (列表, 网格 and 时间轴 stay in the layout switch). Each panel is a
-// category: its header, then a tile of one to three lines per record (the same rows as the list, so ⌥↑↓, dragging, the quick actions
-// and a click to the inspector all work as there). The panels are packed into columns, each into the shortest column, so they read
-// left to right. Three columns are the wall: a window too narrow for three at WALL_MIN_COL gets two, then one, and only a window
-// where three would each be wider than WALL_MAX_COL gets a fourth. The column count is the same in every density, and nothing in a
-// tile is cut: a line that does not fit wraps, so a tile grows taller instead of losing text.
+// category: its header, then a tile per record (the same rows as the list, so ⌥↑↓, dragging, the quick actions and a click to the
+// inspector all work as there). The panels are packed into columns, each into the shortest column, so they read left to right.
+// Three columns are the wall: a window too narrow for three at WALL_MIN_COL gets two, then one, and only a window where three would
+// each be wider than WALL_MAX_COL gets a fourth. The column count is the same in every density.
+// A tile is a fixed structure (MARK: Tile): every kind of fact has its place, so one kind reads down a panel in one column, and a
+// tile is as tall as every other in its density. A text too long for its place is cut on its one line (a domain, an address or a
+// long identifier in the middle, keeping its end; other text at the end); the whole text is in its title and in the peek.
 // Dragging a panel by its header (or ⌥ + arrows on its title) moves the category: the same order as the sidebar's.
 // Three densities say how much a tile holds; ⌘− and ⌘= (a pinch on the trackpad) step through them, the view keeping its place:
-//  glance    name, day count and the amber or red dot: as much of the board on one screen as fits
-//  standard  + a second line (IP, account, platform) with the price at its end, and a live reading on a third; a record with
-//            nothing for the second line stays one line, its price beside the day count
-//  detail    + every known fact of the record inside the panel, by weight (wallFacts)
+//  glance    one line: name, day count and the amber or red dot: as much of the board on one screen as fits
+//  standard  two lines: + the fields (IP, account, platform, or a live reading) in columns, the price at the right end
+//  detail    the name line, then every known fact of the record (the cost among them), one line each, by weight (wallFacts)
 // Hovering a line (or reaching it with the keyboard while the inspector is closed) shows the same facts in a card beside it.
 // How the panels look (tilt, edge, the lift of a dragged panel) is the skin's (theme.js, material.css); this file only lays out.
 // Loaded after board-views.js and before app.js; the app.js helpers used here are called only at render and event time.
@@ -18,9 +19,11 @@ const WALL_DENSITY_NAMES={glance:tr('全局'),standard:tr('标准'),detail:tr('�
 const WALL_MIN_COL=280,WALL_MAX_COL=560,WALL_COLS=3,WALL_GAP=12;
 let wallDensity='standard';
 
-// A dated line says only its day count (12 天, 过期 3 天); its full label stays in the item's name and the inspector. A line that is a
-// question or a state (续上了吗？, 冻结), or a prepaid credit's expiry (not a renewal), keeps it.
+// A dated line says only its day count (12 天, 过期 3 天), and a line in a stage after its date the stage and the days it has left
+// (赎回期 29 天); the full label stays in the item's name, the line's title and the inspector. A line that is a question or a state
+// (续上了吗？, 冻结), or a prepaid credit's expiry (not a renewal), keeps it.
 function wallWhen(a,e){
+ const life=lifecycleOf(a);if(life&&!life.gone&&e.text===life.label)return {text:tr('{stage} {n} 天',{stage:life.stage.label,n:life.daysLeft+1}),cls:e.cls};
  const s=assetDateStatus(a);if(s.level==='none'||a.stopped||a.creditExpiry)return e;
  return e.text===(a.creditExpiry?tr('额度{status}',{status:s.label}):s.label)?{text:agendaWhen(s),cls:e.cls}:e;
 }
@@ -58,10 +61,69 @@ function wallAiFacts(a){
   [2,tr('最近使用'),q.last?aiAgoText(q.last):'']
  ];
 }
+// In a tile a fact is one line, cut when it is too long (the title has it whole); a reading's windows keep a line each, and the
+// cost carries the price's mark (a promotion, a rise). The peek has the room to wrap.
 function wallFactsHtml(a,cls){
- let tier=0;
- const html=wallFacts(a).map(([t,k,v])=>{const gap=tier&&t!==tier?' gap':'';tier=t;return `<span class="fact-k t${t}${gap}">${esc(k)}</span><span class="fact-v t${t}${gap}">${esc(v)}</span>`;}).join('');
+ let tier=0;const tile=cls==='r-facts';
+ const html=wallFacts(a).map(([t,k,v])=>{const gap=tier&&t!==tier?' gap':'';tier=t;
+  const value=!tile?`<span class="fact-v t${t}${gap}">${esc(v)}</span>`:/\n/.test(v)&&k===tr('额度')?`<span class="fact-v fact-lines t${t}${gap}" title="${esc(v)}">${esc(v)}</span>`:wallTextHtml(String(v).replace(/\s*\n\s*/g,' '),`fact-v t${t}${gap}`);
+  return `<span class="fact-k t${t}${gap}"${tile?` title="${esc(k)}"`:''}>${esc(k)}</span>${tile&&k===tr('费用')?`<span class="fact-v fact-cost t${t}${gap}">${priceMark(a)}${wallTextHtml(v)}</span>`:value}`;}).join('');
  return html?`<span class="${cls}">${html}</span>`:'';
+}
+
+// MARK: Tile
+// Where a text that does not fit is cut in the middle, as [head, tail] (the tail always stays): an address keeps its @host, a domain
+// its registered name, a long identifier without spaces (an IPv6 address, a key's name) its last characters. Anything else (a
+// name in words) is cut at its end and gives null.
+const WALL_SECOND_LEVEL=['co','com','net','org','gov','edu','ac'];
+function wallCut(text){
+ const t=String(text||'');if(t.length<12||/\s/.test(t))return null;
+ const at=t.lastIndexOf('@');if(at>0&&at<t.length-3)return [t.slice(0,at),t.slice(at)];
+ const labels=t.split('.');
+ if(labels.length>1&&/^[a-z0-9-]+(\.[a-z0-9-]+)+$/i.test(t)&&/^[a-z]{2,}$/i.test(labels.at(-1))){
+  const want=labels.length>3&&labels.at(-1).length===2&&WALL_SECOND_LEVEL.includes(labels.at(-2).toLowerCase())?3:2,keep=labels.length>want?want:1;
+  return [labels.slice(0,-keep).join('.'),'.'+labels.slice(-keep).join('.')];
+ }
+ return t.length>=20&&/^[\w.:\/+-]+$/.test(t)?[t.slice(0,-6),t.slice(-6)]:null;
+}
+// A text on one line of a tile. The whole text is the element's content and its title; when it is cut in the middle the head and
+// the tail are drawn from data-head and data-tail (material.css, .w-mid), the head giving way first.
+function wallTextHtml(text,cls='',title=text){
+ const t=String(text??''),cut=wallCut(t);
+ return `<span class="${[cls,'w-text',cut&&'w-mid'].filter(Boolean).join(' ')}"${cut?` data-head="${esc(cut[0])}" data-tail="${esc(cut[1])}"`:''} title="${esc(title)}">${cut?`<span class="w-full">${esc(t)}</span>`:esc(t)}</span>`;
+}
+// The fields of a 标准 tile's second line, each in its own column, so one kind of fact is at one place down a panel. A field the
+// record has nothing for is left empty; the others keep their columns.
+//  1  what the record is reached or known by: a server's address (or its region), a card's or a number's digits, a sign-in
+//     account, an AI plan's service; for everything else the platform
+//  2  the platform (a server's, a card's bank, a number's carrier); for everything else the account
+//  3  what hangs on a card, a number or an account (支付 5 项), at the right end with the price
+function wallFields(a){
+ const provider=a.provider==='平台待补充'?'':a.provider||'',flag=regionFlag(a.region),flagHtml=flag?`<span class="flag" title="${esc(regionName(a.region))}">${flag}</span>`:'';
+ const text=(value,cls,title)=>value?wallTextHtml(value,cls,title):'';
+ const impact=linkImpact(state.assets,a),hangs=impact.length&&IMPACT_WORDS[a.type]?`<span class="w-text r-impact" title="${esc(impact.map(displayName).join(tr('、')))}">${tr('{verb} {n} 项',{verb:IMPACT_WORDS[a.type].verb,n:formatCount(impact.length)})}</span>`:'';
+ if(a.type==='server'){
+  const ip=primaryIp(a);
+  const where=ip?`${flagHtml}${ip.inner?`<em class="ip-inner" title="${tr('内网地址')}">${tr('内')}</em>`:''}${text(veilIp(ip.ip),'ip-text',assetIps(a).map(x=>veilIp(x.ip)).join('  '))}${ip.more?`<em class="ip-more" aria-label="${tr('另有 IPv6')}">+${ip.more}</em>`:''}`:flag?`${flagHtml}${text(regionName(a.region))}`:'';
+  return [where,text(provider),hangs];
+ }
+ if(assetProfiles[a.type]){
+  const identity={bankcard:[a.network&&tr(a.network),a.last4&&`•••• ${a.last4}`].filter(Boolean).join(' '),phone:maskPhone(a.phone),appleid:maskEmail(a.account)||regionName(a.region),google:maskEmail(a.account)||regionName(a.region),ai:provider}[a.type]||'';
+  return [identity?`${flagHtml}${text(identity)}`:'',text({bankcard:provider,phone:provider}[a.type]),hangs];
+ }
+ return [text(provider),text(veilAccount(a.account)),hangs];
+}
+// A tile's lines. The first is the same in every density: the name, cut when long, and the day count or state, which is never
+// cut for the name's sake. 标准 adds the fields with the price at the right end; a live reading (a probe's, an AI plan's limits)
+// takes the second field's place. 详细 lists the facts under the first line, the cost among them.
+function wallTileHtml(a,{e,when,costSpan,live}){
+ const name=`<span class="r-name">${wallTextHtml(displayName(a),'r-text')}${lockMark(a)}${stopRing(a)}${relMark(a)}</span>`;
+ const first=`<span class="r-line">${name}<span class="r-when"${e.text?` title="${esc(e.text)}"`:''}>${statusHtml(when,!!a.date)}</span></span>`;
+ if(wallDensity==='glance')return `<span class="r-main">${first}</span>`;
+ if(wallDensity==='detail')return `<span class="r-main">${first}${live?`<span class="r-line r-read">${live}</span>`:''}${wallFactsHtml(a,'r-facts')}</span>`;
+ const [one,two,three]=wallFields(a),reading=live||(a.type==='ai'&&typeof aiQuotaFieldHtml==='function'?aiQuotaFieldHtml(a):'');
+ const field=(n,html,cls='')=>html?`<span class="f f-${n}${cls}">${html}</span>`:'';
+ return `<span class="r-main">${first}<span class="r-line r-sub r-fields">${field(1,one)}${reading?field(2,reading,' f-read'):field(2,two)}<span class="f-end">${field(3,three)}${costSpan}</span></span></span>`;
 }
 
 // MARK: The wall

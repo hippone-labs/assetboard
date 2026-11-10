@@ -2313,38 +2313,69 @@ body::before,.native-app body::before{background:radial-gradient(70vw 65vh at 0%
 #board .wall>.group.is-dragging{z-index:70;rotate:var(--wall-lift-turn);box-shadow:var(--wall-rim),var(--wall-lift-shadow)!important}
 #board .wall>.group.is-dragging.lifted{scale:var(--wall-lift-scale)}
 #board .wall>.group.is-dragging.settling{rotate:0deg;transition:translate .2s cubic-bezier(.3,1.2,.5,1),scale .2s ease,rotate .2s ease,box-shadow .2s ease}
-#board .wall .group-head{position:relative;top:auto;z-index:auto;flex-wrap:wrap;row-gap:0;min-height:38px;margin:0 -8px;padding:5px 6px 5px 10px;border-radius:var(--wall-radius) var(--wall-radius) 0 0;background:none;box-shadow:0 1px 0 var(--hairline);touch-action:none}
+#board .wall .group-head{position:relative;top:auto;z-index:auto;min-height:38px;margin:0 -8px;padding:0 6px 0 10px;border-radius:var(--wall-radius) var(--wall-radius) 0 0;background:none;box-shadow:0 1px 0 var(--hairline);touch-action:none}
 #board .wall>.group.folded .group-head{box-shadow:none}
-#board .wall .group-title{flex:0 1 auto;max-width:100%}
-/* the monthly sum goes under the title when the two do not fit on one line */
-#board .wall .group-head .g-cost{flex:none;padding-left:8px;line-height:18px}
+/* a panel's head is one line: the monthly sum stays; the due counts go first when the line is short (a whole count at a time),
+   then the title is cut at its end */
+#board .wall .group-title{flex:0 1 auto;min-width:4em;max-width:100%}
+#board .wall .group-head .g-cost{flex:none}
+#board .wall .group-head .g-sum{flex:0 9999 auto;flex-wrap:wrap;min-width:0;height:18px;overflow:hidden}
+#board .wall .group-head .g-sum::before{content:"";width:0;height:18px;margin-right:-10px}
+#board .wall .group-head .g-flag{flex:none;height:18px}
+#board .wall .group-head .g-cost{padding-left:8px}
 #board .wall .g-actions{position:absolute;top:50%;right:6px;translate:0 -50%;margin:0;padding-left:6px;border-radius:7px;background:var(--wall-fill)}
 @media(hover:hover){#board .wall .group-head:not(:hover,:focus-within) .g-actions{visibility:hidden}}
 #board .wall .group-body.list{padding:3px 0 2px}
-/* a line: icon, name (and its second line), then the day count and the price at the right */
 #board .wall .row{margin:0 -4px;border-radius:7px}
 #board .wall .row+.row::before{left:36px;right:6px}
-/* a tile: the mark, then lines. The name with the day count (and the price, when there is no second line); the second line with
-   the price at its end; a reading or the facts under them. A name, a second line or a reading that does not fit wraps inside the
-   panel, and a day count or state too long to sit beside the name goes under it. */
-#board .wall .row .item-open{grid-template-columns:18px minmax(0,1fr);column-gap:10px;align-items:start;min-height:34px;padding:7px 6px 7px 8px;border-radius:7px}
-#board .wall .row .r-main{display:flex;flex-direction:column;gap:1px;min-width:0}
-#board .wall .row .r-line{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:1px 10px;min-width:0}
-#board .wall .row .r-name{flex:1 1 auto;align-items:flex-start;max-width:100%;min-height:18px}
-#board .wall .row .r-name>:not(.r-text){flex:none;align-self:flex-start;min-height:18px}
-#board .wall .row .r-text{white-space:normal;overflow:visible;overflow-wrap:anywhere}
-#board .wall .row .r-when{display:flex;flex:0 1 auto;margin-left:auto;justify-content:flex-end;max-width:100%;grid-column:auto;grid-row:auto;flex-direction:row;align-items:center;gap:10px;min-width:0;min-height:18px;max-width:none}
+/* a tile (board-wall.js, wallTileHtml): the mark, then lines of one fixed height each, so a tile is as tall as every other in its
+   density. The first line is the name and, at the right, the day count or state: the name gives way, the state does not. 标准's
+   second line is two field columns and, at the right end, what hangs on the record and the price; the columns are a share of the tile, not of what is in
+   them, so a field starts at the same place in every tile of a panel. Nothing wraps: a text too long for its place is cut. */
+#board .wall .row .item-open{grid-template-columns:18px minmax(0,1fr);column-gap:10px;align-items:start;min-height:0;padding:7px 6px 7px 8px;border-radius:7px}
+#board .wall .row .r-main{display:flex;flex-direction:column;gap:2px;min-width:0}
+#board .wall .row .r-line{display:grid;grid-template-columns:minmax(4.5em,1fr) auto;align-items:center;column-gap:10px;min-width:0;height:18px}
+#board .wall .row .r-name{min-width:0;height:18px}
+#board .wall .row .r-name>:not(.r-text){flex:none}
+#board .wall .row .r-when{display:flex;grid-column:auto;grid-row:auto;flex-direction:row;align-items:center;justify-content:flex-end;gap:10px;min-width:0;max-width:none;height:18px}
 #board .wall .row :is(.r-date,.r-cost){grid-column:auto;grid-row:auto}
-#board .wall .row .r-date{max-width:100%;overflow:visible;white-space:normal;text-align:left}
-#board .wall .row .r-date.warn,#board .wall .row .r-date.overdue{border-radius:10px;margin-block:-1px}
-#board .wall .row .r-cost{flex:none;margin-left:auto;font-size:12px}
-#board .wall .row .r-second .r-cost{line-height:15px}
-#board .wall .r-sub{flex:1 1 9em;flex-wrap:wrap;row-gap:0;font-size:11.5px;line-height:15px;color:var(--muted);white-space:normal;overflow:visible;overflow-wrap:anywhere}
-#board .wall .r-sub :is(.ip-prov,.account-tag){max-width:100%;overflow:visible;white-space:normal}
-#board .wall .row .live-line{display:flex;align-items:flex-start;white-space:normal}
-#board .wall .row .live-line .live-text{overflow:visible;white-space:normal}
-#board .wall .row .r-probe{grid-column:auto;grid-row:auto;margin:0;overflow:visible}
-#board .wall .r-sub .account-tag{color:var(--muted);font-size:11.5px}
+/* the state is cut only when the name is already at its least, and then at its end */
+#board .wall .row .r-date{display:block;flex:0 1 auto;max-width:100%;white-space:nowrap;text-align:left}
+#board .wall .row .r-date .dot{display:inline-block;margin-right:6px;vertical-align:middle;translate:0 -1px}
+#board .wall .row .r-date.warn,#board .wall .row .r-date.overdue{padding-block:1px}
+#board .wall .row .r-cost{flex:none;font-size:12px;line-height:16px}
+#board .wall .row .r-cost:empty{display:none}
+#board .wall .row .r-fields{grid-template-columns:minmax(0,min(42%,15em)) minmax(0,1fr) auto;height:16px;overflow:visible;font-size:11.5px;line-height:16px;color:var(--muted)}
+/* an AI plan's panel gives the reading the wider column: a service's name is short */
+#board .wall .group[data-group=ai] .row .r-fields{grid-template-columns:minmax(0,min(34%,15em)) minmax(0,1fr) auto}
+#board .wall .row .r-fields .f{display:flex;align-items:center;gap:5px;min-width:0;height:16px;overflow:hidden;white-space:nowrap}
+#board .wall .row .r-fields .f-1{grid-column:1}
+#board .wall .row .r-fields .f-2{grid-column:2}
+#board .wall .row .r-fields .f-end{grid-column:3;display:flex;align-items:center;justify-content:flex-end;gap:10px;min-width:0;height:16px}
+#board .wall .row .r-fields .f-3{flex:0 1 auto}
+#board .wall .row .r-fields :is(.flag,.ip-inner){flex:none}
+#board .wall .row .r-fields .flag{font-size:12px}
+#board .wall .row .r-fields .ip-text{flex:0 1 auto;color:var(--muted)}
+/* the count of further addresses goes before the address is cut */
+#board .wall .row .r-fields .ip-more{flex:0 9999 auto;min-width:0;overflow:hidden;font-style:normal;font-size:11px;color:var(--muted)}
+/* a live reading in the second field: a probe's line cut at its end; an AI plan's meters, as many whole ones as fit */
+#board .wall .row .live-line{display:flex;align-items:center;min-width:0;max-width:100%;font-size:11.5px;line-height:16px}
+#board .wall .row .r-probe{grid-column:auto;grid-row:auto;margin:0}
+#board .wall .row .r-fields .probe-seen{flex:0 9999 auto;min-width:0;overflow:hidden}
+#board .wall .row .ai-quota{flex-wrap:wrap;gap:0 10px;height:16px;overflow:hidden}
+#board .wall .row .ai-quota .aq-part{flex:none;gap:5px;max-width:100%;height:16px;overflow:hidden}
+#board .wall .row .ai-quota :is(.live-meter,.aq-pct){flex:none}
+#board .wall .row .ai-quota .live-meter{margin-right:0}
+#board .wall .row .ai-quota .aq-pct{min-width:2.4em}
+#board .wall .row .ai-quota .aq-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#board .wall .row .r-read{grid-template-columns:minmax(0,1fr);height:16px}
+/* one line of text in a tile, cut at its end; .w-mid is cut in the middle: its head and tail are drawn from data-head and
+   data-tail, the head giving way first, while the whole text stays the element's (unseen) content */
+.w-text{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.w-mid{position:relative;display:flex}
+.w-mid::before{content:attr(data-head);flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:pre}
+.w-mid::after{content:attr(data-tail);flex:0 0 auto;max-width:82%;overflow:hidden;text-overflow:ellipsis;white-space:pre}
+.w-mid .w-full{position:absolute;inset:0;overflow:hidden;opacity:0;white-space:pre;pointer-events:none}
 #board .wall .item-open .tile.sm{width:18px;height:18px}
 #board .wall .row .r-actions{position:absolute;top:50%;right:2px;translate:0 -50%;width:auto;padding:0 2px 0 8px;border-radius:7px;background:linear-gradient(var(--hover),var(--hover)),var(--wall-fill)}
 #board .wall .row.selected .r-actions{background:linear-gradient(var(--selected),var(--selected)),var(--wall-fill)}
@@ -2352,11 +2383,18 @@ body::before,.native-app body::before{background:radial-gradient(70vw 65vh at 0%
 #board .wall .row:focus-within .r-actions{display:flex}
 @media(hover:hover){#board .wall .row:hover .r-actions{display:flex}}
 body.drag-active #board .wall .row .r-actions{display:none}
-/* 全局: name, day count and dot; 标准: + the second line with the price at its end, and a live reading under it; 详细: every fact,
-   by weight */
-#board .wall[data-density=glance] .row .item-open{min-height:28px;padding-block:5px}
-#board .wall[data-density=glance] :is(.r-sub,.r-cost,.live-line,.card-hit,.g-cost){display:none}
+/* 全局: one line, name and day count; 标准: + the fields and the price; 详细: every fact under the first line, a line each, the
+   labels in one column down the panel */
+#board .wall[data-density=glance] .g-cost{display:none}
+#board .wall[data-density=detail] .row .r-main{gap:0}
+#board .wall[data-density=detail] .row .r-read{margin-top:2px}
 .r-facts,.peek-facts{display:grid;grid-template-columns:fit-content(8.5em) minmax(0,1fr);gap:2px 12px;margin:5px 0 1px;font-size:11.5px;line-height:16px;font-variant-numeric:tabular-nums}
+:root{--wall-key:6.5em}
+:root:lang(en){--wall-key:10em}
+.r-facts{grid-template-columns:var(--wall-key) minmax(0,1fr)}
+.r-facts .fact-k{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.r-facts .fact-v{overflow:hidden;text-overflow:ellipsis;white-space:pre}
+.r-facts .fact-cost{display:flex;align-items:center;gap:6px}
 .fact-k{color:var(--faint)}
 .fact-v{min-width:0;color:var(--ink);overflow-wrap:anywhere;white-space:pre-line}
 .fact-v.t3{color:var(--muted)}

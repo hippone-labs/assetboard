@@ -65,6 +65,20 @@ function aiQuotaRowHtml(a){
  const said=[...q.windows.slice(0,2).map(w=>`${aiWindowName(w)} ${Math.round(w.used)}%`),q.top?.resetsAt&&aiResetText(q.top.resetsAt)].filter(Boolean).join(tr('，'));
  return `<span class="r-probe live-line ai-quota" title="${esc(tr('AI 额度 · 实时读数'))}"><span class="live-text" aria-label="${esc(said)}">${parts.join('<span class="aq-sep" aria-hidden="true"> · </span>')}</span></span>`;
 }
+// The reading as a field of a wall tile (board-wall.js): per window a meter, its share and its name (the share first, so the
+// shares line up down a panel and a short column cuts the name, not the number), then what needs a look; the tile shows as many
+// of them as fit its column, and the title says them all.
+function aiQuotaFieldHtml(a){
+ const q=aiQuotaFor(a);if(!q)return '';
+ const parts=[],said=[];
+ for(const w of q.windows.slice(0,2)){const hot=w.used>=AI_TIGHT||w===q.top&&q.pace>100,words=`${aiWindowName(w)} ${Math.round(w.used)}%`;said.push(words);parts.push(`<span class="aq-part${hot?' aq-hot':''}">${aiMeter(w)}<span class="aq-pct">${Math.round(w.used)}%</span><span class="aq-name">${esc(aiWindowName(w))}</span></span>`);}
+ if(q.limitHit&&!q.windows.length){const words=tr('额度用完，{when}',{when:aiResetText(q.limitHit.resetsAt)});said.push(words);parts.push(`<span class="aq-part aq-hot"><span class="aq-name">${esc(words)}</span></span>`);}
+ if(q.price>0&&q.idleDays!=null&&q.idleDays>=AI_IDLE_DAYS){const words=tr('本机 {n} 天没用',{n:q.idleDays});said.push(words);parts.push(`<span class="aq-part aq-hot"><span class="aq-name">${esc(words)}</span></span>`);}
+ if(q.top?.resetsAt)said.push(aiResetText(q.top.resetsAt));
+ if(!parts.length)return '';
+ const words=tr('AI 额度 · 实时读数')+tr('：')+said.join(tr('，'));
+ return `<span class="r-probe live-line ai-quota" role="group" aria-label="${esc(words)}" title="${esc(words)}">${parts.join('')}</span>`;
+}
 function aiQuotaFactsHtml(a,row){
  const q=aiQuotaFor(a);if(!q)return '';
  const out=[],src=q.windowsFrom==='api'?tr('用量接口'):tr('本机日志');
