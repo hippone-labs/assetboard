@@ -1222,7 +1222,7 @@ body.drag-active .r-actions{visibility:hidden}
 :root #main .empty{padding:96px 24px}
 /* inspector: docked beside the list on a wide window, an overlay on a narrow one */
 :root :is(#detail,.detail-leave){top:0;bottom:0;right:0;width:var(--inspector-w);max-width:100%;padding:18px 22px 32px;border-radius:0;border:0;background:var(--surface-content);box-shadow:-1px 0 0 var(--hairline);animation:none;z-index:35}
-@media(min-width:1180px){body.inspecting #main{margin-right:var(--inspector-w)}}
+@media(min-width:1180px){body.detail-room #main{margin-right:var(--inspector-w)}}
 @media(max-width:1179px){:root :is(#detail,.detail-leave){box-shadow:var(--shadow-pop);border-radius:var(--radius-lg) 0 0 var(--radius-lg)}}
 :root :is(#detail,.detail-leave) .close{top:14px;right:14px;width:28px;height:28px;font-size:20px;background:var(--hover);border:0;color:var(--muted)}
 :root :is(#detail,.detail-leave) .close:hover{color:var(--ink)}
@@ -1632,7 +1632,7 @@ body::before{background:radial-gradient(1100px 560px at 12% -10%,var(--canvas-gl
  /* The card. */
  :root #main{position:fixed;top:var(--topnav-h);bottom:var(--shell-gap);left:var(--sidebar-w);right:var(--shell-gap);margin:0;min-height:0;display:flex;flex-direction:column;overflow:hidden;
   border-radius:var(--shell-radius);background:var(--surface-content);box-shadow:var(--card-shadow);container:card/inline-size}
- :root body.inspecting #main{margin:0}
+ :root body.detail-room #main{margin:0}
  :root #main .appbar{position:relative;top:auto;flex:none;border-radius:var(--shell-radius) var(--shell-radius) 0 0;background:transparent;box-shadow:0 1px 0 var(--hairline)}
  /* No top padding on the scroller: a sticky group header sits right under the toolbar. */
  :root #board{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding-top:0}
@@ -1641,7 +1641,7 @@ body::before{background:radial-gradient(1100px 560px at 12% -10%,var(--canvas-gl
  .group-head{top:0}
  .action-banner{position:relative;top:auto;flex:none}
  /* The detail docks inside the card, under its toolbar; the board gives it the room. */
- :root body.inspecting #board,:root body.inspecting .action-banner{margin-right:var(--inspector-w)}
+ :root body.detail-room #board,:root body.detail-room .action-banner{margin-right:var(--inspector-w)}
  :root :is(#detail,.detail-leave){position:fixed;top:calc(var(--topnav-h) + var(--bar-h));bottom:var(--shell-gap);right:var(--shell-gap);left:auto;width:var(--inspector-w);max-width:none;
   border-radius:0 0 var(--shell-radius) 0;background:var(--surface-content);box-shadow:-1px 0 0 var(--hairline);animation:none;overflow:auto}
  /* The panorama takes the card's place; presenting (or full screen) still fills the window. */
@@ -2501,8 +2501,9 @@ body.drag-active #board .wall .row .r-actions{display:none}
    gap between panels, with the panels' radius and a light shadow, so it belongs with them and leaves the door and its figure in
    view. Quiet: the sidebar's glass (the window's own canvas, blurred), so the two sides of the window match; 冰箱贴: the door's
    paper a little clear, ringed with the door's colour. It comes in from the right and goes back there (app.js, detailMotion). The
-   board gives it its width and the gap; under 冰箱贴 a lane more, where the door's figure stands beside it, kept while the figure pushes the
-   card back so the panels come back over the lane after it. */
+   board gives it its width and the gap (body.detail-room); under 冰箱贴 a lane more, where the door's figure stands beside it. The
+   room follows the card once its act is over, the panels sliding to their new places (app.js, boardRoom), so the panels come
+   back over the lane after the figure has pushed the card back. */
 :root{--detail-gap:12px;--detail-radius:12px;--detail-fill:radial-gradient(700px 360px at 100% -6%,var(--canvas-glow),transparent 70%),linear-gradient(180deg,rgba(var(--tone-canvas),.72),rgba(var(--tone-canvas),.9));
  --detail-shadow:0 0 0 1px var(--hairline),0 1px 2px rgba(16,24,40,.05),0 12px 30px -14px rgba(16,24,40,.24);--detail-blur:blur(24px) saturate(1.4);--soft-fill:rgba(var(--tone-primary),.12);--soft-hover:rgba(var(--tone-primary),.18);--soft-ink:color-mix(in srgb,rgb(var(--tone-primary)) 82%,rgb(var(--tone-ink)))}
 :root[data-scheme=dark]{--detail-fill:rgba(var(--tone-card),.62);--detail-shadow:0 0 0 1px rgba(255,255,255,.075),0 14px 34px -14px rgba(0,0,0,.62);--soft-fill:rgba(var(--tone-primary),.16);--soft-hover:rgba(var(--tone-primary),.24);--soft-ink:color-mix(in srgb,rgb(var(--tone-primary)) 70%,rgb(var(--tone-ink)))}
@@ -2512,8 +2513,8 @@ body.drag-active #board .wall .row .r-actions{display:none}
 @media(min-width:761px){
  :root :is(#detail,.detail-leave){top:calc(var(--topnav-h) + var(--bar-h) + var(--detail-gap));bottom:calc(var(--shell-gap) + var(--detail-gap));right:calc(var(--shell-gap) + var(--detail-gap));
   border-radius:var(--detail-radius);background:var(--detail-fill);box-shadow:var(--detail-shadow);backdrop-filter:var(--detail-blur);-webkit-backdrop-filter:var(--detail-blur)}
- :root body.inspecting #board,:root body.inspecting .action-banner{margin-right:calc(var(--inspector-w) + var(--detail-gap))}
-:root[data-skin=magnet] :is(body.inspecting,body.fig-push).wall-shown #board{margin-right:calc(var(--inspector-w) + var(--detail-gap) + var(--figure-lane))}
+ :root body.detail-room #board,:root body.detail-room .action-banner{margin-right:calc(var(--inspector-w) + var(--detail-gap))}
+:root[data-skin=magnet] body.detail-room.wall-shown #board{margin-right:calc(var(--inspector-w) + var(--detail-gap) + var(--figure-lane))}
 }
 @media(prefers-reduced-transparency:reduce){:root :is(#detail,.detail-leave){background:rgb(var(--tone-card));backdrop-filter:none;-webkit-backdrop-filter:none}}
 /* the copy that goes back to the right as the detail closes (the detail itself is hidden at once) */

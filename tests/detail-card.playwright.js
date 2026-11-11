@@ -18,7 +18,7 @@ async (page) => {
   await p.goto('http://127.0.0.1:4317/'+(native?'':'?demo'));await p.waitForTimeout(500);
   // a record with a real management page, so the detail has 打开 and 编辑 side by side
   await p.evaluate(()=>{const a=state.assets.find(a=>a.name==='studio.example.com');a.url='https://www.namecheap.com/';if(!$('#detail').hidden)closeDetail();});
-  await p.waitForTimeout(400);
+  await p.waitForTimeout(720);
   return errors;
  };
  const openDetail=async()=>{await p.evaluate(()=>document.querySelector('#board [data-asset] .item-open').click());};
@@ -29,7 +29,8 @@ async (page) => {
  const pixel=async(x,y)=>{const shot=(await p.screenshot({clip:{x,y,width:1,height:1}})).toString('base64');
   return p.evaluate(async s=>{const im=new Image();im.src='data:image/png;base64,'+s;await im.decode();const c=document.createElement('canvas');c.width=c.height=1;const x=c.getContext('2d');x.drawImage(im,0,0);return [...x.getImageData(0,0,1,1).data].slice(0,3);},shot);};
  const contrast=(a,b)=>p.evaluate(([a,b])=>themeContrast(a,b),[a,b]);
- const settle=()=>p.waitForTimeout(420);
+ // the card's act (0.3 s), then the board's room (app.js, boardRoom: 0.34 s after the act)
+ const settle=()=>p.waitForTimeout(720);
  try {
   // the card's place, in both skins and both schemes, the browser and the Mac app
   const cases=[{skin:'quiet',scheme:'light',gap:12,radius:12},{skin:'quiet',scheme:'dark',gap:12,radius:12},{skin:'quiet',scheme:'light',gap:12,radius:12,native:true},
