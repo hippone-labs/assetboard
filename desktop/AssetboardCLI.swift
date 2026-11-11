@@ -3,7 +3,7 @@ import Foundation
 /// assetboard-cli: the command line and MCP server for Assetboard. Every call goes to the running app over AgentSocket,
 /// so the page stays the one place that writes the board; when the app is not running it is opened in the background.
 @main struct AssetboardCLI {
-    static let version = "2026.11.9"
+    static let version = "2026.11.10"
     static var usage: String { AppLanguage.isEnglish ? englishUsage : chineseUsage }
     static let chineseUsage = """
     用法：assetboard-cli <命令>
