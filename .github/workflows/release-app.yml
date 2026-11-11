@@ -1,8 +1,12 @@
-# Signs, notarizes and publishes on the self-hosted Mac labelled mac-build, which holds the signing keychain and the notary profile.
-# That runner is attached to this public repository: no workflow that runs on it has a pull_request trigger, and a pull request
-# from outside must not be approved to run workflows while it stays attached. Ordinary builds and tests run on GitHub-hosted
-# runners (build.yml). Push an annotated vX.Y.Z tag on main, with the release notes as its message: a "## English" and a "## 中文"
+# Builds, signs, notarizes and publishes on GitHub-hosted macOS 26 with the pinned Xcode. The job runs in the release environment
+# (an approval, main and v* tags only), which holds the Developer ID p12, the App Store Connect API key and SITE_PUSH_TOKEN; the
+# job puts the first two into a temporary keychain and deletes it at the end (tools/ci-mac.sh). The self-hosted Macs (mini-dev.yml,
+# mbp-dev.yml, site-screenshots.yml) are attached to this public repository: no workflow that runs on them has a pull_request
+# trigger, and a pull request from outside must not be approved to run workflows while they stay attached.
+# Push an annotated vX.Y.Z tag on main, with the release notes as its message: a "## English" and a "## 中文"
 # section, each a list of changes (tools/release_notes.py).
+# By hand on a Mac with the Developer ID and a notary profile: SIGNING_IDENTITY, NOTARY_PROFILE and RELEASE_DIR set, zsh desktop/release.sh,
+# then tools/publish-site-release.py.
 name: release-app
 
 on:
@@ -27,17 +31,16 @@ defaults:
   run:
     shell: bash
 
-# The signing identity and the notary keychain profile are repository secrets (masked in the public logs), never written in the repository.
+# The signing identity is a secret (masked in the public logs); NOTARY_PROFILE and NOTARY_KEYCHAIN come from tools/ci-mac.sh.
 env:
   SIGNING_IDENTITY: ${{ secrets.SIGNING_IDENTITY }}
-  NOTARY_PROFILE: ${{ secrets.NOTARY_PROFILE }}
-  # Optional: the password of a dedicated signing keychain (~/Library/Keychains/assetboard-signing.keychain-db) holding only the
-  # Developer ID certificate and the notary profile. Without it the runner's login keychain is used and must already be unlocked.
-  SIGNING_KEYCHAIN_PASSWORD: ${{ secrets.SIGNING_KEYCHAIN_PASSWORD }}
+  # The same Xcode as build.yml.
+  XCODE_VERSION: '26.6'
 
 jobs:
   release:
-    runs-on: [self-hosted, macOS, ARM64, mac-build]
+    runs-on: macos-26
+    environment: release
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
@@ -55,27 +58,29 @@ jobs:
           gh repo clone "${{ vars.PRO_REPO || 'hippone-labs/assetboard-pro' }}" pro -- --depth=1 --quiet
           test -f pro/web/pro.js
 
-      - name: Unlock the signing keychain
-        if: ${{ env.SIGNING_KEYCHAIN_PASSWORD != '' }}
-        run: |
-          set -euo pipefail
-          kc="$HOME/Library/Keychains/assetboard-signing.keychain-db"
-          test -f "$kc" || { echo "::error::$kc not found"; exit 1; }
-          security unlock-keychain -p "$SIGNING_KEYCHAIN_PASSWORD" "$kc"
-          security set-keychain-settings -lut 7200 "$kc"
-          # codesign finds the identity through the search list; notarytool is pointed at the keychain explicitly.
-          security list-keychains -d user | xargs | grep -qF "$kc" || security list-keychains -d user -s "$kc" $(security list-keychains -d user | xargs)
-          echo "NOTARY_KEYCHAIN=$kc" >> "$GITHUB_ENV"
+      - name: Select Xcode
+        run: bash tools/ci-mac.sh xcode
+
+      - name: Temporary signing keychain and notary profile
+        env:
+          DEVELOPER_ID_P12_BASE64: ${{ secrets.DEVELOPER_ID_P12_BASE64 }}
+          DEVELOPER_ID_P12_PASSWORD: ${{ secrets.DEVELOPER_ID_P12_PASSWORD }}
+          NOTARY_KEY_P8_BASE64: ${{ secrets.NOTARY_KEY_P8_BASE64 }}
+          NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
+        run: bash tools/ci-mac.sh keychain
 
       - name: Prepare release and check publishing access
         env:
           MANUAL_NOTES: ${{ inputs.notes }}
           RELEASE_REF: ${{ github.ref }}
           RELEASE_REF_NAME: ${{ github.ref_name }}
+          GH_TOKEN: ${{ github.token }}
+          SITE_PUSH_TOKEN: ${{ secrets.SITE_PUSH_TOKEN }}
         run: |
           set -euo pipefail
           test -n "$SIGNING_IDENTITY" || { echo '::error::Set the SIGNING_IDENTITY repository secret'; exit 1; }
-          test -n "$NOTARY_PROFILE" || { echo '::error::Set the NOTARY_PROFILE repository secret'; exit 1; }
+          test -n "$SITE_PUSH_TOKEN" || { echo '::error::Set SITE_PUSH_TOKEN in the release environment'; exit 1; }
           git merge-base --is-ancestor HEAD origin/main
           version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' desktop/Info.plist)"
           if [[ "$RELEASE_REF" == refs/tags/* ]]; then
@@ -92,10 +97,13 @@ jobs:
           test -s "$RUNNER_TEMP/release-notes.md"
           # One section per language, for the GitHub Release, docs/releases and the version file; lines in turn are sorted too.
           python3 tools/release_notes.py "$RUNNER_TEMP/release-notes.md"
-          # Reuse the runner's existing GitHub login; never copy its personal token into repository secrets.
-          gh api repos/hippone/assetboard-site --jq '.permissions.push' | grep -qx true
+          # SITE_PUSH_TOKEN reads and pushes hippone/assetboard-site only; git takes it from this credential helper (the helper's shell
+          # reads it from the environment), never from a URL or an argument.
+          site_auth=(-c credential.helper= -c 'credential.helper=!f() { test "$1" = get || return 0; echo username=x-access-token; echo "password=$SITE_PUSH_TOKEN"; }; f')
           site="$(mktemp -d "$RUNNER_TEMP/assetboard-site.XXXXXX")"
-          git -c credential.helper= -c 'credential.helper=!gh auth git-credential' clone --depth=1 https://github.com/hippone/assetboard-site.git "$site"
+          git "${site_auth[@]}" clone --depth=1 https://github.com/hippone/assetboard-site.git "$site"
+          # A push dry run asks GitHub for the receive-pack refs, which needs write access: a token without it fails here, before the build.
+          git -C "$site" "${site_auth[@]}" push --dry-run origin HEAD:main
           VERSION="$version" SITE_DIR="$site" python3 - <<'PY'
           import json, os
           from pathlib import Path
@@ -107,8 +115,7 @@ jobs:
           echo "RELEASE_DIR=$RUNNER_TEMP/app-release-$GITHUB_RUN_ID" >> "$GITHUB_ENV"
           mkdir -p "docs/releases"
           cp "$RUNNER_TEMP/release-notes.md" "docs/releases/$version.md"
-          notary_kc=(); [[ -n "${NOTARY_KEYCHAIN:-}" ]] && notary_kc=(--keychain "$NOTARY_KEYCHAIN")
-          perl -e 'alarm 60; exec @ARGV' xcrun notarytool history --keychain-profile "$NOTARY_PROFILE" ${notary_kc[@]+"${notary_kc[@]}"} >/dev/null
+          perl -e 'alarm 60; exec @ARGV' xcrun notarytool history --keychain-profile "$NOTARY_PROFILE" --keychain "$NOTARY_KEYCHAIN" >/dev/null
 
       - name: JavaScript tests
         run: node --test
@@ -118,7 +125,7 @@ jobs:
 
       - name: Browser regression
         run: |
-          # Cached in the runner user's home; this step sets it up itself.
+          # This step sets Playwright up itself, in the runner user's home.
           pw_home="$HOME/.cache/assetboard-ci/playwright-1.64.1"
           if [ ! -d "$pw_home/node_modules/playwright" ]; then
             npm install --prefix "$pw_home" --no-audit --no-fund playwright@1.64.1
@@ -138,9 +145,9 @@ jobs:
             --version "$VERSION" --notes "$RUNNER_TEMP/release-notes.md"
           python3 "$SITE_DIR/tools/check_links.py" "$SITE_DIR"
 
-      - name: Lock the signing keychain
-        if: ${{ always() && env.SIGNING_KEYCHAIN_PASSWORD != '' }}
-        run: security lock-keychain "$HOME/Library/Keychains/assetboard-signing.keychain-db" || true
+      - name: Delete the temporary keychain
+        if: ${{ always() }}
+        run: bash tools/ci-mac.sh cleanup
 
       - name: Upload signed release and notarization receipt
         if: ${{ always() && env.RELEASE_DIR != '' }}
@@ -152,6 +159,10 @@ jobs:
           if-no-files-found: ignore
 
       - name: Publish site commit and wait for deployment
+        # SITE_PUSH_TOKEN pushes the site commit (git) and watches its deployment (gh, Actions read on the site repository).
+        env:
+          SITE_PUSH_TOKEN: ${{ secrets.SITE_PUSH_TOKEN }}
+          GH_TOKEN: ${{ secrets.SITE_PUSH_TOKEN }}
         run: |
           set -euo pipefail
           cd "$SITE_DIR"
@@ -161,7 +172,7 @@ jobs:
           git diff --cached --check
           git -c user.name=lihaosong-code -c user.email=207678397+lihaosong-code@users.noreply.github.com commit -m "Release notarized Assetboard $VERSION"
           site_commit="$(git rev-parse HEAD)"
-          git -c credential.helper= -c 'credential.helper=!gh auth git-credential' push origin HEAD:main
+          git -c credential.helper= -c 'credential.helper=!f() { test "$1" = get || return 0; echo username=x-access-token; echo "password=$SITE_PUSH_TOKEN"; }; f' push origin HEAD:main
           run_id=''
           for attempt in {1..12}; do
             run_id="$(gh run list --repo hippone/assetboard-site --workflow deploy-site.yml --commit "$site_commit" --json databaseId --jq '.[0].databaseId // empty')"

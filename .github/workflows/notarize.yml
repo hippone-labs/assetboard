@@ -1,5 +1,6 @@
-# Signs with the Developer ID in the login keychain of the Mac labelled mac-build, notarizes with the notary keychain profile (repository secrets, masked in the public logs),
-# staples and uploads the zip as an artifact. It never creates a release or pushes a tag; publishing stays manual.
+# Builds on GitHub-hosted macOS 26 with the pinned Xcode, signs with the Developer ID from a temporary keychain, notarizes with an
+# App Store Connect API key (tools/ci-mac.sh; the secrets are in the release environment, which needs an approval), staples and
+# uploads the zip as an artifact. It never creates a release or pushes a tag; publishing stays manual.
 # Manual only (see release-app.yml).
 name: notarize
 
@@ -24,17 +25,26 @@ defaults:
 
 env:
   SIGNING_IDENTITY: ${{ secrets.SIGNING_IDENTITY }}
-  NOTARY_PROFILE: ${{ secrets.NOTARY_PROFILE }}
-  SIGNING_KEYCHAIN_PASSWORD: ${{ secrets.SIGNING_KEYCHAIN_PASSWORD }}
+  # The same Xcode as build.yml.
+  XCODE_VERSION: '26.6'
 
 jobs:
   notarize:
-    runs-on: [self-hosted, macOS, ARM64, mac-build]
+    runs-on: macos-26
+    environment: release
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.ref }}
+      # tools/ci-mac.sh as this workflow's own commit has it: inputs.ref may be a commit without it.
+      - name: CI helper of this workflow's commit
+        uses: actions/checkout@v4
+        with:
+          path: .ci
+          sparse-checkout: tools/ci-mac.sh
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
       - name: Pro modules (private checkout beside the board)
         # The runner's own gh login reads the private repository; a PRO_REPO_TOKEN secret (a fine-grained token with contents: read
         # on it) is used instead when set, for a runner that is not logged in.
@@ -46,24 +56,17 @@ jobs:
           gh repo clone "${{ vars.PRO_REPO || 'hippone-labs/assetboard-pro' }}" pro -- --depth=1 --quiet
           test -f pro/web/pro.js
 
-      - name: Unlock the signing keychain
-        # A dedicated keychain (release-app.yml says which) lets a runner that is a background service sign without a prompt.
-        if: ${{ env.SIGNING_KEYCHAIN_PASSWORD != '' }}
-        run: |
-          set -euo pipefail
-          kc="$HOME/Library/Keychains/assetboard-signing.keychain-db"
-          test -f "$kc" || { echo "::error::$kc not found"; exit 1; }
-          security unlock-keychain -p "$SIGNING_KEYCHAIN_PASSWORD" "$kc"
-          security set-keychain-settings -lut 7200 "$kc"
-          security list-keychains -d user | xargs | grep -qF "$kc" || security list-keychains -d user -s "$kc" $(security list-keychains -d user | xargs)
-          echo "NOTARY_KEYCHAIN=$kc" >> "$GITHUB_ENV"
+      - name: Select Xcode
+        run: bash .ci/tools/ci-mac.sh xcode
 
-      - name: Signing identity is available
-        run: |
-          test -n "$SIGNING_IDENTITY" && test -n "$NOTARY_PROFILE" || { echo '::error::Set the SIGNING_IDENTITY and NOTARY_PROFILE repository secrets'; exit 1; }
-          count="$(security find-identity -v -p codesigning | grep -cF "$SIGNING_IDENTITY" || true)"
-          echo "matching identities: $count"
-          [ "$count" -ge 1 ] || { echo "::error::Developer ID not found in the runner's keychain"; exit 1; }
+      - name: Temporary signing keychain and notary profile
+        env:
+          DEVELOPER_ID_P12_BASE64: ${{ secrets.DEVELOPER_ID_P12_BASE64 }}
+          DEVELOPER_ID_P12_PASSWORD: ${{ secrets.DEVELOPER_ID_P12_PASSWORD }}
+          NOTARY_KEY_P8_BASE64: ${{ secrets.NOTARY_KEY_P8_BASE64 }}
+          NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
+        run: bash .ci/tools/ci-mac.sh keychain
 
       - name: Signing key and notary profile are usable
         run: |
@@ -72,7 +75,7 @@ jobs:
           perl -e 'alarm 60; exec @ARGV' codesign --force --timestamp=none --sign "$SIGNING_IDENTITY" "$probe" \
             || { echo "::error::codesign could not use the Developer ID key (locked keychain or access prompt)"; exit 1; }
           rm -f "$probe"
-          perl -e 'alarm 60; exec @ARGV' xcrun notarytool history --keychain-profile "$NOTARY_PROFILE" ${NOTARY_KEYCHAIN:+--keychain "$NOTARY_KEYCHAIN"} >/dev/null 2>&1 \
+          perl -e 'alarm 60; exec @ARGV' xcrun notarytool history --keychain-profile "$NOTARY_PROFILE" --keychain "$NOTARY_KEYCHAIN" >/dev/null 2>&1 \
             || { echo "::error::notarytool cannot use the keychain profile $NOTARY_PROFILE"; exit 1; }
           echo "codesign: ok, notary profile: ok"
 
@@ -89,7 +92,7 @@ jobs:
           codesign --verify --deep --strict --verbose=2 "$app"
           submit="$RUNNER_TEMP/submit.zip"
           ditto -c -k --keepParent "$app" "$submit"
-          xcrun notarytool submit "$submit" --keychain-profile "$NOTARY_PROFILE" ${NOTARY_KEYCHAIN:+--keychain "$NOTARY_KEYCHAIN"} --wait 2>&1 | tee "$out/notary.log"
+          xcrun notarytool submit "$submit" --keychain-profile "$NOTARY_PROFILE" --keychain "$NOTARY_KEYCHAIN" --wait 2>&1 | tee "$out/notary.log"
           grep -q 'status: Accepted' "$out/notary.log" || { echo "::error::notarization not accepted"; exit 1; }
           xcrun stapler staple "$app"
           xcrun stapler validate "$app"
@@ -105,9 +108,9 @@ jobs:
             echo "| $name | \`$sum\` |"
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Lock the signing keychain
-        if: ${{ always() && env.SIGNING_KEYCHAIN_PASSWORD != '' }}
-        run: security lock-keychain "$HOME/Library/Keychains/assetboard-signing.keychain-db" || true
+      - name: Delete the temporary keychain
+        if: ${{ always() }}
+        run: bash .ci/tools/ci-mac.sh cleanup
 
       - name: Upload notarized zips
         uses: actions/upload-artifact@v4

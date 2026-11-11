@@ -1,6 +1,7 @@
 #!/bin/zsh
 # Produce the signed, notarized and stapled release: the zip the in-app update installs and the disk image the site offers.
-# Signing credentials stay on the Mac runner.
+# Signing uses the keychain: in Actions a temporary one with the notary profile (tools/ci-mac.sh sets NOTARY_PROFILE and
+# NOTARY_KEYCHAIN), by hand the Mac's own keychain and notary profile.
 set -euo pipefail
 cd "${0:A:h:h}"
 : "${SIGNING_IDENTITY:?Set SIGNING_IDENTITY}"
