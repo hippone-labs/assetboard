@@ -475,8 +475,8 @@ body.drag-active .quick-action{visibility:hidden}
 
 
 /* Detail actions read as one cluster: 8px inside, 16px before the hide/delete pair, 24px from the heading. */
-:root #detail-content .detail-actions{gap:8px;margin:8px 0 0}
-:root #detail-content :not(.detail-actions)+.detail-actions{margin-top:24px}
+:root :is(#detail-content,.detail-copy) .detail-actions{gap:8px;margin:8px 0 0}
+:root :is(#detail-content,.detail-copy) :not(.detail-actions)+.detail-actions{margin-top:24px}
 
 
 /* Empty search: one clear line, one quiet hint, one action. */
@@ -867,7 +867,7 @@ span.link-tag{cursor:default}
 /* v13b P2 · panorama overview: a read-only layer over the board. Canvas, trays, lanes and chips reuse the v12 depth tokens; the bar is the only blur. */
 .panorama{position:fixed;inset:0;z-index:30;display:flex;flex-direction:column;color:var(--ink);font-size:13px;background:transparent}
 .panorama[hidden]{display:none}
-:root #detail{z-index:35}
+:root :is(#detail,.detail-leave){z-index:35}
 body.pano-open main{visibility:hidden}
 .panorama svg{fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
 .pano-bar{flex:none;display:flex;align-items:center;gap:16px;height:56px;padding:0 24px;background:var(--bar);backdrop-filter:blur(24px) saturate(1.1);-webkit-backdrop-filter:blur(24px) saturate(1.1);border-bottom:1px solid var(--bar-edge,var(--border))}
@@ -1221,28 +1221,28 @@ body.drag-active .r-actions{visibility:hidden}
 .view-empty .button .ui-icon{width:14px;height:14px;margin-right:4px}
 :root #main .empty{padding:96px 24px}
 /* inspector: docked beside the list on a wide window, an overlay on a narrow one */
-:root #detail{top:0;bottom:0;right:0;width:var(--inspector-w);max-width:100%;padding:18px 22px 32px;border-radius:0;border:0;background:var(--surface-content);box-shadow:-1px 0 0 var(--hairline);animation:none;z-index:35}
+:root :is(#detail,.detail-leave){top:0;bottom:0;right:0;width:var(--inspector-w);max-width:100%;padding:18px 22px 32px;border-radius:0;border:0;background:var(--surface-content);box-shadow:-1px 0 0 var(--hairline);animation:none;z-index:35}
 @media(min-width:1180px){body.inspecting #main{margin-right:var(--inspector-w)}}
-@media(max-width:1179px){:root #detail{box-shadow:var(--shadow-pop);border-radius:var(--radius-lg) 0 0 var(--radius-lg)}}
-:root #detail .close{top:14px;right:14px;width:28px;height:28px;font-size:20px;background:var(--hover);border:0;color:var(--muted)}
-:root #detail .close:hover{color:var(--ink)}
-:root #detail-content .detail-head{display:flex;align-items:center;gap:12px;margin:4px 0 14px}
-:root #detail-content h2{margin:0 0 4px;font-size:20px;line-height:26px;font-weight:600;letter-spacing:0;word-break:break-word}
-:root #detail-content .detail-sub{margin:0;font-size:13px}
-:root #detail-content .detail-badge{margin-top:10px}
-:root #detail-content .main-actions{display:flex;gap:8px;margin:20px 0 0}
-:root #detail-content .main-actions .button{flex:1;height:32px;font-size:13px;font-weight:500}
-:root #detail-content .main-actions .button .ui-icon{width:14px;height:14px;margin-right:4px}
-:root #detail-content .main-actions .detail-more{flex:none;width:34px;height:32px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface-card);color:var(--ink)}
-:root #detail-content .main-actions .detail-more .ui-icon{margin:0;width:17px;height:17px}
-:root #detail-content .quick-row{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 0}
-:root #detail-content .quick-row .button{flex:none;height:28px;padding:0 10px;font-size:12px;gap:6px;background:none;border-color:var(--border)}
-:root #detail-content .quick-row .button:hover{background:var(--hover)}
-:root #detail-content .facts{margin-top:22px;padding-top:0;border-top:0}
-:root #detail-content .fact{padding:11px 0;font-size:13px;gap:16px}
-:root #detail-content .fact span:last-child{text-align:right;font-variant-numeric:tabular-nums}
-:root #detail-content .fact.fact-block{flex-direction:column;align-items:flex-start;gap:6px}
-:root #detail-content .fact.fact-block span{text-align:left}
+@media(max-width:1179px){:root :is(#detail,.detail-leave){box-shadow:var(--shadow-pop);border-radius:var(--radius-lg) 0 0 var(--radius-lg)}}
+:root :is(#detail,.detail-leave) .close{top:14px;right:14px;width:28px;height:28px;font-size:20px;background:var(--hover);border:0;color:var(--muted)}
+:root :is(#detail,.detail-leave) .close:hover{color:var(--ink)}
+:root :is(#detail-content,.detail-copy) .detail-head{display:flex;align-items:center;gap:12px;margin:4px 0 14px}
+:root :is(#detail-content,.detail-copy) h2{margin:0 0 4px;font-size:20px;line-height:26px;font-weight:600;letter-spacing:0;word-break:break-word}
+:root :is(#detail-content,.detail-copy) .detail-sub{margin:0;font-size:13px}
+:root :is(#detail-content,.detail-copy) .detail-badge{margin-top:10px}
+:root :is(#detail-content,.detail-copy) .main-actions{display:flex;gap:8px;margin:20px 0 0}
+:root :is(#detail-content,.detail-copy) .main-actions .button{flex:1;height:32px;font-size:13px;font-weight:500}
+:root :is(#detail-content,.detail-copy) .main-actions .button .ui-icon{width:14px;height:14px;margin-right:4px}
+:root :is(#detail-content,.detail-copy) .main-actions .detail-more{flex:none;width:34px;height:32px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface-card);color:var(--ink)}
+:root :is(#detail-content,.detail-copy) .main-actions .detail-more .ui-icon{margin:0;width:17px;height:17px}
+:root :is(#detail-content,.detail-copy) .quick-row{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 0}
+:root :is(#detail-content,.detail-copy) .quick-row .button{flex:none;height:28px;padding:0 10px;font-size:12px;gap:6px;background:none;border-color:var(--border)}
+:root :is(#detail-content,.detail-copy) .quick-row .button:hover{background:var(--hover)}
+:root :is(#detail-content,.detail-copy) .facts{margin-top:22px;padding-top:0;border-top:0}
+:root :is(#detail-content,.detail-copy) .fact{padding:11px 0;font-size:13px;gap:16px}
+:root :is(#detail-content,.detail-copy) .fact span:last-child{text-align:right;font-variant-numeric:tabular-nums}
+:root :is(#detail-content,.detail-copy) .fact.fact-block{flex-direction:column;align-items:flex-start;gap:6px}
+:root :is(#detail-content,.detail-copy) .fact.fact-block span{text-align:left}
 .life-steps{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;color:var(--ink)}
 .life-step.now{font-weight:600;color:var(--warning)}
 .life-arrow{color:var(--muted)}
@@ -1279,7 +1279,7 @@ body.first-paint #sidebar,body.first-paint .group{animation:v12-fade .15s var(--
  :root #main .search{flex:1;width:auto}
  :root #board{padding:0 16px 64px}
  .group-head{position:static}
- :root #detail{width:100%;border-radius:0}
+ :root :is(#detail,.detail-leave){width:100%;border-radius:0}
 }
 @media(prefers-reduced-motion:reduce){.g-chevron .ui-icon,.row,.gcard,.nav-item{transition:none}.nav-item.drop-flash{animation:none}}
 
@@ -1436,7 +1436,7 @@ body.first-paint #sidebar,body.first-paint .group{animation:v12-fade .15s var(--
 .cost-rates{display:flex;gap:6px;align-items:flex-start}
 .cost-rates .ui-icon{flex:none;width:13px;height:13px;margin-top:3px}
 @media(max-width:520px){.cost-totals strong{font-size:18px}.cost-items li{grid-template-columns:minmax(0,1fr) auto}.cost-own{display:none}}
-:root #detail-content .detail-head .detail-icon-fetch{margin-left:-4px;font-size:12px}
+:root :is(#detail-content,.detail-copy) .detail-head .detail-icon-fetch{margin-left:-4px;font-size:12px}
 :root #modal .form .provider-picks{margin-top:-6px}
 /* Wide windows: the search box gives way before the title and its totals do. */
 /* The title keeps its own width (capped); the auto margin sends the eye, layout and search to the right edge. */
@@ -1571,7 +1571,7 @@ body.first-paint #sidebar,body.first-paint .group{animation:v12-fade .15s var(--
 :root .button:not(.primary):not(.danger):not(.quiet):hover{border-color:rgba(var(--tone-primary),.35);background:rgba(var(--tone-primary),.06)}
 :root .button.primary{box-shadow:0 1px 2px rgba(var(--tone-primary),.25),inset 0 1px 0 rgba(255,255,255,.12)}
 :root .button.primary:hover{filter:brightness(1.06)}
-:root #detail-content .main-actions .button.primary{background:rgb(var(--tone-primary))}
+:root :is(#detail-content,.detail-copy) .main-actions .button.primary{background:rgb(var(--tone-primary))}
 /* Rows and groups: rounder selection, a lighter rule between groups, counts as small pills. */
 .row{border-radius:10px}
 .row.selected{background:var(--selected)}
@@ -1586,7 +1586,7 @@ body.first-paint #sidebar,body.first-paint .group{animation:v12-fade .15s var(--
 /* A stopped automatic sync (U4): grey like the rest of the line, never amber or red, which mean dates. */
 .meta-flag.stale{border:0;font:inherit;font-weight:500;color:var(--muted);background:var(--hover);cursor:pointer}.meta-flag.stale::before{background:var(--muted)}
 /* The inspector breathes a little more; section titles are quiet. */
-:root #detail-content .fact{padding:10px 0}
+:root :is(#detail-content,.detail-copy) .fact{padding:10px 0}
 :root .detail h2{letter-spacing:-.01em}
 .link-section h3,.pay-head h3{letter-spacing:.01em}
 /* Dialogs: rounder sheets with a softer shadow. */
@@ -1642,7 +1642,7 @@ body::before{background:radial-gradient(1100px 560px at 12% -10%,var(--canvas-gl
  .action-banner{position:relative;top:auto;flex:none}
  /* The detail docks inside the card, under its toolbar; the board gives it the room. */
  :root body.inspecting #board,:root body.inspecting .action-banner{margin-right:var(--inspector-w)}
- :root #detail{position:fixed;top:calc(var(--topnav-h) + var(--bar-h));bottom:var(--shell-gap);right:var(--shell-gap);left:auto;width:var(--inspector-w);max-width:none;
+ :root :is(#detail,.detail-leave){position:fixed;top:calc(var(--topnav-h) + var(--bar-h));bottom:var(--shell-gap);right:var(--shell-gap);left:auto;width:var(--inspector-w);max-width:none;
   border-radius:0 0 var(--shell-radius) 0;background:var(--surface-content);box-shadow:-1px 0 0 var(--hairline);animation:none;overflow:auto}
  /* The panorama takes the card's place; presenting (or full screen) still fills the window. */
  :root .panorama{top:var(--topnav-h);left:var(--sidebar-w);right:var(--shell-gap);bottom:var(--shell-gap);border-radius:var(--shell-radius);overflow:hidden;box-shadow:var(--card-shadow)}
@@ -1677,7 +1677,7 @@ body::before{background:radial-gradient(1100px 560px at 12% -10%,var(--canvas-gl
 @container card (max-width:760px){#view-meta .mf-word{display:none}#view-meta .meta-flag{gap:3px}}
 @container card (max-width:560px){#view-meta>:not(.meta-flag){display:none}}
 /* The next date in the detail stays on one line; when it does not fit its end is cut and the whole text is the tip. */
-:root #detail-content .fact.fact-date span:last-child{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+:root :is(#detail-content,.detail-copy) .fact.fact-date span:last-child{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
 /* 更多: the categories the sidebar folds away open in place under it. */
 #sidebar .nav-more .ui-icon{color:var(--muted)}
@@ -2236,9 +2236,9 @@ body::before,.native-app body::before{background:radial-gradient(70vw 65vh at 0%
 :root .button,:root .choice,:root .r-actions .button{border-radius:999px}
 :root .button.primary,:root .button.primary:hover{background:var(--cta);border-color:transparent;color:var(--on-cta);filter:none}
 :root .button.primary:hover{box-shadow:0 0 0 3px var(--cta-ring)}
-:root #detail-content h2{font-size:22px;line-height:28px;letter-spacing:-.02em}
-:root #detail-content .main-actions .detail-more,:root #detail-content .quick-row .button{border-radius:999px}
-:root #detail-content .fact span:last-child{font-variant-numeric:tabular-nums}
+:root :is(#detail-content,.detail-copy) h2{font-size:22px;line-height:28px;letter-spacing:-.02em}
+:root :is(#detail-content,.detail-copy) .main-actions .detail-more,:root :is(#detail-content,.detail-copy) .quick-row .button{border-radius:999px}
+:root :is(#detail-content,.detail-copy) .fact span:last-child{font-variant-numeric:tabular-nums}
 /* the Mac app: the sidebar floats as a glass pane beside the sheet (macOS 26); the browser keeps the sidebar on the canvas */
 @media(min-width:761px){
  html.native-app{--shell-radius:18px}
@@ -2247,7 +2247,7 @@ body::before,.native-app body::before{background:radial-gradient(70vw 65vh at 0%
  html.native-app .panorama.show{inset:0}
 }
 :root #sidebar .nav-item.active .nav-count{color:var(--ink)}
-:root #detail-content .main-actions .button.primary{background:var(--cta)}
+:root :is(#detail-content,.detail-copy) .main-actions .button.primary{background:var(--cta)}
 :root .button.primary{box-shadow:none}
 :root .ov-tile.ov-live .ov-value{color:var(--ink)}
 /* 过期后 as a track: a segment per stage (amber, then red), the current one at full strength, labels under their segments. */
@@ -2452,8 +2452,8 @@ body.drag-active #board .wall .row .r-actions{display:none}
  --tape:rgba(120,220,180,.45);--pin-0:#45b07a;--pin-1:#f2b632;--pin-2:#3f8ed8;--pin-3:#45b07a;
  --stk-0:image-set(url("art/fridge/stk-px-server.png") 1x,url("art/fridge/stk-px-server@2x.png") 2x);--stk-1:image-set(url("art/fridge/stk-px-rocket.png") 1x,url("art/fridge/stk-px-rocket@2x.png") 2x);--stk-2:image-set(url("art/fridge/stk-px-check.png") 1x,url("art/fridge/stk-px-check@2x.png") 2x);--stk-3:image-set(url("art/fridge/stk-px-coffee.png") 1x,url("art/fridge/stk-px-coffee@2x.png") 2x);--stk-4:var(--stk-0);--stk-5:var(--stk-2);
  --figure:image-set(url("art/fridge/cat.gif") 1x,url("art/fridge/cat@2x.gif") 2x);--figure-still:image-set(url("art/fridge/cat.png") 1x,url("art/fridge/cat@2x.png") 2x);--figure-w:32px;--figure-h:32px;--figure-x:30px}
-/* the door: behind everything in #main while the wall is on screen; the figure in its corner (left or right by scene), clear of an
-   open inspector, gone in a narrow window */
+/* the door: behind everything in #main while the wall is on screen; the figure in its corner (left or right by scene), beside an
+   open detail (below), gone in a narrow window */
 .fridge-scene{display:none}
 :root[data-skin=magnet] body.wall-shown #main{background:var(--scene-color)}
 :root[data-skin=magnet] body.wall-shown .fridge-scene{display:block;position:absolute;inset:0;z-index:0;border-radius:inherit;overflow:hidden;pointer-events:none;background:var(--scene-color) var(--scene-bg) center bottom/cover no-repeat;image-rendering:var(--scene-render)}
@@ -2462,7 +2462,6 @@ body.drag-active #board .wall .row .r-actions{display:none}
 :root[data-skin=magnet] body.wall-shown #main>#board{z-index:1}
 .scene-figure{position:absolute;z-index:1;bottom:var(--figure-y);right:var(--figure-x);width:var(--figure-w);height:var(--figure-h);background:var(--figure) center/contain no-repeat;image-rendering:var(--figure-render);opacity:.92}
 :root[data-scene=city] .scene-figure,:root[data-scene=handdrawn] .scene-figure{right:auto;left:var(--figure-x)}
-@media(min-width:1180px){:root:is([data-scene=kitchen],[data-scene=server]) body.inspecting .scene-figure{right:calc(var(--inspector-w) + var(--figure-x))}}
 @media(max-width:899px){.scene-figure{display:none}}
 @media(prefers-reduced-motion:reduce){.scene-figure{background-image:var(--figure-still)}}
 /* what sits on the door besides the panels has the panels' paper under it */
@@ -2498,6 +2497,70 @@ body.drag-active #board .wall .row .r-actions{display:none}
 #board .wall.free-dragging>.group:not(.free-drag){rotate:calc(var(--tilt,0) * var(--wall-tilt))}
 @media(hover:hover){#board .wall.free>.group:not(.free-drag) .group-head{cursor:grab}}
 @media(prefers-reduced-motion:reduce){#board .wall>.group,#board .wall>.group.is-dragging.settling,#board .wall.free>.group,#board .wall.free>.group.free-drag{transition:none;animation:none}:root[data-skin=magnet]{--wall-lift-turn:0deg}}
+/* The detail, a card of its own over the content (both skins): clear of the toolbar, the content card's edges and the board by the
+   gap between panels, with the panels' radius and a light shadow, so it belongs with them and leaves the door and its figure in
+   view. Quiet: the sidebar's glass (the window's own canvas, blurred), so the two sides of the window match; 冰箱贴: the door's
+   paper a little clear, ringed with the door's colour. It comes in from the right and goes back there (app.js, detailMotion). The
+   board gives it its width and the gap; under 冰箱贴 a lane more, where the door's figure stands beside it, kept while the figure pushes the
+   card back so the panels come back over the lane after it. */
+:root{--detail-gap:12px;--detail-radius:12px;--detail-fill:radial-gradient(700px 360px at 100% -6%,var(--canvas-glow),transparent 70%),linear-gradient(180deg,rgba(var(--tone-canvas),.72),rgba(var(--tone-canvas),.9));
+ --detail-shadow:0 0 0 1px var(--hairline),0 1px 2px rgba(16,24,40,.05),0 12px 30px -14px rgba(16,24,40,.24);--detail-blur:blur(24px) saturate(1.4);--soft-fill:rgba(var(--tone-primary),.12);--soft-hover:rgba(var(--tone-primary),.18);--soft-ink:color-mix(in srgb,rgb(var(--tone-primary)) 82%,rgb(var(--tone-ink)))}
+:root[data-scheme=dark]{--detail-fill:rgba(var(--tone-card),.62);--detail-shadow:0 0 0 1px rgba(255,255,255,.075),0 14px 34px -14px rgba(0,0,0,.62);--soft-fill:rgba(var(--tone-primary),.16);--soft-hover:rgba(var(--tone-primary),.24);--soft-ink:color-mix(in srgb,rgb(var(--tone-primary)) 70%,rgb(var(--tone-ink)))}
+:root[data-skin=magnet]{--detail-gap:20px;--detail-radius:14px;--detail-fill:rgba(var(--tone-card),.86);--detail-blur:blur(12px) saturate(1.15);--figure-lane:28px;
+ --detail-shadow:0 0 0 1px rgba(var(--tone-primary),.42),0 2px 0 var(--mag-edge),0 16px 30px -14px rgba(0,0,0,.42)}
+:root[data-skin=magnet][data-scheme=dark]{--detail-fill:rgba(var(--tone-card),.88);--detail-shadow:0 0 0 1px rgba(var(--tone-primary),.34),0 2px 0 var(--mag-edge),0 18px 34px -14px rgba(0,0,0,.66)}
+@media(min-width:761px){
+ :root :is(#detail,.detail-leave){top:calc(var(--topnav-h) + var(--bar-h) + var(--detail-gap));bottom:calc(var(--shell-gap) + var(--detail-gap));right:calc(var(--shell-gap) + var(--detail-gap));
+  border-radius:var(--detail-radius);background:var(--detail-fill);box-shadow:var(--detail-shadow);backdrop-filter:var(--detail-blur);-webkit-backdrop-filter:var(--detail-blur)}
+ :root body.inspecting #board,:root body.inspecting .action-banner{margin-right:calc(var(--inspector-w) + var(--detail-gap))}
+:root[data-skin=magnet] :is(body.inspecting,body.fig-push).wall-shown #board{margin-right:calc(var(--inspector-w) + var(--detail-gap) + var(--figure-lane))}
+}
+@media(prefers-reduced-transparency:reduce){:root :is(#detail,.detail-leave){background:rgb(var(--tone-card));backdrop-filter:none;-webkit-backdrop-filter:none}}
+/* the copy that goes back to the right as the detail closes (the detail itself is hidden at once) */
+.detail-leave{pointer-events:none}
+/* 编辑 beside 打开: a wash of the accent (the door's under 冰箱贴), lighter than the main button and heavier than an outline */
+:root :is(#detail-content,.detail-copy) .main-actions .button.soft{background:var(--soft-fill);border-color:transparent;color:var(--soft-ink)}
+:root :is(#detail-content,.detail-copy) .main-actions .button.soft:hover{background:var(--soft-hover)}
+/* The door's figure and the detail: it pulls the card out and pushes it back, and stands beside it while it is open, in the lane
+   the board leaves (--figure-dock, from the content card's right edge). A figure at the door's right walks with the card's edge; one
+   at its left goes to pixel dust where it stands and appears beside the card (.scene-ghost plays the dust at home), and back on
+   close. The frames are a strip drawn from the figure (tools/fridge-frames.js): 0 idle, 1 reach, 2–3 pull, 4–5 push, 6–9 dust;
+   10 is past the strip, nothing. A figure walks with the card's timing over a shorter way, so
+   it stays clear of the card's edge; the whole act is 0.3 s; app.js skips it on a quick toggle and under less motion. */
+:root[data-scene=kitchen]{--figure-act:image-set(url("art/fridge/chef-act.png") 1x,url("art/fridge/chef-act@2x.png") 2x)}
+:root[data-scene=city]{--figure-act:image-set(url("art/fridge/engineer-act.png") 1x,url("art/fridge/engineer-act@2x.png") 2x)}
+:root[data-scene=handdrawn]{--figure-act:image-set(url("art/fridge/hedgehog-act.png") 1x,url("art/fridge/hedgehog-act@2x.png") 2x)}
+:root[data-scene=server]{--figure-act:image-set(url("art/fridge/cat-act.png") 1x,url("art/fridge/cat-act@2x.png") 2x)}
+:root[data-skin=magnet]{--figure-fw:calc(var(--figure-w) + 8px);--figure-dock:calc(var(--detail-gap) + var(--inspector-w) + (var(--figure-lane) + 20px - var(--figure-w)) / 2);--figure-travel:calc(var(--figure-dock) - var(--figure-x))}
+.scene-ghost{display:none}
+.scene-figure::after,.scene-ghost{content:"";position:absolute;left:0;bottom:0;width:var(--figure-fw);height:var(--figure-h);background:var(--figure-act) 0 0/calc(var(--figure-fw) * 10) 100% no-repeat;image-rendering:var(--figure-render);opacity:0}
+.scene-ghost{left:var(--figure-x);bottom:var(--figure-y);opacity:.92}
+@media(min-width:900px){
+ :root[data-skin=magnet] :is(body.inspecting,body.fig-push) .scene-figure{left:auto;right:var(--figure-dock)}
+ :root[data-skin=magnet] :is(body.fig-pull,body.fig-push) .scene-figure{background-image:none}
+ :root[data-skin=magnet] :is(body.fig-pull,body.fig-push) .scene-figure::after{opacity:1}
+ :root[data-skin=magnet] body.fig-pull .scene-figure{animation:fig-walk-in .24s cubic-bezier(.2,.8,.2,1) both}
+ :root[data-skin=magnet] body.fig-pull .scene-figure::after{animation:fig-pull .3s step-end both}
+ :root[data-skin=magnet] body.fig-push .scene-figure{animation:fig-walk-out .22s cubic-bezier(.4,0,.8,.4) both}
+ :root[data-skin=magnet] body.fig-push .scene-figure::after{animation:fig-push .3s step-end both}
+ :root:is([data-scene=city],[data-scene=handdrawn]) body.fig-pull .scene-figure{animation:fig-warp-in .3s cubic-bezier(.2,.8,.2,1) both}
+ :root:is([data-scene=city],[data-scene=handdrawn]) body.fig-pull .scene-figure::after{animation:fig-warp-pull .3s step-end both}
+ :root:is([data-scene=city],[data-scene=handdrawn]) body.fig-push .scene-figure{animation:fig-warp-out .3s cubic-bezier(.4,0,.6,1) both}
+ :root:is([data-scene=city],[data-scene=handdrawn]) body.fig-push .scene-figure::after{animation:fig-warp-push .3s step-end both}
+ :root:is([data-scene=city],[data-scene=handdrawn]) :is(body.fig-pull,body.fig-push) .scene-ghost{display:block}
+ :root:is([data-scene=city],[data-scene=handdrawn]) body.fig-pull .scene-ghost{animation:fig-ghost-go .3s step-end both}
+ :root:is([data-scene=city],[data-scene=handdrawn]) body.fig-push .scene-ghost{animation:fig-ghost-come .3s step-end both}
+}
+@keyframes fig-walk-in{from{translate:var(--figure-travel) 0}to{translate:0 0}}
+@keyframes fig-walk-out{from{translate:0 0}to{translate:var(--figure-travel) 0}}
+@keyframes fig-warp-in{0%,40%{translate:16px 0}100%{translate:0 0}}
+@keyframes fig-warp-out{0%{translate:0 0}45%,100%{translate:16px 0}}
+@keyframes fig-pull{0%{background-position-x:calc(var(--figure-fw) * -1)}20%{background-position-x:calc(var(--figure-fw) * -2)}48%{background-position-x:calc(var(--figure-fw) * -3)}76%{background-position-x:calc(var(--figure-fw) * -2)}100%{background-position-x:0}}
+@keyframes fig-push{0%{background-position-x:calc(var(--figure-fw) * -4)}30%{background-position-x:calc(var(--figure-fw) * -5)}60%{background-position-x:calc(var(--figure-fw) * -4)}100%{background-position-x:0}}
+@keyframes fig-warp-pull{0%{background-position-x:calc(var(--figure-fw) * -9)}10%{background-position-x:calc(var(--figure-fw) * -8)}20%{background-position-x:calc(var(--figure-fw) * -7)}30%{background-position-x:calc(var(--figure-fw) * -6)}40%{background-position-x:calc(var(--figure-fw) * -1)}60%{background-position-x:calc(var(--figure-fw) * -2)}80%{background-position-x:calc(var(--figure-fw) * -3)}100%{background-position-x:0}}
+@keyframes fig-warp-push{0%{background-position-x:calc(var(--figure-fw) * -4)}22%{background-position-x:calc(var(--figure-fw) * -5)}45%{background-position-x:calc(var(--figure-fw) * -6)}55%{background-position-x:calc(var(--figure-fw) * -7)}65%{background-position-x:calc(var(--figure-fw) * -8)}75%{background-position-x:calc(var(--figure-fw) * -9)}85%,100%{background-position-x:calc(var(--figure-fw) * -10)}}
+@keyframes fig-ghost-go{0%{background-position-x:0}8%{background-position-x:calc(var(--figure-fw) * -6)}16%{background-position-x:calc(var(--figure-fw) * -7)}24%{background-position-x:calc(var(--figure-fw) * -8)}32%{background-position-x:calc(var(--figure-fw) * -9)}40%,100%{background-position-x:calc(var(--figure-fw) * -10)}}
+@keyframes fig-ghost-come{0%,50%{background-position-x:calc(var(--figure-fw) * -10)}55%{background-position-x:calc(var(--figure-fw) * -9)}66%{background-position-x:calc(var(--figure-fw) * -8)}77%{background-position-x:calc(var(--figure-fw) * -7)}88%{background-position-x:calc(var(--figure-fw) * -6)}100%{background-position-x:0}}
 /* 连接后挑选: the pick list right after a platform answers, the sidebar's 待引入 and the add form's pick from a connected platform. */
 .connect-pick{display:grid;gap:12px}
 .connect-summary{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px;color:var(--ink)}

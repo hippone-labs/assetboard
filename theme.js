@@ -193,7 +193,7 @@ document.addEventListener('DOMContentLoaded',()=>{
  const button=document.createElement('button');button.id='theme';button.className='button icon-only';button.onclick=themeDialog;(document.querySelector('#inbox-button')||document.querySelector('#add-block')).after(button);if(typeof setIconButton==='function'){setIconButton(button,'palette',tr('主题'));}else{button.textContent=tr('主题');button.title=tr('主题');}
  document.querySelector('#modal').addEventListener('close',()=>{if(themePreview){themePreview=false;applyBoardTheme();}});
  // The door behind the wall (shown by material.css under 冰箱贴 while the wall is on screen).
- const scene=document.createElement('div');scene.className='fridge-scene';scene.setAttribute('aria-hidden','true');scene.innerHTML='<i class="scene-figure"></i>';document.querySelector('#main')?.prepend(scene);
+ const scene=document.createElement('div');scene.className='fridge-scene';scene.setAttribute('aria-hidden','true');scene.innerHTML='<i class="scene-figure"></i><i class="scene-ghost"></i>';document.querySelector('#main')?.prepend(scene);
  applyBoardTheme();
  schemeQuery?.addEventListener?.('change',()=>applyBoardTheme());
 });

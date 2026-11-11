@@ -1,5 +1,5 @@
 // The window's shell: a top bar across the window, the sidebar under it on the background, and one raised card holding the toolbar,
-// the board (which scrolls, not the page), the docked detail and the panorama. Checks the geometry at three widths, the toolbar giving
+// the board (which scrolls, not the page), the detail floating in it and the panorama. Checks the geometry at three widths, the toolbar giving
 // way inside the card, the detail's date on one line, and the Mac app's part: room for the traffic lights (given back in full screen)
 // and the bar's controls reported so the rest of the bar can move the window, and the backdrop (see-through over the native glass,
 // solid in the browser). On CI (full edition) it also saves review screenshots into the logs artifact (shots/).
@@ -28,7 +28,7 @@ async (page) => {
  check(top.top===0&&top.height===40&&top.width===1440,'The top bar spans the window: '+JSON.stringify(top));
  check(main.left===228&&main.top===40&&main.right===1430&&main.bottom===890,'The card: '+JSON.stringify(main));
  check(side.top===40&&await s.p.evaluate(()=>/rgba\(0, 0, 0, 0\)|transparent/.test(getComputedStyle($('#sidebar')).backgroundColor)),'The sidebar sits under the top bar with no fill: '+JSON.stringify(side));
- check(detail.right===1430&&detail.bottom===890&&detail.width===380&&Math.abs(detail.top-bar.bottom)<=1,'The detail docks in the card under its toolbar: '+JSON.stringify({detail,bar}));
+ check(detail.right===1418&&detail.bottom===878&&detail.width===380&&Math.abs(detail.top-bar.bottom-12)<=1,'The detail floats in the card under its toolbar, 12px clear of the toolbar and the card\'s edges: '+JSON.stringify({detail,bar}));
  check(await s.p.evaluate(()=>{const g=document.querySelector('#board .group').getBoundingClientRect();return g.right<=document.querySelector('#detail').getBoundingClientRect().left+1;}),'The board makes room for the detail');
  check(await s.p.evaluate(()=>boardScroller()===$('#board')&&document.scrollingElement.scrollHeight<=innerHeight+1),'The board scrolls, the page does not');
  check(await s.p.evaluate(()=>!!$('#topnav #search')&&!!$('#topnav #inbox-button')&&!!$('#topnav #theme')&&!!$('#topbar #add-block')&&!!$('#topbar #panorama-button')),'Window tools in the top bar, view tools in the card');

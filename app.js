@@ -609,7 +609,7 @@ function autoOrder(id){const a=state.assets.find(x=>x.id===id);if(!a||!manualOrd
 // Opening by keyboard, or as an overlay on a narrow window, moves focus into it; a click on a wide window leaves focus on the row so ↑/↓ keep browsing.
 // When a record was last synced or imported, with how long ago once that is more than a day.
 function syncedText(at){const days=localDay()-localDay(new Date(at));return `${new Date(at).toLocaleString(trLocale())}${days>1?` · ${tr('{n} 天前',{n:days})}`:''}`;}
-function showDetail(id,{focus}={}){
+function showDetail(id,{focus,still}={}){
  const a=state.assets.find(a=>a.id===id);if(!a)return;
  const wasOpen=!$('#detail').hidden,active=document.activeElement,inside=!!active?.closest?.('#detail');if(active&&!active.closest?.('#detail,#menu'))lastFocus=active;
  activeAsset=id;
@@ -617,12 +617,12 @@ function showDetail(id,{focus}={}){
  const sub=assetProfiles[a.type]?[regionFlag(a.region),identityText(a)].filter(Boolean).join(' '):[a.provider,veilAccount(a.account)].filter(Boolean).join(' · ');
  const primary=a.hiddenAt?`<button class="button primary" data-action="restore-asset" data-id="${esc(id)}">${tr('恢复显示')}</button>`:realLink?`<button class="button primary" data-action="external" data-id="${esc(id)}" title="${tr('打开管理页')}">${ui('external')}${tr('打开')}</button>`:'';
  const renew=renewable(a)?`<button class="button" data-action="renew" data-id="${esc(id)}" title="${tr('{action}（R）',{action:renewWord(a)})}">${renewWord(a)}</button>`:'';
- const actions=`<div class="detail-actions main-actions">${primary}<button class="button${primary?'':' primary'}" data-action="edit-asset" data-id="${esc(id)}">${tr('编辑')}</button>${renew}<button class="button icon-only detail-more" data-action="asset-menu" data-id="${esc(id)}" aria-haspopup="menu" aria-expanded="false" aria-label="${tr('更多操作')}" title="${tr('更多操作')}">${ui('more')}</button></div>`;
+ const actions=`<div class="detail-actions main-actions">${primary}<button class="button${primary?' soft':' primary'}" data-action="edit-asset" data-id="${esc(id)}">${tr('编辑')}</button>${renew}<button class="button icon-only detail-more" data-action="asset-menu" data-id="${esc(id)}" aria-haspopup="menu" aria-expanded="false" aria-label="${tr('更多操作')}" title="${tr('更多操作')}">${ui('more')}</button></div>`;
  const source={cloudflare:nativeStore&&!proOff?tr('同步自 Cloudflare。账号和状态下次同步按平台值更新，你改过的名称会保留；Cloudflare 上新增的域名在「文件 → 同步 Cloudflare…」重新同步后出现。'):tr('同步自 Cloudflare。账号和状态下次同步按平台值更新，你改过的名称会保留。'),github:tr('同步自 GitHub，名称和账号下次同步会按平台值更新。'),...Object.fromEntries(Object.entries(REGISTRARS).map(([id,r])=>[id,tr('从 {name} 读取。到期日和自动续费下次同步按注册商的值更新，你改过的名称会保留；在「导入 › 注册商」重新同步。',{name:r.name})])),...Object.fromEntries(Object.entries(CLOUD_IMPORTS).map(([id,c])=>[id,tr('从 {name} 读取。状态、地址和地区下次同步按平台的值更新，你改过的名称和费用会保留；在「导入 › 云平台」重新同步。',{name:c.name})])),ssh:tr('来自 ~/.ssh/config，名称和主机下次导入会按配置更新。'),csv:tr('从{file}导入；再导入同一份文件时，同名默认跳过。',{file:a.importedFrom?tr(a.importedFrom):tr('表格')}),manual:'',demo:tr('演示数据，不代表实际账户。')}[a.source]??'';
  const notes=a.notes||source?`<details><summary>${a.notes?tr('备注'):tr('来源')}${a.notes&&source?' · '+tr('来源'):''}</summary>${a.notes?`<p>${esc(a.notes)}</p>`:''}${source?`<p>${source}</p>`:''}</details>`:'';
  const iconButton=nativeStore&&!demoMode&&!a.hiddenAt&&!hasRealIcon(a)?(iconFetching.has(id)?`<button class="text-button detail-icon-fetch" disabled>${tr('获取中…')}</button>`:`<button class="text-button detail-icon-fetch" data-action="icon-fetch" data-id="${esc(id)}" title="${esc(iconHost(a)?tr('从 {site} 获取网站图标',{site:iconSiteFor(iconSites(),iconHost(a))}):tr('填写网站域名获取图标'))}">${tr('获取图标')}</button>`):'';
  $('#detail-content').innerHTML=`<div class="detail-head">${tile(a,'lg')}<span class="eyebrow">${esc(cats[a.type].one)}${a.stopped?' · '+tr('已停用'):''}${a.hiddenAt?' · '+tr('已隐藏'):''}</span>${iconButton}</div><h2>${esc(veil(a.name))}</h2>${sub?`<p class="detail-sub">${esc(sub)}</p>`:''}${a.purpose?`<span class="detail-badge">${esc(a.purpose)}</span>`:''}${actions}${a.hiddenAt?'':quickRow(a)}<div class="facts">${detailFacts(a,lastSync)}${extraFacts(a)}${keepFacts(a)}</div>${paymentsSection(a)}${linkSection(a)}${notes}`;
- $('#detail').hidden=false;markSelected();
+ $('#detail').hidden=false;if(!wasOpen&&!still)detailMotion(true);markSelected();
  if(focus??(wasOpen?inside:!inspectorDocked()))$('#close-detail').focus();
 }
 // Masked values reveal on request; the full value never appears in the list.
@@ -940,7 +940,29 @@ function markTone(src){
  img.src=src;return '';
 }
 function refreshMarkTones(){document.querySelectorAll('.tile.custom-art img,.site-mark').forEach(img=>{const tone=markTones.get(img.getAttribute('src'));if(tone===undefined)return;const host=img.classList.contains('site-mark')?img:img.parentElement;host.classList.toggle('mark-dark',tone==='mark-dark');host.classList.toggle('mark-light',tone==='mark-light');});}
-function closeDetail(){$('#detail').hidden=true;activeAsset=null;markSelected();if(lastFocus?.isConnected)lastFocus.focus();}
+// The detail comes in from the right at once and goes back there (material.css, the detail as a card): opening animates the detail
+// itself; closing hides it at once and lets an inert copy (.detail-leave, no ids) slide away. Under 冰箱贴 the door's figure pulls
+// the card out and pushes it back (body.fig-pull, body.fig-push). Both take DETAIL_MOTION and the card never waits for the figure; a
+// toggle sooner than that after the last goes straight to where it ends, without the figure; less motion only fades the card.
+const DETAIL_MOTION=300;let detailToggled=-1e9,detailMotionTimer=0;
+function detailMotion(open){
+ const card=$('#detail'),body=document.body,now=performance.now(),quick=now-detailToggled<DETAIL_MOTION+40,still=matchMedia('(prefers-reduced-motion: reduce)').matches;
+ detailToggled=now;clearTimeout(detailMotionTimer);
+ card.getAnimations().forEach(a=>a.cancel());document.querySelectorAll('.detail-leave').forEach(n=>n.remove());body.classList.remove('fig-pull','fig-push');
+ if(quick)return;
+ const away=Math.max(0,innerWidth-card.getBoundingClientRect().left),slide=still?[{opacity:0},{opacity:1}]:[{translate:`${away}px 0`,opacity:.4},{translate:'0 0',opacity:1}];
+ let target=card;
+ if(open)card.animate(slide,{duration:still?150:240,easing:'cubic-bezier(.2,.8,.2,1)'});
+ else{
+  target=card.cloneNode(true);target.removeAttribute('id');target.removeAttribute('aria-label');target.classList.add('detail-leave');target.inert=true;target.setAttribute('aria-hidden','true');
+  target.querySelectorAll('[id]').forEach(n=>{if(n.id==='detail-content')n.classList.add('detail-copy');n.removeAttribute('id');});
+  card.after(target);target.scrollTop=card.scrollTop;
+  target.animate(slide.slice().reverse(),{duration:still?150:220,easing:'cubic-bezier(.4,0,.8,.4)',fill:'forwards'}).finished.then(()=>target.remove(),()=>{});
+ }
+ if(!still&&boardSkin==='magnet'&&body.classList.contains('wall-shown'))body.classList.add(open?'fig-pull':'fig-push');
+ detailMotionTimer=setTimeout(()=>{body.classList.remove('fig-pull','fig-push');if(!open)target.remove();},DETAIL_MOTION);
+}
+function closeDetail(){if(!$('#detail').hidden)detailMotion(false);$('#detail').hidden=true;activeAsset=null;markSelected();if(lastFocus?.isConnected)lastFocus.focus();}
 // Dialog widths by content: short confirmations narrow, lists wide, forms in between.
 const MODAL_SIZES={connect:'l',asset:'xl',prefs:'l',confirm:'s',inbox:'l','import-preview':'l',agent:'l',network:'l',cost:'l'};
 function modal(title,html,view=''){const dialog=$('#modal'),content=$('#modal-content'),scroll=dialog.open&&dialog.dataset.view===view?content.scrollTop:0;$('#modal-title').textContent=title;content.innerHTML=html;dialog.dataset.view=view;dialog.dataset.size=MODAL_SIZES[view]||'';if(!html.includes('id="asset-form"')&&!html.includes("id='asset-form'")&&!html.includes('id="dirty-save"'))assetFormSnapshot=null;if(nativeStore)content.querySelectorAll('.form-note').forEach(el=>{if(el.textContent.includes(tr('浏览器')))el.textContent=el.textContent.replaceAll(tr('当前浏览器'),tr('此 Mac')).replaceAll(tr('此浏览器'),tr('此 Mac'));});if(!dialog.open)dialog.showModal();content.scrollTop=scroll;
@@ -3381,7 +3403,7 @@ document.addEventListener('visibilitychange',()=>document.visibilityState==='hid
 setInterval(checkMissed,300000);
 checkMissed();
 // A wide window opens with the first item selected, so the inspector column is there from the start (once per launch, focus stays put).
-function selectFirstOnce(){if(!inspectorDocked()||!$('#detail').hidden||query)return;const first=document.querySelector('#board [data-asset]');if(first)showDetail(first.dataset.asset,{focus:false});}
+function selectFirstOnce(){if(!inspectorDocked()||!$('#detail').hidden||query)return;const first=document.querySelector('#board [data-asset]');if(first)showDetail(first.dataset.asset,{focus:false,still:true});}
 selectFirstOnce();
 installImportDropPaste();
 // Delete requests still waiting from an earlier run come back to the confirmation list.
