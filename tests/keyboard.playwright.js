@@ -67,6 +67,8 @@ async (page) => {
   await p.focus('#board [data-asset="s0"] .item-open');
   await key('Enter');check(await p.locator('#detail').isVisible()&&await p.evaluate(()=>document.activeElement.id==='close-detail'),'Enter opens the inspector with focus inside');
   check(await p.locator('#detail .quick-row [data-quick="copy-ip"]').count()===1,'The inspector lists the quick actions beyond the row');
+  // the board makes the card's room once the card is in (app.js, boardRoom)
+  await p.waitForTimeout(700);
   check(await p.evaluate(()=>document.body.classList.contains('inspecting')&&document.querySelector('#board').getBoundingClientRect().right<=document.querySelector('#detail').getBoundingClientRect().left+1),'The inspector docks beside the list, inside the card');
   check(await p.locator('#board [data-asset="s0"].selected').count()===1,'The open record is selected in the list');
   await key('Escape');check(await p.locator('#detail').isHidden(),'Esc closes the inspector');

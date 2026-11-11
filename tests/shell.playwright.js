@@ -87,7 +87,8 @@ async (page) => {
   // Inspector: docked inside the card beside the list, at every desktop width (it narrows: 380, 340 below 1280, 320 below 1100).
   const boardNode=await p.evaluate(()=>{window.__firstRow=document.querySelector('#board [data-asset]');return document.querySelector('#board').dataset.size;});
   check(boardNode==='l','A wide main area lays rows out in one line');
-  await p.click('#board [data-asset="d0"] .item-open');await settle();
+  // the board makes the card's room once the card is in (app.js, boardRoom)
+  await p.click('#board [data-asset="d0"] .item-open');await p.waitForTimeout(700);
   const docked=()=>p.evaluate(()=>{const m=document.querySelector('#main').getBoundingClientRect(),b=document.querySelector('#board').getBoundingClientRect(),d=document.querySelector('#detail').getBoundingClientRect();return b.right<=d.left+1&&Math.abs(m.right-d.right-12)<1&&d.top>m.top&&getComputedStyle(document.querySelector('#detail')).boxShadow!=='none';});
   check(await docked(),'The inspector docks beside the list, inside the card, 12px clear of its edge');
   await p.setViewportSize({width:1100,height:800});await settle();

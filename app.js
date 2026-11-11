@@ -558,7 +558,7 @@ function syncActionBanner(){
 }
 function agentDeleteNudge(){syncActionBanner();if(nativeStore&&!demoMode)try{window.webkit.messageHandlers.assetboard.postMessage({action:'attention'});}catch{}}
 // The selected row follows the inspector without a re-render.
-function markSelected(){document.querySelectorAll('#board .selected').forEach(n=>n.classList.remove('selected'));const open=!$('#detail').hidden;document.body.classList.toggle('inspecting',open);if(open&&activeAsset)document.querySelector(`#board [data-asset="${CSS.escape(activeAsset)}"]`)?.classList.add('selected');}
+function markSelected(){document.querySelectorAll('#board .selected').forEach(n=>n.classList.remove('selected'));const open=!$('#detail').hidden;document.body.classList.toggle('inspecting',open);boardRoom(open);if(open&&activeAsset)document.querySelector(`#board [data-asset="${CSS.escape(activeAsset)}"]`)?.classList.add('selected');}
 // One small menu for the inspector's ⋯ and a row's context menu. Items are ordinary data-action buttons, so they run through the one click handler.
 let menuReturn=null;
 function assetMenuItems(a,full=false){
@@ -943,12 +943,15 @@ function refreshMarkTones(){document.querySelectorAll('.tile.custom-art img,.sit
 // The detail comes in from the right at once and goes back there (material.css, the detail as a card): opening animates the detail
 // itself; closing hides it at once and lets an inert copy (.detail-leave, no ids) slide away. Under 冰箱贴 the door's figure pulls
 // the card out and pushes it back (body.fig-pull, body.fig-push). Both take DETAIL_MOTION and the card never waits for the figure; a
-// toggle sooner than that after the last goes straight to where it ends, without the figure; less motion only fades the card.
+// toggle sooner than that after the last goes straight to where it ends, without the figure; less motion only fades the card. The
+// board makes or gives back its room after the act (boardRoom, below: roomWait is how long the act takes).
 const DETAIL_MOTION=300;let detailToggled=-1e9,detailMotionTimer=0;
 function detailMotion(open){
  const card=$('#detail'),body=document.body,now=performance.now(),quick=now-detailToggled<DETAIL_MOTION+40,still=matchMedia('(prefers-reduced-motion: reduce)').matches;
  detailToggled=now;clearTimeout(detailMotionTimer);
  card.getAnimations().forEach(a=>a.cancel());document.querySelectorAll('.detail-leave').forEach(n=>n.remove());body.classList.remove('fig-pull','fig-push');
+ const figure=!still&&boardSkin==='magnet'&&body.classList.contains('wall-shown');
+ roomWait=still?0:quick?BOARD_ROOM_QUICK:figure?DETAIL_MOTION:open?240:220;
  if(quick)return;
  const away=Math.max(0,innerWidth-card.getBoundingClientRect().left),slide=still?[{opacity:0},{opacity:1}]:[{translate:`${away}px 0`,opacity:.4},{translate:'0 0',opacity:1}];
  let target=card;
@@ -959,8 +962,49 @@ function detailMotion(open){
   card.after(target);target.scrollTop=card.scrollTop;
   target.animate(slide.slice().reverse(),{duration:still?150:220,easing:'cubic-bezier(.4,0,.8,.4)',fill:'forwards'}).finished.then(()=>target.remove(),()=>{});
  }
- if(!still&&boardSkin==='magnet'&&body.classList.contains('wall-shown'))body.classList.add(open?'fig-pull':'fig-push');
+ if(figure)body.classList.add(open?'fig-pull':'fig-push');
  detailMotionTimer=setTimeout(()=>{body.classList.remove('fig-pull','fig-push');if(!open)target.remove();},DETAIL_MOTION);
+}
+// The board's room for the detail (body.detail-room, material.css) follows the card: once the card is in or gone (under 冰箱贴, once
+// the figure's act is over) the board takes its new width and the panels slide to their new places over BOARD_ROOM_MS, eased in and
+// out, changing width as they go; the strip and the other blocks on the board change width with them. Opening keeps the board as
+// wide as it was until the panels are there, so none slides under an edge. A toggle while they move starts from where they are;
+// quick toggles move the panels once, BOARD_ROOM_QUICK after the last. Less motion, or a detail shown without its motion, makes
+// the room at once. The free places of 冰箱贴 are not touched: the panels are laid out from them for the new width (board-free.js).
+const BOARD_ROOM_MS=340,BOARD_ROOM_QUICK=120,BOARD_ROOM_EASE='cubic-bezier(.45,.05,.25,1)';
+let roomWait=0,roomTimer=0,roomTarget=null,roomMove=null;
+function boardRoom(open){
+ const wait=roomWait;roomWait=0;
+ if(roomTarget===open)return;
+ clearTimeout(roomTimer);roomTarget=null;
+ if((roomMove?roomMove.open:document.body.classList.contains('detail-room'))===open)return;
+ if(!wait){roomSlide(open,false);return;}
+ roomTarget=open;roomTimer=setTimeout(()=>{roomTarget=null;roomSlide(open,true);},wait);
+}
+function roomSlide(open,motion){
+ const body=document.body,board=$('#board'),wall=board.querySelector('.wall'),panels=wall?[...wall.children].filter(n=>n.dataset.group):[];
+ const blocks=[...board.children].filter(n=>n!==wall&&n.getClientRects().length);
+ motion=motion&&!reduceMotion()&&!freeDrag?.started&&!gesture?.active&&board.getClientRects().length>0;
+ // where everything is drawn now, also halfway through a slide
+ const from=motion&&new Map([...panels.map(n=>{const t=getComputedStyle(n).translate.split(' ').map(parseFloat);return [n,{x:n.offsetLeft+(t[0]||0),y:n.offsetTop+(t[1]||0),w:n.offsetWidth}];}),...blocks.map(n=>[n,{w:n.offsetWidth}])]);
+ const height=wall?.offsetHeight;
+ roomDone();body.classList.toggle('detail-room',open);
+ if(!motion){if(wall)packWall();return;}
+ wallHold=true;
+ const width=wall?.clientWidth,widths=new Map(blocks.map(n=>[n,n.offsetWidth]));
+ if(open){body.classList.remove('detail-room');if(wall)wall.style.width=width+'px';}
+ if(wall)packWall();
+ const timing={duration:BOARD_ROOM_MS,easing:BOARD_ROOM_EASE,fill:'forwards'},anims=[];
+ for(const n of panels){const f=from.get(n),dx=f.x-n.offsetLeft,dy=f.y-n.offsetTop,w=n.offsetWidth;
+  if(Math.abs(dx)>=1||Math.abs(dy)>=1||Math.abs(f.w-w)>=1)anims.push(n.animate([{translate:`${dx}px ${dy}px`,width:f.w+'px'},{translate:'0px 0px',width:w+'px'}],timing));}
+ for(const n of blocks){const f=from.get(n).w,w=widths.get(n);if(Math.abs(f-w)>=1)anims.push(n.animate([{width:f+'px'},{width:w+'px'}],timing));}
+ if(wall&&Math.abs(wall.offsetHeight-height)>=1)anims.push(wall.animate([{height:height+'px'},{height:wall.offsetHeight+'px'}],timing));
+ roomMove={open,wall,anims,timer:setTimeout(roomDone,BOARD_ROOM_MS)};
+}
+function roomDone(){
+ const m=roomMove;if(!m)return;roomMove=null;clearTimeout(m.timer);
+ document.body.classList.toggle('detail-room',m.open);if(m.wall)m.wall.style.width='';
+ m.anims.forEach(a=>a.cancel());wallHold=false;packWall();
 }
 function closeDetail(){if(!$('#detail').hidden)detailMotion(false);$('#detail').hidden=true;activeAsset=null;markSelected();if(lastFocus?.isConnected)lastFocus.focus();}
 // Dialog widths by content: short confirmations narrow, lists wide, forms in between.

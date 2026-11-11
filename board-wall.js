@@ -156,15 +156,16 @@ function wallDeco(id,i){
 }
 
 // Packing: every panel (and a dragged panel's slot) gets the column width, then goes to the top of the shortest column. Positions are
-// absolute, so a panel that changes height (folding, fonts, a density) moves the ones under it at once; a ResizeObserver repacks.
+// absolute, so a panel that changes height (folding, fonts, a density) moves the ones under it at once; a ResizeObserver repacks,
+// except while the board makes or gives back the detail's room (wallHold; app.js, boardRoom packs before and after itself).
 function wallColumns(width,gap=WALL_GAP){
  const fit=Math.max(1,Math.floor((width+gap)/(WALL_MIN_COL+gap)));
  return fit<=WALL_COLS?fit:Math.max(WALL_COLS,Math.ceil((width+gap)/(WALL_MAX_COL+gap)));
 }
-let wallObserver=null,wallWidth=0;
+let wallObserver=null,wallWidth=0,wallHold=false;
 function packWall(){
  const wall=document.querySelector('#board .wall');document.body.classList.toggle('wall-shown',!!wall);if(!wall)return;
- if(!wallObserver)wallObserver=new ResizeObserver(entries=>{if(entries.some(en=>en.target!==wallObserver.wall||Math.abs(en.contentRect.width-wallWidth)>.5))packWall();});
+ if(!wallObserver)wallObserver=new ResizeObserver(entries=>{if(!wallHold&&entries.some(en=>en.target!==wallObserver.wall||Math.abs(en.contentRect.width-wallWidth)>.5))packWall();});
  if(wallObserver.wall!==wall){wallObserver.disconnect();wallObserver.wall=wall;wallObserver.observe(wall);for(const n of wall.children)wallObserver.observe(n);}
  const items=[...wall.children].filter(n=>!n.classList.contains('is-dragging')),width=wall.clientWidth;if(!width)return;
  if(wall.classList.contains('free')){wallWidth=width;freePack(wall,items.filter(n=>n.dataset.group),width);return;}
