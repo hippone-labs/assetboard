@@ -282,12 +282,14 @@ function freeTick(d){
  d.el.style.left=x+'px';d.el.style.top=y+'px';
  const wall=freeView.wall,need=y+d.s.h+FREE_SAFE;if(need>(parseFloat(wall.style.height)||0))wall.style.height=Math.ceil(need)+'px';
  freeNudge(nudges);
+ // A pointer that stops is at rest FREE_STILL ms later, however fast it came: the nudges are drawn again then, as no move will.
+ clearTimeout(d.still);d.still=setTimeout(()=>{if(freeDrag===d)freeNudge(d.s.nudges(performance.now()));},FREE_STILL+1);
  if(d.s.armed!==armed)freeArm(d);
  if(sc)d.frame=requestAnimationFrame(()=>freeTick(d));
 }
 function freeNudge(nudges){for(const [id,{dx,dy}] of nudges){const el=freeEl(id);if(el)el.style.translate=dx||dy?`${dx.toFixed(1)}px ${dy.toFixed(1)}px`:'';}}
 function freeArm(d){clearTimeout(d.dwell);if(d.s.armed===null)return;d.dwell=setTimeout(()=>{if(freeDrag!==d)return;const at=Math.max(performance.now(),d.s.armed+d.s.feel.dwell);freeNudge(d.s.nudges(at));if(d.s.due(at)){freeNudge(new Map([...d.s.layout.keys()].map(k=>[k,{dx:0,dy:0}])));freePlace(d.s.layout,d.id);}else freeArm(d);},Math.max(0,d.s.armed+d.s.feel.dwell-performance.now()));}
-function freeRelease(){const d=freeDrag;if(!d)return;clearTimeout(d.timer);clearTimeout(d.dwell);cancelAnimationFrame(d.frame);removeEventListener('pointermove',freeMove);removeEventListener('pointerup',freeEnd);removeEventListener('pointercancel',freeEnd);freeDrag=null;}
+function freeRelease(){const d=freeDrag;if(!d)return;clearTimeout(d.timer);clearTimeout(d.dwell);clearTimeout(d.still);cancelAnimationFrame(d.frame);removeEventListener('pointermove',freeMove);removeEventListener('pointerup',freeEnd);removeEventListener('pointercancel',freeEnd);freeDrag=null;}
 function freeCleanup(d){
  const wall=freeView?.wall;document.body.classList.remove('drag-active');
  if(wall){wall.classList.remove('free-dragging');for(const n of wall.children)n.style.translate='';}
