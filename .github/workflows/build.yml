@@ -1,8 +1,9 @@
 # Tests every push and pull request: the web tests on a GitHub-hosted Ubuntu runner, and the Swift build and self-tests, with the Pro
-# modules when the runner's checkout has them and without (ASSETBOARD_EDITION=free), on the self-hosted Mac labelled mac-build (it
-# holds no signing keychain; signing and releases stay on assetboard-mini).
+# modules when the checkout has them and without (ASSETBOARD_EDITION=free), on GitHub-hosted macOS 26 with the Xcode pinned in
+# XCODE_VERSION (tools/ci-mac.sh). No job here signs or reads a secret.
 # Before a release, run it by hand with "Minimum system" ticked: the Swift job then runs on GitHub-hosted macOS 15, the oldest
-# system the app supports (LSMinimumSystemVersion), so the WebKit and system libraries under test are the ones a user at the minimum has.
+# system the app supports (LSMinimumSystemVersion), so the WebKit and system libraries under test are the ones a user at the minimum has;
+# that run keeps the image's default Xcode.
 name: build
 
 on:
@@ -30,6 +31,8 @@ defaults:
 env:
   PLAYWRIGHT_VERSION: 1.64.1
   PW_PORT: 4320
+  # The Xcode the macOS 26 jobs build with (the same in notarize.yml and release-app.yml).
+  XCODE_VERSION: '26.6'
 
 jobs:
   web:
@@ -75,8 +78,8 @@ jobs:
           path: ${{ runner.temp }}/logs/
           retention-days: 7
 
-  # Assets.car (the app icon for macOS 26 and later) needs actool, which comes with Xcode; the self-hosted Macs have only the
-  # Command Line Tools and build.sh copies the committed desktop/Assets.car. Here a GitHub-hosted Mac with Xcode compiles it from
+  # Assets.car (the app icon for macOS 26 and later) needs actool, which comes with Xcode; a Mac with only the Command Line Tools
+  # builds with the committed desktop/Assets.car (build.sh copies it). Here a GitHub-hosted Mac with Xcode compiles it from
   # desktop/AppIcon.icon again: the job fails when the committed car's recorded source is not the current icon, and the fresh car is
   # in the artifact. The free edition is then built and self-tested with it on macOS 26, where --test-app-icon checks the system's icon.
   icon:
@@ -86,6 +89,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+
+      - name: Select Xcode
+        run: bash tools/ci-mac.sh xcode
 
       - name: Prepare logs
         run: mkdir -p "$RUNNER_TEMP/logs" && { sw_vers; xcodebuild -version; } 2>&1 | tee "$RUNNER_TEMP/logs/env.log"
@@ -124,12 +130,16 @@ jobs:
           retention-days: 7
 
   mac:
-    runs-on: ${{ inputs.min_os && 'macos-15' || fromJSON('["self-hosted","macOS","ARM64","mac-build"]') }}
+    runs-on: ${{ inputs.min_os && 'macos-15' || 'macos-26' }}
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+
+      - name: Select Xcode
+        if: ${{ !inputs.min_os }}
+        run: bash tools/ci-mac.sh xcode
 
       - name: Prepare logs
         run: mkdir -p "$RUNNER_TEMP/logs" && { sw_vers; xcrun swiftc --version; } 2>&1 | tee "$RUNNER_TEMP/logs/env.log"
