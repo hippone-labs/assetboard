@@ -12,7 +12,9 @@
 //  standard  two lines: + the fields (IP, account, platform, or a live reading) in columns, the price at the right end
 //  detail    the name line, then every known fact of the record (the cost among them), one line each, by weight (wallFacts)
 // Hovering a line (or reaching it with the keyboard while the inspector is closed) shows the same facts in a card beside it.
-// How the panels look (tilt, edge, the lift of a dragged panel) is the skin's (theme.js, material.css); this file only lays out.
+// How the panels look (tilt, edge, the lift of a dragged panel, a 冰箱贴 panel's pin or tape and sticker) is the skin's (theme.js,
+// material.css). Under the quiet skin this file packs the columns; under 冰箱贴 the panels are placed freely (board-free.js), with
+// the same columns as their places and the same tiles.
 // Loaded after board-views.js and before app.js; the app.js helpers used here are called only at render and event time.
 const WALL_DENSITIES=['glance','standard','detail'];
 const WALL_DENSITY_NAMES={glance:tr('全局'),standard:tr('标准'),detail:tr('详细')};
@@ -133,9 +135,9 @@ function wallTileHtml(a,{e,when,costSpan,live}){
 function wallBoardHtml(live){
  const panels=categoryIds().map(id=>({id,list:arranged(id,live.filter(a=>a.type===id))})).filter(p=>p.list.length);
  const empty=categoryIds().filter(id=>state.blocks.some(b=>b.id===id)&&!live.some(a=>a.type===id));
- const html=panels.map(({id,list})=>groupHtml({id,title:cats[id].name,glyph:`<span class="g-icon">${icon(id)}</span>`,list,fold:true,folded:!!state.blocks.find(b=>b.id===id)?.folded,reorder:true,summary:groupSummary(list)+(list.length>1?groupCostHtml(list):''),actions:categoryActions(id),wall:true})).join('');
+ const html=panels.map(({id,list},i)=>groupHtml({id,title:cats[id].name,glyph:`<span class="g-icon">${icon(id)}</span>`,list,fold:true,folded:!!state.blocks.find(b=>b.id===id)?.folded,reorder:true,summary:groupSummary(list)+(list.length>1?groupCostHtml(list):''),actions:categoryActions(id),wall:true,deco:wallDeco(id,i)})).join('');
  const rest=empty.length?`<p class="wall-empty"><span>${tr('空的类别')}</span>${empty.map(id=>`<button class="wall-add" data-action="add-asset" data-id="${esc(id)}" title="${tr('添加{name}',{name:esc(cats[id].name)})}">${ui('plus')}${esc(cats[id].name)}</button>`).join('')}</p>`:'';
- return `<div class="wall" data-density="${wallDensity}">${html}</div>${wallPendingHtml()}${rest}`;
+ return `<div class="wall${typeof freeOn==='function'&&freeOn()?' free':''}" data-density="${wallDensity}">${html}</div>${wallPendingHtml()}${rest}`;
 }
 // What a connected platform read and the board does not hold yet (待引入): one quiet line under the wall, a button per platform.
 function wallPendingHtml(){
@@ -143,20 +145,29 @@ function wallPendingHtml(){
  return `<p class="wall-empty wall-pending"><span>${tr('待引入')}</span>${sources.map(s=>`<button class="wall-add" data-action="connect-pending" data-id="${esc(s.source)}" title="${tr('还没在大板里，点开挑选')}">${ui('download')}${esc(s.name)} ${formatCount(s.count)}</button>`).join('')}</p>`;
 }
 // A panel's tilt under a skin that tilts: a steady -1…1 from its category, so a panel keeps its angle from one drawing to the next.
-function wallTilt(id){let h=7;for(const c of String(id))h=(h*31+c.charCodeAt(0))|0;return ((Math.abs(h)%17)/8-1).toFixed(2);}
+function wallHash(id){let h=7;for(const c of String(id))h=(h*31+c.charCodeAt(0))|0;return Math.abs(h);}
+function wallTilt(id){return ((wallHash(id)%17)/8-1).toFixed(2);}
+// What holds a 冰箱贴 panel to the door: a pin and a strip of tape by turns along the wall, and on about one panel in three a
+// sticker at its top right corner (the skin's scene picks the pins' colours in turn and the sticker's picture from the number). Drawn for
+// every skin, shown only by 冰箱贴; never takes the pointer, and the head leaves the sticker its corner.
+function wallDeco(id,i){
+ const h=wallHash(id),top=i%2===0?`<i class="wall-pin" data-n="${(i>>1)%4}" aria-hidden="true"></i>`:`<i class="wall-tape" style="--tape-turn:${h%11-5}deg" aria-hidden="true"></i>`;
+ return {html:top+((h>>3)%3===0?`<i class="wall-sticker" data-n="${(h>>5)%6}" aria-hidden="true"></i>`:''),cls:(h>>3)%3===0?' has-sticker':''};
+}
 
 // Packing: every panel (and a dragged panel's slot) gets the column width, then goes to the top of the shortest column. Positions are
 // absolute, so a panel that changes height (folding, fonts, a density) moves the ones under it at once; a ResizeObserver repacks.
-function wallColumns(width){
- const fit=Math.max(1,Math.floor((width+WALL_GAP)/(WALL_MIN_COL+WALL_GAP)));
- return fit<=WALL_COLS?fit:Math.max(WALL_COLS,Math.ceil((width+WALL_GAP)/(WALL_MAX_COL+WALL_GAP)));
+function wallColumns(width,gap=WALL_GAP){
+ const fit=Math.max(1,Math.floor((width+gap)/(WALL_MIN_COL+gap)));
+ return fit<=WALL_COLS?fit:Math.max(WALL_COLS,Math.ceil((width+gap)/(WALL_MAX_COL+gap)));
 }
 let wallObserver=null,wallWidth=0;
 function packWall(){
- const wall=document.querySelector('#board .wall');if(!wall)return;
+ const wall=document.querySelector('#board .wall');document.body.classList.toggle('wall-shown',!!wall);if(!wall)return;
  if(!wallObserver)wallObserver=new ResizeObserver(entries=>{if(entries.some(en=>en.target!==wallObserver.wall||Math.abs(en.contentRect.width-wallWidth)>.5))packWall();});
  if(wallObserver.wall!==wall){wallObserver.disconnect();wallObserver.wall=wall;wallObserver.observe(wall);for(const n of wall.children)wallObserver.observe(n);}
  const items=[...wall.children].filter(n=>!n.classList.contains('is-dragging')),width=wall.clientWidth;if(!width)return;
+ if(wall.classList.contains('free')){wallWidth=width;freePack(wall,items.filter(n=>n.dataset.group),width);return;}
  const cols=wallColumns(width),colW=Math.floor((width-WALL_GAP*(cols-1))/cols*100)/100;
  wallWidth=width;wall.dataset.cols=cols;
  for(const n of items)n.style.width=colW+'px';

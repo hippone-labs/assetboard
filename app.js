@@ -86,7 +86,9 @@ let remindersSent='';
 function syncReminders(){if(!nativeStore||demoMode)return;try{const items=reminderPlan(state.assets),json=JSON.stringify(items);if(json===remindersSent)return;window.webkit.messageHandlers.assetboard.postMessage({action:'reminders',items});remindersSent=json;}catch{}}
 // A click on a notification: one record opens in 即将到来 with the inspector; a merged day opens 即将到来.
 window.assetboardReminderOpen=id=>{if($('#modal')?.open)$('#modal').close();if(typeof panoOpen!=='undefined'&&panoOpen)togglePanorama(false);setView('upcoming');if(id&&state.assets.some(a=>a.id===id))showDetail(id,{focus:true});};
-function checkpoint(){history.push(JSON.stringify(state));if(history.length>25)history.shift();future=[];}
+function checkpoint(){checkpointEntry(JSON.stringify(state));}
+// An undo step is the board as it was (JSON), or, for where the 冰箱贴 wall's panels are, 'wall:' and that (board-free.js).
+function checkpointEntry(entry){history.push(entry);if(history.length>25)history.shift();future=[];}
 // A Latin word set into Chinese text gets a space on the side that meets a Chinese character (添加 AI 订阅资产, 添加 Apple ID 资产).
 function zhGap(text){text=String(text);return appLang==='zh'?(/^[A-Za-z0-9]/.test(text)?' ':'')+text+(/[A-Za-z0-9]$/.test(text)?' ':''):text;}
 function toast(message,undoable=false,redoable=false,act=null){clearTimeout(toastTimer);$('#toast').classList.remove('notice','ask');$('#toast').setAttribute('role','status');const offer=(undoable&&history.length)||(redoable&&future.length)||!!act;$('#toast').innerHTML=`<span>${esc(message)}</span>${undoable&&history.length?'<button class="toast-undo" data-action="undo">'+tr('撤销')+'</button>':redoable&&future.length?'<button class="toast-undo" data-action="redo">'+tr('重做')+'</button>':act?`<button class="toast-undo" data-action="${esc(act.action)}"${act.id?` data-id="${esc(act.id)}"`:''}>${esc(act.label)}</button>`:''}`;$('#toast').classList.add('show');toastTimer=setTimeout(()=>$('#toast').classList.remove('show'),offer?6000:3000);}
@@ -97,8 +99,10 @@ function hideToast(){clearTimeout(toastTimer);$('#toast').classList.remove('show
 function notice(message,act=null){clearTimeout(toastTimer);const t=$('#toast');t.classList.remove('ask');t.classList.add('notice','show');t.setAttribute('role','alert');t.innerHTML=`${ui('warn')}<span>${esc(message)}</span>${act?`<button class="toast-undo" data-action="${esc(act.action)}"${act.id?` data-id="${esc(act.id)}"`:''}>${esc(act.label)}</button>`:''}<button class="toast-close" data-action="toast-close" aria-label="${tr('关闭提示')}" title="${tr('关闭')}">×</button>`;toastTimer=setTimeout(hideToast,NOTICE_MS);}
 for(const [type,ms] of [['mouseenter',0],['focusin',0],['mouseleave',4000],['focusout',4000]])$('#toast').addEventListener(type,()=>{const t=$('#toast');if(!t.classList.contains('notice')||!t.classList.contains('show'))return;clearTimeout(toastTimer);if(ms&&!t.matches(':hover,:focus-within'))toastTimer=setTimeout(hideToast,ms);});
 function restoreSnapshot(json){const actions=state.agentActions;state=JSON.parse(json);if(actions)state.agentActions=actions;rememberCosts();save();if(activeAsset&&!state.assets.some(a=>a.id===activeAsset))closeDetail();else if(activeAsset&&!$('#detail').hidden)showDetail(activeAsset,{focus:false});render();}
-function undo(){if(!history.length){toast(tr('没有可撤销的'));return;}future.push(JSON.stringify(state));if(future.length>25)future.shift();restoreSnapshot(history.pop());toast(tr('已撤销'),false,true);}
-function redo(){if(!future.length){toast(tr('没有可重做的'));return;}history.push(JSON.stringify(state));if(history.length>25)history.shift();restoreSnapshot(future.pop());toast(tr('已重做'),true);}
+function restoreEntry(entry){if(entry.startsWith('wall:'))freeRestore(entry);else restoreSnapshot(entry);}
+function currentEntry(like){return like.startsWith('wall:')?freeEntry():JSON.stringify(state);}
+function undo(){if(!history.length){toast(tr('没有可撤销的'));return;}const entry=history.pop();future.push(currentEntry(entry));if(future.length>25)future.shift();restoreEntry(entry);toast(tr('已撤销'),false,true);}
+function redo(){if(!future.length){toast(tr('没有可重做的'));return;}const entry=future.pop();history.push(currentEntry(entry));if(history.length>25)history.shift();restoreEntry(entry);toast(tr('已重做'),true);}
 // A close event from the dialog this one replaced arrives after it opens; only a close that leaves the dialog shut cancels.
 function confirmDialog(title,message,confirmLabel,danger=false){return new Promise(resolve=>{modal(title,`<p class="form-note confirm-message">${esc(message).replaceAll('\n','<br>')}</p><div class="confirm-actions"><button class="button ${danger?'danger':'primary'}" id="confirm-yes">${esc(confirmLabel)}</button><button class="button" id="confirm-no">${tr('取消')}</button></div>`,'confirm');const dialog=$('#modal');let settled=false;const finish=value=>{if(settled)return;settled=true;dialog.removeEventListener('close',cancel);resolve(value);},cancel=()=>{if(!dialog.open)finish(false);};dialog.addEventListener('close',cancel);$('#confirm-yes').onclick=()=>{finish(true);dialog.close();};$('#confirm-no').onclick=()=>dialog.close();$('#confirm-no').focus();});}
 // Release notes, a Markdown list: "- " starts an item, an indented line goes on with it, heading marks are dropped.
@@ -119,7 +123,7 @@ function isHidden(a){return !!(a&&a.hiddenAt);}
 function rememberDeleted(a){if(!a)return;const key=assetSyncKey(a);if(!key){addTombstone(state,a.id);return;}if(!Array.isArray(state.deletedExternalIds))state.deletedExternalIds=[];if(!state.deletedExternalIds.includes(key))state.deletedExternalIds.push(key);if(a.id&&!state.deletedExternalIds.includes(a.id))state.deletedExternalIds.push(a.id);}
 function icon(type){return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[type]||icons.storage}</svg>`;}
 // Small UI glyphs for buttons and chips; every icon-only button must carry title and aria-label.
-const uiGlyphs={pulse:'<path d="M3 12h4l2.5-6 5 12 2.5-6h4"/>',download:'<path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19.5h14"/>',file:'<path d="M7 3.5h6.5L18 8v12.5H7z"/><path d="M13.5 3.5V8H18"/>',plus:'<path d="M12 5v14M5 12h14"/>',mail:'<path d="M4 6h16v12H4zM4 6l8 7 8-7"/>',image:'<rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.5"/><path d="m5 17 4.5-4.5L13 16l2.5-2.5L19 17"/>',terminal:'<rect x="3.5" y="5" width="17" height="14" rx="2"/><path d="m7.5 10 3 2.5-3 2.5M13 15h3.5"/>',refresh:'<path d="M19.5 9.5A8 8 0 0 0 5.2 7.8M4.5 14.5a8 8 0 0 0 14.3 1.7"/><path d="M5 4v4h4M19 20v-4h-4"/>',cloud:'<path d="M3.5 15.5h12a4 4 0 0 0 .4-8 6 6 0 0 0-11.5 1.8A3.5 3.5 0 0 0 3.5 15.5Z"/>',server:'<rect x="4" y="4.5" width="16" height="6" rx="1.5"/><rect x="4" y="13.5" width="16" height="6" rx="1.5"/><path d="M7.5 7.5h.01M7.5 16.5h.01"/>',github:'<path d="M9 19c-4 1.5-4-2-7-2m14 5v-3.9a3.4 3.4 0 0 0-1-2.6c3.2-.3 6.5-1.5 6.5-7A5.2 5.2 0 0 0 19 4.6 4.8 4.8 0 0 0 18.9 1S17.7.7 15 2.5a10.4 10.4 0 0 0-6 0C6.3.7 5.1 1 5.1 1A4.8 4.8 0 0 0 5 4.6 5.2 5.2 0 0 0 3.5 8.5c0 5.4 3.3 6.7 6.5 7a3.4 3.4 0 0 0-1 2.6V22"/>',back:'<path d="M10 6 4 12l6 6M4 12h16"/>',info:'<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5M12 8h.01"/>',lock:'<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8.5 11V8a3.5 3.5 0 0 1 7 0v3"/>',warn:'<path d="M12 4 3 19.5h18z"/><path d="M12 10v4.5M12 17h.01"/>',check:'<path d="m5 12.5 4.5 4.5L19 7.5"/>',gear:'<circle cx="12" cy="12" r="3"/><path d="M12 3.5v2M12 18.5v2M3.5 12h2M18.5 12h2M6 6l1.4 1.4M16.6 16.6 18 18M18 6l-1.4 1.4M7.4 16.6 6 18"/>',tray:'<path d="M4 13.5 6.5 5.5h11L20 13.5V18a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18Z"/><path d="M4 13.5h4.5a1 1 0 0 1 1 1 2.5 2.5 0 0 0 5 0 1 1 0 0 1 1-1H20"/>',palette:'<path d="M12 3.5a8.5 8.5 0 1 0 0 17c1.2 0 1.8-.8 1.8-1.7 0-1.3-1-1.6-1-2.7 0-.9.7-1.6 1.7-1.6h2.2a3.3 3.3 0 0 0 3.3-3.3C20 6.9 16.5 3.5 12 3.5Z"/><circle cx="7.8" cy="11" r=".7"/><circle cx="10.5" cy="7.5" r=".7"/><circle cx="15" cy="8" r=".7"/>',clock:'<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',sidebar:'<rect x="3.5" y="5" width="17" height="14" rx="2.5"/><path d="M9.5 5v14"/>',eye:'<path d="M3.5 12s3.2-5.5 8.5-5.5S20.5 12 20.5 12s-3.2 5.5-8.5 5.5S3.5 12 3.5 12Z"/><circle cx="12" cy="12" r="2.5"/>',eyeoff:'<path d="M3.5 12s3.2-5.5 8.5-5.5S20.5 12 20.5 12s-3.2 5.5-8.5 5.5S3.5 12 3.5 12Z"/><circle cx="12" cy="12" r="2.5"/><path d="M4.5 4.5l15 15"/>',spark:'<path d="M11 4c.6 3.9 2.6 5.9 6.5 6.5-3.9.6-5.9 2.6-6.5 6.5-.6-3.9-2.6-5.9-6.5-6.5C8.4 9.9 10.4 7.9 11 4Z"/>'};
+const uiGlyphs={tidy:'<path d="M4.5 4v16"/><rect x="8" y="5" width="11.5" height="5.5" rx="1.2"/><rect x="8" y="13.5" width="7.5" height="5.5" rx="1.2"/>',pulse:'<path d="M3 12h4l2.5-6 5 12 2.5-6h4"/>',download:'<path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19.5h14"/>',file:'<path d="M7 3.5h6.5L18 8v12.5H7z"/><path d="M13.5 3.5V8H18"/>',plus:'<path d="M12 5v14M5 12h14"/>',mail:'<path d="M4 6h16v12H4zM4 6l8 7 8-7"/>',image:'<rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.5"/><path d="m5 17 4.5-4.5L13 16l2.5-2.5L19 17"/>',terminal:'<rect x="3.5" y="5" width="17" height="14" rx="2"/><path d="m7.5 10 3 2.5-3 2.5M13 15h3.5"/>',refresh:'<path d="M19.5 9.5A8 8 0 0 0 5.2 7.8M4.5 14.5a8 8 0 0 0 14.3 1.7"/><path d="M5 4v4h4M19 20v-4h-4"/>',cloud:'<path d="M3.5 15.5h12a4 4 0 0 0 .4-8 6 6 0 0 0-11.5 1.8A3.5 3.5 0 0 0 3.5 15.5Z"/>',server:'<rect x="4" y="4.5" width="16" height="6" rx="1.5"/><rect x="4" y="13.5" width="16" height="6" rx="1.5"/><path d="M7.5 7.5h.01M7.5 16.5h.01"/>',github:'<path d="M9 19c-4 1.5-4-2-7-2m14 5v-3.9a3.4 3.4 0 0 0-1-2.6c3.2-.3 6.5-1.5 6.5-7A5.2 5.2 0 0 0 19 4.6 4.8 4.8 0 0 0 18.9 1S17.7.7 15 2.5a10.4 10.4 0 0 0-6 0C6.3.7 5.1 1 5.1 1A4.8 4.8 0 0 0 5 4.6 5.2 5.2 0 0 0 3.5 8.5c0 5.4 3.3 6.7 6.5 7a3.4 3.4 0 0 0-1 2.6V22"/>',back:'<path d="M10 6 4 12l6 6M4 12h16"/>',info:'<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5M12 8h.01"/>',lock:'<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8.5 11V8a3.5 3.5 0 0 1 7 0v3"/>',warn:'<path d="M12 4 3 19.5h18z"/><path d="M12 10v4.5M12 17h.01"/>',check:'<path d="m5 12.5 4.5 4.5L19 7.5"/>',gear:'<circle cx="12" cy="12" r="3"/><path d="M12 3.5v2M12 18.5v2M3.5 12h2M18.5 12h2M6 6l1.4 1.4M16.6 16.6 18 18M18 6l-1.4 1.4M7.4 16.6 6 18"/>',tray:'<path d="M4 13.5 6.5 5.5h11L20 13.5V18a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18Z"/><path d="M4 13.5h4.5a1 1 0 0 1 1 1 2.5 2.5 0 0 0 5 0 1 1 0 0 1 1-1H20"/>',palette:'<path d="M12 3.5a8.5 8.5 0 1 0 0 17c1.2 0 1.8-.8 1.8-1.7 0-1.3-1-1.6-1-2.7 0-.9.7-1.6 1.7-1.6h2.2a3.3 3.3 0 0 0 3.3-3.3C20 6.9 16.5 3.5 12 3.5Z"/><circle cx="7.8" cy="11" r=".7"/><circle cx="10.5" cy="7.5" r=".7"/><circle cx="15" cy="8" r=".7"/>',clock:'<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',sidebar:'<rect x="3.5" y="5" width="17" height="14" rx="2.5"/><path d="M9.5 5v14"/>',eye:'<path d="M3.5 12s3.2-5.5 8.5-5.5S20.5 12 20.5 12s-3.2 5.5-8.5 5.5S3.5 12 3.5 12Z"/><circle cx="12" cy="12" r="2.5"/>',eyeoff:'<path d="M3.5 12s3.2-5.5 8.5-5.5S20.5 12 20.5 12s-3.2 5.5-8.5 5.5S3.5 12 3.5 12Z"/><circle cx="12" cy="12" r="2.5"/><path d="M4.5 4.5l15 15"/>',spark:'<path d="M11 4c.6 3.9 2.6 5.9 6.5 6.5-3.9.6-5.9 2.6-6.5 6.5-.6-3.9-2.6-5.9-6.5-6.5C8.4 9.9 10.4 7.9 11 4Z"/>'};
 uiGlyphs.grid='<rect x="4" y="4" width="7" height="7" rx="1.8"/><rect x="13" y="4" width="7" height="7" rx="1.8"/><rect x="4" y="13" width="7" height="7" rx="1.8"/><rect x="13" y="13" width="7" height="7" rx="1.8"/>';
 // v15 shell glyphs: view switch, sidebar views, disclosure, more, external link.
 Object.assign(uiGlyphs,{wall:'<rect x="4" y="4" width="7" height="9" rx="1.5"/><rect x="13" y="4" width="7" height="5" rx="1.5"/><rect x="4" y="15" width="7" height="5" rx="1.5"/><rect x="13" y="11" width="7" height="9" rx="1.5"/>','density-glance':'<path d="M5 6.5h14M5 10.2h14M5 13.8h14M5 17.5h14"/>','density-standard':'<path d="M5 7h14M5 14h14"/><path d="M5 10h8M5 17h8" opacity=".45"/>','density-detail':'<path d="M5 6h14"/><path d="M8 9.5h11M8 12.5h11M8 15.5h8" opacity=".45"/><path d="M5 19h14"/>',list:'<path d="M9 6.5h11M9 12h11M9 17.5h11"/><path d="M4.5 6.5h.01M4.5 12h.01M4.5 17.5h.01"/>',timeline:'<path d="M4 7h16M4 12h16M4 17h16" opacity=".35"/><circle cx="8" cy="7" r="1.8"/><circle cx="15" cy="12" r="1.8"/><circle cx="11" cy="17" r="1.8"/>',calendar:'<rect x="4" y="5.5" width="16" height="14" rx="2"/><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4"/>',tiles:'<rect x="4" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5"/>',stack:'<path d="m12 4 8 4-8 4-8-4z"/><path d="m4 12 8 4 8-4M4 16l8 4 8-4"/>',chevron:'<path d="m9.5 6 6 6-6 6"/>',more:'<path d="M6 12h.01M12 12h.01M18 12h.01" stroke-width="2.6"/>',external:'<path d="M13.5 4.5h6v6M19.5 4.5 11 13M17.5 13.5v5a1.5 1.5 0 0 1-1.5 1.5H6a1.5 1.5 0 0 1-1.5-1.5V8A1.5 1.5 0 0 1 6 6.5h5"/>'});
@@ -409,7 +413,7 @@ function renderHeader(v,shown){
  if(cats[v])$('#view-menu').setAttribute('aria-label',tr('{name}类别设置',{name:cats[v].name}));
  const toggle=$('#layout-toggle'),shown_=shownLayout(v),upcoming=v==='upcoming'&&!query;toggle.hidden=!state.assets.length;
  toggle.querySelectorAll('[data-action="layout"]').forEach(b=>{const id=b.dataset.id;b.hidden=upcoming?!['list','calendar'].includes(id):id==='calendar'||id==='timeline'&&(!!query||v==='hidden')||id==='wall'&&(!!query||v!=='all');});
- const density=$('#density-toggle');density.hidden=shown_!=='wall'||!state.assets.length;if(!density.hidden)density.innerHTML=densityButtons();
+ const density=$('#density-toggle');density.hidden=shown_!=='wall'||!state.assets.length;if(!density.hidden)density.innerHTML=densityButtons()+(freeOn()?`<button class="seg-button" data-action="wall-tidy" aria-label="${tr('排整齐')}" title="${tr('排整齐：每块面板回到最近一列的位置（⌘Z 撤销）')}">${ui('tidy')}</button>`:'');
  $('#privacy-wrap').hidden=!state.assets.length;setIconButton($('#privacy-toggle'),privacy?'eyeoff':'eye',privacy?tr('显示名称、账号和 IP'):tr('隐藏名称、账号和 IP'));$('#privacy-toggle').setAttribute('aria-pressed',String(privacy));
  toggle.querySelectorAll('[data-action="layout"]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.id===shown_)));
  document.title=`${title} · Assetboard`;
@@ -456,10 +460,10 @@ function itemHtml(a,{withType=false,grid=false,wall=false}={}){
 }
 function groupSummary(list){const l=dueLevels(list);return l.overdue||l.soon?`<span class="g-sum" role="img" aria-label="${dueWords(l)}" title="${dueWords(l)}">${l.overdue?`<span class="g-flag overdue"><i class="dot" aria-hidden="true"></i>${formatCount(l.overdue)}</span>`:''}${l.soon?`<span class="g-flag soon"><i class="dot" aria-hidden="true"></i>${formatCount(l.soon)}</span>`:''}</span>`:'';}
 // A group is a category (or a date band, or the hidden pile). Only categories in the overview fold and reorder.
-function groupHtml({id,title,glyph='',list,fold=false,folded=false,reorder=false,head=true,summary='',actions='',withType=false,wall=false}){
+function groupHtml({id,title,glyph='',list,fold=false,folded=false,reorder=false,head=true,summary='',actions='',withType=false,wall=false,deco=null}){
  const grid=layoutMode==='grid'&&!withType&&!wall,count=`<span class="g-count">${formatCount(list.length)}</span>`;
  const heading=!head?'':`<header class="group-head">${fold?`<button class="group-title" data-action="collapse" data-id="${id}" aria-expanded="${!folded}" aria-controls="group-${id}" aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown" title="${folded?tr('展开（按住 ⌥ 点按：全部）'):tr('收起（按住 ⌥ 点按：全部）')}"><span class="g-chevron">${ui('chevron')}</span>${glyph}<span class="g-name">${esc(title)}</span>${count}</button>`:`<h2 class="group-title static">${glyph}<span class="g-name">${esc(title)}</span>${count}</h2>`}${summary}${actions?`<span class="g-actions">${actions}</span>`:''}</header>`;
- return `<section class="group${folded?' folded':''}${head?'':' solo'}" data-group="${id}" aria-label="${esc(title)}"${wall?` style="--tilt:${wallTilt(id)}"`:''}>${heading}${folded?'':`<div class="group-body ${grid?'grid':'list'}" id="group-${id}"${reorder?` data-reorder="${id}"`:''}>${list.map(a=>itemHtml(a,{withType,grid,wall})).join('')}</div>`}</section>`;
+ return `<section class="group${folded?' folded':''}${head?'':' solo'}${deco?.cls||''}" data-group="${id}" aria-label="${esc(title)}"${wall?` style="--tilt:${wallTilt(id)}"`:''}>${deco?.html||''}${heading}${folded?'':`<div class="group-body ${grid?'grid':'list'}" id="group-${id}"${reorder?` data-reorder="${id}"`:''}>${list.map(a=>itemHtml(a,{withType,grid,wall})).join('')}</div>`}</section>`;
 }
 function categoryActions(id){return `<button class="icon-button" data-action="add-asset" data-id="${id}" aria-label="${tr('添加{name}',{name:esc(cats[id].name)})}" title="${tr('添加{name}',{name:esc(cats[id].name)})}">${ui('plus')}</button><button class="icon-button" data-action="view" data-id="${id}" aria-label="${tr('只看{name}',{name:esc(cats[id].name)})}" title="${tr('只看{name}',{name:esc(cats[id].name)})}">${ui('chevron')}</button>`;}
 function arranged(id,list){return arrangeAssets(list,state.cardOrder?.[id]);}
@@ -605,7 +609,7 @@ function autoOrder(id){const a=state.assets.find(x=>x.id===id);if(!a||!manualOrd
 // Opening by keyboard, or as an overlay on a narrow window, moves focus into it; a click on a wide window leaves focus on the row so ↑/↓ keep browsing.
 // When a record was last synced or imported, with how long ago once that is more than a day.
 function syncedText(at){const days=localDay()-localDay(new Date(at));return `${new Date(at).toLocaleString(trLocale())}${days>1?` · ${tr('{n} 天前',{n:days})}`:''}`;}
-function showDetail(id,{focus}={}){
+function showDetail(id,{focus,still}={}){
  const a=state.assets.find(a=>a.id===id);if(!a)return;
  const wasOpen=!$('#detail').hidden,active=document.activeElement,inside=!!active?.closest?.('#detail');if(active&&!active.closest?.('#detail,#menu'))lastFocus=active;
  activeAsset=id;
@@ -613,12 +617,12 @@ function showDetail(id,{focus}={}){
  const sub=assetProfiles[a.type]?[regionFlag(a.region),identityText(a)].filter(Boolean).join(' '):[a.provider,veilAccount(a.account)].filter(Boolean).join(' · ');
  const primary=a.hiddenAt?`<button class="button primary" data-action="restore-asset" data-id="${esc(id)}">${tr('恢复显示')}</button>`:realLink?`<button class="button primary" data-action="external" data-id="${esc(id)}" title="${tr('打开管理页')}">${ui('external')}${tr('打开')}</button>`:'';
  const renew=renewable(a)?`<button class="button" data-action="renew" data-id="${esc(id)}" title="${tr('{action}（R）',{action:renewWord(a)})}">${renewWord(a)}</button>`:'';
- const actions=`<div class="detail-actions main-actions">${primary}<button class="button${primary?'':' primary'}" data-action="edit-asset" data-id="${esc(id)}">${tr('编辑')}</button>${renew}<button class="button icon-only detail-more" data-action="asset-menu" data-id="${esc(id)}" aria-haspopup="menu" aria-expanded="false" aria-label="${tr('更多操作')}" title="${tr('更多操作')}">${ui('more')}</button></div>`;
+ const actions=`<div class="detail-actions main-actions">${primary}<button class="button${primary?' soft':' primary'}" data-action="edit-asset" data-id="${esc(id)}">${tr('编辑')}</button>${renew}<button class="button icon-only detail-more" data-action="asset-menu" data-id="${esc(id)}" aria-haspopup="menu" aria-expanded="false" aria-label="${tr('更多操作')}" title="${tr('更多操作')}">${ui('more')}</button></div>`;
  const source={cloudflare:nativeStore&&!proOff?tr('同步自 Cloudflare。账号和状态下次同步按平台值更新，你改过的名称会保留；Cloudflare 上新增的域名在「文件 → 同步 Cloudflare…」重新同步后出现。'):tr('同步自 Cloudflare。账号和状态下次同步按平台值更新，你改过的名称会保留。'),github:tr('同步自 GitHub，名称和账号下次同步会按平台值更新。'),...Object.fromEntries(Object.entries(REGISTRARS).map(([id,r])=>[id,tr('从 {name} 读取。到期日和自动续费下次同步按注册商的值更新，你改过的名称会保留；在「导入 › 注册商」重新同步。',{name:r.name})])),...Object.fromEntries(Object.entries(CLOUD_IMPORTS).map(([id,c])=>[id,tr('从 {name} 读取。状态、地址和地区下次同步按平台的值更新，你改过的名称和费用会保留；在「导入 › 云平台」重新同步。',{name:c.name})])),ssh:tr('来自 ~/.ssh/config，名称和主机下次导入会按配置更新。'),csv:tr('从{file}导入；再导入同一份文件时，同名默认跳过。',{file:a.importedFrom?tr(a.importedFrom):tr('表格')}),manual:'',demo:tr('演示数据，不代表实际账户。')}[a.source]??'';
  const notes=a.notes||source?`<details><summary>${a.notes?tr('备注'):tr('来源')}${a.notes&&source?' · '+tr('来源'):''}</summary>${a.notes?`<p>${esc(a.notes)}</p>`:''}${source?`<p>${source}</p>`:''}</details>`:'';
  const iconButton=nativeStore&&!demoMode&&!a.hiddenAt&&!hasRealIcon(a)?(iconFetching.has(id)?`<button class="text-button detail-icon-fetch" disabled>${tr('获取中…')}</button>`:`<button class="text-button detail-icon-fetch" data-action="icon-fetch" data-id="${esc(id)}" title="${esc(iconHost(a)?tr('从 {site} 获取网站图标',{site:iconSiteFor(iconSites(),iconHost(a))}):tr('填写网站域名获取图标'))}">${tr('获取图标')}</button>`):'';
  $('#detail-content').innerHTML=`<div class="detail-head">${tile(a,'lg')}<span class="eyebrow">${esc(cats[a.type].one)}${a.stopped?' · '+tr('已停用'):''}${a.hiddenAt?' · '+tr('已隐藏'):''}</span>${iconButton}</div><h2>${esc(veil(a.name))}</h2>${sub?`<p class="detail-sub">${esc(sub)}</p>`:''}${a.purpose?`<span class="detail-badge">${esc(a.purpose)}</span>`:''}${actions}${a.hiddenAt?'':quickRow(a)}<div class="facts">${detailFacts(a,lastSync)}${extraFacts(a)}${keepFacts(a)}</div>${paymentsSection(a)}${linkSection(a)}${notes}`;
- $('#detail').hidden=false;markSelected();
+ $('#detail').hidden=false;if(!wasOpen&&!still)detailMotion(true);markSelected();
  if(focus??(wasOpen?inside:!inspectorDocked()))$('#close-detail').focus();
 }
 // Masked values reveal on request; the full value never appears in the list.
@@ -936,7 +940,29 @@ function markTone(src){
  img.src=src;return '';
 }
 function refreshMarkTones(){document.querySelectorAll('.tile.custom-art img,.site-mark').forEach(img=>{const tone=markTones.get(img.getAttribute('src'));if(tone===undefined)return;const host=img.classList.contains('site-mark')?img:img.parentElement;host.classList.toggle('mark-dark',tone==='mark-dark');host.classList.toggle('mark-light',tone==='mark-light');});}
-function closeDetail(){$('#detail').hidden=true;activeAsset=null;markSelected();if(lastFocus?.isConnected)lastFocus.focus();}
+// The detail comes in from the right at once and goes back there (material.css, the detail as a card): opening animates the detail
+// itself; closing hides it at once and lets an inert copy (.detail-leave, no ids) slide away. Under 冰箱贴 the door's figure pulls
+// the card out and pushes it back (body.fig-pull, body.fig-push). Both take DETAIL_MOTION and the card never waits for the figure; a
+// toggle sooner than that after the last goes straight to where it ends, without the figure; less motion only fades the card.
+const DETAIL_MOTION=300;let detailToggled=-1e9,detailMotionTimer=0;
+function detailMotion(open){
+ const card=$('#detail'),body=document.body,now=performance.now(),quick=now-detailToggled<DETAIL_MOTION+40,still=matchMedia('(prefers-reduced-motion: reduce)').matches;
+ detailToggled=now;clearTimeout(detailMotionTimer);
+ card.getAnimations().forEach(a=>a.cancel());document.querySelectorAll('.detail-leave').forEach(n=>n.remove());body.classList.remove('fig-pull','fig-push');
+ if(quick)return;
+ const away=Math.max(0,innerWidth-card.getBoundingClientRect().left),slide=still?[{opacity:0},{opacity:1}]:[{translate:`${away}px 0`,opacity:.4},{translate:'0 0',opacity:1}];
+ let target=card;
+ if(open)card.animate(slide,{duration:still?150:240,easing:'cubic-bezier(.2,.8,.2,1)'});
+ else{
+  target=card.cloneNode(true);target.removeAttribute('id');target.removeAttribute('aria-label');target.classList.add('detail-leave');target.inert=true;target.setAttribute('aria-hidden','true');
+  target.querySelectorAll('[id]').forEach(n=>{if(n.id==='detail-content')n.classList.add('detail-copy');n.removeAttribute('id');});
+  card.after(target);target.scrollTop=card.scrollTop;
+  target.animate(slide.slice().reverse(),{duration:still?150:220,easing:'cubic-bezier(.4,0,.8,.4)',fill:'forwards'}).finished.then(()=>target.remove(),()=>{});
+ }
+ if(!still&&boardSkin==='magnet'&&body.classList.contains('wall-shown'))body.classList.add(open?'fig-pull':'fig-push');
+ detailMotionTimer=setTimeout(()=>{body.classList.remove('fig-pull','fig-push');if(!open)target.remove();},DETAIL_MOTION);
+}
+function closeDetail(){if(!$('#detail').hidden)detailMotion(false);$('#detail').hidden=true;activeAsset=null;markSelected();if(lastFocus?.isConnected)lastFocus.focus();}
 // Dialog widths by content: short confirmations narrow, lists wide, forms in between.
 const MODAL_SIZES={connect:'l',asset:'xl',prefs:'l',confirm:'s',inbox:'l','import-preview':'l',agent:'l',network:'l',cost:'l'};
 function modal(title,html,view=''){const dialog=$('#modal'),content=$('#modal-content'),scroll=dialog.open&&dialog.dataset.view===view?content.scrollTop:0;$('#modal-title').textContent=title;content.innerHTML=html;dialog.dataset.view=view;dialog.dataset.size=MODAL_SIZES[view]||'';if(!html.includes('id="asset-form"')&&!html.includes("id='asset-form'")&&!html.includes('id="dirty-save"'))assetFormSnapshot=null;if(nativeStore)content.querySelectorAll('.form-note').forEach(el=>{if(el.textContent.includes(tr('浏览器')))el.textContent=el.textContent.replaceAll(tr('当前浏览器'),tr('此 Mac')).replaceAll(tr('此浏览器'),tr('此 Mac'));});if(!dialog.open)dialog.showModal();content.scrollTop=scroll;
@@ -2887,8 +2913,9 @@ function prefsDialog(section){
   mac&&typeof platformOn==='function'&&platformOn()?link(tr('平台状态'),platform.sources.length>0,'platform-sources',tr('Supabase、Vercel、Render、Upstash 上的项目状态')):''].join(''):'';
  // 外观: the accent (the 主题 dialog), the wall's skin (theme.js) and its density (board-wall.js); all kept on this device only.
  const radios=(label,list,on,action)=>`<div class="chip-group" role="radiogroup" aria-label="${label}">${list.map(([id,name,note])=>`<button type="button" class="choice" role="radio" aria-checked="${id===on}" data-action="${action}" data-id="${id}"${note?` title="${esc(note)}"`:''}>${esc(name)}</button>`).join('')}</div>`;
- const look=[row(tr('主题'),`<span class="prefs-edition">${esc(tr(themeFor(themePref).name||'')||tr('墨蓝'))}</span><button class="button" data-action="prefs-theme">${tr('选择…')}</button>`,tr('强调色用于按钮、选中和链接；到期红、橙色保持不变')),
-  row(tr('风格'),radios(tr('风格'),BOARD_SKINS,boardSkin,'prefs-skin'),tr('只改磁贴墙的样子：倾角、边缘、拖动的手感；内容、布局和密度不变')),
+ const look=[row(tr('主题'),`<span class="prefs-edition">${esc(tr(themeFor(themePref).name||'')||tr('墨蓝'))}</span><button class="button" data-action="prefs-theme">${tr('选择…')}</button>`,boardSkin==='magnet'?tr('冰箱贴下整个窗口用冰箱门的配色；这里选的主题在安静风格下生效'):tr('强调色用于按钮、选中和链接；到期红、橙色保持不变')),
+  row(tr('风格'),radios(tr('风格'),BOARD_SKINS,boardSkin,'prefs-skin'),tr('只改磁贴墙的样子和摆法；内容、字段和密度不变')),
+  boardSkin==='magnet'?row(tr('冰箱门'),radios(tr('冰箱门'),FRIDGE_SCENES.map(([id,name,,note])=>[id,name,note]),fridgeScene,'prefs-scene'),tr('冰箱贴下面板可以拖到任意位置，位置只存在这台设备上；顶栏的「排整齐」让它们回到列上')):'',
   row(tr('磁贴密度'),radios(tr('磁贴密度'),WALL_DENSITIES.map(id=>[id,WALL_DENSITY_NAMES[id]]),wallDensity,'prefs-density'),tr('全局只留名称和天数，详细把每条的属性都摊开；⌘− 和 ⌘= 或在触控板上捏合也能切换'))].join('');
  const edition=row(tr('版本类型'),`<span class="prefs-edition">${esc(typeof proEditionText==='function'&&proBuilt()?proEditionText():tr('免费版'))}</span>`);
  const about=[edition,nativeStore?row(tr('版本'),`<span class="prefs-version">${esc(nativeStore.version||'')}${mac?`<button class="button" data-action="check-updates">${tr('检查更新…')}</button>`:''}</span>`):'',
@@ -2932,6 +2959,7 @@ document.addEventListener('click',e=>{const button=e.target.closest('[data-actio
  else if(action==='view')setView(id);
  else if(action==='layout')setLayout(id);
  else if(action==='density')setDensity(id);
+ else if(action==='wall-tidy')freeTidyWall();
  else if(action==='calendar-month')shiftCalendar(Number(id));
  else if(action==='asset-menu'){if(!$('#menu').hidden&&$('#menu').anchor===button){closeMenu();return;}const a=state.assets.find(x=>x.id===id);if(a)openMenu(assetMenuItems(a),{anchor:button});}
  else if(action==='category-menu'){if(cats[button.dataset.id])settings(button.dataset.id);}
@@ -3011,6 +3039,7 @@ document.addEventListener('click',e=>{const button=e.target.closest('[data-actio
  else if(action==='prefs-privacy'){setPrivacy(button.checked);prefsChanged();}
  else if(action==='prefs-theme')themeDialog();
  else if(action==='prefs-skin'){if(setSkin(id)){render();prefsChanged();}}
+ else if(action==='prefs-scene'){if(setScene(id)){render();prefsChanged();}}
  else if(action==='prefs-density')setDensity(id);
  else if(action==='prefs-section'){prefsDialog(id);$(`#prefs-tab-${id}`)?.focus();}
  else if(action==='check-updates'){if(nativeStore&&!demoMode)window.webkit.messageHandlers.assetboard.postMessage({action:'checkUpdates'});}
@@ -3166,7 +3195,8 @@ document.addEventListener('keydown',e=>{
  }
 });
 // Direct manipulation, no layout mode: a row moves within its group, onto a sidebar category to change its category, and sidebar categories
-// reorder, as do the tile wall's panels (dragged by their header; board-wall.js packs them and picks the place).
+// reorder, as do the tile wall's panels (dragged by their header; board-wall.js packs them and picks the place). Under 冰箱贴 a
+// panel is placed freely instead (board-free.js has that drag).
 // Mouse starts after 5px, touch after a long press; Esc cancels; ⌥ + arrows is the keyboard path.
 let gesture=null,suppressClick=false,floatTip=null;
 const settleEase='cubic-bezier(.22,1,.36,1)';
@@ -3189,7 +3219,7 @@ function dragSource(target){
  if(query)return null;
  const item=target.closest('#board [data-reorder] > [data-asset]');
  if(item)return {kind:'card',el:item,container:item.parentElement,block:item.closest('.group')};
- const head=target.closest('#board .wall > .group > .group-head');
+ const head=target.closest('#board .wall:not(.free) > .group > .group-head');
  if(head&&!target.closest('.g-actions'))return {kind:'panel',el:head.parentElement,container:head.parentElement.parentElement};
  const nav=target.closest('#sidebar .nav-item[data-block]');
  return nav?{kind:'block',el:nav,container:nav.parentElement}:null;
@@ -3319,9 +3349,9 @@ document.addEventListener('keydown',e=>{
   const source=opener.closest('[data-asset]'),id=source.dataset.asset,siblings=[...source.parentElement.children].filter(n=>n.dataset.asset);
   if(commitAssetOrder(source,siblings[siblings.indexOf(source)+step],step>0)){focusAsset(id);toast(step<0?tr('已向前移动'):tr('已向后移动'),true);}return;
  }
- // A wall panel moves among the panels shown, with all four arrows.
+ // A wall panel moves among the panels shown, with all four arrows; a freely placed one (冰箱贴) a column aside or a little up or down.
  const panel=e.target.closest?.('#board .wall .group-title[data-action="collapse"]');
- if(panel){e.preventDefault();const id=panel.dataset.id;if(movePanel(id,step))document.querySelector(`#board .group-title[data-id="${CSS.escape(id)}"]`)?.focus();return;}
+ if(panel){e.preventDefault();const id=panel.dataset.id;if(freeShown()?freeKeyMove(id,e.key):movePanel(id,step))document.querySelector(`#board .group-title[data-id="${CSS.escape(id)}"]`)?.focus();return;}
  const nav=e.target.closest?.('#sidebar .nav-item[data-block]')||(e.key==='ArrowUp'||e.key==='ArrowDown')&&e.target.closest?.('#board .group-title[data-action="collapse"]');
  if(nav&&(e.key==='ArrowUp'||e.key==='ArrowDown')){e.preventDefault();const id=nav.dataset.block||nav.dataset.id,fromBoard=!!nav.closest('#board');if(moveBlock(id,step))document.querySelector(fromBoard?`#board .group-title[data-id="${CSS.escape(id)}"]`:`#sidebar .nav-item[data-block="${CSS.escape(id)}"]`)?.focus();}
 });
@@ -3373,7 +3403,7 @@ document.addEventListener('visibilitychange',()=>document.visibilityState==='hid
 setInterval(checkMissed,300000);
 checkMissed();
 // A wide window opens with the first item selected, so the inspector column is there from the start (once per launch, focus stays put).
-function selectFirstOnce(){if(!inspectorDocked()||!$('#detail').hidden||query)return;const first=document.querySelector('#board [data-asset]');if(first)showDetail(first.dataset.asset,{focus:false});}
+function selectFirstOnce(){if(!inspectorDocked()||!$('#detail').hidden||query)return;const first=document.querySelector('#board [data-asset]');if(first)showDetail(first.dataset.asset,{focus:false,still:true});}
 selectFirstOnce();
 installImportDropPaste();
 // Delete requests still waiting from an earlier run come back to the confirmation list.

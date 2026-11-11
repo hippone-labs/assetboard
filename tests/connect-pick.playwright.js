@@ -3,6 +3,11 @@
 // 待引入, the 设置 › 连接 row and the add form; turning items down keeps later reads from offering them; a read with nothing new says
 // so; the automatic Cloudflare sync only holds what it finds; agents list and import what waits; undo puts it back. Never writes data.
 async (page) => {
+ // A scheme is set when the board has taken it (<html data-scheme>, from the change event the browser sends on its next frame) and
+ // the transitions it started have run out; a fixed wait can end before both on a slow runner.
+ const atScheme=async(p,scheme)=>{await p.emulateMedia({colorScheme:scheme});await p.waitForFunction(s=>document.documentElement.dataset.scheme===s,scheme);
+  await p.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
+  await p.evaluate(()=>Promise.race([Promise.all(document.getAnimations().filter(a=>a.effect?.getComputedTiming().iterations!==Infinity).map(a=>a.finished.catch(()=>{}))),new Promise(r=>setTimeout(r,5000))]));};
  const check=(ok,message)=>{if(!ok)throw new Error(message);};
  const until=async(p,fn,arg,{timeout=10000}={})=>{const end=Date.now()+timeout;for(;;){const value=await p.evaluate(fn,arg);if(value)return value;if(Date.now()>end)throw new Error('Timed out waiting for '+String(fn).slice(0,80));await new Promise(r=>setTimeout(r,40));}};
  const host=()=>{
@@ -47,7 +52,7 @@ async (page) => {
   check(first.rows.length===4&&first.rows.every(([,on])=>on)&&first.board===0,'Every new record is offered, ticked, and none is on the board: '+JSON.stringify(first));
   check(first.go==='引入 4 项'&&/Cloudflare/.test(first.title)&&first.groups.some(g=>g.startsWith('域名'))&&first.groups.some(g=>g.startsWith('部署')),'Grouped by category with one action: '+JSON.stringify(first));
   check(!await p.evaluate(()=>JSON.stringify(state).includes('token-typed-here')),'The token is not kept in the page');
-  for(const scheme of ['light','dark']){await p.emulateMedia({colorScheme:scheme});await p.waitForTimeout(300);const bad=await contrast(p,scheme+' pick');check(!bad.length,bad.join(' | '));}
+  for(const scheme of ['light','dark']){await atScheme(p,scheme);const bad=await contrast(p,scheme+' pick');check(!bad.length,bad.join(' | '));}
   await p.emulateMedia({colorScheme:'light'});
   // Untick one: the count follows, 没勾的不再提醒 appears; import the rest.
   await p.locator('#connect-pick input[name="connect-take"]').nth(1).uncheck();

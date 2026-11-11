@@ -4,6 +4,11 @@
 // last used, a config to copy) and the log with filters by tool, time and kind, newest first; the demo shows made-up rows, with and
 // without the Pro modules (?free). Never writes data.
 async (page) => {
+ // A scheme is set when the board has taken it (<html data-scheme>, from the change event the browser sends on its next frame) and
+ // the transitions it started have run out; a fixed wait can end before both on a slow runner.
+ const atScheme=async(p,scheme)=>{await p.emulateMedia({colorScheme:scheme});await p.waitForFunction(s=>document.documentElement.dataset.scheme===s,scheme);
+  await p.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
+  await p.evaluate(()=>Promise.race([Promise.all(document.getAnimations().filter(a=>a.effect?.getComputedTiming().iterations!==Infinity).map(a=>a.finished.catch(()=>{}))),new Promise(r=>setTimeout(r,5000))]));};
  const check=(ok,message)=>{if(!ok)throw new Error(message);};
  const until=async(p,fn,arg,{timeout=10000}={})=>{const end=Date.now()+timeout;for(;;){const value=await p.evaluate(fn,arg);if(value)return value;if(Date.now()>end)throw new Error('Timed out waiting for '+String(fn).slice(0,80));await new Promise(r=>setTimeout(r,40));}};
  const host=()=>{
@@ -91,7 +96,7 @@ async (page) => {
   check(pane.rows[0]==='claude-code'&&/已配置/.test(pane.claude)&&/最近/.test(pane.claude)&&/次调用/.test(pane.claude),'Claude Code first: set up, last used, calls: '+JSON.stringify(pane));
   check(pane.log.length===10&&pane.log[0]==='Claude Code'&&pane.log.at(-1)==='Codex','Newest first, the injected old row last: '+pane.log);
   check(/费用\$6\/月→\$7\/月/.test(pane.write.replace(/\s/g,'')),'A write shows the change: '+pane.write);
-  for(const scheme of ['light','dark']){await p.emulateMedia({colorScheme:scheme});await p.waitForTimeout(300);const bad=await contrast(p,scheme+' mcp');check(!bad.length,bad.join(' | '));}
+  for(const scheme of ['light','dark']){await atScheme(p,scheme);const bad=await contrast(p,scheme+' mcp');check(!bad.length,bad.join(' | '));}
   await p.emulateMedia({colorScheme:'light'});
   await p.click('#prefs-pane-mcp [data-action="agent-log-filter"][data-kind="client"][data-id="codex"]');
   check(await p.evaluate(()=>[...document.querySelectorAll('#prefs-pane-mcp .act-row')].every(r=>r.querySelector('.act-line strong').textContent==='Codex')),'Filtered by tool');

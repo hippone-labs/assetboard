@@ -46,8 +46,9 @@ async (page) => {
   check((await p.locator('[data-asset="late"] .tl-mark').first().getAttribute('class')).includes('overdue'),'Overdue is red');
   check(/1/.test(await p.locator('#board .tl-note').innerText()),'The undated record is counted');
   // A date at the far end of the year puts its label on the left of the dot: nothing reaches past the chart, so the chart never
-  // scrolls sideways and no scrollbar lands on the Today label or the note under the chart.
-  const edge=await p.evaluate(async()=>{state.assets.push({id:'edge',type:'domain',name:'edge.example.com',provider:'Registrar',date:isoDay(localDay()+355),dateKind:'expire',cycle:'yearly',cost:'$9.90 / 年',source:'manual'});render();
+  // scrolls sideways and no scrollbar lands on the Today label or the note under the chart. The chart runs from the first of this
+  // month through twelve whole months, so the date is taken five days before that end, inside the chart on any day of the month.
+  const edge=await p.evaluate(async()=>{const end=dayNumber(addMonths(isoDay(localDay()).slice(0,8)+'01',12));state.assets.push({id:'edge',type:'domain',name:'edge.example.com',provider:'Registrar',date:isoDay(end-5),dateKind:'expire',cycle:'yearly',cost:'$9.90 / 年',source:'manual'});render();
    const t=document.querySelector('#board .timeline'),label=document.querySelector('[data-asset="edge"] .tl-label'),track=label.parentElement.getBoundingClientRect(),l=label.getBoundingClientRect();
    const out={before:label.classList.contains('before'),inside:l.right<=track.right+1,scroll:t.scrollWidth-t.clientWidth};state.assets=state.assets.filter(a=>a.id!=='edge');render();return out;});
   check(edge.before&&edge.inside&&edge.scroll<=0,'A late label stays inside the chart: '+JSON.stringify(edge));

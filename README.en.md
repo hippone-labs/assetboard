@@ -96,7 +96,7 @@ Scripts can put JSON in this format into `~/Library/Application Support/Assetboa
 - AI usage and limits: plan limits and usage of Claude Code, Codex, Cursor, GitHub Copilot, Grok CLI, opencode and Antigravity, read from their local files and shown on the matching AI subscription: close to the limit, idle, worth its price at API rates or not. Only numbers, model names and times are read.
 - Repositories (Mac, off by default): a GitHub sync also reads branches and the latest Actions run; a failed or running run leads the row, and new branches show for 14 days.
 - Keyboard control; `?` lists the shortcuts.
-- Accent themes, two tile-wall skins (Quiet, Fridge magnets) and three densities; light and dark follow the system.
+- Accent themes, two tile-wall skins (Quiet; Fridge magnets, with four fridge doors whose colours the whole window takes, and panels you place anywhere) and three densities; light and dark follow the system.
 
 ## Free and Pro
 

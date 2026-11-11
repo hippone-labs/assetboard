@@ -3,6 +3,11 @@
 // becomes domain records (same-name ones asked about), a sync again sends no credentials, disconnecting keeps the records; the
 // Mac app has a way in without the Pro modules too (?free), the browser none. Light and dark contrast of the dialog. Never writes data.
 async (page) => {
+ // A scheme is set when the board has taken it (<html data-scheme>, from the change event the browser sends on its next frame) and
+ // the transitions it started have run out; a fixed wait can end before both on a slow runner.
+ const atScheme=async(p,scheme)=>{await p.emulateMedia({colorScheme:scheme});await p.waitForFunction(s=>document.documentElement.dataset.scheme===s,scheme);
+  await p.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
+  await p.evaluate(()=>Promise.race([Promise.all(document.getAnimations().filter(a=>a.effect?.getComputedTiming().iterations!==Infinity).map(a=>a.finished.catch(()=>{}))),new Promise(r=>setTimeout(r,5000))]));};
  const check=(ok,message)=>{if(!ok)throw new Error(message);};
  const until=async(p,fn,arg,{timeout=10000}={})=>{const end=Date.now()+timeout;for(;;){const value=await p.evaluate(fn,arg);if(value)return value;if(Date.now()>end)throw new Error('Timed out waiting for '+String(fn).slice(0,80));await new Promise(r=>setTimeout(r,40));}};
  const host=()=>{
@@ -49,7 +54,7 @@ async (page) => {
   check(nc.status==='未连接','Not connected yet');
   await p.click('#registrar-form [data-action="registrar-key"]');
   check(await p.evaluate(()=>__sent.some(m=>m.action==='openExternal'&&m.url==='https://ap.www.namecheap.com/settings/tools/apiaccess/')),'建 API Key opens Namecheap\'s API page through the app');
-  for(const scheme of ['light','dark']){await p.emulateMedia({colorScheme:scheme});await p.waitForTimeout(400);const bad=await contrast(p,scheme+' registrar');check(!bad.length,bad.join(' | '));}
+  for(const scheme of ['light','dark']){await atScheme(p,scheme);const bad=await contrast(p,scheme+' registrar');check(!bad.length,bad.join(' | '));}
   await p.emulateMedia({colorScheme:'light'});
 
   // Checked before anything is sent: a local address is not the whitelisted one.
