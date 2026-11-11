@@ -39,11 +39,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
 
@@ -72,7 +72,7 @@ jobs:
 
       - name: Upload logs
         if: ${{ always() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: web-logs-${{ github.sha }}
           path: ${{ runner.temp }}/logs/
@@ -86,7 +86,7 @@ jobs:
     runs-on: macos-26
     timeout-minutes: 40
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
 
@@ -101,7 +101,7 @@ jobs:
 
       - name: Upload Assets.car
         if: ${{ always() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: assets-car-${{ github.sha }}
           path: |
@@ -123,7 +123,7 @@ jobs:
 
       - name: Upload logs
         if: ${{ always() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: icon-logs-${{ github.sha }}
           path: ${{ runner.temp }}/logs/
@@ -133,7 +133,7 @@ jobs:
     runs-on: ${{ inputs.min_os && 'macos-15' || 'macos-26' }}
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
 
@@ -179,7 +179,7 @@ jobs:
 
       - name: Upload apps
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: apps-${{ github.sha }}
           path: |
@@ -190,7 +190,7 @@ jobs:
 
       - name: Upload logs
         if: ${{ always() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: mac-logs-${{ github.sha }}
           path: ${{ runner.temp }}/logs/

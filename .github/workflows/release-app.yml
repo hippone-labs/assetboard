@@ -43,7 +43,7 @@ jobs:
     environment: release
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -151,7 +151,7 @@ jobs:
 
       - name: Upload signed release and notarization receipt
         if: ${{ always() && env.RELEASE_DIR != '' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: app-release-${{ github.run_number }}
           path: ${{ env.RELEASE_DIR }}

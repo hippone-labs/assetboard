@@ -34,12 +34,12 @@ jobs:
     environment: release
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.ref }}
       # tools/ci-mac.sh as this workflow's own commit has it: inputs.ref may be a commit without it.
       - name: CI helper of this workflow's commit
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: .ci
           sparse-checkout: tools/ci-mac.sh
@@ -113,7 +113,7 @@ jobs:
         run: bash .ci/tools/ci-mac.sh cleanup
 
       - name: Upload notarized zips
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: notarized-${{ github.run_number }}
           path: ${{ runner.temp }}/release/

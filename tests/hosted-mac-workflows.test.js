@@ -122,7 +122,7 @@ test('notarize runs the helper of its own commit, whatever ref it builds', () =>
  assert.equal(helperCheckout.with.path, '.ci');
  assert.equal(helperCheckout.with.ref, undefined);
  assert.equal(helperCheckout.with['sparse-checkout'], 'tools/ci-mac.sh');
- assert.equal(step(notarize.jobs.notarize, 'actions/checkout@v4').with.ref, '${{ inputs.ref }}');
+ assert.equal(step(notarize.jobs.notarize, 'actions/checkout@v7').with.ref, '${{ inputs.ref }}');
 });
 
 test('the Pro checkout steps are unchanged in the hosted jobs', () => {

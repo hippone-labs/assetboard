@@ -28,7 +28,7 @@ jobs:
     runs-on: [self-hosted, assetboard-mini]
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Pro modules (private checkout beside the board)
         # The runner's own gh login reads the private repository; a PRO_REPO_TOKEN secret (a fine-grained token with contents: read
         # on it) is used instead when set, for a runner that is not logged in.
@@ -48,7 +48,7 @@ jobs:
 
       - name: Upload
         if: ${{ always() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: site-screenshots-${{ github.run_number }}
           path: ${{ runner.temp }}/site-screenshots
@@ -65,11 +65,11 @@ jobs:
       group: app-production-release
       cancel-in-progress: false
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: site-screenshots-${{ github.run_number }}
           path: ${{ runner.temp }}/site-screenshots

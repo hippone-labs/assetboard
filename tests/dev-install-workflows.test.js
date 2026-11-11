@@ -121,8 +121,8 @@ test('the workflow parser reads the mini install that is already on main', () =>
  assert.equal(mini.concurrency['cancel-in-progress'], false);
  assert.deepEqual(mini.jobs.install['runs-on'], ['self-hosted', 'macOS', 'ARM64', 'assetboard-mini']);
  assert.equal(mini.jobs.install['timeout-minutes'], 30);
- assert.equal(step(mini.jobs.install, 'actions/checkout@v4').with.ref, '${{ inputs.ref || github.sha }}');
- assert.equal(step(mini.jobs.install, 'actions/checkout@v4').with['persist-credentials'], false);
+ assert.equal(step(mini.jobs.install, 'actions/checkout@v7').with.ref, '${{ inputs.ref || github.sha }}');
+ assert.equal(step(mini.jobs.install, 'actions/checkout@v7').with['persist-credentials'], false);
  assert.match(step(mini.jobs.install, 'Main only').run, /git merge-base --is-ancestor HEAD FETCH_HEAD/);
  assert.equal(step(mini.jobs.install, 'Pro modules (private checkout beside the board)').env.PRO_REPO_TOKEN, '${{ secrets.PRO_REPO_TOKEN }}');
  assert.equal(step(mini.jobs.install, 'Build and install the developer build').run.trim(), 'zsh desktop/dev-install.sh | tee "$RUNNER_TEMP/dev-install.log"');
@@ -172,14 +172,14 @@ test('mbp-dev installs on assetboard-mbp only, from the same ref, with the token
  assert.equal(job.if, "${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}");
  assert.equal(Object.keys(doc.jobs).length, 1);
 
- const checkout = step(job, 'actions/checkout@v4');
+ const checkout = step(job, 'actions/checkout@v7');
  assert.equal(checkout.with.ref, '${{ github.event.workflow_run.head_sha || github.sha }}');
  assert.equal(checkout.with['persist-credentials'], false);
  assert.equal(checkout.with.token, undefined);
 
  const names = job.steps.map((item) => item.name || item.uses);
  assert.deepEqual(names, [
-  'actions/checkout@v4',
+  'actions/checkout@v7',
   'Main only',
   'Pro modules (private checkout beside the board)',
   'Build and install the developer build',
@@ -216,13 +216,13 @@ test('mbp-dev installs on assetboard-mbp only, from the same ref, with the token
 
 test('the release commit is the commit both machines check out', () => {
  const callerRef = evalMustache(release.jobs['mini-dev'].with.ref, {name: 'push', sha: RELEASE_SHA});
- const miniRef = evalMustache(step(mini.jobs.install, 'actions/checkout@v4').with.ref, {
+ const miniRef = evalMustache(step(mini.jobs.install, 'actions/checkout@v7').with.ref, {
   name: 'workflow_call',
   sha: DEFAULT_BRANCH_SHA,
   inputs: {ref: callerRef}
  });
  const doc = workflow('.github/workflows/mbp-dev.yml');
- const refExpr = step(doc.jobs.install, 'actions/checkout@v4').with.ref;
+ const refExpr = step(doc.jobs.install, 'actions/checkout@v7').with.ref;
  const mbpRef = evalMustache(refExpr, {name: 'workflow_run', sha: DEFAULT_BRANCH_SHA, conclusion: 'success', head_sha: RELEASE_SHA});
  const manualRef = evalMustache(refExpr, {name: 'workflow_dispatch', sha: RELEASE_SHA});
  assert.equal(callerRef, RELEASE_SHA);
