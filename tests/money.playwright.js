@@ -6,7 +6,9 @@ async (page) => {
  const check=(ok,message)=>{if(!ok)throw new Error(message);};
  const context=await page.context().browser().newContext({viewport:{width:1440,height:900},acceptDownloads:true});const p=await context.newPage();
  const errors=[];p.on('pageerror',e=>errors.push(e.message));
- const settle=()=>p.waitForTimeout(250);
+ // then, on a slow machine, until the wall is packed for the width it has (it repacks in a ResizeObserver), up to 3 s
+ const settle=async()=>{await p.waitForTimeout(250);
+  await p.waitForFunction(()=>{const w=document.querySelector('#board .wall');return !w||!wallHold&&Math.abs(wallWidth-w.clientWidth)<=.5;},null,{timeout:3000,polling:50}).catch(()=>{});};
  const mod=process.platform==='darwin'?'Meta':'Control';
  const call=(method,params={})=>p.evaluate(([method,params])=>assetboardAgent({requestId:'t',method,params}),[method,params]);
  const asset=id=>p.evaluate(id=>JSON.parse(JSON.stringify(state.assets.find(a=>a.id===id)||null)),id);
