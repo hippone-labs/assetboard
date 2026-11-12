@@ -88,7 +88,9 @@ async (page) => {
   const boardNode=await p.evaluate(()=>{window.__firstRow=document.querySelector('#board [data-asset]');return document.querySelector('#board').dataset.size;});
   check(boardNode==='l','A wide main area lays rows out in one line');
   // the board makes the card's room once the card is in (app.js, boardRoom)
+  // (0.24 s for the card, then 0.34 s for the room; a slow machine takes longer: then up to 5 s more, until the room is made)
   await p.click('#board [data-asset="d0"] .item-open');await p.waitForTimeout(700);
+  await p.waitForFunction(()=>roomTarget===null&&!roomMove&&document.body.classList.contains('detail-room'),null,{timeout:5000,polling:50}).catch(()=>{});
   const docked=()=>p.evaluate(()=>{const m=document.querySelector('#main').getBoundingClientRect(),b=document.querySelector('#board').getBoundingClientRect(),d=document.querySelector('#detail').getBoundingClientRect();return b.right<=d.left+1&&Math.abs(m.right-d.right-12)<1&&d.top>m.top&&getComputedStyle(document.querySelector('#detail')).boxShadow!=='none';});
   check(await docked(),'The inspector docks beside the list, inside the card, 12px clear of its edge');
   await p.setViewportSize({width:1100,height:800});await settle();

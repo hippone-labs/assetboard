@@ -50,9 +50,10 @@ async (page) => {
    const during=frames.filter(fr=>fr.card);
    check(during.length&&during.every(fr=>done(fr)<.01),`${label}: ${id} waits for the card ${JSON.stringify(during.map(fr=>[Math.round(fr.t),done(fr).toFixed(2)]))}`);
    // and soon after it: within 180 ms of the last frame the card moves in (the card's act is 0.24 s, the figure's 0.3 s), counted
-   // from there rather than from the click, since a slow machine runs the wait for the act late
+   // from there rather than from the click, since a slow machine runs the wait for the act late; there the start is seen up to two
+   // frames late (the one that lays the board out for the slide, then the one that draws its first step)
    const start=frames.find(fr=>done(fr)>.01),finish=frames.find(fr=>done(fr)>.995),card=Math.max(...during.map(fr=>fr.t));
-   check(start&&finish&&finish.t-start.t>=250-slack&&finish.t-start.t<=460+slack&&start.t-card<=180+slack,`${label}: ${id} slides from ${start?.t|0} to ${finish?.t|0} ms, the card moving until ${card|0} ms (frames up to ${Math.round(frame)} ms apart)`);
+   check(start&&finish&&finish.t-start.t>=250-slack&&finish.t-start.t<=460+slack&&start.t-card<=180+2*slack,`${label}: ${id} slides from ${start?.t|0} to ${finish?.t|0} ms, the card moving until ${card|0} ms (frames up to ${Math.round(frame)} ms apart)`);
   }
   check(durations.length&&durations.every(x=>x.d>=300&&x.d<=400&&/cubic-bezier|ease-in-out/.test(x.e)),`${label}: the slide takes 0.3–0.4 s, eased in and out ${JSON.stringify(durations)}`);
  };

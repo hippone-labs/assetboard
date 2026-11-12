@@ -1,4 +1,4 @@
-# TEMPORARY: diagnostics for the browser tests on GitHub-hosted macOS 26 (removed before merge). No secrets.
+# TEMPORARY: the browser tests on GitHub-hosted macOS 26, several times over, to find slow-machine flakes (removed before merge). No secrets.
 name: diag-browser
 on:
   push:
@@ -9,30 +9,19 @@ jobs:
   diag:
     runs-on: macos-26
     timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        run: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 22
-      - name: System settings
-        run: |
-          sw_vers; sysctl -n machdep.cpu.brand_string hw.ncpu hw.memsize || true
-          for k in reduceTransparency reduceMotion increaseContrast; do echo "universalaccess $k: $(defaults read com.apple.universalaccess $k 2>&1)"; done
-          echo "AppleShowScrollBars: $(defaults read -g AppleShowScrollBars 2>&1)"
-          system_profiler SPDisplaysDataType 2>&1 | head -30
       - name: Playwright
         run: |
           pw_home="$RUNNER_TEMP/playwright"
           npm install --prefix "$pw_home" --no-audit --no-fund playwright@1.64.1
           "$pw_home/node_modules/.bin/playwright" install chromium
           echo "NODE_PATH=$pw_home/node_modules" >> "$GITHUB_ENV"
-      - name: Diagnostics
-        run: node tools/ci-diag.js
-      - name: The three tests
-        if: ${{ !cancelled() }}
+      - name: Browser tests
         run: node tools/browser-tests.js --port 4330
-      - name: Sidebar alone
-        if: ${{ !cancelled() }}
-        run: node tools/browser-tests.js --port 4330 tests/sidebar-fold.playwright.js
