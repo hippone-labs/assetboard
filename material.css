@@ -2691,3 +2691,38 @@ button.pj-fig:hover{background:var(--hover)}
 .share-unit{color:var(--muted);font-family:var(--num)}
 @media(prefers-reduced-motion:reduce){button.pj-fig,.pj-seg{transition:none}}
 @media(max-width:760px){.pj-figs{gap:4px 16px}.pj-shutdown{margin-left:0}}
+/* 滚动条 (scrollbars.js): the page draws its own bars, so they look the same whatever the system's scroll bar setting (a mouse or
+   「显示滚动条：始终」 makes WebKit draw the old grey bars, a trackpad its overlay ones). A bar is a 10px gutter with a 6px capsule of
+   the ink in it, no track, kept clear of the rounded corners; the main scrollers keep the gutter whether or not they scroll, and
+   give their right padding to it, so nothing moves when a bar comes or goes. The capsule shows while its scroller scrolls and while
+   the pointer is near its edge, then fades (--sb-a, faded by scrollbars.js; at once under less motion); at rest it is hidden, faint
+   when the system shows its bars always (html.sb-classic), and full under more contrast. Less transparency gives it a solid colour.
+   The probe that reads the system's setting (.sb-probe) keeps the system's own bar. */
+@property --sb-a{syntax:'<number>';inherits:true;initial-value:0}
+:root{--sb-size:10px;--sb-rest:0;--sb-a:var(--sb-rest);--sb-thumb:rgba(var(--tone-ink),.3);--sb-thumb-hover:rgba(var(--tone-ink),.46);--sb-thumb-active:rgba(var(--tone-ink),.58)}
+:root[data-scheme=dark]{--sb-thumb:rgba(var(--tone-ink),.3);--sb-thumb-hover:rgba(var(--tone-ink),.46);--sb-thumb-active:rgba(var(--tone-ink),.6)}
+:root.sb-classic{--sb-rest:.5}
+@media(prefers-contrast:more){:root,:root.sb-classic{--sb-rest:1;--sb-thumb:rgba(var(--tone-ink),.55);--sb-thumb-hover:rgba(var(--tone-ink),.7);--sb-thumb-active:rgba(var(--tone-ink),.8)}}
+@media(prefers-reduced-transparency:reduce){:root{--sb-thumb:color-mix(in srgb,rgb(var(--tone-ink)) 34%,rgb(var(--tone-card)));--sb-thumb-hover:color-mix(in srgb,rgb(var(--tone-ink)) 50%,rgb(var(--tone-card)));--sb-thumb-active:color-mix(in srgb,rgb(var(--tone-ink)) 62%,rgb(var(--tone-card)))}}
+.sb-on *{--sb-a:var(--sb-rest)}
+:root .sb-on,:root.sb-on{--sb-a:1}
+:not(.sb-probe)::-webkit-scrollbar{width:var(--sb-size);height:var(--sb-size);background:transparent}
+:not(.sb-probe)::-webkit-scrollbar-button{display:none}
+:not(.sb-probe)::-webkit-scrollbar-corner{background:transparent}
+:not(.sb-probe)::-webkit-scrollbar-track{background:transparent}
+:not(.sb-probe)::-webkit-scrollbar-track:vertical{margin:var(--sb-start,4px) 0 var(--sb-end,4px)}
+:not(.sb-probe)::-webkit-scrollbar-track:horizontal{margin:0 var(--sb-end,4px) 0 var(--sb-start,4px)}
+:not(.sb-probe)::-webkit-scrollbar-thumb{min-width:32px;min-height:32px;border:2px solid transparent;border-radius:999px;background:color-mix(in srgb,var(--sb-thumb) calc(var(--sb-a) * 100%),transparent) padding-box}
+:not(.sb-probe)::-webkit-scrollbar-thumb:hover{background:var(--sb-thumb-hover) padding-box}
+:not(.sb-probe)::-webkit-scrollbar-thumb:active{background:var(--sb-thumb-active) padding-box}
+@supports not selector(::-webkit-scrollbar){:root{scrollbar-width:thin;scrollbar-color:var(--sb-thumb) transparent}}
+/* the main scrollers: the gutter is kept and takes the place of the right padding; the bar stays clear of the rounded corners */
+:root :is(#board,#detail,#modal-content,#sidebar){scrollbar-gutter:stable}
+:root #modal-content{padding-right:calc(24px - var(--sb-size));--sb-start:0px;--sb-end:14px}
+:root #modal-content :is(.confirm-actions,.form-actions):last-child{margin-right:calc(var(--sb-size) - 24px);padding-right:calc(24px - var(--sb-size))}
+@media(min-width:761px){
+ :root #board{padding-right:calc(20px - var(--sb-size));--sb-end:var(--shell-radius)}
+ :root :is(#detail,.detail-leave){padding-right:calc(22px - var(--sb-size));--sb-start:var(--detail-radius);--sb-end:var(--detail-radius)}
+ :root #sidebar,:root body.sidebar-rail #sidebar{padding-right:0}
+ html.native-app #sidebar{--sb-start:var(--shell-radius);--sb-end:var(--shell-radius)}
+}

@@ -29,7 +29,7 @@ async (page) => {
  const openDetail=async()=>{await p.evaluate(()=>document.querySelector('#board [data-asset] .item-open').click());};
  const geometry=()=>p.evaluate(()=>{const box=s=>{const r=document.querySelector(s).getBoundingClientRect();return {l:r.left,t:r.top,r:r.right,b:r.bottom,w:r.width};};
   const d=getComputedStyle($('#detail'));
-  return {main:box('#main'),bar:box('#main .appbar'),detail:box('#detail'),board:{...box('#board'),r:box('#board').r-parseFloat(getComputedStyle($('#board')).paddingRight)},radius:parseFloat(d.borderTopLeftRadius),shadow:d.boxShadow,blur:d.backdropFilter||d.webkitBackdropFilter||'',fill:d.backgroundColor,image:d.backgroundImage};});
+  return {main:box('#main'),bar:box('#main .appbar'),detail:box('#detail'),board:{...box('#board'),r:box('#board').l+$('#board').clientLeft+$('#board').clientWidth-parseFloat(getComputedStyle($('#board')).paddingRight)},radius:parseFloat(d.borderTopLeftRadius),shadow:d.boxShadow,blur:d.backdropFilter||d.webkitBackdropFilter||'',fill:d.backgroundColor,image:d.backgroundImage};});
  const resolve=value=>p.evaluate(v=>{const c=document.createElement('canvas');c.width=c.height=1;const x=c.getContext('2d');x.fillStyle=v;x.fillRect(0,0,1,1);return [...x.getImageData(0,0,1,1).data].slice(0,3);},value);
  const pixel=async(x,y)=>{const shot=(await p.screenshot({clip:{x,y,width:1,height:1}})).toString('base64');
   return p.evaluate(async s=>{const im=new Image();im.src='data:image/png;base64,'+s;await im.decode();const c=document.createElement('canvas');c.width=c.height=1;const x=c.getContext('2d');x.drawImage(im,0,0);return [...x.getImageData(0,0,1,1).data].slice(0,3);},shot);};
@@ -69,7 +69,7 @@ async (page) => {
    if(c.skin==='magnet'){
     // the figure stands beside the card in view, on the door, not under the card or a panel
     const fig=await p.evaluate(()=>{const f=document.querySelector('.scene-figure').getBoundingClientRect(),d=$('#detail').getBoundingClientRect(),b=$('#board').getBoundingClientRect(),m=$('#main').getBoundingClientRect();
-     const s=getComputedStyle(document.querySelector('.scene-figure'));return {l:f.left,r:f.right,t:f.top,b:f.bottom,card:d.left,board:b.right-parseFloat(getComputedStyle($('#board')).paddingRight),bottom:m.bottom,shown:s.display!=='none'&&Number(s.opacity)>.5,still:s.backgroundImage!=='none'};});
+     const s=getComputedStyle(document.querySelector('.scene-figure'));return {l:f.left,r:f.right,t:f.top,b:f.bottom,card:d.left,board:b.left+$('#board').clientLeft+$('#board').clientWidth-parseFloat(getComputedStyle($('#board')).paddingRight),bottom:m.bottom,shown:s.display!=='none'&&Number(s.opacity)>.5,still:s.backgroundImage!=='none'};});
     check(fig.shown&&fig.still&&fig.r<=fig.card-2&&fig.l>=fig.board-1&&fig.b<=fig.bottom,`${label}: the figure stands in view beside the card ${JSON.stringify(fig)}`);
    }
    // the content card under a closed detail: the toolbar and the board take the whole width again

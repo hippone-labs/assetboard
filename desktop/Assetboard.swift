@@ -2368,6 +2368,10 @@ func testWebView() {
         // The page cannot reach the network: its Content-Security-Policy blocks a request from the page itself.
         _ = run("window.__csp='';addEventListener('securitypolicyviolation',e=>{window.__csp=e.violatedDirective||e.effectiveDirective});fetch('https://example.com/').catch(()=>{});''")
         wait("CSP violation") { run("window.__csp").hasPrefix("connect-src") }
+        // 滚动条 (material.css, scrollbars.js): WebKit draws the page's own 10px bar whatever the system's scroll bar setting
+        // (not the old grey bar of a mouse or 显示滚动条：始终), and the board keeps the gutter.
+        let bars = run("(()=>{const n=document.createElement('div');n.style.cssText='position:absolute;width:80px;height:40px;overflow:auto';n.innerHTML='<div style=\"height:200px\"></div>';document.body.append(n);const w=n.offsetWidth-n.clientWidth;n.remove();const b=document.querySelector('#board');return JSON.stringify({w,board:b.offsetWidth-b.clientWidth})})()")
+        check(bars.contains("\"w\":10") && bars.contains("\"board\":10"), "WebKit draws the page's 10px scroll bars: \(bars)")
         // The page plans four reminders for soon.dev (due in 3 days, no renewal): the 1-day lead, the day itself, and 3 and
         // 14 days after expiry; the plan passes the Swift validation.
         wait("reminder plan") { handler.reminders != nil }
