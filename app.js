@@ -971,7 +971,9 @@ function detailMotion(open){
 // wide as it was until the panels are there, so none slides under an edge. A toggle while they move starts from where they are;
 // quick toggles move the panels once, BOARD_ROOM_QUICK after the last. Less motion, or a detail shown without its motion, makes
 // the room at once. The free places of 冰箱贴 are not touched: the panels are laid out from them for the new width (board-free.js).
-const BOARD_ROOM_MS=340,BOARD_ROOM_QUICK=120,BOARD_ROOM_EASE='cubic-bezier(.45,.05,.25,1)';
+// The act's animations start with the first frame drawn after the click, which a slow machine draws late: once roomWait is over,
+// the room also waits for what of the act is still running (the card, its leaving copy, the figure), up to ROOM_ACT_LATE more.
+const BOARD_ROOM_MS=340,BOARD_ROOM_QUICK=120,BOARD_ROOM_EASE='cubic-bezier(.45,.05,.25,1)',ROOM_ACT_LATE=600;
 let roomWait=0,roomTimer=0,roomTarget=null,roomMove=null;
 function boardRoom(open){
  const wait=roomWait;roomWait=0;
@@ -979,7 +981,16 @@ function boardRoom(open){
  clearTimeout(roomTimer);roomTarget=null;
  if((roomMove?roomMove.open:document.body.classList.contains('detail-room'))===open)return;
  if(!wait){roomSlide(open,false);return;}
- roomTarget=open;roomTimer=setTimeout(()=>{roomTarget=null;roomSlide(open,true);},wait);
+ const until=performance.now()+wait+ROOM_ACT_LATE;
+ const go=()=>{const left=roomActLeft();
+  if(left>0&&performance.now()<until){roomTimer=setTimeout(go,Math.max(16,left));return;}
+  roomTarget=null;roomSlide(open,true);};
+ roomTarget=open;roomTimer=setTimeout(go,wait);
+}
+// how long the detail's act still runs, in ms (0 when it is over)
+function roomActLeft(){
+ const acts=[...$('#detail').getAnimations(),...[...document.querySelectorAll('.detail-leave')].flatMap(n=>n.getAnimations()),...(document.querySelector('.scene-figure')?.getAnimations({subtree:true})||[])];
+ return Math.max(0,...acts.filter(a=>a.playState==='running'||a.pending).map(a=>{const end=a.effect?.getComputedTiming().endTime;return Number.isFinite(end)?end-(a.currentTime||0):0;}));
 }
 function roomSlide(open,motion){
  const body=document.body,board=$('#board'),wall=board.querySelector('.wall'),panels=wall?[...wall.children].filter(n=>n.dataset.group):[];

@@ -34,8 +34,10 @@ async (page) => {
  const pixel=async(x,y)=>{const shot=(await p.screenshot({clip:{x,y,width:1,height:1}})).toString('base64');
   return p.evaluate(async s=>{const im=new Image();im.src='data:image/png;base64,'+s;await im.decode();const c=document.createElement('canvas');c.width=c.height=1;const x=c.getContext('2d');x.drawImage(im,0,0);return [...x.getImageData(0,0,1,1).data].slice(0,3);},shot);};
  const contrast=(a,b)=>p.evaluate(([a,b])=>themeContrast(a,b),[a,b]);
- // the card's act (0.3 s), then the board's room (app.js, boardRoom: 0.34 s after the act)
- const settle=()=>p.waitForTimeout(720);
+ // the card's act (0.3 s), then the board's room (app.js, boardRoom: 0.34 s after the act); a slow machine takes longer, so after
+ // that it waits, up to 5 s, until the room is made and nothing runs
+ const settle=async()=>{await p.waitForTimeout(720);
+  await p.waitForFunction(()=>roomTarget===null&&!roomMove&&!document.getAnimations().length,null,{timeout:5000,polling:50}).catch(()=>{});};
  try {
   // the card's place, in both skins and both schemes, the browser and the Mac app
   const cases=[{skin:'quiet',scheme:'light',gap:12,radius:12},{skin:'quiet',scheme:'dark',gap:12,radius:12},{skin:'quiet',scheme:'light',gap:12,radius:12,native:true},
