@@ -2693,7 +2693,7 @@ button.pj-fig:hover{background:var(--hover)}
 @media(max-width:760px){.pj-figs{gap:4px 16px}.pj-shutdown{margin-left:0}}
 /* 滚动条 (scrollbars.js): the page draws its own bars, so they look the same whatever the system's scroll bar setting (a mouse or
    「显示滚动条：始终」 makes WebKit draw the old grey bars, a trackpad its overlay ones). A bar is a 10px gutter with a 6px capsule of
-   the ink in it, no track, kept clear of the rounded corners; the main scrollers keep the gutter whether or not they scroll, and
+   the ink in it, no track, kept clear of the rounded corners; the main scrollers keep the bar whether or not they scroll, and
    give their right padding to it, so nothing moves when a bar comes or goes. The capsule shows while its scroller scrolls and while
    the pointer is near its edge, then fades (--sb-a, faded by scrollbars.js; at once under less motion); at rest it is hidden, faint
    when the system shows its bars always (html.sb-classic), and full under more contrast. Less transparency gives it a solid colour.
@@ -2716,11 +2716,15 @@ button.pj-fig:hover{background:var(--hover)}
 :not(.sb-probe)::-webkit-scrollbar-thumb:hover{background:var(--sb-thumb-hover) padding-box}
 :not(.sb-probe)::-webkit-scrollbar-thumb:active{background:var(--sb-thumb-active) padding-box}
 @supports not selector(::-webkit-scrollbar){:root{scrollbar-width:thin;scrollbar-color:var(--sb-thumb) transparent}}
-/* the main scrollers: the gutter is kept and takes the place of the right padding; the bar stays clear of the rounded corners */
+/* the main scrollers keep their bar while nothing scrolls, with no capsule in it: overflow-y:scroll, since WebKit sizes a stable
+   gutter with no bar in it as the system's bar; the gutter is kept too, for a browser that hides its bars (Playwright's Chromium).
+   The bar takes the place of the right padding and stays clear of rounded corners. */
 :root :is(#board,#detail,#modal-content,#sidebar){scrollbar-gutter:stable}
+:root :is(#detail,#modal-content){overflow-y:scroll}
 :root #modal-content{padding-right:calc(24px - var(--sb-size));--sb-start:0px;--sb-end:14px}
 :root #modal-content :is(.confirm-actions,.form-actions):last-child{margin-right:calc(var(--sb-size) - 24px);padding-right:calc(24px - var(--sb-size))}
 @media(min-width:761px){
+ :root #board,:root #sidebar{overflow-y:scroll}
  :root #board{padding-right:calc(20px - var(--sb-size));--sb-end:var(--shell-radius)}
  :root :is(#detail,.detail-leave){padding-right:calc(22px - var(--sb-size));--sb-start:var(--detail-radius);--sb-end:var(--detail-radius)}
  :root #sidebar,:root body.sidebar-rail #sidebar{padding-right:0}

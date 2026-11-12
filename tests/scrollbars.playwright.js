@@ -45,7 +45,7 @@ async (page) => {
    check(Math.max(cols[1],cols[8])<=10,`${label}: nothing is drawn at the gutter's sides (no track, no grey bar) ${cols}`);
    check(Math.min(...cols.slice(3,7))>=18,`${label}: the capsule is drawn in the gutter's middle ${cols}`);
   };
-  const clear=(cols,label)=>check(Math.max(...cols)<=10,`${label}: no capsule at rest ${cols}`);
+  const clear=(cols,label)=>check(Math.max(...cols.slice(1,-1))<=10,`${label}: no capsule at rest ${cols}`);
 
   for(const [skin,scene,scheme] of [['quiet','','light'],['quiet','','dark'],['magnet','kitchen','light'],['magnet','city','dark']]){
    const label=`${skin}${scene?'/'+scene:''} ${scheme}`,{p,context,errors}=await open({skin,scene,scheme});
@@ -80,6 +80,11 @@ async (page) => {
    await p.mouse.move(edge.far,edge.y);await p.waitForTimeout(1200);check(!await on(p,'#detail'),`${label}: the detail's capsule is not shown with the pointer far from its edge`);
    await p.mouse.move(edge.x-14,edge.y);await p.mouse.move(edge.x,edge.y);await p.waitForFunction(()=>$('#detail').classList.contains('sb-on'));
    await p.mouse.move(edge.far,edge.y);await p.waitForFunction(()=>!$('#detail').classList.contains('sb-on'),null,{timeout:3000});
+   // a board with nothing to scroll keeps its bar, with no capsule in it
+   await p.evaluate(()=>setView('google'));await p.waitForTimeout(300);
+   check(await p.evaluate(()=>$('#board').scrollHeight<=$('#board').clientHeight),`${label}: the google view does not scroll`);
+   check(await gutter(p,'#board')===10,`${label}: a board with nothing to scroll keeps the 10px gutter ${await gutter(p,'#board')}`);
+   if(skin==='quiet')clear(await columns(p,await strip(p,'#board')),`${label} board with nothing to scroll`);
    // a dialog's scroller keeps its gutter, and the dialog's text its padding
    await p.evaluate(()=>{closeDetail();prefsDialog();});await p.waitForSelector('#modal[open]');
    check(await gutter(p,'#modal-content')===10,`${label}: the dialog has a 10px gutter ${await gutter(p,'#modal-content')}`);
