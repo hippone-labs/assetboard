@@ -11,7 +11,10 @@ async (page) => {
  const p=await page.context().newPage();
  const check=(ok,message)=>{if(!ok)throw new Error(message);};
  const errors=[];p.on('pageerror',e=>errors.push(e.message));
- const settle=()=>p.waitForTimeout(120);
+ // after a change, wait until the wall is packed for the width it has (it repacks in a ResizeObserver) and the panels have slid to
+ // their places (a panel measured while it slides is where it was): up to 3 s on a slow machine
+ const settle=async()=>{await p.waitForTimeout(120);
+  await p.waitForFunction(()=>{const w=document.querySelector('#board .wall');return !w||!wallHold&&Math.abs(wallWidth-w.clientWidth)<=.5&&!w.getAnimations({subtree:true}).length;},null,{timeout:3000,polling:50}).catch(()=>{});};
  try {
   await p.setViewportSize({width:1500,height:900});
   await p.goto('http://127.0.0.1:4317/');

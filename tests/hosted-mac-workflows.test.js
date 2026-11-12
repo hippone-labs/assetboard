@@ -35,6 +35,22 @@ test('the Mac jobs run on GitHub-hosted macOS 26 with one pinned Xcode', () => {
  assert.match(helper, /sudo xcode-select --switch "\$app\/Contents\/Developer"/);
 });
 
+test('every push and pull request runs the release browser tests on GitHub-hosted macOS 26, without secrets', () => {
+ const job = build.jobs['browser-mac'];
+ assert.equal(job['runs-on'], release.jobs.release['runs-on']);
+ assert.equal(job.environment, undefined);
+ assert.ok(build.on.pull_request !== undefined && build.on.push.branches.includes('cc/**'));
+ // The same Playwright as the release, and the same runner over the whole tests/ batch (no files named, so pro/tests/ joins when pro/ is there).
+ const releaseRun = step(release.jobs.release, 'Browser regression').run;
+ assert.equal(/playwright@([\d.]+)/.exec(releaseRun)[1], build.env.PLAYWRIGHT_VERSION);
+ assert.match(step(job, 'Set up Playwright').run, /"playwright@\$PLAYWRIGHT_VERSION"/);
+ assert.match(step(job, 'Set up Playwright').run, /playwright" install chromium/);
+ assert.match(releaseRun, /^\s*node tools\/browser-tests\.js --port \d+\s*$/m);
+ assert.match(step(job, 'Browser regression').run, /^node tools\/browser-tests\.js --port "\$PW_PORT" 2>&1/);
+ assert.equal(JSON.stringify(job).includes('secrets.'), false);
+ assert.equal(step(job, 'actions/checkout@v7').with['persist-credentials'], false);
+});
+
 test('build.yml reads no secret and needs no environment', () => {
  assert.equal(read('.github/workflows/build.yml').includes('secrets.'), false);
  for (const job of Object.values(build.jobs)) assert.equal(job.environment, undefined);

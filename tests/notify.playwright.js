@@ -46,6 +46,8 @@ async (page) => {
     await p.click('.notify-off [data-action="notification-settings"]');
     check(await p.evaluate(()=>window.__sent.some(m=>m.action==='openNotificationSettings')),'The button asks the Mac app to open the settings');
     await p.setViewportSize({width:390,height:800});
+    // the wall repacks for the new width in a ResizeObserver, with the next frame: measure once a frame is drawn
+    await p.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
     const fit=await p.evaluate(()=>{const n=document.querySelector('.notify-off').getBoundingClientRect(),b=document.querySelector('.notify-off .button').getBoundingClientRect();return {overflow:document.documentElement.scrollWidth>innerWidth,inside:b.right<=n.right+0.5&&n.right<=innerWidth};});
     check(!fit.overflow&&fit.inside,'Note fits at 390px: '+JSON.stringify(fit));
     await p.evaluate(()=>assetboardConnectionState({notifications:'allowed'}));

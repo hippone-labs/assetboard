@@ -5,20 +5,25 @@
 // 打开 is a wash of the accent and reads at AA. It comes in at once and a copy goes out as it closes, the detail itself hidden at
 // once; the door's figure pulls it out and pushes it back within 0.3 s (one at the door's left goes to dust and appears beside the
 // card), stands beside it in view while it is open, and is home again after; quick toggles skip to the end without the figure, in
-// order; less motion only fades the card. The figures' stills are transparent.
+// order; less motion only fades the card. With less transparency (the system's Reduce transparency) the card is solid, without
+// the glass. The figures' stills are transparent.
 async (page) => {
  const browser=page.context().browser();
  const check=(ok,message)=>{if(!ok)throw new Error(message);};
  const contexts=[];let p;
- const open=async({skin='quiet',scene='',scheme='light',motion='no-preference',native=false}={})=>{
+ const open=async({skin='quiet',scene='',scheme='light',motion='no-preference',transparency='no-preference',native=false}={})=>{
   const context=await browser.newContext({viewport:{width:1440,height:900},reducedMotion:motion,colorScheme:scheme});contexts.push(context);
   await context.addInitScript(([skin,scene,native])=>{localStorage.setItem('assetboard-lang-v1','zh');localStorage.setItem('assetboard-skin-v1',skin);if(scene)localStorage.setItem('assetboard-fridge-scene-v1',scene);
    if(native){window.webkit={messageHandlers:{assetboard:{postMessage:()=>{}}}};window.__ASSETBOARD_NATIVE__={data:null,demo:true,themePref:null,systemAccent:'#0a6fe8',lang:'zh'};}},[skin,scene,native]);
   p=await context.newPage();const errors=[];p.on('pageerror',e=>errors.push(e.message));
+  // Playwright has no option for prefers-reduced-transparency, and Chromium on macOS takes it from the system's Reduce
+  // transparency (on in GitHub's hosted macOS images), so the page is given it here; this call replaces the media features
+  // Playwright set, so the scheme and the motion are given again.
+  await (await context.newCDPSession(p)).send('Emulation.setEmulatedMedia',{media:'',features:[{name:'prefers-color-scheme',value:scheme},{name:'prefers-reduced-motion',value:motion},{name:'prefers-reduced-transparency',value:transparency}]});
   await p.goto('http://127.0.0.1:4317/'+(native?'':'?demo'));await p.waitForTimeout(500);
   // a record with a real management page, so the detail has 打开 and 编辑 side by side
   await p.evaluate(()=>{const a=state.assets.find(a=>a.name==='studio.example.com');a.url='https://www.namecheap.com/';if(!$('#detail').hidden)closeDetail();});
-  await p.waitForTimeout(720);
+  await settle();
   return errors;
  };
  const openDetail=async()=>{await p.evaluate(()=>document.querySelector('#board [data-asset] .item-open').click());};
@@ -29,8 +34,10 @@ async (page) => {
  const pixel=async(x,y)=>{const shot=(await p.screenshot({clip:{x,y,width:1,height:1}})).toString('base64');
   return p.evaluate(async s=>{const im=new Image();im.src='data:image/png;base64,'+s;await im.decode();const c=document.createElement('canvas');c.width=c.height=1;const x=c.getContext('2d');x.drawImage(im,0,0);return [...x.getImageData(0,0,1,1).data].slice(0,3);},shot);};
  const contrast=(a,b)=>p.evaluate(([a,b])=>themeContrast(a,b),[a,b]);
- // the card's act (0.3 s), then the board's room (app.js, boardRoom: 0.34 s after the act)
- const settle=()=>p.waitForTimeout(720);
+ // the card's act (0.3 s), then the board's room (app.js, boardRoom: 0.34 s after the act); a slow machine takes longer, so after
+ // that it waits, up to 5 s, until the room is made and nothing runs
+ const settle=async()=>{await p.waitForTimeout(720);
+  await p.waitForFunction(()=>roomTarget===null&&!roomMove&&!document.getAnimations().length,null,{timeout:5000,polling:50}).catch(()=>{});};
  try {
   // the card's place, in both skins and both schemes, the browser and the Mac app
   const cases=[{skin:'quiet',scheme:'light',gap:12,radius:12},{skin:'quiet',scheme:'dark',gap:12,radius:12},{skin:'quiet',scheme:'light',gap:12,radius:12,native:true},
@@ -72,17 +79,28 @@ async (page) => {
    check(!errors.length,`${label}: page errors: ${errors.join(' | ')}`);
   }
 
+  // less transparency: the card keeps its place, radius and shadow, and is the solid card colour, without the glass
+  for(const c of [{skin:'quiet',radius:12},{skin:'magnet',scene:'kitchen',radius:14}]){
+   const label=`less transparency (${c.scene||c.skin})`;
+   const errors=await open({...c,transparency:'reduce'});
+   await openDetail();await settle();
+   const g=await geometry(),card=await p.evaluate(()=>({reduce:matchMedia('(prefers-reduced-transparency: reduce)').matches,tone:getComputedStyle(document.documentElement).getPropertyValue('--tone-card').trim().replace(/\s/g,'')}));
+   check(card.reduce&&Math.abs(g.radius-c.radius)<=1&&/rgba?\(/.test(g.shadow),`${label}: the card keeps its radius and shadow (${g.radius}, ${g.shadow})`);
+   check(g.blur==='none'&&g.image==='none'&&g.fill.replace(/\s/g,'')===`rgb(${card.tone})`,`${label}: the card is solid, without the glass (${g.blur}, ${g.fill}, ${g.image}, card ${card.tone})`);
+   check(!errors.length,`${label}: page errors: ${errors.join(' | ')}`);
+  }
+
   // motion: the card at once, the copy on close, the figure's act inside 0.3 s, then home
   for(const scene of ['kitchen','city']){
    await open({skin:'magnet',scene});
-   await openDetail();
-   const first=await p.evaluate(()=>({anim:$('#detail').getAnimations().map(a=>({d:a.effect.getTiming().duration,k:a.effect.getKeyframes().map(k=>k.translate||'')})),fig:[...document.body.classList].filter(c=>c.startsWith('fig-')),
-    ghost:getComputedStyle(document.querySelector('.scene-ghost')).display,figAnim:document.querySelector('.scene-figure').getAnimations({subtree:true}).map(a=>a.animationName)}));
+   // read in the same turn as the click, so a slow round trip does not read the act after it
+   const first=await p.evaluate(()=>{document.querySelector('#board [data-asset] .item-open').click();return {anim:$('#detail').getAnimations().map(a=>({d:a.effect.getTiming().duration,k:a.effect.getKeyframes().map(k=>k.translate||'')})),fig:[...document.body.classList].filter(c=>c.startsWith('fig-')),
+    ghost:getComputedStyle(document.querySelector('.scene-ghost')).display,figAnim:document.querySelector('.scene-figure').getAnimations({subtree:true}).map(a=>a.animationName),
+    longest:Math.max(...document.getAnimations().map(a=>a.effect.getComputedTiming().endTime))};});
    check(first.anim.length===1&&first.anim[0].d<=300&&/px/.test(first.anim[0].k[0]),`${scene}: the card slides in at once from the right ${JSON.stringify(first.anim)}`);
    check(first.fig.join()==='fig-pull'&&first.figAnim.length===2,`${scene}: the figure pulls the card out ${JSON.stringify(first)}`);
    check(scene==='city'?first.ghost==='block'&&first.figAnim.includes('fig-warp-pull'):first.ghost==='none'&&first.figAnim.includes('fig-pull'),`${scene}: ${scene==='city'?'the figure at the left goes to dust and appears beside the card':'the figure at the right pulls where it stands'} ${JSON.stringify(first)}`);
-   const longest=await p.evaluate(()=>Math.max(...document.getAnimations().map(a=>a.effect.getComputedTiming().endTime)));
-   check(longest<=300,`${scene}: the whole act ends within 0.3 s (${longest})`);
+   check(first.longest<=300,`${scene}: the whole act ends within 0.3 s (${first.longest})`);
    await settle();
    check(await p.evaluate(()=>!document.body.className.includes('fig-')&&!document.getAnimations().length),`${scene}: after the act nothing is left running`);
    const closed=await p.evaluate(()=>{closeDetail();const copy=document.querySelector('.detail-leave');

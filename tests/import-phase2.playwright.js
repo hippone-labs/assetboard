@@ -56,7 +56,8 @@ async (page) => {
   await p.evaluate(()=>{window.__localCli={gh:true,ghAccounts:['alice'],sshConfig:true};importHub();});
   await p.waitForSelector('[data-action="ssh-import"]');
   await p.evaluate(()=>window.webkit.messageHandlers.assetboard.postMessage({action:'sshConfigImport'}));
-  await p.waitForTimeout(100);
+  // the app's answer comes back on a later turn: wait for the host, up to 3 s on a slow machine
+  await p.waitForFunction(()=>state.assets.some(a=>a.source==='ssh'),null,{timeout:3000,polling:25}).catch(()=>{});
   const names=await p.evaluate(()=>state.assets.filter(a=>a.source==='ssh').map(a=>a.name));
   check(names.includes('demo-box'),'SSH import adds host: '+names);
   check(await p.evaluate(()=>document.querySelector('#board [data-asset] .account-tag')?.textContent==='deploy'||state.assets.some(a=>a.account==='deploy')),'SSH account tag / account field set');

@@ -963,7 +963,11 @@ function detailMotion(open){
   target.animate(slide.slice().reverse(),{duration:still?150:220,easing:'cubic-bezier(.4,0,.8,.4)',fill:'forwards'}).finished.then(()=>target.remove(),()=>{});
  }
  if(figure)body.classList.add(open?'fig-pull':'fig-push');
- detailMotionTimer=setTimeout(()=>{body.classList.remove('fig-pull','fig-push');if(!open)target.remove();},DETAIL_MOTION);
+ // the act ends after DETAIL_MOTION, or later if its animations started late (a slow machine draws the first frame late; actLeft)
+ const until=now+DETAIL_MOTION+ROOM_ACT_LATE;
+ const end=()=>{const left=actLeft();if(left>0&&performance.now()<until){detailMotionTimer=setTimeout(end,Math.max(16,left));return;}
+  body.classList.remove('fig-pull','fig-push');if(!open)target.remove();};
+ detailMotionTimer=setTimeout(end,DETAIL_MOTION);
 }
 // The board's room for the detail (body.detail-room, material.css) follows the card: once the card is in or gone (under 冰箱贴, once
 // the figure's act is over) the board takes its new width and the panels slide to their new places over BOARD_ROOM_MS, eased in and
@@ -971,7 +975,10 @@ function detailMotion(open){
 // wide as it was until the panels are there, so none slides under an edge. A toggle while they move starts from where they are;
 // quick toggles move the panels once, BOARD_ROOM_QUICK after the last. Less motion, or a detail shown without its motion, makes
 // the room at once. The free places of 冰箱贴 are not touched: the panels are laid out from them for the new width (board-free.js).
-const BOARD_ROOM_MS=340,BOARD_ROOM_QUICK=120,BOARD_ROOM_EASE='cubic-bezier(.45,.05,.25,1)';
+// The act's animations start with the first frame drawn after the click, which a slow machine draws late: once roomWait is over,
+// the room also waits for what of the act is still running (the card, its leaving copy, the figure; actLeft) and for the figure to
+// be done (detailMotion takes fig-pull/fig-push off), up to ROOM_ACT_LATE more.
+const BOARD_ROOM_MS=340,BOARD_ROOM_QUICK=120,BOARD_ROOM_EASE='cubic-bezier(.45,.05,.25,1)',ROOM_ACT_LATE=600;
 let roomWait=0,roomTimer=0,roomTarget=null,roomMove=null;
 function boardRoom(open){
  const wait=roomWait;roomWait=0;
@@ -979,7 +986,16 @@ function boardRoom(open){
  clearTimeout(roomTimer);roomTarget=null;
  if((roomMove?roomMove.open:document.body.classList.contains('detail-room'))===open)return;
  if(!wait){roomSlide(open,false);return;}
- roomTarget=open;roomTimer=setTimeout(()=>{roomTarget=null;roomSlide(open,true);},wait);
+ const until=performance.now()+wait+ROOM_ACT_LATE;
+ const go=()=>{const left=Math.max(actLeft(),/\bfig-(pull|push)\b/.test(document.body.className)?16:0);
+  if(left>0&&performance.now()<until){roomTimer=setTimeout(go,Math.max(16,left));return;}
+  roomTarget=null;roomSlide(open,true);};
+ roomTarget=open;roomTimer=setTimeout(go,wait);
+}
+// how long the detail's act still runs, in ms (0 when it is over)
+function actLeft(){
+ const acts=[...$('#detail').getAnimations(),...[...document.querySelectorAll('.detail-leave')].flatMap(n=>n.getAnimations()),...(document.querySelector('.scene-figure')?.getAnimations({subtree:true})||[])];
+ return Math.max(0,...acts.filter(a=>a.playState==='running'||a.pending).map(a=>{const end=a.effect?.getComputedTiming().endTime;return Number.isFinite(end)?end-(a.currentTime||0):0;}));
 }
 function roomSlide(open,motion){
  const body=document.body,board=$('#board'),wall=board.querySelector('.wall'),panels=wall?[...wall.children].filter(n=>n.dataset.group):[];

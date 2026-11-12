@@ -27,7 +27,8 @@ async (page) => {
    // Escape is 稍后; notes in one language only show that language with nothing folded.
    await p.evaluate(()=>window.assetboardUpdateOffer({version:'2026.11.9',notes:{en:'- Fixes'}}));
    check(await p.evaluate(()=>!$('.update-other')&&$('.update-notes li').textContent==='Fixes'),`${lang}: notes in one language only`);
-   await p.keyboard.press('Escape');await p.waitForTimeout(100);
+   // the answer goes to the app when the dialog has closed: wait for it, up to 3 s on a slow machine
+   await p.keyboard.press('Escape');await p.waitForFunction(()=>window.__sent.some(m=>m.action==='updateChoice'&&m.version==='2026.11.9'),null,{timeout:3000,polling:25}).catch(()=>{});
    sent=await p.evaluate(()=>window.__sent.filter(m=>m.action==='updateChoice').at(-1));
    check(sent.install===false&&sent.version==='2026.11.9',`${lang}: closing is 稍后: `+JSON.stringify(sent));
    // Another dialog stays: the app asks in an alert instead.

@@ -99,6 +99,8 @@ async (page) => {
 
   // 390px: the form picker and the list fit without sideways scrolling.
   await p.setViewportSize({width:390,height:800});
+  // the wall repacks for the new width in a ResizeObserver, with the next frame: measure once a frame is drawn
+  await p.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
   await p.evaluate(()=>assetForm('ai',null,{provider:'Gemini'}));
   const fitForm=await p.evaluate(()=>{const m=document.querySelector('#modal').getBoundingClientRect(),c=[...document.querySelectorAll('#plan-picks .choice')].map(b=>b.getBoundingClientRect());return {page:document.documentElement.scrollWidth>innerWidth,modal:document.querySelector('#modal-content').scrollWidth>document.querySelector('#modal-content').clientWidth,inside:c.every(r=>r.right<=m.right+0.5),n:c.length};});
   check(!fitForm.page&&!fitForm.modal&&fitForm.inside&&fitForm.n===4,'Form picker fits at 390px: '+JSON.stringify(fitForm));

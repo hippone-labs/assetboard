@@ -1,4 +1,5 @@
-# Tests every push and pull request: the web tests on a GitHub-hosted Ubuntu runner, and the Swift build and self-tests, with the Pro
+# Tests every push and pull request: the web tests on a GitHub-hosted Ubuntu runner, the browser tests again on GitHub-hosted macOS 26
+# as release-app.yml runs them before a release, and the Swift build and self-tests, with the Pro
 # modules when the checkout has them and without (ASSETBOARD_EDITION=free), on GitHub-hosted macOS 26 with the Xcode pinned in
 # XCODE_VERSION (tools/ci-mac.sh). No job here signs or reads a secret.
 # Before a release, run it by hand with "Minimum system" ticked: the Swift job then runs on GitHub-hosted macOS 15, the oldest
@@ -75,6 +76,39 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: web-logs-${{ github.sha }}
+          path: ${{ runner.temp }}/logs/
+          retention-days: 7
+
+  # The browser tests as release-app.yml's "Browser regression" runs them: the same runner image, Playwright and command. Chromium
+  # there draws in software on three cores and the image has Reduce transparency and Reduce motion on, none of which the Ubuntu job
+  # shows. The Pro modules come from a private repository that a pull request has no token for, so this is tests/ alone: the runner
+  # adds pro/tests/ only when pro/ is there.
+  browser-mac:
+    runs-on: macos-26
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Prepare logs
+        run: mkdir -p "$RUNNER_TEMP/logs" && { sw_vers; node --version; } 2>&1 | tee "$RUNNER_TEMP/logs/env.log"
+
+      - name: Set up Playwright
+        run: |
+          pw_home="$RUNNER_TEMP/playwright"
+          npm install --prefix "$pw_home" --no-audit --no-fund "playwright@$PLAYWRIGHT_VERSION"
+          "$pw_home/node_modules/.bin/playwright" install chromium
+          echo "NODE_PATH=$pw_home/node_modules" >> "$GITHUB_ENV"
+
+      - name: Browser regression
+        run: node tools/browser-tests.js --port "$PW_PORT" 2>&1 | tee "$RUNNER_TEMP/logs/playwright-mac.log"
+
+      - name: Upload logs
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: browser-mac-logs-${{ github.sha }}
           path: ${{ runner.temp }}/logs/
           retention-days: 7
 

@@ -91,7 +91,11 @@ async (page) => {
   await p.evaluate(()=>{assetFormSnapshot=null;$('#modal').close();});
 
   await p.setViewportSize({width:390,height:844});
-  check(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Mobile horizontal overflow');
+  // the wall repacks for the new width in a ResizeObserver with the next frame (later while the board makes the detail's room):
+  // wait until the page fits, up to 3 s on a slow machine
+  await p.waitForFunction(()=>document.documentElement.scrollWidth<=innerWidth,null,{timeout:3000,polling:50}).catch(()=>{});
+  const overflow=await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth?'':`${document.documentElement.scrollWidth} > ${innerWidth}: `+[...document.querySelectorAll('#board *')].filter(n=>n.getBoundingClientRect().right>innerWidth+.5).slice(0,5).map(n=>`${n.tagName.toLowerCase()}.${String(n.className).trim().split(/\s+/).join('.')} ${Math.round(n.getBoundingClientRect().right)}`).join(', '));
+  check(!overflow,'Mobile horizontal overflow '+overflow);
   check(!errors.length,'Page errors: '+errors.join(' | '));
   return 'PASS: card number guard, bank card fields and expiry, phone region inference and masking, email masking, reveal, two-way links listed in the inspector, unlink and undo, delete cleanup, search by tail, category switch, mobile bounds';
  } finally { await p.close(); }
