@@ -177,3 +177,19 @@ window.assetboardDemoAgentClients=function(){
  const at=minutes=>new Date(Date.now()-minutes*60000).toISOString();
  return [{id:'claude-code',name:'Claude Code',first:at(9000),last:at(4),calls:46,by:'clientInfo',version:'2.1.4'},{id:'codex',name:'Codex',first:at(4000),last:at(38),calls:12,by:'clientInfo',version:'0.58.0'},{id:'grok',name:'Grok',first:at(95),last:at(95),calls:1,by:'process'},{id:'unknown',name:'未知客户端',first:at(130),last:at(130),calls:1,by:'none'}];
 };
+// 待合并的 PR (pulls-view.js) as the Mac app passes GitHub's answer on: one ready and one draft on atlas-ui, a failing check next to
+// a ready one on notes-api, a ready one nobody has touched for days on pixel-kit, a conflict on studio-site, and a repository
+// this login cannot see. The links are never opened from the demo.
+window.assetboardDemoPulls=function(){
+ const ago=hours=>new Date(Date.now()-hours*3600000).toISOString().replace(/\.\d+Z$/,'Z');
+ const pr=(repo,number,title,{draft=false,ci='SUCCESS',merge='MERGEABLE',created,updated})=>({number,title,url:`https://github.com/acme-labs/${repo}/pull/${number}`,isDraft:draft,createdAt:ago(created),updatedAt:ago(updated),mergeable:merge,author:{login:'acme-dev'},commits:{nodes:[{commit:{statusCheckRollup:ci?{state:ci}:null}}]}});
+ const repo=(name,list)=>[`acme-labs/${name}`,{total:list.length,nodes:list.map(p=>pr(name,...p))}];
+ return {ok:true,at:ago(0.1),via:['gh'],repos:Object.fromEntries([
+  repo('atlas-ui',[[42,'Keep column widths when the window resizes',{created:30,updated:5}],[39,'Dark tokens for charts',{draft:true,ci:'PENDING',created:150,updated:140}]]),
+  repo('notes-api',[[118,'Fix token refresh race',{ci:'FAILURE',created:52,updated:3}],[115,'Bump sqlite driver to 3.47',{created:70,updated:20}]]),
+  repo('pixel-kit',[[7,'Add 2x export',{created:110,updated:100}]]),
+  repo('studio-site',[[3,'Copy edits on the pricing page',{merge:'CONFLICTING',created:96,updated:22}]]),
+  ...['ledger-cli','orbit-bot','paper-docs','glass-theme','tiny-queue','sample-ml','mock-store','field-guide','zen-timer'].map(name=>repo(name,[])),
+  ['acme-labs/plain-auth',{error:'denied'}]
+ ])};
+};

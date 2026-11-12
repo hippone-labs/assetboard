@@ -12,6 +12,8 @@ const FEATURES={
  // use a tool's own login, are switched on per tool in its dialog, never here.
  aiUsage:{name:tr('AI 额度与用量'),note:tr('读本机 AI 工具（Claude Code、Codex、Cursor、Copilot、Grok CLI、opencode）的用量文件，在 AI 订阅上显示额度、重置时间和本期用量；只读数字，不读对话内容，不联网'),on:true,mac:true},
  repoDetails:{name:tr('仓库分支和 Actions'),note:tr('同步 GitHub 时，每个仓库多读两次：分支列表和最近一次 Actions 运行。细粒度令牌要加 Contents 和 Actions 的只读权限（Contents 也能读代码）'),on:false,mac:true},
+ // 待合并的 PR (pulls-view.js): free and on until switched; it reads with the GitHub login the person already has (gh or the saved token).
+ pulls:{name:tr('待合并的 PR'),note:tr('用本机 gh 或已保存的令牌读 GitHub 仓库打开的 PR：App 打开时、每 15 分钟和同步 GitHub 后各读一次。只读，结果只存在这台 Mac'),on:true,mac:true},
  agent:{name:tr('外部工具接入（MCP）'),note:tr('让 Claude、ChatGPT、Cursor 等工具或脚本通过 assetboard-cli 查询和修改资产；关掉后它们的调用一律被拒绝'),on:true,mac:true},
  // Under 外部工具接入, shown while it is on. Off until switched, in a demo too: they decide what leaves the Mac.
  agentAddresses:{name:tr('把地址和联系方式交给 AI 工具'),note:tr('关着时，AI 工具读到的 IP、SSH 主机和用户、手机号和邮箱都是遮住的；搜索仍按真实值匹配'),on:false,mac:true,under:'agent'},

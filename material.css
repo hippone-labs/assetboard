@@ -2691,3 +2691,41 @@ button.pj-fig:hover{background:var(--hover)}
 .share-unit{color:var(--muted);font-family:var(--num)}
 @media(prefers-reduced-motion:reduce){button.pj-fig,.pj-seg{transition:none}}
 @media(max-width:760px){.pj-figs{gap:4px 16px}.pj-shutdown{margin-left:0}}
+
+/* 待合并的 PR (pulls-view.js): the repository line, the panel's summary under its title and the inspector's list. Grey type; red
+   for a failed check, amber for a pull request left still, 可以合并 in the ink's weight with a check. */
+:root .r-date.pr-ready{color:var(--ink)}
+.r-date .pr-mark{display:inline-flex;align-items:center;gap:1px;margin-left:6px;font-weight:600;color:var(--ink)}
+.r-date.warn .pr-mark{color:inherit}
+.r-date .pr-mark .ui-icon{width:11px;height:11px;stroke-width:2.2}
+.pr-sum{display:flex;align-items:center;gap:8px;margin:0;padding:6px 2px 6px 4px;font-size:12px;line-height:18px;color:var(--muted);box-shadow:0 1px 0 var(--hairline)}
+.pr-sum-text{display:flex;flex-wrap:wrap;align-items:center;gap:0 6px;min-width:0;flex:1 1 auto}
+.pr-part{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.pr-sum .pr-refresh{flex:none;width:22px;height:22px;margin:-2px 0}
+.pr-sum .pr-refresh .ui-icon{width:13px;height:13px}
+.pr-sum .text-button{padding:0;font-size:12px;color:rgb(var(--tone-primary))}
+.pr-ok{display:inline-flex;align-items:center;gap:3px;color:var(--ink);font-weight:600}
+.pr-ok .ui-icon{width:12px;height:12px}
+.pr-bad{color:var(--danger);font-weight:600}
+.pr-stale{color:var(--warning);font-weight:500}
+.pr-faint{color:var(--muted)}
+.pr-problem{display:inline-flex;align-items:center;gap:4px;color:var(--warning)}
+.pr-problem .ui-icon{width:12px;height:12px;flex:none}
+#board .wall .pr-sum{margin:0 -8px;padding-inline:10px 6px}
+#board .group-body.list+.pr-sum,#board .group>.pr-sum{font-variant-numeric:tabular-nums}
+.pr-head .pr-count{font-family:var(--num);font-size:12px;color:var(--muted)}
+.pr-head .pr-when{margin-left:auto;font-size:11.5px;color:var(--muted)}
+.pr-head .pr-when+.text-button{margin-left:6px}
+.pr-list{list-style:none;margin:0 -8px;padding:0}
+.pr-item{display:flex;flex-direction:column;gap:2px;width:100%;padding:7px 8px;border:0;border-radius:var(--radius-sm);background:none;color:var(--ink);font:inherit;text-align:left;cursor:pointer}
+.pr-item:hover{background:var(--hover)}
+.pr-item:focus-visible{outline:2px solid rgba(var(--tone-primary),.55);outline-offset:-2px}
+.pr-line{display:flex;gap:6px;min-width:0;font-size:13px;line-height:18px}
+.pr-num{flex:none;font-family:var(--num);font-size:12px;color:var(--muted)}
+.pr-title{min-width:0;overflow-wrap:anywhere}
+.pr-meta{display:flex;flex-wrap:wrap;align-items:center;gap:0 6px;padding-left:1px;font-size:11.5px;line-height:17px;color:var(--muted)}
+.pr-draft{color:var(--muted);font-style:italic}
+.pr-note{margin:4px 0 0;font-size:12px;color:var(--muted)}
+.pr-note.pr-problem{display:flex;flex-wrap:wrap;gap:4px 8px}
+.pr-note .text-button{padding:0;font-size:12px;color:rgb(var(--tone-primary))}
+:root[data-skin=magnet] #board .wall .pr-sum{box-shadow:none;border-bottom:1px dashed var(--mag-line)}

@@ -950,6 +950,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         }
     }
 
+    /// 待合并的 PR (github-pulls.js): the page names the GitHub repositories on the board; one read at a time, off the main thread
+    /// (gh can take seconds). The answer goes to `assetboardPulls` with the page's requestId.
+    let pulls = GitHubPulls()
+    private var pullsReading = false
+    func readPulls(_ body: [String: Any]) {
+        let requestId = body["requestId"] as? Int ?? 0
+        let names = Array(Set((body["repos"] as? [String] ?? []).filter(GitHubPulls.validName))).sorted().prefix(GitHubPulls.repoLimit)
+        func answer(_ reply: [String: Any]) {
+            DispatchQueue.main.async {
+                self.pullsReading = false
+                var reply = reply
+                reply["requestId"] = requestId
+                guard let data = try? JSONSerialization.data(withJSONObject: reply), let json = String(data: data, encoding: .utf8) else { return }
+                self.webView.evaluateJavaScript("window.assetboardPulls?.(\(json))")
+            }
+        }
+        guard !pullsReading else { return }
+        pullsReading = true
+        guard !names.isEmpty else { answer(["ok": true, "repos": [String: Any](), "via": [String](), "at": ISO8601DateFormatter().string(from: Date())]); return }
+        let saved = github.token()
+        DispatchQueue.global(qos: .utility).async {
+            answer(self.pulls.read(names: Array(names), tokens: GitHubPulls.logins(keychain: saved)))
+        }
+    }
+
     func syncGitHubWithLocalCLI(users: [String]? = nil, details: Bool = false) {
         DispatchQueue.global(qos: .userInitiated).async {
             guard let path = LocalCLI.ghPath() else {
@@ -1319,6 +1344,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
             importDroppedOCR(body)
             return
         }
+        if body["action"] as? String == "githubPulls" {
+            readPulls(body)
+            return
+        }
         if body["action"] as? String == "githubSync" {
             let supplied = (body["token"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             guard supplied.isEmpty || (supplied.count <= 256 && !supplied.contains(where: { $0.isWhitespace })) else {
@@ -1619,11 +1648,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
 
 final class MockCloudflareProtocol: URLProtocol {
     static var reply: ((URLRequest) -> (Int, Any))!
+    /// Response headers for the next replies (待合并的 PR reads GitHub's rate limit from them).
+    static var headers: [String: String]? = nil
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
     override func startLoading() {
         let (status, body) = Self.reply(request)
-        let response = HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: nil)!
+        let response = HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: Self.headers)!
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
         client?.urlProtocol(self, didLoad: try! JSONSerialization.data(withJSONObject: body))
         client?.urlProtocolDidFinishLoading(self)
@@ -2062,6 +2093,64 @@ func testCloudflare() {
     let empty = run { _ in (200, ["success": true, "result_info": ["total_pages": 0], "result": []]) }
     precondition(empty.0?.isEmpty == true && empty.1 == nil)
     print("PASS: Cloudflare GET-only auth header, pagination, denial, partial response, empty result")
+}
+
+/// 待合并的 PR: names checked, one POST of a fixed read-only query with the names as variables, a repository one login cannot see
+/// asked again with the next, what nobody sees `denied`, and the whole-read failures (no login, refused, rate limit).
+func testGitHubPulls() {
+    precondition(GitHubPulls.validName("acme-labs/atlas-ui") && GitHubPulls.validName("a/b.c_d-e"))
+    precondition(!GitHubPulls.validName("acme labs/x") && !GitHubPulls.validName("a/b/c") && !GitHubPulls.validName("-a/b") && !GitHubPulls.validName("a/..") && !GitHubPulls.validName("a/b\"x"))
+    let query = GitHubPulls.query(count: 2)
+    precondition(query.hasPrefix("query(") && !query.lowercased().contains("mutation") && query.contains("r1: repository(owner: $o1, name: $n1)"))
+    let configuration = URLSessionConfiguration.ephemeral
+    configuration.protocolClasses = [MockCloudflareProtocol.self]
+    let reader = GitHubPulls(session: URLSession(configuration: configuration))
+    func body(_ request: URLRequest) -> [String: Any] {
+        if let data = request.httpBody { return (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] ?? [:] }
+        guard let stream = request.httpBodyStream else { return [:] }
+        stream.open(); defer { stream.close() }
+        var data = Data(), buffer = [UInt8](repeating: 0, count: 4096)
+        while stream.hasBytesAvailable { let n = stream.read(&buffer, maxLength: buffer.count); if n <= 0 { break }; data.append(buffer, count: n) }
+        return (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] ?? [:]
+    }
+    let node: [String: Any] = ["number": 7, "title": "Add export", "url": "https://github.com/owner/repo-1/pull/7", "isDraft": false, "createdAt": "2026-11-01T10:00:00Z",
+                               "updatedAt": "2026-11-02T10:00:00Z", "mergeable": "MERGEABLE", "author": ["login": "someone"],
+                               "commits": ["nodes": [["commit": ["statusCheckRollup": ["state": "SUCCESS"]]]]]]
+    var asked: [String] = []
+    MockCloudflareProtocol.reply = { request in
+        precondition(request.httpMethod == "POST" && request.url?.absoluteString == "https://api.github.com/graphql")
+        let sent = body(request), variables = sent["variables"] as? [String: String] ?? [:]
+        precondition((sent["query"] as? String ?? "").hasPrefix("query("))
+        let auth = request.value(forHTTPHeaderField: "Authorization") ?? ""
+        asked.append(auth + " " + (0..<variables.count / 2).map { "\(variables["o\($0)"]!)/\(variables["n\($0)"]!)" }.joined(separator: ","))
+        var data: [String: Any] = [:]
+        for i in 0..<variables.count / 2 {
+            let full = "\(variables["o\(i)"]!)/\(variables["n\(i)"]!)"
+            let visible = full == "owner/repo-1" && auth == "Bearer first" || full == "owner/repo-2" && auth == "Bearer second"
+            let found: [String: Any] = ["pullRequests": ["totalCount": 1, "nodes": [node]] as [String: Any]]
+            data["r\(i)"] = visible ? found as Any : NSNull()
+        }
+        let reply: [String: Any] = ["data": data, "errors": [["type": "NOT_FOUND", "path": ["r1"]] as [String: Any]]]
+        return (200, reply)
+    }
+    let read = reader.read(names: ["owner/repo-1", "owner/repo-2", "owner/repo-3"], tokens: [(via: "gh", token: "first"), (via: "token", token: "second")])
+    let repos = read["repos"] as? [String: Any] ?? [:]
+    precondition(read["ok"] as? Bool == true && read["via"] as? [String] == ["gh", "token"], "\(read)")
+    precondition(((repos["owner/repo-1"] as? [String: Any])?["nodes"] as? [Any])?.count == 1 && (repos["owner/repo-1"] as? [String: Any])?["total"] as? Int == 1)
+    precondition((repos["owner/repo-2"] as? [String: Any])?["total"] as? Int == 1, "the second login reads what the first cannot see")
+    precondition((repos["owner/repo-3"] as? [String: Any])?["error"] as? String == "denied")
+    precondition(asked == ["Bearer first owner/repo-1,owner/repo-2,owner/repo-3", "Bearer second owner/repo-2,owner/repo-3"], "\(asked)")
+    precondition(reader.read(names: ["owner/repo-1"], tokens: [])["reason"] as? String == "nosource")
+    MockCloudflareProtocol.reply = { _ in (401, ["message": "Bad credentials"]) }
+    precondition(reader.read(names: ["owner/repo-1"], tokens: [(via: "gh", token: "x"), (via: "token", token: "y")])["reason"] as? String == "auth")
+    MockCloudflareProtocol.headers = ["x-ratelimit-remaining": "0", "x-ratelimit-reset": "1800000000"]
+    MockCloudflareProtocol.reply = { _ in (403, ["message": "API rate limit exceeded"]) }
+    let limited = reader.read(names: ["owner/repo-1"], tokens: [(via: "gh", token: "x")])
+    precondition(limited["reason"] as? String == "rate" && (limited["resetAt"] as? String)?.hasPrefix("2027-01-15") == true, "\(limited)")
+    MockCloudflareProtocol.headers = nil
+    MockCloudflareProtocol.reply = { _ in (502, ["message": "Bad gateway"]) }
+    precondition(reader.read(names: ["owner/repo-1"], tokens: [(via: "gh", token: "x")])["reason"] as? String == "net")
+    print("PASS: GitHub pull requests: names, read-only query, second login, denied, no login, refused, rate limit, server error")
 }
 
 func testGitHub() {
@@ -2531,6 +2620,7 @@ if CommandLine.arguments.contains(Updater.launchCheckFlag) {
     testProbeSources()
 } else if CommandLine.arguments.contains("--test-github") {
     testGitHub()
+    testGitHubPulls()
 } else if CommandLine.arguments.contains("--test-registrar") {
     testRegistrars()
 } else if CommandLine.arguments.contains("--test-cloud-import") {
