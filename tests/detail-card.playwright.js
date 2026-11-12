@@ -93,9 +93,9 @@ async (page) => {
   // motion: the card at once, the copy on close, the figure's act inside 0.3 s, then home
   for(const scene of ['kitchen','city']){
    await open({skin:'magnet',scene});
-   await openDetail();
-   const first=await p.evaluate(()=>({anim:$('#detail').getAnimations().map(a=>({d:a.effect.getTiming().duration,k:a.effect.getKeyframes().map(k=>k.translate||'')})),fig:[...document.body.classList].filter(c=>c.startsWith('fig-')),
-    ghost:getComputedStyle(document.querySelector('.scene-ghost')).display,figAnim:document.querySelector('.scene-figure').getAnimations({subtree:true}).map(a=>a.animationName)}));
+   // read in the same turn as the click, so a slow round trip does not read the act after it
+   const first=await p.evaluate(()=>{document.querySelector('#board [data-asset] .item-open').click();return {anim:$('#detail').getAnimations().map(a=>({d:a.effect.getTiming().duration,k:a.effect.getKeyframes().map(k=>k.translate||'')})),fig:[...document.body.classList].filter(c=>c.startsWith('fig-')),
+    ghost:getComputedStyle(document.querySelector('.scene-ghost')).display,figAnim:document.querySelector('.scene-figure').getAnimations({subtree:true}).map(a=>a.animationName)};});
    check(first.anim.length===1&&first.anim[0].d<=300&&/px/.test(first.anim[0].k[0]),`${scene}: the card slides in at once from the right ${JSON.stringify(first.anim)}`);
    check(first.fig.join()==='fig-pull'&&first.figAnim.length===2,`${scene}: the figure pulls the card out ${JSON.stringify(first)}`);
    check(scene==='city'?first.ghost==='block'&&first.figAnim.includes('fig-warp-pull'):first.ghost==='none'&&first.figAnim.includes('fig-pull'),`${scene}: ${scene==='city'?'the figure at the left goes to dust and appears beside the card':'the figure at the right pulls where it stands'} ${JSON.stringify(first)}`);
