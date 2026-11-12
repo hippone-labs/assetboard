@@ -17,6 +17,8 @@ async (page) => {
   p=await context.newPage();const errors=[];p.on('pageerror',e=>errors.push(e.message));
   await p.goto('http://127.0.0.1:4317/?demo');await p.waitForTimeout(500);
   await p.evaluate(()=>{if(!$('#detail').hidden)closeDetail();});await p.waitForTimeout(800);
+  // a slow machine takes longer to give the room back: then up to 5 s more, until nothing runs
+  await p.waitForFunction(()=>roomTarget===null&&!roomMove&&!document.getAnimations().length,null,{timeout:5000,polling:50}).catch(()=>{});
   return errors;
  };
  // every panel's place on the wall (its layout box, without the slide's translate) and where it is drawn, frame by frame
@@ -26,7 +28,7 @@ async (page) => {
   if(act==='open')document.querySelector('#board [data-asset] .item-open').click();else closeDetail();
   await new Promise(done=>{const f=()=>{const w=wall.getBoundingClientRect();
    const anims=panels.flatMap(n=>n.getAnimations());if(anims.length&&!durations.length)durations=anims.map(a=>({d:a.effect.getTiming().duration,e:a.effect.getTiming().easing}));
-   frames.push({t:performance.now()-t0,card:!!document.querySelector('.detail-leave')||$('#detail').getAnimations().length>0,at:Object.fromEntries(panels.map(n=>{const t=getComputedStyle(n).translate.split(' ').map(parseFloat);return [n.dataset.group,{x:n.offsetLeft+(t[0]||0),y:n.offsetTop+(t[1]||0)}];}))});
+   frames.push({t:performance.now()-t0,card:!!document.querySelector('.detail-leave')||$('#detail').getAnimations().length>0||/\bfig-(pull|push)\b/.test(document.body.className),at:Object.fromEntries(panels.map(n=>{const t=getComputedStyle(n).translate.split(' ').map(parseFloat);return [n.dataset.group,{x:n.offsetLeft+(t[0]||0),y:n.offsetTop+(t[1]||0)}];}))});
    if(performance.now()-t0<1100)requestAnimationFrame(f);else done();};f();});
   return {frames,durations};
  },act);
@@ -49,11 +51,11 @@ async (page) => {
    // the card first: while it moves, no panel does
    const during=frames.filter(fr=>fr.card);
    check(during.length&&during.every(fr=>done(fr)<.01),`${label}: ${id} waits for the card ${JSON.stringify(during.map(fr=>[Math.round(fr.t),done(fr).toFixed(2)]))}`);
-   // and soon after it: within 180 ms of the last frame the card moves in (the card's act is 0.24 s, the figure's 0.3 s), counted
+   // and soon after it: within 180 ms of the last frame of the act (the card's 0.24 s, under 冰箱贴 the figure's 0.3 s), counted
    // from there rather than from the click, since a slow machine runs the wait for the act late; there the start is seen up to two
    // frames late (the one that lays the board out for the slide, then the one that draws its first step)
    const start=frames.find(fr=>done(fr)>.01),finish=frames.find(fr=>done(fr)>.995),card=Math.max(...during.map(fr=>fr.t));
-   check(start&&finish&&finish.t-start.t>=250-slack&&finish.t-start.t<=460+slack&&start.t-card<=180+2*slack,`${label}: ${id} slides from ${start?.t|0} to ${finish?.t|0} ms, the card moving until ${card|0} ms (frames up to ${Math.round(frame)} ms apart)`);
+   check(start&&finish&&finish.t-start.t>=250-slack&&finish.t-start.t<=460+slack&&start.t-card<=180+2*slack,`${label}: ${id} slides from ${start?.t|0} to ${finish?.t|0} ms, the act until ${card|0} ms (frames up to ${Math.round(frame)} ms apart)`);
   }
   check(durations.length&&durations.every(x=>x.d>=300&&x.d<=400&&/cubic-bezier|ease-in-out/.test(x.e)),`${label}: the slide takes 0.3–0.4 s, eased in and out ${JSON.stringify(durations)}`);
  };

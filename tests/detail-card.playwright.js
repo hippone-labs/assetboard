@@ -23,7 +23,7 @@ async (page) => {
   await p.goto('http://127.0.0.1:4317/'+(native?'':'?demo'));await p.waitForTimeout(500);
   // a record with a real management page, so the detail has 打开 and 编辑 side by side
   await p.evaluate(()=>{const a=state.assets.find(a=>a.name==='studio.example.com');a.url='https://www.namecheap.com/';if(!$('#detail').hidden)closeDetail();});
-  await p.waitForTimeout(720);
+  await settle();
   return errors;
  };
  const openDetail=async()=>{await p.evaluate(()=>document.querySelector('#board [data-asset] .item-open').click());};
@@ -95,12 +95,12 @@ async (page) => {
    await open({skin:'magnet',scene});
    // read in the same turn as the click, so a slow round trip does not read the act after it
    const first=await p.evaluate(()=>{document.querySelector('#board [data-asset] .item-open').click();return {anim:$('#detail').getAnimations().map(a=>({d:a.effect.getTiming().duration,k:a.effect.getKeyframes().map(k=>k.translate||'')})),fig:[...document.body.classList].filter(c=>c.startsWith('fig-')),
-    ghost:getComputedStyle(document.querySelector('.scene-ghost')).display,figAnim:document.querySelector('.scene-figure').getAnimations({subtree:true}).map(a=>a.animationName)};});
+    ghost:getComputedStyle(document.querySelector('.scene-ghost')).display,figAnim:document.querySelector('.scene-figure').getAnimations({subtree:true}).map(a=>a.animationName),
+    longest:Math.max(...document.getAnimations().map(a=>a.effect.getComputedTiming().endTime))};});
    check(first.anim.length===1&&first.anim[0].d<=300&&/px/.test(first.anim[0].k[0]),`${scene}: the card slides in at once from the right ${JSON.stringify(first.anim)}`);
    check(first.fig.join()==='fig-pull'&&first.figAnim.length===2,`${scene}: the figure pulls the card out ${JSON.stringify(first)}`);
    check(scene==='city'?first.ghost==='block'&&first.figAnim.includes('fig-warp-pull'):first.ghost==='none'&&first.figAnim.includes('fig-pull'),`${scene}: ${scene==='city'?'the figure at the left goes to dust and appears beside the card':'the figure at the right pulls where it stands'} ${JSON.stringify(first)}`);
-   const longest=await p.evaluate(()=>Math.max(...document.getAnimations().map(a=>a.effect.getComputedTiming().endTime)));
-   check(longest<=300,`${scene}: the whole act ends within 0.3 s (${longest})`);
+   check(first.longest<=300,`${scene}: the whole act ends within 0.3 s (${first.longest})`);
    await settle();
    check(await p.evaluate(()=>!document.body.className.includes('fig-')&&!document.getAnimations().length),`${scene}: after the act nothing is left running`);
    const closed=await p.evaluate(()=>{closeDetail();const copy=document.querySelector('.detail-leave');
