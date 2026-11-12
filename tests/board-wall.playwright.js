@@ -112,7 +112,10 @@ async (page) => {
   await p.mouse.move(head.x+head.width*.5,head.y+head.height/2);await p.mouse.down();
   await p.mouse.move(head.x+head.width*.5-20,head.y+head.height/2+10,{steps:4});
   check(await p.locator('#board .wall > .group.is-dragging').count()===1&&await p.locator('#board .wall > .drop-slot').count()===1,'A dragged panel is lifted and leaves a slot');
-  await p.mouse.move(to.x+to.width*.3,to.y+20,{steps:12});await p.waitForTimeout(150);await p.mouse.up();await p.waitForTimeout(400);
+  await p.mouse.move(to.x+to.width*.3,to.y+20,{steps:12});await p.waitForTimeout(150);
+  // a slow machine takes the pointer's moves late: release once the slot is under the pointer, up to 2 s
+  await p.waitForFunction(([x,y])=>{const r=document.querySelector('#board .wall > .drop-slot')?.getBoundingClientRect();return r&&x>=r.left&&x<=r.right&&y>=r.top&&y<=r.bottom;},[to.x+to.width*.3,to.y+20],{timeout:2000,polling:50}).catch(()=>{});
+  await p.mouse.up();await p.waitForTimeout(400);
   check(await panels()==='repository,server,domain','A dropped panel takes the place under the pointer: '+await panels());
   await p.reload();await settle();
   check(await panels()==='repository,server,domain','The panel order is kept after a reload: '+await panels());
