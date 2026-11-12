@@ -112,6 +112,9 @@ async (page) => {
   check(await p.evaluate(()=>state.blocks.map(b=>b.id).join(','))==='server,domain,repository,license','The sidebar order is the same order');
   // Dragging a panel by its header: picked up, its place a slot, dropped where the pointer is.
   const head=await p.locator('#board .group[data-group="repository"] .group-head').boundingBox(),to=await p.locator('#board .group[data-group="server"]').boundingBox();
+  await p.evaluate(()=>{window.__trace=[];const ps=window.placeSlot,ms=window.moveSlot,order=g=>[...g.container.children].map(n=>n===g.slot?'SLOT':n.dataset.group||'').filter(Boolean).join(',');
+   window.placeSlot=function(g){window.__trace.push(`place t=${Math.round(performance.now())} x=${Math.round(g.x)} y=${Math.round(g.y)} lock=${Math.round((g.lockUntil||0)-performance.now())} still=${g.still?Math.round(g.still.x)+','+Math.round(g.still.y):''} slot=${g.slotRect?Math.round(g.slotRect.left)+'-'+Math.round(g.slotRect.right):''} ${order(g)}`);return ps(g);};
+   window.moveSlot=function(g,mode,ref){const r=ms(g,mode,ref);window.__trace.push(`  move ${mode} ${ref?.dataset?.group||''} -> ${order(g)}`);return r;};});
   await p.mouse.move(head.x+head.width*.5,head.y+head.height/2);await p.mouse.down();
   await p.mouse.move(head.x+head.width*.5-20,head.y+head.height/2+10,{steps:4});
   check(await p.locator('#board .wall > .group.is-dragging').count()===1&&await p.locator('#board .wall > .drop-slot').count()===1,'A dragged panel is lifted and leaves a slot');
@@ -119,7 +122,7 @@ async (page) => {
   // a slow machine takes the pointer's moves late: release once the slot is under the pointer, up to 2 s
   await p.waitForFunction(([x,y])=>{const r=document.querySelector('#board .wall > .drop-slot')?.getBoundingClientRect();return r&&x>=r.left&&x<=r.right&&y>=r.top&&y<=r.bottom;},[to.x+to.width*.3,to.y+20],{timeout:2000,polling:50}).catch(()=>{});
   await p.mouse.up();await p.waitForTimeout(400);
-  check(await panels()==='repository,server,domain','A dropped panel takes the place under the pointer: '+await panels());
+  check(await panels()==='repository,server,domain','A dropped panel takes the place under the pointer: '+await panels()+` (pointer ${Math.round(to.x+to.width*.3)},${Math.round(to.y+20)})\n`+(await p.evaluate(()=>window.__trace.join('\n'))));
   await p.reload();await settle();
   check(await panels()==='repository,server,domain','The panel order is kept after a reload: '+await panels());
 

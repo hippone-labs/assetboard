@@ -1,0 +1,27 @@
+# TEMPORARY: board-wall's drag on GitHub-hosted macOS 26, many times (removed before merge). No secrets.
+name: diag-browser
+on:
+  push:
+    branches: [cc/hosted-mac-tests]
+permissions:
+  contents: read
+jobs:
+  diag:
+    runs-on: macos-26
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        run: [1, 2, 3, 4, 5, 6]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Playwright
+        run: |
+          pw_home="$RUNNER_TEMP/playwright"
+          npm install --prefix "$pw_home" --no-audit --no-fund playwright@1.64.1
+          "$pw_home/node_modules/.bin/playwright" install chromium
+          echo "NODE_PATH=$pw_home/node_modules" >> "$GITHUB_ENV"
+      - name: board-wall x30
+        run: for i in $(seq 30); do node tools/browser-tests.js --port 4330 tests/board-wall.playwright.js | grep -v '^ok\|^Chromium' || true; done
