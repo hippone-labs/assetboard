@@ -67,14 +67,18 @@ async (page) => {
    await p.mouse.move(400,400);await p.mouse.wheel(0,0);
    const box=await p.evaluate(()=>{const r=$('#detail').getBoundingClientRect();return {x:r.left+120,y:r.top+200};});
    await p.mouse.move(box.x,box.y);await p.mouse.wheel(0,120);
-   await p.waitForFunction(()=>$('#detail').scrollTop>0&&$('#detail').classList.contains('sb-on'));await p.waitForTimeout(150);
-   const shown=await columns(p,await strip(p,'#detail'));capsule(shown,`${label} detail, scrolling`);
+   await p.waitForFunction(()=>$('#detail').scrollTop>0&&$('#detail').classList.contains('sb-on'));
+   // held shown while the picture is taken (a slow machine may take longer than the 0.9 s a scroll shows it for)
+   const pin=sel=>p.evaluate(sel=>sbPoint(sel?new Set([document.querySelector(sel)]):new Set()),sel);
+   await pin('#detail');await p.waitForTimeout(150);
+   const shown=await columns(p,await strip(p,'#detail'));capsule(shown,`${label} detail, scrolling`);await pin(null);
    check(Math.max(...shown.slice(3,7))>Math.max(...faint.slice(3,7))+6,`${label}: scrolling shows the capsule stronger than at rest ${shown} ${faint}`);
    await p.waitForFunction(()=>!$('#detail').classList.contains('sb-on'),null,{timeout:3000});
    // the board too
-   await p.evaluate(()=>{$('#board').scrollTop+=80;});await p.waitForFunction(()=>$('#board').classList.contains('sb-on'));await p.waitForTimeout(150);
+   await p.evaluate(()=>{$('#board').scrollTop+=80;});await p.waitForFunction(()=>$('#board').classList.contains('sb-on'));await pin('#board');await p.waitForTimeout(150);
    // (under 冰箱贴 the board's gutter is over the door's picture, which has no plain ground to measure against)
    if(skin==='quiet')capsule(await columns(p,await strip(p,'#board')),`${label} board, scrolling`);
+   await pin(null);
    // near the detail's edge the capsule is shown, away from it hidden again
    const edge=await p.evaluate(()=>{const r=$('#detail').getBoundingClientRect();return {x:r.right-6,y:r.top+r.height/2,far:r.left+60};});
    await p.mouse.move(edge.far,edge.y);await p.waitForTimeout(1200);check(!await on(p,'#detail'),`${label}: the detail's capsule is not shown with the pointer far from its edge`);
@@ -100,13 +104,15 @@ async (page) => {
    const after=await p.evaluate(()=>$('#detail').scrollTop);
    check(after>before+40,`dragging the capsule scrolls the detail ${before} → ${after}`);
    // the fade runs on --sb-a
-   await p.evaluate(()=>{$('#board').scrollTop+=60;});await p.waitForTimeout(30);
-   check(await p.evaluate(()=>$('#board').getAnimations().some(a=>a.effect?.getKeyframes?.().some(k=>'--sb-a' in k))),'the capsule fades in (an animation of --sb-a)');
+   // read in the scroll event itself (after the page's own listener, which captures it): a slow machine may draw the next frame
+   // after the 80 ms fade is over
+   const fading=()=>p.evaluate(()=>new Promise(done=>{const b=$('#board');b.addEventListener('scroll',()=>done({on:b.classList.contains('sb-on'),fade:b.getAnimations().some(a=>a.effect?.getKeyframes?.().some(k=>'--sb-a' in k))}),{once:true});b.scrollTop+=60;}));
+   const fade=await fading();check(fade.on&&fade.fade,`the capsule fades in (an animation of --sb-a) ${JSON.stringify(fade)}`);
    await context.close();}
   // less motion: shown and hidden at once
   {const {p,context}=await open({motion:'reduce'});
-   await p.evaluate(()=>{$('#board').scrollTop+=60;});await p.waitForTimeout(30);
-   check(await p.evaluate(()=>$('#board').classList.contains('sb-on')&&!$('#board').getAnimations().some(a=>a.effect?.getKeyframes?.().some(k=>'--sb-a' in k))),'less motion: the capsule is shown without a fade');
+   const fade=await p.evaluate(()=>new Promise(done=>{const b=$('#board');b.addEventListener('scroll',()=>done({on:b.classList.contains('sb-on'),fade:b.getAnimations().some(a=>a.effect?.getKeyframes?.().some(k=>'--sb-a' in k))}),{once:true});b.scrollTop+=60;}));
+   check(fade.on&&!fade.fade,`less motion: the capsule is shown without a fade ${JSON.stringify(fade)}`);
    await context.close();}
   // less transparency: a solid capsule; more contrast: shown at rest
   {const solid=async media=>{const {p,context}=await open({media});const r=await p.evaluate(()=>{const n=document.createElement('i');n.style.background='var(--sb-thumb)';document.body.append(n);const c=getComputedStyle(n).backgroundColor;n.remove();return {c,rest:getComputedStyle(document.documentElement).getPropertyValue('--sb-rest').trim(),reduce:matchMedia('(prefers-reduced-transparency: reduce)').matches};});await context.close();return r;};
