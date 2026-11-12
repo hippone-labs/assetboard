@@ -135,6 +135,8 @@ async (page) => {
   check(await p.evaluate(()=>state.iconSites?.['bandwagonhost.com']==='www.bwh.example.com'),'Clearing can be undone');
   // Narrow window: the dialog with an open field does not scroll sideways.
   await p.evaluate(()=>{$('#modal').close();iconBatchDialog();});await p.setViewportSize({width:390,height:800});
+  // the wall repacks for the new width in a ResizeObserver, with the next frame: measure once a frame is drawn
+  await p.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
   await edit('cloudflare.com');
   check(await p.evaluate(()=>{const c=$('#modal-content'),d=$('#modal');return c.scrollWidth<=c.clientWidth+1&&d.getBoundingClientRect().right<=innerWidth;}),'No sideways overflow at 390px');
   await p.setViewportSize({width:1400,height:900});

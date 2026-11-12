@@ -3,6 +3,10 @@
 // the panels on the left wait until the card's act is over (the card itself, under 冰箱贴 also the figure), then slide to their new
 // places over 0.3–0.4 s, eased in and out, instead of jumping there. Quick toggles end in the last state with nothing left running;
 // less motion makes the room at once; under 冰箱贴 the panels' free places are kept.
+// What is drawn is sampled once a frame. A machine that draws slowly (GitHub's hosted Macs draw in software, frames 50–150 ms apart
+// under load) sees fewer places on the way and a slide that seems to start later and end sooner than it does, by up to one frame:
+// the limits below that are read off the frames are widened by the longest frame past 40 ms. At 60 frames a second nothing changes,
+// and the slide's own timing (0.3–0.4 s, eased in and out) is checked exactly.
 async (page) => {
  const browser=page.context().browser();
  const check=(ok,message)=>{if(!ok)throw new Error(message);};
@@ -30,18 +34,25 @@ async (page) => {
  const slid=(label,frames,from,to,durations)=>{
   const moved=Object.keys(to).filter(id=>Math.hypot(to[id].x-from[id].x,to[id].y-from[id].y)>100);
   check(moved.length,`${label}: some panel changes place ${JSON.stringify({from,to})}`);
+  // the longest time between two frames, and how much of it is past 40 ms (none at 60 frames a second)
+  const frame=Math.max(...frames.slice(1).map((fr,i)=>fr.t-frames[i].t)),slack=Math.max(0,frame-40);
+  // the ease is between 5 % and 95 % of the way for about 205 ms of its 340, so frames at most `frame` apart draw it there at least
+  // 205/frame times: four up to 50 ms apart; a jump is drawn there at no place
+  const places=Math.max(1,Math.min(4,Math.floor(200/frame)));
   for(const id of moved){
    const d=Math.hypot(to[id].x-from[id].x,to[id].y-from[id].y),done=fr=>Math.hypot(fr.at[id].x-from[id].x,fr.at[id].y-from[id].y)/d;
    const between=frames.filter(fr=>done(fr)>.05&&done(fr)<.95);
-   check(between.length>=4,`${label}: ${id} is drawn at ${between.length} places on its way (a slide, not a jump) ${JSON.stringify(frames.map(fr=>[Math.round(fr.t),Math.round(fr.at[id].x),Math.round(fr.at[id].y)]))}`);
+   check(between.length>=places,`${label}: ${id} is drawn at ${between.length} places on its way, ${places} or more at frames up to ${Math.round(frame)} ms apart (a slide, not a jump) ${JSON.stringify(frames.map(fr=>[Math.round(fr.t),Math.round(fr.at[id].x),Math.round(fr.at[id].y)]))}`);
    let last=-1;for(const fr of frames){const v=done(fr);check(v>=last-.02,`${label}: ${id} goes one way`);last=Math.max(last,v);}
    const end=frames[frames.length-1].at[id];
    check(Math.abs(end.x-to[id].x)<1&&Math.abs(end.y-to[id].y)<1,`${label}: ${id} ends in its place ${JSON.stringify(end)} ${JSON.stringify(to[id])}`);
    // the card first: while it moves, no panel does
    const during=frames.filter(fr=>fr.card);
    check(during.length&&during.every(fr=>done(fr)<.01),`${label}: ${id} waits for the card ${JSON.stringify(during.map(fr=>[Math.round(fr.t),done(fr).toFixed(2)]))}`);
-   const start=frames.find(fr=>done(fr)>.01),finish=frames.find(fr=>done(fr)>.995);
-   check(start&&finish&&finish.t-start.t>=250&&finish.t-start.t<=460&&start.t<=420,`${label}: ${id} slides from ${start?.t|0} to ${finish?.t|0} ms`);
+   // and soon after it: within 180 ms of the last frame the card moves in (the card's act is 0.24 s, the figure's 0.3 s), counted
+   // from there rather than from the click, since a slow machine runs the wait for the act late
+   const start=frames.find(fr=>done(fr)>.01),finish=frames.find(fr=>done(fr)>.995),card=Math.max(...during.map(fr=>fr.t));
+   check(start&&finish&&finish.t-start.t>=250-slack&&finish.t-start.t<=460+slack&&start.t-card<=180+slack,`${label}: ${id} slides from ${start?.t|0} to ${finish?.t|0} ms, the card moving until ${card|0} ms (frames up to ${Math.round(frame)} ms apart)`);
   }
   check(durations.length&&durations.every(x=>x.d>=300&&x.d<=400&&/cubic-bezier|ease-in-out/.test(x.e)),`${label}: the slide takes 0.3–0.4 s, eased in and out ${JSON.stringify(durations)}`);
  };

@@ -91,6 +91,8 @@ async (page) => {
   await p.evaluate(()=>{assetFormSnapshot=null;$('#modal').close();});
 
   await p.setViewportSize({width:390,height:844});
+  // the wall repacks for the new width in a ResizeObserver, with the next frame: measure once a frame is drawn
+  await p.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
   check(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Mobile horizontal overflow');
   check(!errors.length,'Page errors: '+errors.join(' | '));
   return 'PASS: card number guard, bank card fields and expiry, phone region inference and masking, email masking, reveal, two-way links listed in the inspector, unlink and undo, delete cleanup, search by tail, category switch, mobile bounds';

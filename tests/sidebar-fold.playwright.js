@@ -153,6 +153,8 @@ async (page) => {
   await p.evaluate(()=>{setView('all');toggleSidebar(true);});
 
   await p.setViewportSize({width:390,height:800});
+  // the wall repacks for the new width in a ResizeObserver, with the next frame: measure once a frame is drawn
+  await p.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
   const narrow=await p.evaluate(()=>({scroll:document.documentElement.scrollWidth,inner:innerWidth,dpr:devicePixelRatio,narrow:matchMedia('(max-width:760px)').matches,toggle:getComputedStyle($('#sidebar-toggle')).display,
    wider:[...document.querySelectorAll('body *')].filter(n=>{const r=n.getBoundingClientRect();return r.width&&r.right>innerWidth+.5&&!n.closest('#sidebar')&&getComputedStyle(n).position!=='fixed';}).slice(0,8).map(n=>`${n.tagName.toLowerCase()}${n.id?'#'+n.id:''}${typeof n.className==='string'&&n.className?'.'+n.className.trim().split(/\s+/).join('.'):''} ${Math.round(n.getBoundingClientRect().left)}–${Math.round(n.getBoundingClientRect().right)}`)}));
   check(narrow.scroll<=390&&narrow.toggle==='none','Narrow: the strip layout fits and has no fold button '+JSON.stringify(narrow));

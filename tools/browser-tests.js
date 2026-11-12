@@ -2,7 +2,7 @@
 // that this script starts itself on 127.0.0.1:4318, so the browser version you serve on 4317 (README) can keep running.
 // The tests are written against http://127.0.0.1:4317/; that address is pointed at this server when a file is loaded.
 //
-//   node tools/browser-tests.js                       the full edition: this checkout, tests/ and pro/tests/
+//   node tools/browser-tests.js                       this checkout: tests/, and pro/tests/ when pro/ is there (the free edition has none)
 //   node tools/browser-tests.js --root <dir>          another copy of the board (its tests/)
 //   node tools/browser-tests.js tests/keyboard.playwright.js ...   only these files (paths relative to the root)
 //   --port <n>                                         serve on another port
@@ -36,6 +36,13 @@ server.listen(port,'127.0.0.1',async()=>{
   await context.addInitScript(()=>{try{if(!localStorage.getItem('assetboard-lang-v1'))localStorage.setItem('assetboard-lang-v1','zh');}catch{}});
   return context;
  };
+ // The machine's own settings reach Chromium where Playwright has no option for them (Reduce transparency: on in GitHub's hosted
+ // macOS images), and a machine without a GPU draws in software: one line on what this run has, before the tests.
+ {const context=await newContext(),page=await context.newPage();
+  const host=await page.evaluate(()=>{let gl='';try{const c=document.createElement('canvas').getContext('webgl'),info=c.getExtension('WEBGL_debug_renderer_info');gl=c.getParameter(info?info.UNMASKED_RENDERER_WEBGL:c.RENDERER);}catch{gl='none';}
+   return {transparency:matchMedia('(prefers-reduced-transparency: reduce)').matches?'reduce':'no-preference',dpr:devicePixelRatio,gl};});
+  console.log(`Chromium ${browser.version()}; prefers-reduced-transparency: ${host.transparency}; devicePixelRatio ${host.dpr}; WebGL ${host.gl}`);
+  await context.close();}
  let failed=0;
  for(const file of listed){
   const context=await browser.newContext({viewport:{width:1400,height:900},locale:'zh-CN'}),page=await context.newPage(),errors=[];

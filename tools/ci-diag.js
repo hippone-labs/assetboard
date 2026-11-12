@@ -46,6 +46,13 @@ server.listen(port,'127.0.0.1',async()=>{
  // the narrow strip
  const c2=await browser.newContext({viewport:{width:1280,height:800},reducedMotion:'reduce'});await c2.addInitScript(()=>{localStorage.setItem('assetboard-lang-v1','zh');});
  const q=await c2.newPage();await q.goto(base+'/?demo');await q.waitForTimeout(800);
+ for(let i=0;i<5;i++){
+  await q.setViewportSize({width:390,height:800});
+  const now=await q.evaluate(()=>document.documentElement.scrollWidth);
+  const later=await q.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(()=>r(document.documentElement.scrollWidth)))));
+  console.log('resize race',JSON.stringify({immediately:now,afterTwoFrames:later}));
+  await q.setViewportSize({width:1280,height:800});await q.waitForTimeout(300);
+ }
  await q.setViewportSize({width:390,height:800});await q.waitForTimeout(300);
  console.log('narrow',JSON.stringify(await q.evaluate(()=>{const over=[...document.querySelectorAll('body *')].filter(n=>n.getClientRects().length&&n.getBoundingClientRect().right>390.5).slice(0,15).map(n=>{const r=n.getBoundingClientRect(),s=getComputedStyle(n);return `${n.tagName}#${n.id}.${String(n.className).slice(0,40)} l=${r.left|0} r=${r.right|0} w=${r.width|0} pos=${s.position} ws=${s.whiteSpace}`;});
   return {inner:innerWidth,client:document.documentElement.clientWidth,scroll:document.documentElement.scrollWidth,toggle:getComputedStyle($('#sidebar-toggle')).display,over};})));

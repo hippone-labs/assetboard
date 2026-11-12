@@ -110,6 +110,8 @@ async (page) => {
   // render() starts its layout animation on the next frame; let it finish before changing the viewport.
   await p.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))).then(()=>Promise.all(document.getAnimations().map(animation=>animation.finished))));
   await p.setViewportSize({width:390,height:844});
+  // the wall repacks for the new width in a ResizeObserver, with the next frame: measure once a frame is drawn
+  await p.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
   check(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Mobile horizontal overflow');
   return 'PASS: 即将到来 bands and sidebar count, computed summaries, in-page delete confirm, toast and keyboard undo, paste review, category change, move down, collision list, grouped evidence, unsaved-changes prompt, mobile bounds';
  } finally { await p.close(); }

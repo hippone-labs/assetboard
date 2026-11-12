@@ -5,16 +5,21 @@
 // 打开 is a wash of the accent and reads at AA. It comes in at once and a copy goes out as it closes, the detail itself hidden at
 // once; the door's figure pulls it out and pushes it back within 0.3 s (one at the door's left goes to dust and appears beside the
 // card), stands beside it in view while it is open, and is home again after; quick toggles skip to the end without the figure, in
-// order; less motion only fades the card. The figures' stills are transparent.
+// order; less motion only fades the card. With less transparency (the system's Reduce transparency) the card is solid, without
+// the glass. The figures' stills are transparent.
 async (page) => {
  const browser=page.context().browser();
  const check=(ok,message)=>{if(!ok)throw new Error(message);};
  const contexts=[];let p;
- const open=async({skin='quiet',scene='',scheme='light',motion='no-preference',native=false}={})=>{
+ const open=async({skin='quiet',scene='',scheme='light',motion='no-preference',transparency='no-preference',native=false}={})=>{
   const context=await browser.newContext({viewport:{width:1440,height:900},reducedMotion:motion,colorScheme:scheme});contexts.push(context);
   await context.addInitScript(([skin,scene,native])=>{localStorage.setItem('assetboard-lang-v1','zh');localStorage.setItem('assetboard-skin-v1',skin);if(scene)localStorage.setItem('assetboard-fridge-scene-v1',scene);
    if(native){window.webkit={messageHandlers:{assetboard:{postMessage:()=>{}}}};window.__ASSETBOARD_NATIVE__={data:null,demo:true,themePref:null,systemAccent:'#0a6fe8',lang:'zh'};}},[skin,scene,native]);
   p=await context.newPage();const errors=[];p.on('pageerror',e=>errors.push(e.message));
+  // Playwright has no option for prefers-reduced-transparency, and Chromium on macOS takes it from the system's Reduce
+  // transparency (on in GitHub's hosted macOS images), so the page is given it here; this call replaces the media features
+  // Playwright set, so the scheme and the motion are given again.
+  await (await context.newCDPSession(p)).send('Emulation.setEmulatedMedia',{media:'',features:[{name:'prefers-color-scheme',value:scheme},{name:'prefers-reduced-motion',value:motion},{name:'prefers-reduced-transparency',value:transparency}]});
   await p.goto('http://127.0.0.1:4317/'+(native?'':'?demo'));await p.waitForTimeout(500);
   // a record with a real management page, so the detail has 打开 and 编辑 side by side
   await p.evaluate(()=>{const a=state.assets.find(a=>a.name==='studio.example.com');a.url='https://www.namecheap.com/';if(!$('#detail').hidden)closeDetail();});
@@ -69,6 +74,17 @@ async (page) => {
    await p.evaluate(()=>closeDetail());await settle();
    const shut=await p.evaluate(()=>({detail:$('#detail').hidden,copies:document.querySelectorAll('.detail-leave').length,board:$('#board').getBoundingClientRect().right,main:$('#main').getBoundingClientRect().right,fig:[...document.body.classList].filter(c=>c.startsWith('fig-'))}));
    check(shut.detail&&!shut.copies&&!shut.fig.length&&shut.board>=shut.main-1,`${label}: closed, the board has the width back and nothing is left over ${JSON.stringify(shut)}`);
+   check(!errors.length,`${label}: page errors: ${errors.join(' | ')}`);
+  }
+
+  // less transparency: the card keeps its place, radius and shadow, and is the solid card colour, without the glass
+  for(const c of [{skin:'quiet',radius:12},{skin:'magnet',scene:'kitchen',radius:14}]){
+   const label=`less transparency (${c.scene||c.skin})`;
+   const errors=await open({...c,transparency:'reduce'});
+   await openDetail();await settle();
+   const g=await geometry(),card=await p.evaluate(()=>({reduce:matchMedia('(prefers-reduced-transparency: reduce)').matches,tone:getComputedStyle(document.documentElement).getPropertyValue('--tone-card').trim().replace(/\s/g,'')}));
+   check(card.reduce&&Math.abs(g.radius-c.radius)<=1&&/rgba?\(/.test(g.shadow),`${label}: the card keeps its radius and shadow (${g.radius}, ${g.shadow})`);
+   check(g.blur==='none'&&g.image==='none'&&g.fill.replace(/\s/g,'')===`rgb(${card.tone})`,`${label}: the card is solid, without the glass (${g.blur}, ${g.fill}, ${g.image}, card ${card.tone})`);
    check(!errors.length,`${label}: page errors: ${errors.join(' | ')}`);
   }
 
