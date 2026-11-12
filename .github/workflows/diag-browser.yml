@@ -32,4 +32,7 @@ jobs:
         run: node tools/ci-diag.js
       - name: The three tests
         if: ${{ !cancelled() }}
-        run: node tools/browser-tests.js --port 4330 tests/detail-card.playwright.js tests/detail-room.playwright.js tests/sidebar-fold.playwright.js
+        run: node tools/browser-tests.js --port 4330
+      - name: Sidebar alone
+        if: ${{ !cancelled() }}
+        run: node tools/browser-tests.js --port 4330 tests/sidebar-fold.playwright.js
