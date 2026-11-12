@@ -3324,8 +3324,11 @@ function moveSlot(g,mode,ref){
  measureItems(g);
  if(motion)for(const n of all)slideFrom(n,from.get(n));
 }
+// Right after the slot moves the others are still reflowing, so placing waits until lockUntil; a pointer that stops in that time
+// (a slow machine takes its last moves late) is placed when the wait is over, not left until it moves again.
 function placeSlot(g){
- if(performance.now()<(g.lockUntil||0))return;
+ const wait=(g.lockUntil||0)-performance.now();
+ if(wait>0){clearTimeout(g.placeLater);g.placeLater=setTimeout(()=>{if(gesture===g&&g.active)placeSlot(g);},wait+1);return;}
  const s=boardScroller(),x=g.x+s.scrollLeft,y=g.y+s.scrollTop;
  if(g.kind==='card'){const over=g.others.find(n=>inside(n.getBoundingClientRect(),g.x,g.y))||null;setCrossTarget(g,over);if(over||!inside(g.homeRect,x,y)){moveSlot(g,'home');return;}}
  else if(x<g.box.left-48||x>g.box.right+48||y<g.box.top-48||y>g.box.bottom+48){moveSlot(g,'home');return;}
