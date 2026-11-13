@@ -2022,22 +2022,14 @@ body::before,.native-app body::before{background:radial-gradient(70vw 65vh at 0%
 .ai-plans .plan-row>.plan-price{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
 .ai-plans .plan-have{font-size:11px;color:var(--muted)}
 
-/* Assetboard Pro (pro/web/license-pro.js, pro-slots.js): the licence section of 设置, the one calm hint where a locked feature would
-   be, and the small Pro mark beside a locked switch (it opens the section). Colours from the colour system; the mark uses the one accent. */
+/* Assetboard Pro (pro/web/pro-panel.js): 设置 › Assetboard Pro, the official plugin with its badge, its state and what it includes.
+   Colours from the colour system; the badge uses the one accent. */
+:root #modal .pro-lead{margin:0 0 8px;font-size:13px;line-height:1.5;color:var(--ink)}
+:root #modal .pro-badge{display:inline-block;margin:0 4px 0 0;padding:0 6px;border:1px solid rgba(var(--tone-primary),.55);border-radius:4px;font-size:11px;font-weight:600;color:rgb(var(--tone-primary));vertical-align:1px}
 :root #modal .pro-state{font-size:13px;font-weight:600;color:var(--ink)}
-:root #modal .pro-price{margin:6px 0 2px;font-size:13px;color:var(--ink)}
-:root #modal .pro-key-row{display:flex;flex:1 1 260px;gap:8px;min-width:0}
-:root #modal .pro-key{flex:1 1 auto;min-width:0;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}
-:root #modal .pro-status{margin:0;min-height:0}
-:root #modal .pro-status:empty{display:none}
-:root #modal .pro-status.bad{color:var(--danger)}
 :root #modal .pro-includes{margin:8px 0 4px;font-size:13px;color:var(--ink)}
-:root #modal .pro-includes summary{cursor:pointer;color:var(--muted)}
 :root #modal .pro-list{margin:4px 0 6px;padding-inline-start:18px}
 :root #modal .pro-list li{margin:2px 0}
-.pro-note{margin:6px 0 0}
-.pro-tag{display:inline-block;flex:none;margin:0 0 0 5px;padding:0 4px;border:1px solid rgba(var(--tone-primary),.55);border-radius:4px;background:none;font:inherit;font-size:9px;font-style:normal;font-weight:600;line-height:14px;color:rgb(var(--tone-primary));vertical-align:1px;cursor:pointer}
-.pro-tag:focus-visible{outline:2px solid rgb(var(--tone-primary));outline-offset:1px}
 :root #modal input.prefs-switch:disabled{opacity:.55;cursor:not-allowed}
 
 /* Polish (2026-11-02): the add form's 更多 and 找回 groups spaced like the rest of the form (a <details> is not laid out as a grid in

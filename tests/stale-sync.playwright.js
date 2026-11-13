@@ -7,7 +7,7 @@ async (page) => {
  const host=connected=>{
   const ago=n=>new Date(Date.now()-n*86400000).toISOString();
   window.__sent=[];window.webkit={messageHandlers:{assetboard:{postMessage(m){window.__sent.push(JSON.parse(JSON.stringify(m)));}}}};
-  window.__ASSETBOARD_NATIVE__={pro:{on:true,kind:'licensed',id:'K3Q7NVHM'},demo:false,cloudflareConnected:connected,githubConnected:false,data:{blocks:[{id:'domain'},{id:'repository'}],assets:[
+  window.__ASSETBOARD_NATIVE__={pro:{on:true,kind:'official'},demo:false,cloudflareConnected:connected,githubConnected:false,data:{blocks:[{id:'domain'},{id:'repository'}],assets:[
    {id:'cloudflare-zone-z1',type:'domain',name:'old.example',provider:'Cloudflare',account:'Work',source:'cloudflare',syncedAt:ago(6),externalId:'z1',resourceKind:'Zone',syncStatus:'active',art:'generic'},
    {id:'cloudflare-zone-z2',type:'domain',name:'older.example',provider:'Cloudflare',account:'Work',source:'cloudflare',syncedAt:ago(9),externalId:'z2',resourceKind:'Zone',syncStatus:'active',art:'generic'},
    {id:'gh1',type:'repository',name:'me/app',provider:'GitHub',account:'me',source:'github',syncedAt:ago(40),externalId:'r1',syncStatus:'公开仓库',art:'generic'}]}};

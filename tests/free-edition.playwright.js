@@ -2,7 +2,7 @@
 // ?free shows the board without the Pro modules from any checkout (what building this repository alone gives): the payment ledger,
 // 待确认扣款, projects with revenue and splits, the shutdown list and 定期清理, the connectors, AI recognition, MCP and the command line
 // are all there. External tools look up, add (a name the board already has is skipped, never overwritten) and import from 待引入; changing
-// or deleting a record that is there is refused. No licence panel, no Pro hint, no live status.
+// or deleting a record that is there is refused, naming the Pro plugin. No Pro section in 设置, no live status.
 async (page) => {
  const check=(ok,message)=>{if(!ok)throw new Error(message);};
  const p=await page.context().newPage();
@@ -21,7 +21,7 @@ async (page) => {
    return {pro:{probe:proSlots.serverProbe,platform:proSlots.platformProbe,methods:Object.keys(proSlots.agentMethods)},
     missing:missing.every(r=>!r.ok&&/未知方法/.test(r.error)),reads:reads.map(r=>r.ok),cli:call('list',{},'cli').ok,
     costMore:cost.includes('cost-more'),menu:assetMenuItems(state.assets[0],true).map(x=>x.action).filter(Boolean),
-    licence:proBuilt(),hint:proHint('x')+proTag()};
+    proPane:proBuilt(),edition:(prefsDialog('about'),document.querySelector('#prefs-pane-about .prefs-edition')?.textContent||'')};
   });
   check(!seen.pro.probe&&!seen.pro.platform&&!seen.pro.methods.length,'Pro filled something in ?free: '+JSON.stringify(seen.pro));
   check(seen.missing,'Pro agent methods answer in ?free');
@@ -29,7 +29,7 @@ async (page) => {
   check(seen.cli,'the command line is refused in ?free');
   check(seen.costMore,'the cost panel lost paid / forecast in ?free');
   check(seen.menu.includes('payment-add')&&seen.menu.includes('renew'),'the asset menu lost 记一笔 or 已续费: '+seen.menu.join());
-  check(!seen.licence&&!seen.hint,'?free shows the licence panel or a Pro hint');
+  check(!seen.proPane&&/不含 Pro 插件/.test(seen.edition),'?free shows a Pro section or the wrong edition: '+seen.edition);
   // Adding is free and never overwrites: a name the category already has is skipped and the record stays as it was. Changing,
   // deleting, payments and project figures wait for Pro.
   const agent=await p.evaluate(()=>{
@@ -47,7 +47,7 @@ async (page) => {
   });
   check(agent.same?.added.length===1&&agent.same.skipped.length===1&&agent.same.skipped[0].id==='d1'&&agent.kept&&agent.fresh,'add overwrote or lost a record: '+JSON.stringify(agent.same));
   check(agent.swap?.added.length===1&&agent.swap.warnings.some(w=>w.link==='s1'&&/Pro/.test(w.error))&&agent.links.join()==='a1','add took another account off a server: '+JSON.stringify(agent));
-  check(agent.writes.every(e=>/修改和删除已有资产在 Assetboard Pro 里/.test(e)),'a change went through without Pro: '+agent.writes.join(' | '));
+  check(agent.writes.every(e=>/修改和删除已有资产要用 Assetboard Pro 插件/.test(e)),'a change went through without Pro: '+agent.writes.join(' | '));
   // A monthly charge that came due five days ago is asked about in 即将到来 and the detail.
   const charges=await p.evaluate(()=>{
    state={...state,assets:[{id:'u1',type:'subscription',name:'Notes Pro',provider:'Notes',account:'',purpose:'',date:isoDay(localDay()-5),dateKind:'renew',cycle:'monthly',cost:'$8 / 月',art:'generic',source:'manual',createdAt:'2025-01-01T00:00:00Z'}],paymentsSince:isoDay(localDay()-40)};

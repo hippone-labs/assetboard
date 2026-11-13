@@ -11,7 +11,7 @@ async (page) => {
   const answers={'same.example':{ok:true,json:rdap('2027-03-01')},'moved.example':{ok:true,json:rdap('2027-06-01')},'lapsed.example':{ok:true,json:rdap('2027-01-10',['redemption period'])},'nordap.example':{ok:false,error:'注册局不支持 RDAP'}};
   window.__asked=[];
   window.webkit={messageHandlers:{assetboard:{postMessage(m){if(m?.action!=='rdap')return;window.__asked.push(m.domain);setTimeout(()=>window.assetboardRdap({requestId:m.requestId,...answers[m.domain]}),5);}}}};
-  window.__ASSETBOARD_NATIVE__={pro:{on:true,kind:'licensed',id:'K3Q7NVHM'},demo:false,cloudflareConnected:false,githubConnected:false,data:{blocks:[{id:'domain'}],assets:[
+  window.__ASSETBOARD_NATIVE__={pro:{on:true,kind:'official'},demo:false,cloudflareConnected:false,githubConnected:false,data:{blocks:[{id:'domain'}],assets:[
    {id:'same',type:'domain',name:'same.example',date:'2027-03-01',dateKind:'expire',source:'manual',art:'generic'},
    {id:'moved',type:'domain',name:'moved.example',date:'2027-03-01',dateKind:'expire',source:'manual',art:'generic'},
    {id:'lapsed',type:'domain',name:'lapsed.example',date:'2026-10-01',dateKind:'expire',source:'manual',art:'generic'},

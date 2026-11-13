@@ -124,7 +124,7 @@ App 和只读 MCP 免费、开源，不限时间和条数。Assetboard Pro 是�
 | 只读 MCP 和命令行 `assetboard-cli`：查询；另外可以添加新记录（同名跳过）、引入待引入；Inbox 文件夹 | 即将推出：加密快照、「如果我出事」接手包 |
 | 关联、全景、AI 额度与用量、隐私模式、网络记录、备份和导出 | |
 
-这个仓库是免费部分的全部代码，自己编译得到的版本就是完整的免费版。Pro 插件不在这个仓库里，随官方安装包提供，见[使用手册 · Assetboard Pro](GUIDE.md#assetboard-pro)。
+怎么拿到 Pro：从 [assetboard.app](https://assetboard.app/) 下载官方安装包，Pro 已经内置并默认启用，不用注册，也不用输入许可证；在「设置 › Assetboard Pro」可以看到它的状态。这个仓库是免费部分的全部代码，自己编译得到的版本就是完整的免费版，不含 Pro 插件。见[使用手册 · Assetboard Pro](GUIDE.md#assetboard-pro)。
 
 ## 数据与网络
 

@@ -16,7 +16,6 @@ export ASSETBOARD_BUILD_STAMP="${GITHUB_RUN_ID:-local}.${GITHUB_RUN_ATTEMPT:-1}.
 app=dist/Assetboard.app
 version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist")"
 "$app/Contents/MacOS/Assetboard" --test-store
-"$app/Contents/MacOS/Assetboard" --test-license
 "$app/Contents/MacOS/Assetboard" --test-update
 codesign --verify --deep --strict --verbose=2 "$app"
 notary_kc=(); [[ -n "${NOTARY_KEYCHAIN:-}" ]] && notary_kc=(--keychain "$NOTARY_KEYCHAIN")

@@ -19,7 +19,7 @@ async (page) => {
    if(m?.action==='evidenceList')setTimeout(()=>window.assetboardEvidenceList?.([]),5);
    if(m?.action==='agentConfigs')setTimeout(()=>window.assetboardAgentConfigs?.([{id:'claude-code',path:'~/.claude.json',found:true,configured:true},{id:'codex',path:'~/.codex/config.toml',found:true,configured:false},{id:'cursor',path:'~/.cursor/mcp.json',found:false,configured:false}]),5);
   }}}};
-  window.__ASSETBOARD_NATIVE__={demo:false,pro:{on:true,kind:'licensed',id:'K3Q7NVHM'},cloudflareConnected:false,githubConnected:false,cliPath:'/Applications/Assetboard.app/Contents/MacOS/assetboard-cli',
+  window.__ASSETBOARD_NATIVE__={demo:false,pro:{on:true,kind:'official'},cloudflareConnected:false,githubConnected:false,cliPath:'/Applications/Assetboard.app/Contents/MacOS/assetboard-cli',
    agentLog:[{id:'old',at:'2026-01-02T03:04:05.000Z',client:{id:'codex',name:'Codex',by:'clientInfo'},via:'mcp',method:'list',tool:'list_assets',kind:'read',ok:true,count:2}],
    agentClients:[{id:'codex',name:'Codex',first:'2026-01-02T03:04:05.000Z',last:'2026-01-02T03:04:05.000Z',calls:1,by:'clientInfo'}],
    agentConfigs:[{id:'claude-code',path:'~/.claude.json',found:true,configured:true}],

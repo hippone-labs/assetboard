@@ -8,13 +8,15 @@ free=0
 [[ "${ASSETBOARD_EDITION:-}" == free ]] && free=1
 (( free )) && out_dir="$out_dir/free"
 swift_flags=()
-# Pro's Swift (pro/desktop/: the offline licence check) when this checkout has it; ASSETBOARD_EDITION=free leaves it out.
+# Assetboard Pro, the official plugin (free, no licence), when this checkout has pro/: -D ASSETBOARD_PRO makes the app say Pro is on
+# and adds its menu item, plus any Swift of its own in pro/desktop/. ASSETBOARD_EDITION=free leaves it out.
+pro=0
 pro_swift=()
-if [[ -d "$project_dir/pro/desktop" ]] && (( ! free )); then pro_swift=("$project_dir"/pro/desktop/*.swift); swift_flags+=(-D ASSETBOARD_PRO); fi
-# ASSETBOARD_PRO_DEV=1: a developer build for this Mac that counts as licensed without a licence (pro/desktop/License.swift). Its
-# Info.plist carries AssetboardDeveloperBuild, and desktop/package.sh refuses to package it, so it is never signed or published.
+if [[ -f "$project_dir/pro/web/pro.js" ]] && (( ! free )); then pro=1; pro_swift=("$project_dir"/pro/desktop/*.swift(N)); swift_flags+=(-D ASSETBOARD_PRO); fi
+# ASSETBOARD_PRO_DEV=1: a developer build for this Mac (设置 › Assetboard Pro says so). Its Info.plist carries AssetboardDeveloperBuild,
+# and desktop/package.sh refuses to package it, so it is never signed or published.
 dev=0
-[[ "${ASSETBOARD_PRO_DEV:-}" == 1 && ${#pro_swift[@]} -gt 0 ]] && { dev=1; swift_flags+=(-D ASSETBOARD_PRO_DEV); }
+[[ "${ASSETBOARD_PRO_DEV:-}" == 1 ]] && (( pro )) && { dev=1; swift_flags+=(-D ASSETBOARD_PRO_DEV); }
 app_dir="$out_dir/Assetboard.app"
 # The oldest macOS the app runs on comes from LSMinimumSystemVersion. Without -target, swiftc builds for the macOS of the build
 # machine, and dyld then stops the app at launch on every older system.
@@ -112,7 +114,6 @@ codesign --verify --deep --strict "$app_dir"
 "$app_dir/Contents/MacOS/Assetboard" --test-agent-socket
 "$app_dir/Contents/MacOS/Assetboard" --test-agent-log
 "$app_dir/Contents/MacOS/Assetboard" --test-update
-(( ${#pro_swift} == 0 )) || "$app_dir/Contents/MacOS/Assetboard" --test-license
 "$app_dir/Contents/MacOS/assetboard-cli" --self-test
 if (( free )); then
   leftovers="$(find "$app_dir/Contents/Resources/Board" -maxdepth 1 -name pro)"

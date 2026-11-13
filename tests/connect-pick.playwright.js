@@ -18,7 +18,7 @@ async (page) => {
    if(m?.action==='evidenceList')setTimeout(()=>window.assetboardEvidenceList?.([]),5);
    if(m?.action==='cloudflareSync'&&window.__answer)setTimeout(()=>window.assetboardCloudflareResult(window.__answer(m)),5);
   }}}};
-  window.__ASSETBOARD_NATIVE__={demo:false,pro:{on:true,kind:'licensed',id:'K3Q7NVHM'},cloudflareConnected:false,githubConnected:false,registrars:{namecheap:false,porkbun:false},cloudImports:{hetzner:false,digitalocean:false,vercel:false},
+  window.__ASSETBOARD_NATIVE__={demo:false,pro:{on:true,kind:'official'},cloudflareConnected:false,githubConnected:false,registrars:{namecheap:false,porkbun:false},cloudImports:{hetzner:false,digitalocean:false,vercel:false},
    data:{blocks:[{id:'domain'}],assets:[{id:'own',type:'domain',name:'mine.example.com',provider:'Namecheap',source:'manual',art:'generic'}],deletedExternalIds:[]}};
  };
  const zones=names=>({ok:true,queriedKinds:['zone','pages','workers','r2'],resources:names.map((name,i)=>({kind:name.includes('.')?'zone':'pages',id:'z'+name.length+'-'+i,name,account:'Acme',status:'active'}))});
