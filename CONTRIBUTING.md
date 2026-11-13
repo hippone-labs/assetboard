@@ -35,4 +35,4 @@ Assetboard 会按这些规则提醒你「还剩几天能救」。规则错了，
 - 先开一个 issue 说清楚要改什么，大一点的改动先对一下方向，省得白写。
 - 构建、测试和代码约定见 README 的“从源码构建”。提交前跑 `node --test`；改了界面，跑相关的 `tests/*.playwright.js`；改了 Swift，在 Mac 上跑 `./desktop/build.sh`（会跑全部自测）。
 - 代码、测试、截图和提交说明里不要出现真实的个人信息、域名、邮箱、IP、令牌；示例数据只用 `example.*` 和保留地址段（`192.0.2.0/24`、`198.51.100.0/24`、`203.0.113.0/24`、`2001:db8::/32`）。
-- 提交的代码按 GPL-3.0 授权，和本仓库一致。开 Pull Request 即表示代码是你写的，或你有权按 GPL-3.0 提交（[Developer Certificate of Origin](https://developercertificate.org/)）。Pro 的模块不在这个仓库里，官方版在这份代码之上加上它们。
+- 提交的代码按 GPL-3.0 授权，和本仓库一致。开 Pull Request 即表示代码是你写的，或你有权按 GPL-3.0 提交（[Developer Certificate of Origin](https://developercertificate.org/)）。Pro 插件不在这个仓库里，官方安装包在这份代码之上加上它。
