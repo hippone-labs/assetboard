@@ -121,7 +121,7 @@ jobs:
         run: node --test
 
       - name: Publishing tests
-        run: python3 -m unittest discover -s tools -p 'test_publish_site_release.py'
+        run: python3 -m unittest discover -s tools -p 'test_*.py'
 
       - name: Browser regression
         run: |
@@ -136,6 +136,9 @@ jobs:
 
       - name: Build, test, sign, notarize and package
         run: zsh desktop/release.sh
+
+      - name: Write and verify SHA256SUMS.txt
+        run: bash tools/write-sha256sums.sh "$RELEASE_DIR" "Assetboard-macOS-arm64-$VERSION.dmg" "Assetboard-macOS-arm64-$VERSION.zip"
 
       - name: Stage site release and check links
         run: |
@@ -220,8 +223,16 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          url="$(tools/github-release.sh "$VERSION" "$RUNNER_TEMP/release-notes.md" \
-            "$RELEASE_DIR/Assetboard-macOS-arm64-$VERSION.dmg" "$RELEASE_DIR/Assetboard-macOS-arm64-$VERSION.zip" | tail -1)"
+          notes="$RUNNER_TEMP/github-release-notes.md"
+          {
+            cat "$RUNNER_TEMP/release-notes.md"
+            printf '\n## SHA-256\n\n```\n'
+            cat "$RELEASE_DIR/SHA256SUMS.txt"
+            printf '```\n'
+          } > "$notes"
+          url="$(tools/github-release.sh "$VERSION" "$notes" \
+            "$RELEASE_DIR/Assetboard-macOS-arm64-$VERSION.dmg" "$RELEASE_DIR/Assetboard-macOS-arm64-$VERSION.zip" \
+            "$RELEASE_DIR/SHA256SUMS.txt" | tail -1)"
           echo "GitHub Release: $url" >> "$GITHUB_STEP_SUMMARY"
 
   # The Mac mini's own developer build follows each release; its own workflow, so it can also run by hand (mini-dev.yml).

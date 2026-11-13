@@ -129,6 +129,8 @@ Assetboard 是一个本地 App：每条资产记下一个日期（到期、自�
 
 从 [assetboard.app](https://assetboard.app/zh/) 下载 `.dmg`，把 Assetboard 拖进「应用程序」。需要 macOS 15 或更高、Apple Silicon。安装包已签名并公证，App 内置更新。
 
+发布页附带 [SHA256SUMS.txt](https://github.com/hippone-labs/assetboard/releases/latest/download/SHA256SUMS.txt)。把它和安装包放在同一目录后，运行 `shasum -a 256 -c SHA256SUMS.txt --ignore-missing` 即可核对。
+
 用演示数据启动（不读写你的数据，不联网）：
 
 ```sh

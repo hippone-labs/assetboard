@@ -1,7 +1,7 @@
 #!/bin/bash
-# Publishes the GitHub Release vX.Y.Z of hippone-labs/assetboard: the release notes and the notarized files the site offers.
+# Publishes the GitHub Release vX.Y.Z of hippone-labs/assetboard: the release notes, the notarized files the site offers, and SHA256SUMS.txt.
 # release-app runs it last with GH_TOKEN set to the run's token; after a release by hand, run it with your own gh login:
-#   tools/github-release.sh 2026.11.5 notes.md Assetboard-macOS-arm64-2026.11.5.dmg Assetboard-macOS-arm64-2026.11.5.zip
+#   tools/github-release.sh 2026.11.11 notes.md Assetboard-macOS-arm64-2026.11.11.dmg Assetboard-macOS-arm64-2026.11.11.zip SHA256SUMS.txt
 # Running it again for the same version replaces the notes and the files. A missing tag is created at the checked-out commit.
 set -euo pipefail
 (( $# >= 3 )) || { echo "usage: $0 <version> <notes.md> <file>..." >&2; exit 2; }
@@ -11,7 +11,10 @@ repo=${GITHUB_RELEASE_REPO:-hippone-labs/assetboard}
 test -s "$notes" || { echo "No release notes: $notes" >&2; exit 2; }
 for file in "$@"; do
   test -s "$file" || { echo "Missing file: $file" >&2; exit 2; }
-  [[ $(basename "$file") == *"-$version".* ]] || { echo "Not a $version file: $file" >&2; exit 2; }
+  base=$(basename "$file")
+  if [[ $base != SHA256SUMS.txt && $base != *"-$version".* ]]; then
+    echo "Not a $version file: $file" >&2; exit 2
+  fi
 done
 
 tag="v$version"
