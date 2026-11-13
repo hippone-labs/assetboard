@@ -14,8 +14,9 @@
 // Where panels are (the base) is kept on this device only (localStorage, FREE_KEY): per panel its column coordinate u (x over a
 // column step), its top y and its height h when placed. A wall drawn with other heights (another density, records added or
 // removed) keeps the gaps between a panel and those above it, so panels follow their column instead of jumping; another column
-// count (a narrower window, the inspector) packs the same panels into the columns there are, keeping their order, and the
-// placement comes back when the width does. 排整齐 puts every panel on its column's place, in the columns they are nearest;
+// count (a narrower window) packs the same panels into the columns there are, keeping their order, and the placement comes
+// back when the width does. The inspector covers the wall and does not change its columns. 排整齐 puts every panel on its
+// column's place, in the columns they are nearest;
 // it, a drag and ⌥ + arrows are steps of the board's undo (⌘Z).
 // Loaded after board-wall.js and before app.js; the app.js helpers used here are called only at render and event time.
 const FREE_FEEL=Object.freeze({dwell:300,yield:420,nudge:8,speed:1,drop:380,snap:48,yieldAt:50});

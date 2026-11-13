@@ -973,18 +973,21 @@ function detailMotion(open){
   body.classList.remove('fig-pull','fig-push');if(!open)target.remove();};
  detailMotionTimer=setTimeout(end,DETAIL_MOTION);
 }
-// The board's room for the detail (body.detail-room, material.css) follows the card: once the card is in or gone (under 冰箱贴, once
-// the figure's act is over) the board takes its new width and the panels slide to their new places over BOARD_ROOM_MS, eased in and
-// out, changing width as they go; the strip and the other blocks on the board change width with them. Opening keeps the board as
-// wide as it was until the panels are there, so none slides under an edge. A toggle while they move starts from where they are;
-// quick toggles move the panels once, BOARD_ROOM_QUICK after the last. Less motion, or a detail shown without its motion, makes
-// the room at once. The free places of 冰箱贴 are not touched: the panels are laid out from them for the new width (board-free.js).
-// The act's animations start with the first frame drawn after the click, which a slow machine draws late: once roomWait is over,
-// the room also waits for what of the act is still running (the card, its leaving copy, the figure; actLeft) and for the figure to
-// be done (detailMotion takes fig-pull/fig-push off), up to ROOM_ACT_LATE more.
+// The board's room for the detail (body.detail-room, material.css) follows the card on the quiet skin: once the card is in or gone
+// the board takes its new width and the panels slide to their new places over BOARD_ROOM_MS, eased in and out, changing width as
+// they go; the strip and the other blocks on the board change width with them. Opening keeps the board as wide as it was until
+// the panels are there, so none slides under an edge. A toggle while they move starts from where they are; quick toggles move the
+// panels once, BOARD_ROOM_QUICK after the last. Less motion, or a detail shown without its motion, makes the room at once.
+// Under 冰箱贴, while the wall is on screen, the card covers the wall and the board keeps its width, so this makes the class and
+// returns: the columns and every panel stay where they are, with no slide (material.css). The act's animations start with the
+// first frame drawn after the click, which a slow machine draws late: once roomWait is over, the room also waits for what of the
+// act is still running (the card, its leaving copy, the figure; actLeft) and for the figure to be done (detailMotion takes
+// fig-pull/fig-push off), up to ROOM_ACT_LATE more.
 const BOARD_ROOM_MS=340,BOARD_ROOM_QUICK=120,BOARD_ROOM_EASE='cubic-bezier(.45,.05,.25,1)',ROOM_ACT_LATE=600;
 let roomWait=0,roomTimer=0,roomTarget=null,roomMove=null;
+function detailOverlaysWall(){return boardSkin==='magnet'&&document.body.classList.contains('wall-shown');}
 function boardRoom(open){
+ if(detailOverlaysWall()){roomWait=0;clearTimeout(roomTimer);roomTarget=null;if(roomMove)roomDone();document.body.classList.toggle('detail-room',open);return;}
  const wait=roomWait;roomWait=0;
  if(roomTarget===open)return;
  clearTimeout(roomTimer);roomTarget=null;

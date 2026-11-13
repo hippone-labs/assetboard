@@ -51,7 +51,8 @@ async (page) => {
    check(near(g.bar.l,g.main.l)&&near(g.bar.r,g.main.r),`${label}: the toolbar keeps the content card's whole width ${JSON.stringify(g.bar)} ${JSON.stringify(g.main)}`);
    check(near(g.detail.t,g.bar.b+c.gap),`${label}: the card starts ${c.gap}px under the toolbar (${g.detail.t} vs ${g.bar.b})`);
    check(near(g.main.r-g.detail.r,c.gap)&&near(g.main.b-g.detail.b,c.gap),`${label}: the card is ${c.gap}px clear of the right and bottom edges ${JSON.stringify(g.detail)}`);
-   check(g.board.r<=g.detail.l-c.gap+1,`${label}: the board's panels stop ${c.gap}px or more before the card (${g.board.r} / ${g.detail.l})`);
+   if(c.skin==='magnet')check(g.board.r>g.detail.l+40,`${label}: the board keeps its width and the card covers it (${g.board.r} / ${g.detail.l})`);
+   else check(g.board.r<=g.detail.l-c.gap+1,`${label}: the board's panels stop ${c.gap}px or more before the card (${g.board.r} / ${g.detail.l})`);
    check(near(g.radius,c.radius)&&/rgba?\(/.test(g.shadow)&&/blur\(/.test(g.blur),`${label}: the card has the panels' radius, a shadow and the glass (${g.radius}, ${g.shadow}, ${g.blur})`);
    const tone=await p.evaluate(()=>{const s=getComputedStyle(document.documentElement);return {card:s.getPropertyValue('--tone-card').trim().replace(/\s/g,''),primary:s.getPropertyValue('--tone-primary').trim().replace(/\s/g,'')};});
    if(c.skin==='magnet'){
@@ -70,7 +71,7 @@ async (page) => {
     // the figure stands beside the card in view, on the door, not under the card or a panel
     const fig=await p.evaluate(()=>{const f=document.querySelector('.scene-figure').getBoundingClientRect(),d=$('#detail').getBoundingClientRect(),b=$('#board').getBoundingClientRect(),m=$('#main').getBoundingClientRect();
      const s=getComputedStyle(document.querySelector('.scene-figure'));return {l:f.left,r:f.right,t:f.top,b:f.bottom,card:d.left,board:b.left+$('#board').clientLeft+$('#board').clientWidth-parseFloat(getComputedStyle($('#board')).paddingRight),bottom:m.bottom,shown:s.display!=='none'&&Number(s.opacity)>.5,still:s.backgroundImage!=='none'};});
-    check(fig.shown&&fig.still&&fig.r<=fig.card-2&&fig.l>=fig.board-1&&fig.b<=fig.bottom,`${label}: the figure stands in view beside the card ${JSON.stringify(fig)}`);
+    check(fig.shown&&fig.still&&fig.r<=fig.card-2&&fig.b<=fig.bottom,`${label}: the figure stands in view beside the card, over the wall ${JSON.stringify(fig)}`);
    }
    // the content card under a closed detail: the toolbar and the board take the whole width again
    await p.evaluate(()=>closeDetail());await settle();

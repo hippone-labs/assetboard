@@ -192,8 +192,12 @@ themePref=readThemePref();
 document.addEventListener('DOMContentLoaded',()=>{
  const button=document.createElement('button');button.id='theme';button.className='button icon-only';button.onclick=themeDialog;(document.querySelector('#inbox-button')||document.querySelector('#add-block')).after(button);if(typeof setIconButton==='function'){setIconButton(button,'palette',tr('主题'));}else{button.textContent=tr('主题');button.title=tr('主题');}
  document.querySelector('#modal').addEventListener('close',()=>{if(themePreview){themePreview=false;applyBoardTheme();}});
- // The door behind the wall (shown by material.css under 冰箱贴 while the wall is on screen).
- const scene=document.createElement('div');scene.className='fridge-scene';scene.setAttribute('aria-hidden','true');scene.innerHTML='<i class="scene-figure"></i><i class="scene-ghost"></i>';document.querySelector('#main')?.prepend(scene);
+ // The door behind the wall (shown by material.css under 冰箱贴 while the wall is on screen). The figure and its
+ // ghost are siblings of the door, so they can sit above the panels; they never take the pointer.
+ const main=document.querySelector('#main'),scene=document.createElement('div');
+ scene.className='fridge-scene';scene.setAttribute('aria-hidden','true');
+ scene.innerHTML='<i class="scene-figure" aria-hidden="true"></i><i class="scene-ghost" aria-hidden="true"></i>';
+ if(main){main.prepend(scene);const fig=scene.querySelector('.scene-figure'),ghost=scene.querySelector('.scene-ghost');main.insertBefore(fig,scene.nextSibling);main.insertBefore(ghost,fig.nextSibling);}
  applyBoardTheme();
  schemeQuery?.addEventListener?.('change',()=>applyBoardTheme());
 });
