@@ -138,6 +138,8 @@ The full host list is in the [user guide](GUIDE.md#隐私与网络) (Chinese).
 
 Download the `.dmg` from [assetboard.app](https://assetboard.app/) and drag Assetboard into Applications. Requires macOS 15 or later on Apple Silicon. The package is signed and notarized; the app updates itself.
 
+Each GitHub Release also has [SHA256SUMS.txt](https://github.com/hippone-labs/assetboard/releases/latest/download/SHA256SUMS.txt). Put it next to the package and run `shasum -a 256 -c SHA256SUMS.txt --ignore-missing` to verify.
+
 Start with demo data (your data is not read or written, nothing goes over the network):
 
 ```sh
