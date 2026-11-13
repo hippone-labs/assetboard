@@ -516,8 +516,9 @@ function render(){
  cancelAnimationFrame(layoutFrame);closeMenu(false);
  const v=currentView(),key=`${query}|${v}|${shownLayout(v)}|${calendarMonth}`,same=key===renderedKey;renderedKey=key;
  // Rows slide to their new place inside the same group; groups slide as a whole (a fold above them, a moved category).
- const previousGroups=same?new Map([...document.querySelectorAll('#board .group')].map(el=>[el.dataset.group,el.getBoundingClientRect()])):new Map();
- const previousItems=same?new Map([...document.querySelectorAll('#board [data-asset]')].map(el=>{const group=el.closest('.group');return [el.dataset.asset,{rect:el.getBoundingClientRect(),group:group?.dataset.group,origin:previousGroups.get(group?.dataset.group)}];})):new Map();
+ // Measured in layout (layoutBox), so a panel whose tilt changed (it lost the hover or the focus with the old drawing) does not slide.
+ const previousGroups=same?new Map([...document.querySelectorAll('#board .group')].map(el=>[el.dataset.group,layoutBox(el)])):new Map();
+ const previousItems=same?new Map([...document.querySelectorAll('#board [data-asset]')].map(el=>{const group=el.closest('.group');return [el.dataset.asset,{rect:layoutBox(el),group:group?.dataset.group,origin:previousGroups.get(group?.dataset.group)}];})):new Map();
  renderSidebar();
  const welcome=!query&&!state.assets.length,board=welcome?{html:'',count:0}:boardHtml(v);
  renderHeader(v,board.count);
@@ -531,8 +532,8 @@ function render(){
  layoutFrame=requestAnimationFrame(()=>{
   layoutFrame=0;
   if(!animateLayout||reduceMotion())return;
-  for(const el of document.querySelectorAll('#board .group')){const from=previousGroups.get(el.dataset.group);if(from)slideFrom(el,from,MOTION_MS);}
-  for(const el of document.querySelectorAll('#board [data-asset]')){const was=previousItems.get(el.dataset.asset),group=el.closest('.group'),to=el.getBoundingClientRect(),origin=group?.getBoundingClientRect();if(!was||was.group!==group?.dataset.group||!was.origin||Math.abs(was.rect.width-to.width)>2||Math.abs(was.rect.height-to.height)>2)continue;const dx=(was.rect.left-was.origin.left)-(to.left-origin.left),dy=(was.rect.top-was.origin.top)-(to.top-origin.top);if(Math.abs(dx)>=1||Math.abs(dy)>=1)el.animate([{transform:`translate(${dx}px,${dy}px)`},{transform:'none'}],{duration:MOTION_MS,easing:settleEase});}
+  for(const el of document.querySelectorAll('#board .group')){const from=previousGroups.get(el.dataset.group);if(from)slideFrom(el,from,MOTION_MS,layoutBox(el));}
+  for(const el of document.querySelectorAll('#board [data-asset]')){const was=previousItems.get(el.dataset.asset),group=el.closest('.group'),to=layoutBox(el),origin=group&&layoutBox(group);if(!was||was.group!==group?.dataset.group||!was.origin||Math.abs(was.rect.width-to.width)>2||Math.abs(was.rect.height-to.height)>2)continue;const dx=(was.rect.left-was.origin.left)-(to.left-origin.left),dy=(was.rect.top-was.origin.top)-(to.top-origin.top);if(Math.abs(dx)>=1||Math.abs(dy)>=1)el.animate([{transform:`translate(${dx}px,${dy}px)`},{transform:'none'}],{duration:MOTION_MS,easing:settleEase});}
  });
 }
 // Folding animates the changed groups' height in layout, so the groups below follow; the clicked header stays where it was.
@@ -3265,7 +3266,10 @@ const settleEase='cubic-bezier(.22,1,.36,1)';
 function reduceMotion(){return matchMedia('(prefers-reduced-motion: reduce)').matches;}
 function docRect(el){const r=el.getBoundingClientRect(),s=boardScroller();return {left:r.left+s.scrollLeft,top:r.top+s.scrollTop,right:r.right+s.scrollLeft,bottom:r.bottom+s.scrollTop,width:r.width,height:r.height};}
 function inside(r,x,y){return !!r&&x>=r.left&&x<=r.right&&y>=r.top&&y<=r.bottom;}
-function slideFrom(el,from,duration=MOTION_MS){if(!from)return;const to=el.getBoundingClientRect(),dx=from.left-to.left,dy=from.top-to.top;if(Math.abs(dx)>=1||Math.abs(dy)>=1)el.animate([{transform:`translate(${dx}px,${dy}px)`},{transform:'none'}],{duration,easing:settleEase});}
+// Where an element sits in the page's layout, untouched by transforms (a 冰箱贴 panel's tilt, dropped while it is hovered or
+// focused; a slide in progress): offsets up the chain of positioned parents.
+function layoutBox(el){let left=0,top=0;for(let n=el;n;n=n.offsetParent){left+=n.offsetLeft;top+=n.offsetTop;}return {left,top,width:el.offsetWidth,height:el.offsetHeight};}
+function slideFrom(el,from,duration=MOTION_MS,to=el.getBoundingClientRect()){if(!from)return;const dx=from.left-to.left,dy=from.top-to.top;if(Math.abs(dx)>=1||Math.abs(dy)>=1)el.animate([{transform:`translate(${dx}px,${dy}px)`},{transform:'none'}],{duration,easing:settleEase});}
 function showTip(text,x=0,y=0,tone='',clear=null){if(!floatTip){floatTip=document.createElement('div');floatTip.setAttribute('aria-hidden','true');document.body.append(floatTip);}floatTip.hidden=!text;if(!text)return;floatTip.className=`float-tip ${tone}`;floatTip.textContent=text;const w=floatTip.offsetWidth,h=floatTip.offsetHeight;let left=x+14,top=y+20;if(clear){left=x-w/2;top=clear.bottom+8;if(top+h>innerHeight-8)top=clear.top-h-8;}floatTip.style.left=Math.max(8,Math.min(innerWidth-w-8,left))+'px';floatTip.style.top=Math.max(8,Math.min(innerHeight-h-8,top))+'px';}
 // Only the touched prefix becomes manual order (touchedPrefix); untouched rows keep following recency.
 function saveCardOrder(category,next){const existing=state.cardOrder?.[category]||[];checkpoint();state.cardOrder ||= {};state.cardOrder[category]=[...next,...existing.filter(id=>!next.includes(id))];save();}

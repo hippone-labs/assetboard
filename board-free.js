@@ -184,8 +184,11 @@ function freeShown(){return freeOn()&&!!document.querySelector('#board .wall.fre
 // packWall for every drawing and resize.
 function freePack(wall,items,width){
  if(freeDrag?.started&&freeView?.wall===wall){freeDrag.dirty=true;return;}
- const cols=wallColumns(width,FREE_GAP),geo=freeGeo(width,cols);
- if(freeView&&freeView.wall===wall&&Math.abs(freeView.geo.W-width)>.5){wall.classList.add('free-still');clearTimeout(freeStillTimer);freeStillTimer=setTimeout(()=>wall.classList.remove('free-still'),160);}
+ const cols=wallColumns(width,FREE_GAP),geo=freeGeo(width,cols),fresh=freeView?.wall!==wall;
+ // A new drawing of the wall (every render: a status read, a view switch) puts the panels straight at their places: they are new
+ // elements at the wall's corner, and with the slide on they would all fly in from there each time.
+ if(fresh)wall.classList.add('free-still');
+ if(!fresh&&Math.abs(freeView.geo.W-width)>.5){wall.classList.add('free-still');clearTimeout(freeStillTimer);freeStillTimer=setTimeout(()=>wall.classList.remove('free-still'),160);}
  wall.dataset.cols=cols;
  for(const n of items)n.style.width=geo.colW+'px';
  const ids=items.map(n=>n.dataset.group),heights=new Map(items.map(n=>[n.dataset.group,n.offsetHeight]));
@@ -206,6 +209,7 @@ function freePack(wall,items,width){
  const layout=freeResolve(rects,order,geo);
  freeView={wall,geo,heights,rects,layout,order:freeBase?.order?.length?[...freeBase.order.filter(id=>rects.has(id)),...ids.filter(id=>!freeBase.order.includes(id))]:ids};
  freePlace(layout);
+ if(fresh){void wall.offsetWidth;wall.classList.remove('free-still');}
 }
 function freePlace(layout,skip=null){
  const {wall}=freeView;let bottom=0;
