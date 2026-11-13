@@ -58,7 +58,7 @@ jobs:
         run: node --test 2>&1 | tee "$RUNNER_TEMP/logs/node-test.log"
 
       - name: Publishing tests
-        run: python3 -m unittest discover -s tools -p 'test_publish_site_release.py' 2>&1 | tee "$RUNNER_TEMP/logs/publish.log"
+        run: python3 -m unittest discover -s tools -p 'test_*.py' 2>&1 | tee "$RUNNER_TEMP/logs/publish.log"
 
       - name: Set up Playwright and Chinese fonts
         run: |
