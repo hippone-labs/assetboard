@@ -24,6 +24,7 @@ A macOS app that records the expiry dates, costs and relations of digital assets
 - [Overview](#overview)
 - [What it records](#what-it-records)
 - [Interface](#interface)
+- [Themes](#themes)
 - [Data sources](#data-sources)
 - [Other features](#other-features)
 - [Free and Pro](#free-and-pro)
@@ -59,6 +60,16 @@ The sidebar holds Upcoming, All assets, Panorama, the categories, projects and H
 | Live status (Pro, off by default): a server's memory, traffic and load ![Live status](screenshots/live-en.webp) | A free tier's sleep rule and keep-alive settings ![Sleep rule](screenshots/sleep-en.webp) |
 
 The panorama has four lenses: where it runs, who pays, which login, by project. Drag an asset between cards or press `L` to change a link.
+
+## Themes
+
+Two skins: Quiet, and Fridge magnets. Fridge magnets comes with four doors, and the whole window takes the door's colours. Pick one in Settings › Appearance.
+
+| | |
+| --- | --- |
+| Quiet, light ![Quiet, light](screenshots/theme-quiet-light-en.webp) | Quiet, dark ![Quiet, dark](screenshots/theme-quiet-dark-en.webp) |
+| Fridge magnets: Pixel Kitchen ![Fridge magnets: Pixel Kitchen](screenshots/theme-fridge-kitchen-en.webp) | Fridge magnets: Pixel Night City ![Fridge magnets: Pixel Night City](screenshots/theme-fridge-city-en.webp) |
+| Fridge magnets: Sketchbook Fridge ![Fridge magnets: Sketchbook Fridge](screenshots/theme-fridge-handdrawn-en.webp) | Fridge magnets: Pixel Server Room ![Fridge magnets: Pixel Server Room](screenshots/theme-fridge-server-en.webp) |
 
 ## Data sources
 
@@ -100,18 +111,18 @@ Scripts can put JSON in this format into `~/Library/Application Support/Assetboa
 
 ## Free and Pro
 
-The free edition has no time or record limit. Pro is a US$10 one-time licence, verified offline on the Mac.
+The app and the read-only MCP are free and open source, with no time or record limit. Assetboard Pro is the official plugin that lets AI change, delete and tidy up existing records in bulk through MCP and the command line, plus a few background jobs. Pro is free for now.
 
-| Free | Pro |
+| Free and open source | Pro (official plugin, free for now) |
 | --- | --- |
-| Asset board, Upcoming, local reminders, renewal and charge confirmations | External AI tools changing and deleting existing assets (MCP and the command line) |
+| Asset board, Upcoming, local reminders, renewal and charge confirmations | AI changing, deleting and tidying up existing records in bulk through MCP and the command line |
 | Payment ledger, 12-month forecast, price changes | Weekly automatic registry check |
 | Projects, revenue and shared costs, shutdown list, periodic review | Cloudflare sync every 12 hours, with a note when new assets appear |
 | Every import; connecting Cloudflare, GitHub, Namecheap, Porkbun, Hetzner, DigitalOcean and Vercel, then picking and syncing by hand; AI recognition with your own key | Live status (SSH reads, monitoring panels, platform status) |
-| MCP and the `assetboard-cli` command line: look up, add (same names skipped), import what waits; the Inbox folder | Planned: encrypted snapshots, a handover pack |
+| Read-only MCP and the `assetboard-cli` command line: look up; also add new records (same names skipped) and import what waits; the Inbox folder | Planned: encrypted snapshots, a handover pack |
 | Links, panorama, AI usage, privacy mode, network log, backups and exports | |
 
-This repository is the whole code of the free part; what you build from it works like the official build without a licence. The Pro modules are not in this repository, only in the official build.
+This repository is the whole code of the free part; what you build from it is the complete free edition. The Pro plugin is not in this repository; it comes with the official build. See the [user guide](GUIDE.md#assetboard-pro) (Chinese).
 
 ## Data and network
 
