@@ -1273,7 +1273,7 @@ body.first-paint #sidebar,body.first-paint .group{animation:v12-fade .15s var(--
  .nav-item.active{background:var(--selected-strong)}
  :root #main{margin-left:0;box-shadow:none}
  :root #main .appbar{flex-wrap:wrap;gap:8px 10px;padding:10px 16px}
- :root #main .appbar .toolbar{order:3;flex:1;width:auto;min-width:0}
+ :root #main .appbar .toolbar{order:3;flex:1 0 auto;width:auto}
  .view-head{flex:1 1 100%}
  .layout-toggle{order:4}
  :root #main .search{flex:1;width:auto}
@@ -1281,6 +1281,24 @@ body.first-paint #sidebar,body.first-paint .group{animation:v12-fade .15s var(--
  .group-head{position:static}
  :root :is(#detail,.detail-leave){width:100%;border-radius:0}
 }
+/* The narrow window's bar sticks to the top of the page. Its controls keep their size and wrap to a new row rather than shrink under
+   each other: the title on its own row, then the actions and the toggles. Under 560px the actions join the title (the head's basis
+   leaves room for them and no more, so the toggles start the next row), the meta gives way first and a long title takes a second
+   line rather than an ellipsis, and the layout toggle keeps to the right. The bar stays on top of the board in every skin, a banner
+   under it sits below its real height, and with Reduce transparency it is solid. */
+@media(max-width:760px){
+ :root[data-skin=magnet] body.wall-shown #main>#topbar{position:sticky;z-index:12}
+ :root .action-banner{top:calc(var(--topbar-h,var(--bar-h)) + 8px);z-index:11}
+}
+@media(max-width:560px){
+ :root #main .appbar .view-head{flex:1 1 calc(100% - 140px);min-width:0}
+ :root #main .appbar #view-title{min-width:0;white-space:normal;overflow-wrap:anywhere}
+ :root #main .appbar #view-meta{flex-shrink:999}
+ :root #main .appbar .view-head>:not(#view-title,#view-meta){flex:none}
+ :root #main .appbar .toolbar{order:1;flex:none}
+ :root #main .appbar>#layout-toggle{margin-left:auto}
+}
+@media(max-width:760px) and (prefers-reduced-transparency:reduce){:root #main .appbar{background:rgb(var(--tone-card));backdrop-filter:none;-webkit-backdrop-filter:none}}
 @media(prefers-reduced-motion:reduce){.g-chevron .ui-icon,.row,.gcard,.nav-item{transition:none}.nav-item.drop-flash{animation:none}}
 
 /* Add and edit form: small fixed choices are buttons, rarely used fields fold away, the add panel takes anything pasted or dropped. */
@@ -2729,3 +2747,43 @@ button.pj-fig:hover{background:var(--hover)}
 .pr-note.pr-problem{display:flex;flex-wrap:wrap;gap:4px 8px}
 .pr-note .text-button{padding:0;font-size:12px;color:rgb(var(--tone-primary))}
 :root[data-skin=magnet] #board .wall .pr-sum{box-shadow:none;border-bottom:1px dashed var(--mag-line)}
+
+/* 滚动条 (scrollbars.js): the page draws its own bars, so they look the same whatever the system's scroll bar setting (a mouse or
+   「显示滚动条：始终」 makes WebKit draw the old grey bars, a trackpad its overlay ones). A bar is a 10px gutter with a 6px capsule of
+   the ink in it, no track, kept clear of the rounded corners; the main scrollers keep the bar whether or not they scroll, and
+   give their right padding to it, so nothing moves when a bar comes or goes. The capsule shows while its scroller scrolls and while
+   the pointer is near its edge, then fades (--sb-a, faded by scrollbars.js; at once under less motion); at rest it is hidden, faint
+   when the system shows its bars always (html.sb-classic), and full under more contrast. Less transparency gives it a solid colour.
+   The probe that reads the system's setting (.sb-probe) keeps the system's own bar. */
+@property --sb-a{syntax:'<number>';inherits:true;initial-value:0}
+:root{--sb-size:10px;--sb-rest:0;--sb-a:var(--sb-rest);--sb-thumb:rgba(var(--tone-ink),.3);--sb-thumb-hover:rgba(var(--tone-ink),.46);--sb-thumb-active:rgba(var(--tone-ink),.58)}
+:root[data-scheme=dark]{--sb-thumb:rgba(var(--tone-ink),.3);--sb-thumb-hover:rgba(var(--tone-ink),.46);--sb-thumb-active:rgba(var(--tone-ink),.6)}
+:root.sb-classic{--sb-rest:.5}
+@media(prefers-contrast:more){:root,:root.sb-classic{--sb-rest:1;--sb-thumb:rgba(var(--tone-ink),.55);--sb-thumb-hover:rgba(var(--tone-ink),.7);--sb-thumb-active:rgba(var(--tone-ink),.8)}}
+@media(prefers-reduced-transparency:reduce){:root{--sb-thumb:color-mix(in srgb,rgb(var(--tone-ink)) 34%,rgb(var(--tone-card)));--sb-thumb-hover:color-mix(in srgb,rgb(var(--tone-ink)) 50%,rgb(var(--tone-card)));--sb-thumb-active:color-mix(in srgb,rgb(var(--tone-ink)) 62%,rgb(var(--tone-card)))}}
+.sb-on *{--sb-a:var(--sb-rest)}
+:root .sb-on,:root.sb-on{--sb-a:1}
+:not(.sb-probe)::-webkit-scrollbar{width:var(--sb-size);height:var(--sb-size);background:transparent}
+:not(.sb-probe)::-webkit-scrollbar-button{display:none}
+:not(.sb-probe)::-webkit-scrollbar-corner{background:transparent}
+:not(.sb-probe)::-webkit-scrollbar-track{background:transparent}
+:not(.sb-probe)::-webkit-scrollbar-track:vertical{margin:var(--sb-start,4px) 0 var(--sb-end,4px)}
+:not(.sb-probe)::-webkit-scrollbar-track:horizontal{margin:0 var(--sb-end,4px) 0 var(--sb-start,4px)}
+:not(.sb-probe)::-webkit-scrollbar-thumb{min-width:32px;min-height:32px;border:2px solid transparent;border-radius:999px;background:color-mix(in srgb,var(--sb-thumb) calc(var(--sb-a) * 100%),transparent) padding-box}
+:not(.sb-probe)::-webkit-scrollbar-thumb:hover{background:var(--sb-thumb-hover) padding-box}
+:not(.sb-probe)::-webkit-scrollbar-thumb:active{background:var(--sb-thumb-active) padding-box}
+@supports not selector(::-webkit-scrollbar){:root{scrollbar-width:thin;scrollbar-color:var(--sb-thumb) transparent}}
+/* the main scrollers keep their bar while nothing scrolls, with no capsule in it: overflow-y:scroll, since WebKit sizes a stable
+   gutter with no bar in it as the system's bar; the gutter is kept too, for a browser that hides its bars (Playwright's Chromium).
+   The bar takes the place of the right padding and stays clear of rounded corners. */
+:root :is(#board,#detail,#modal-content,#sidebar){scrollbar-gutter:stable}
+:root :is(#detail,#modal-content){overflow-y:scroll}
+:root #modal-content{padding-right:calc(24px - var(--sb-size));--sb-start:0px;--sb-end:14px}
+:root #modal-content :is(.confirm-actions,.form-actions):last-child{margin-right:calc(var(--sb-size) - 24px);padding-right:calc(24px - var(--sb-size))}
+@media(min-width:761px){
+ :root #board,:root #sidebar{overflow-y:scroll}
+ :root #board{padding-right:calc(20px - var(--sb-size));--sb-end:var(--shell-radius)}
+ :root :is(#detail,.detail-leave){padding-right:calc(22px - var(--sb-size));--sb-start:var(--detail-radius);--sb-end:var(--detail-radius)}
+ :root #sidebar,:root body.sidebar-rail #sidebar{padding-right:0}
+ html.native-app #sidebar{--sb-start:var(--shell-radius);--sb-end:var(--shell-radius)}
+}
