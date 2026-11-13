@@ -12,7 +12,7 @@ async (page) => {
   const dialog=await box('#modal');
   check(dialog.y>=16&&dialog.y+dialog.height<=600-16,'The dialog fits the window: '+JSON.stringify(dialog));
   const scroller=await p.evaluate(()=>{const c=$('#modal-content');return {overflow:c.scrollHeight>c.clientHeight,style:getComputedStyle(c).overflowY};});
-  check(scroller.overflow&&scroller.style==='auto','A long form scrolls inside the body');
+  check(scroller.overflow&&/^(auto|scroll)$/.test(scroller.style),'A long form scrolls inside the body');
   const submit=await box('#asset-form [type="submit"]');
   check(submit.y+submit.height<=dialog.y+dialog.height,'The save button is in view without scrolling');
   check(await p.evaluate(()=>$('#modal').hasAttribute('data-more')),'A rule marks that more lies below the actions');
