@@ -135,7 +135,7 @@ function wallTileHtml(a,{e,when,costSpan,live}){
 function wallBoardHtml(live){
  const panels=categoryIds().map(id=>({id,list:arranged(id,live.filter(a=>a.type===id))})).filter(p=>p.list.length);
  const empty=categoryIds().filter(id=>state.blocks.some(b=>b.id===id)&&!live.some(a=>a.type===id));
- const html=panels.map(({id,list},i)=>groupHtml({id,title:cats[id].name,glyph:`<span class="g-icon">${icon(id)}</span>`,list,fold:true,folded:!!state.blocks.find(b=>b.id===id)?.folded,reorder:true,summary:groupSummary(list)+(list.length>1?groupCostHtml(list):''),actions:categoryActions(id),wall:true,deco:wallDeco(id,i)})).join('');
+ const html=panels.map(({id,list},i)=>groupHtml({id,title:cats[id].name,glyph:`<span class="g-icon">${icon(id)}</span>`,list,fold:true,folded:!!state.blocks.find(b=>b.id===id)?.folded,reorder:true,summary:groupSummary(list)+(list.length>1?groupCostHtml(list):''),actions:categoryActions(id),wall:true,deco:wallDeco(id,i),note:groupNote(id,list)})).join('');
  const rest=empty.length?`<p class="wall-empty"><span>${tr('空的类别')}</span>${empty.map(id=>`<button class="wall-add" data-action="add-asset" data-id="${esc(id)}" title="${tr('添加{name}',{name:esc(cats[id].name)})}">${ui('plus')}${esc(cats[id].name)}</button>`).join('')}</p>`:'';
  return `<div class="wall${typeof freeOn==='function'&&freeOn()?' free':''}" data-density="${wallDensity}">${html}</div>${wallPendingHtml()}${rest}`;
 }
