@@ -22,6 +22,9 @@ async (page) => {
     rec('b1','database','main-db',60),rec('c1','bankcard','Visa',300),rec('a1','ai','Claude',9),rec('a2','ai','Copilot',20)],deletedExternalIds:[]};
    localStorage.setItem(key,JSON.stringify(board));});
   await p.reload();await wait(300);
+  // The official build opens the first record on a wide window; under 冰箱贴 the card covers the wall and would catch a
+  // drag that starts on a panel in the right-hand columns. These checks are of free placement, so the card stays closed.
+  await p.evaluate(()=>{if(!$('#detail').hidden)closeDetail();});await wait(400);
   const rects=()=>p.evaluate(()=>{const wall=document.querySelector('#board .wall');return [...wall.children].filter(n=>n.dataset.group).map(n=>({id:n.dataset.group,x:parseFloat(n.style.left),y:parseFloat(n.style.top),w:n.offsetWidth,h:n.offsetHeight}));});
   const sound=async label=>{
    const list=await rects(),W=await p.locator('#board .wall').evaluate(e=>e.clientWidth);

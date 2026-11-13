@@ -171,7 +171,12 @@ async (page) => {
   await p.evaluate(()=>{setPrivacy(false);setDensity('standard');});
 
   // The skin: a setting that changes how panels look and how they are placed (冰箱贴 freely, board-free.playwright.js), never the
-  // columns, the order or the tiles.
+  // columns, the order or the tiles. A reload above will have opened the first record; under 冰箱贴 that card covers the
+  // wall and does not change its columns, so close it before comparing, as this check is of the packing.
+  await p.evaluate(()=>{if(!$('#detail').hidden)closeDetail();});
+  // closeDetail gives the board its width back after the card's act (app.js, boardRoom); wait for that, not only a pack on the width it still has.
+  await p.waitForFunction(()=>roomTarget===null&&!roomMove&&!document.body.classList.contains('detail-room'),null,{timeout:5000,polling:50}).catch(()=>{});
+  await settle();
   const boxes=()=>p.locator('#board .wall > .group').evaluateAll(els=>{const xs=[...new Set(els.map(e=>Math.round(parseFloat(e.style.left))))].sort((a,b)=>a-b);return els.map(e=>[e.dataset.group,xs.indexOf(Math.round(parseFloat(e.style.left))),e.querySelectorAll('[data-asset]').length].join()).join('|');});
   const quietBoxes=await boxes();
   await p.evaluate(()=>prefsDialog());await settle();

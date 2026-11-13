@@ -2462,18 +2462,20 @@ body.drag-active #board .wall .row .r-actions{display:none}
  --tape:rgba(120,220,180,.45);--pin-0:#45b07a;--pin-1:#f2b632;--pin-2:#3f8ed8;--pin-3:#45b07a;
  --stk-0:image-set(url("art/fridge/stk-px-server.png") 1x,url("art/fridge/stk-px-server@2x.png") 2x);--stk-1:image-set(url("art/fridge/stk-px-rocket.png") 1x,url("art/fridge/stk-px-rocket@2x.png") 2x);--stk-2:image-set(url("art/fridge/stk-px-check.png") 1x,url("art/fridge/stk-px-check@2x.png") 2x);--stk-3:image-set(url("art/fridge/stk-px-coffee.png") 1x,url("art/fridge/stk-px-coffee@2x.png") 2x);--stk-4:var(--stk-0);--stk-5:var(--stk-2);
  --figure:image-set(url("art/fridge/cat.gif") 1x,url("art/fridge/cat@2x.gif") 2x);--figure-still:image-set(url("art/fridge/cat.png") 1x,url("art/fridge/cat@2x.png") 2x);--figure-w:32px;--figure-h:32px;--figure-x:30px}
-/* the door: behind everything in #main while the wall is on screen; the figure in its corner (left or right by scene), beside an
-   open detail (below), gone in a narrow window */
+/* the door: behind everything in #main while the wall is on screen; the figure is a sibling of the door (theme.js), in its
+   corner (left or right by scene), above the panels so it stays in view, beside an open detail (below), gone in a narrow
+   window; it never takes the pointer, so a drag on the wall still starts in the part the card does not cover */
 .fridge-scene{display:none}
 :root[data-skin=magnet] body.wall-shown #main{background:var(--scene-color)}
 :root[data-skin=magnet] body.wall-shown .fridge-scene{display:block;position:absolute;inset:0;z-index:0;border-radius:inherit;overflow:hidden;pointer-events:none;background:var(--scene-color) var(--scene-bg) center bottom/cover no-repeat;image-rendering:var(--scene-render)}
 :root[data-skin=magnet] body.wall-shown .fridge-scene::after{content:"";position:absolute;inset:0;background:var(--scene-veil)}
-:root[data-skin=magnet] body.wall-shown #main>:not(.fridge-scene){position:relative;z-index:1}
+:root[data-skin=magnet] body.wall-shown #main>:not(.fridge-scene):not(.scene-figure):not(.scene-ghost){position:relative;z-index:1}
 :root[data-skin=magnet] body.wall-shown #main>#board{z-index:1}
-.scene-figure{position:absolute;z-index:1;bottom:var(--figure-y);right:var(--figure-x);width:var(--figure-w);height:var(--figure-h);background:var(--figure) center/contain no-repeat;image-rendering:var(--figure-render);opacity:.92}
+.scene-figure,.scene-ghost{display:none;pointer-events:none}
+:root[data-skin=magnet] body.wall-shown .scene-figure{display:block;position:absolute;z-index:2;bottom:var(--figure-y);right:var(--figure-x);width:var(--figure-w);height:var(--figure-h);background:var(--figure) center/contain no-repeat;image-rendering:var(--figure-render);opacity:.92;pointer-events:none}
 :root[data-scene=city] .scene-figure,:root[data-scene=handdrawn] .scene-figure{right:auto;left:var(--figure-x)}
 @media(max-width:899px){.scene-figure{display:none}}
-@media(prefers-reduced-motion:reduce){.scene-figure{background-image:var(--figure-still)}}
+@media(prefers-reduced-motion:reduce){:root[data-skin=magnet] body.wall-shown .scene-figure,.scene-figure{background-image:var(--figure-still)}}
 /* what sits on the door besides the panels has the panels' paper under it */
 :root[data-skin=magnet] body.wall-shown #board .overview{margin:14px 0 6px;padding:10px 16px 14px;border-radius:14px;background:var(--mag-fill);box-shadow:0 1px 0 var(--mag-edge),0 2px 0 var(--mag-edge),var(--mag-shadow)}
 :root[data-skin=magnet] body.wall-shown #board :is(.wall-empty,.wall-pending){width:fit-content;max-width:100%;padding:6px 10px;border-radius:12px;background:var(--mag-fill);color:var(--mag-faint)}
@@ -2507,24 +2509,27 @@ body.drag-active #board .wall .row .r-actions{display:none}
 #board .wall.free-dragging>.group:not(.free-drag){rotate:calc(var(--tilt,0) * var(--wall-tilt))}
 @media(hover:hover){#board .wall.free>.group:not(.free-drag) .group-head{cursor:grab}}
 @media(prefers-reduced-motion:reduce){#board .wall>.group,#board .wall>.group.is-dragging.settling,#board .wall.free>.group,#board .wall.free>.group.free-drag{transition:none;animation:none}:root[data-skin=magnet]{--wall-lift-turn:0deg}}
-/* The detail, a card of its own over the content (both skins): clear of the toolbar, the content card's edges and the board by the
+/* The detail, a card of its own over the content (both skins): clear of the toolbar and the content card's edges by the
    gap between panels, with the panels' radius and a light shadow, so it belongs with them and leaves the door and its figure in
    view. Quiet: the sidebar's glass (the window's own canvas, blurred), so the two sides of the window match; 冰箱贴: the door's
-   paper a little clear, ringed with the door's colour. It comes in from the right and goes back there (app.js, detailMotion). The
-   board gives it its width and the gap (body.detail-room); under 冰箱贴 a lane more, where the door's figure stands beside it. The
-   room follows the card once its act is over, the panels sliding to their new places (app.js, boardRoom), so the panels come
-   back over the lane after the figure has pushed the card back. */
+   paper a little clear, ringed with the door's colour, a deeper glass so the panels under it still read as the door. It comes in
+   from the right and goes back there (app.js, detailMotion). On the quiet skin the board gives it its width and the gap
+   (body.detail-room); under 冰箱贴 the card covers the wall and the board keeps its width, so the columns and the panels stay
+   where they are (app.js, boardRoom). The door's figure still stands beside the card, over the wall, and does not take
+   clicks. */
 :root{--detail-gap:12px;--detail-radius:12px;--detail-fill:radial-gradient(700px 360px at 100% -6%,var(--canvas-glow),transparent 70%),linear-gradient(180deg,rgba(var(--tone-canvas),.72),rgba(var(--tone-canvas),.9));
  --detail-shadow:0 0 0 1px var(--hairline),0 1px 2px rgba(16,24,40,.05),0 12px 30px -14px rgba(16,24,40,.24);--detail-blur:blur(24px) saturate(1.4);--soft-fill:rgba(var(--tone-primary),.12);--soft-hover:rgba(var(--tone-primary),.18);--soft-ink:color-mix(in srgb,rgb(var(--tone-primary)) 82%,rgb(var(--tone-ink)))}
 :root[data-scheme=dark]{--detail-fill:rgba(var(--tone-card),.62);--detail-shadow:0 0 0 1px rgba(255,255,255,.075),0 14px 34px -14px rgba(0,0,0,.62);--soft-fill:rgba(var(--tone-primary),.16);--soft-hover:rgba(var(--tone-primary),.24);--soft-ink:color-mix(in srgb,rgb(var(--tone-primary)) 70%,rgb(var(--tone-ink)))}
-:root[data-skin=magnet]{--detail-gap:20px;--detail-radius:14px;--detail-fill:rgba(var(--tone-card),.86);--detail-blur:blur(12px) saturate(1.15);--figure-lane:28px;
- --detail-shadow:0 0 0 1px rgba(var(--tone-primary),.42),0 2px 0 var(--mag-edge),0 16px 30px -14px rgba(0,0,0,.42)}
-:root[data-skin=magnet][data-scheme=dark]{--detail-fill:rgba(var(--tone-card),.88);--detail-shadow:0 0 0 1px rgba(var(--tone-primary),.34),0 2px 0 var(--mag-edge),0 18px 34px -14px rgba(0,0,0,.66)}
+:root[data-skin=magnet]{--detail-gap:20px;--detail-radius:14px;--detail-fill:rgba(var(--tone-card),.86);--detail-blur:blur(20px) saturate(1.2);--figure-lane:28px;
+ --detail-shadow:0 0 0 1px rgba(var(--tone-primary),.42),0 2px 0 var(--mag-edge),0 10px 16px -8px rgba(0,0,0,.28),0 28px 48px -16px rgba(0,0,0,.5)}
+:root[data-skin=magnet][data-scheme=dark]{--detail-fill:rgba(var(--tone-card),.88);--detail-shadow:0 0 0 1px rgba(var(--tone-primary),.34),0 2px 0 var(--mag-edge),0 12px 18px -8px rgba(0,0,0,.4),0 30px 52px -16px rgba(0,0,0,.72)}
 @media(min-width:761px){
  :root :is(#detail,.detail-leave){top:calc(var(--topnav-h) + var(--bar-h) + var(--detail-gap));bottom:calc(var(--shell-gap) + var(--detail-gap));right:calc(var(--shell-gap) + var(--detail-gap));
   border-radius:var(--detail-radius);background:var(--detail-fill);box-shadow:var(--detail-shadow);backdrop-filter:var(--detail-blur);-webkit-backdrop-filter:var(--detail-blur)}
  :root body.detail-room #board,:root body.detail-room .action-banner{margin-right:calc(var(--inspector-w) + var(--detail-gap))}
-:root[data-skin=magnet] body.detail-room.wall-shown #board{margin-right:calc(var(--inspector-w) + var(--detail-gap) + var(--figure-lane))}
+ /* 冰箱贴, the wall on screen: the card covers the wall; the wall keeps its width and its columns. */
+ :root[data-skin=magnet] body.detail-room.wall-shown #board,
+ :root[data-skin=magnet] body.detail-room.wall-shown .action-banner{margin-right:0}
 }
 @media(prefers-reduced-transparency:reduce){:root :is(#detail,.detail-leave){background:rgb(var(--tone-card));backdrop-filter:none;-webkit-backdrop-filter:none}}
 /* the copy that goes back to the right as the detail closes (the detail itself is hidden at once) */
@@ -2543,9 +2548,9 @@ body.drag-active #board .wall .row .r-actions{display:none}
 :root[data-scene=handdrawn]{--figure-act:image-set(url("art/fridge/hedgehog-act.png") 1x,url("art/fridge/hedgehog-act@2x.png") 2x)}
 :root[data-scene=server]{--figure-act:image-set(url("art/fridge/cat-act.png") 1x,url("art/fridge/cat-act@2x.png") 2x)}
 :root[data-skin=magnet]{--figure-fw:calc(var(--figure-w) + 8px);--figure-dock:calc(var(--detail-gap) + var(--inspector-w) + (var(--figure-lane) + 20px - var(--figure-w)) / 2);--figure-travel:calc(var(--figure-dock) - var(--figure-x))}
-.scene-ghost{display:none}
+.scene-ghost{display:none;pointer-events:none}
 .scene-figure::after,.scene-ghost{content:"";position:absolute;left:0;bottom:0;width:var(--figure-fw);height:var(--figure-h);background:var(--figure-act) 0 0/calc(var(--figure-fw) * 10) 100% no-repeat;image-rendering:var(--figure-render);opacity:0}
-.scene-ghost{left:var(--figure-x);bottom:var(--figure-y);opacity:.92}
+.scene-ghost{left:var(--figure-x);bottom:var(--figure-y);z-index:2;opacity:.92;pointer-events:none}
 @media(min-width:900px){
  :root[data-skin=magnet] :is(body.inspecting,body.fig-push) .scene-figure{left:auto;right:var(--figure-dock)}
  :root[data-skin=magnet] :is(body.fig-pull,body.fig-push) .scene-figure{background-image:none}
