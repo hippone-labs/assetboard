@@ -4,7 +4,7 @@
 // Loaded after demo-data.js and before every script that asks featureOn().
 const FEATURES_KEY='assetboard-features-v1';
 // Each feature: its name in 设置, a one-line note (the row's tooltip), whether it is on until switched, and where it exists (mac: the
-// Mac app; full: only where the Pro modules are; pro: only with Assetboard Pro, its switch locked without it).
+// Mac app; full: only where the Pro modules are; pro: only while Pro is on, hidden otherwise).
 const FEATURES={
  panorama:{name:tr('全景'),note:tr('按 P 打开：每台服务器、每张卡、每个账号上挂着什么'),on:true},
  probe:{name:tr('实时状态'),note:tr('打开后才读：用 SSH 和你添加的监控面板读服务器的内存、网络和负载，每条资产显示一行。这是实时读数，不是登记状态'),on:false,mac:true,full:true,pro:true},

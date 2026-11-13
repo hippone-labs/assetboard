@@ -318,7 +318,7 @@ function rdapFillAnswer(ask,result){
 // Each answer also stores the hold, the registrar and the nameservers (rdapRemember), so the next check can say they changed.
 const RDAP_REFRESH_DAYS=7;
 let rdapQueue=[],rdapBusy=false,rdapGapMs=4000;
-// Weekly checks are Pro: without it state.rdapAuto stays as it was and nothing is sent; 核对注册局 by hand stays free.
+// Weekly checks come with the Pro plugin: without it state.rdapAuto stays as it was and nothing is sent; 核对注册局 by hand is in every build.
 function rdapAutoOn(){return !!state.rdapAuto&&!!nativeStore&&!demoMode&&!proOff;}
 function rdapAutoDue(now=new Date()){
  const last=a=>Math.max(Date.parse(a.registryCheckedAt)||0,Date.parse(a.registryTriedAt)||0);

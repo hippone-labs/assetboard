@@ -122,7 +122,7 @@ The app and the read-only MCP are free and open source, with no time or record l
 | Read-only MCP and the `assetboard-cli` command line: look up; also add new records (same names skipped) and import what waits; the Inbox folder | Planned: encrypted snapshots, a handover pack |
 | Links, panorama, AI usage, privacy mode, network log, backups and exports | |
 
-This repository is the whole code of the free part; what you build from it is the complete free edition. The Pro plugin is not in this repository; it comes with the official build. See the [user guide](GUIDE.md#assetboard-pro) (Chinese).
+Getting Pro: download the official build from [assetboard.app](https://assetboard.app/). Pro is already inside and on, with no sign-up and no license to enter; Settings › Assetboard Pro shows its state. This repository is the whole code of the free part; what you build from it is the complete free edition, without the Pro plugin. See the [user guide](GUIDE.md#assetboard-pro) (Chinese).
 
 ## Data and network
 

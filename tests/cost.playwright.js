@@ -11,7 +11,7 @@ async (page) => {
     if(m.action==='evidenceList')setTimeout(()=>assetboardEvidenceList([]),5);
     if(m.action==='fxRates')setTimeout(()=>{assetboardFxRates({ok:true,date:'2026-10-20',source:'欧洲央行参考汇率',fetchedOn:'2026-10-21',rates:{USD:1,CNY:7,EUR:0.5,GBP:0.8,HKD:7.8,JPY:150,SGD:1.3,AUD:1.4,CAD:1.4}});window.__fxReplies=(window.__fxReplies||0)+1;},20);
    }}}};
-   window.__ASSETBOARD_NATIVE__={pro:{on:true,kind:'licensed',id:'K3Q7NVHM'},data:{blocks:[],assets:[
+   window.__ASSETBOARD_NATIVE__={pro:{on:true,kind:'official'},data:{blocks:[],assets:[
     {id:'a',type:'subscription',name:'Notion',cost:'$10 / 月',cycle:'monthly',source:'manual',art:'generic'},
     {id:'b',type:'domain',name:'example.com',cost:'¥ 84 / 年',cycle:'yearly',source:'manual',art:'generic'},
     {id:'c',type:'subscription',name:'Figma',cost:'€6 / 3 个月',cycle:'quarterly',source:'manual',art:'generic'},

@@ -13,7 +13,7 @@ async (page) => {
     if(m.action==='evidenceList')setTimeout(()=>assetboardEvidenceList([]),5);
     if(m.action==='aiRecognize')setTimeout(()=>assetboardAIResult({kind:'recognize',requestId:m.requestId,ok:true,evidenceId:null,ai:{provider:'anthropic',model:'m',at:'2026-10-20T00:00:00Z',text:'{"items":[{"name":"Notion Plus","merchant":"Notion","type":"subscription","amount":"10","currency":"USD","cycle":"monthly","date":"2099-11-01","dateKind":"renew"}]}'}}),5);
    }}}};
-   window.__ASSETBOARD_NATIVE__={pro:{on:true,kind:'licensed',id:'K3Q7NVHM'},data:{blocks:[],assets:[]},cloudflareConnected:false,githubConnected:false,gmailConfigured:false,ai:{provider:'anthropic',baseURL:'https://api.anthropic.com',model:'m',autoImages:true,host:'api.anthropic.com'},aiKeySaved:true};
+   window.__ASSETBOARD_NATIVE__={pro:{on:true,kind:'official'},data:{blocks:[],assets:[]},cloudflareConnected:false,githubConnected:false,gmailConfigured:false,ai:{provider:'anthropic',baseURL:'https://api.anthropic.com',model:'m',autoImages:true,host:'api.anthropic.com'},aiKeySaved:true};
   },{ai});
   await p.goto('http://127.0.0.1:4317/');
   await until(p,()=>typeof captureDialog==='function');

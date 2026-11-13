@@ -33,8 +33,9 @@
 
 - 是什么： Assetboard Pro 是官方插件，现在免费。它让外部 AI 工具通过 MCP 和命令行修改、删除、批量整理已有记录，另外负责后台自动做的事：每周核对注册局、Cloudflare 每 12 小时自动同步和新资产提醒、实时状态。
 - 不用 Pro 也有的： App 和只读 MCP 免费、开源。手动增改删、导入、连接平台后挑选、手动同步、AI 识别、付款账本、项目、关停清单、定期清理、Inbox 文件夹，以及 MCP 和命令行的查询、添加和引入待引入。
-- 在哪看： “设置 › Assetboard Pro”。演示模式显示全部 Pro 功能。
-- 没有 Pro 时： Pro 的开关（例如每周核对注册局）保留你的选择，只是不运行；数据一样不少。
+- 怎么拿到： 从 [assetboard.app](https://assetboard.app/) 下载官方安装包，Pro 已经内置并默认启用，不用注册，也不用输入许可证。
+- 在哪看： “设置 › Assetboard Pro”显示“官方插件”和状态“已启用”，“设置 › 关于”的版本类型是“官方版 · 含 Assetboard Pro”。演示模式显示全部 Pro 功能。
+- 没有 Pro 时（自己从源码编译的版本）： Pro 的开关（例如每周核对注册局）不显示，你之前的选择照样保留；外部工具修改或删除已有资产会被拒绝并说明原因；数据一样不少。
 - 源码： 这个仓库是免费部分的全部代码（GPL-3.0），自己编译得到的就是完整的免费版。Pro 插件不在仓库里，随官方签名的安装包提供。
 
 ## 下载与安装
@@ -75,7 +76,7 @@ open /Applications/Assetboard.app --args --demo
 | Hetzner、DigitalOcean、Vercel | 「导入 › 云平台」或菜单「文件 → 从云平台导入…」：粘贴 API 令牌，只调用读取列表的接口。Hetzner 读一个项目的服务器（令牌在 Hetzner Console 的项目 › Security › API tokens 里建，权限选 Read；项目名可选，记在“账号”里）；DigitalOcean 读 Droplet、App Platform 应用和托管数据库（建 Custom Scopes 令牌，只勾 droplet、app、database、account 的 read，没勾的类别跳过并说明）；Vercel 读项目和在 Vercel 注册的域名（到期日和自动续费，自动续费开着的按年重复；只是指向 Vercel 的域名不读，请从注册商导入）。服务器带公网 IP、所在国家和列表月价（Hetzner 按项目币种的含税价，DigitalOcean 按美元；不含流量、备份和另计的附加项），月价只填进空着的费用，之后以你填的为准。Vercel 的令牌没有只读的，能改动所属账号或团队，连接前要勾选确认，列表里标“权限大”。令牌验证通过后存入钥匙串，点“重新同步”再读；同名的先问你，删掉的不会再加回来，平台上没了的标“本次未返回”，令牌读不了的类别不标。尚未用真实账号验证 | App |
 | `~/.ssh/config` | 只读 Host、HostName、User、Port，生成服务器；添加服务器时也能直接从里面选一台。github.com、gitlab.com 这类代码托管（以及 `User git` 的 Host）不当作服务器，仓库从 GitHub 连接来 | App |
 | 服务菜单、Dock | 在任何软件里选中文字，右键 → 服务 →「添加到 Assetboard」，文字会填进添加面板，点「识别」才处理。把邮件、截图、PDF、CSV、JSON 拖到 Dock 图标上，或用“打开方式”选 Assetboard：表格和 JSON 一律先进导入预览，截图和 PDF 在本机识别后进待确认。正在编辑或核对时不会打断，收到的内容在「待确认」里排队，可打开或丢弃。首次安装后若菜单里没有，注销再登录一次 | App |
-| MCP 接入 / 命令行 | 查询、添加和引入待引入免费；修改和删除已有资产在 Pro 里。App 内置 `assetboard-cli`：Claude Code、Claude Desktop 等 MCP 客户端或脚本可以查询、添加、修改资产，新增和修改立即生效（`⌘Z` 撤销），删除要你在 App 里确认。通道在本机，但你的 AI 工具会把读到的内容发给它的模型服务商；地址和联系方式默认遮住，银行卡和手机号默认不给。菜单「文件 → MCP 接入…」里有可复制的配置。见下 | App |
+| MCP 接入 / 命令行 | 查询、添加和引入待引入免费；修改和删除已有资产要用 Pro 插件（官方安装包自带，免费）。App 内置 `assetboard-cli`：Claude Code、Claude Desktop 等 MCP 客户端或脚本可以查询、添加、修改资产，新增和修改立即生效（`⌘Z` 撤销），删除要你在 App 里确认。通道在本机，但你的 AI 工具会把读到的内容发给它的模型服务商；地址和联系方式默认遮住，银行卡和手机号默认不给。菜单「文件 → MCP 接入…」里有可复制的配置。见下 | App |
 | Inbox 文件夹 | 把 JSON 文件放进 `~/Library/Application Support/Assetboard/Inbox/`，App 打开或回到前台时读取，一律先进导入预览，确认才写入，同名的跳过、不覆盖；导入或丢弃后原文件才移到 `Inbox/handled/`（保留 30 天），取消预览或退出 App 时文件留在原处。这个格式拖进窗口或 Dock 也能识别。格式见下 | App |
 | AI 识别（可选） | 接入你自己的模型（Claude、OpenAI 兼容接口或本机 Ollama），配置后，导入的截图、PDF、邮件和粘贴的文字会自动发给它识别（AI 识别设置里可关掉，关掉后只在你点“用 AI 识别”时发送）。本地规则只认中文账单和通知，英文的靠 AI。尚未用真实 API key 验证 | App |
 

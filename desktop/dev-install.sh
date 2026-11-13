@@ -20,8 +20,8 @@ running() { /usr/bin/pgrep -f "^$dest/Contents/MacOS/Assetboard( |$)" >/dev/null
 # Actions runner finds and terminates the processes a job leaves running when it ends.
 launch() { /usr/bin/env -i HOME="$HOME" USER="${USER:-$(id -un)}" PATH=/usr/bin:/bin:/usr/sbin:/sbin TMPDIR="${TMPDIR:-/tmp}" LANG="${LANG:-en_US.UTF-8}" /usr/bin/open "$1"; }
 
-# Without Pro, build.sh quietly builds the free board without the developer flag.
-[[ -n "$(print -l pro/desktop/*.swift(N))" && -f pro/web/pro.js ]] || fail "the private Pro checkout is missing at pro/ (pro/desktop/*.swift, pro/web/pro.js)"
+# Without Pro, build.sh quietly builds the board without the plugin and without the developer flag.
+[[ -f pro/web/pro.js ]] || fail "the private Pro checkout is missing at pro/ (pro/web/pro.js)"
 unset SIGNING_IDENTITY NOTARY_PROFILE NOTARY_KEYCHAIN ASSETBOARD_EDITION
 commit="$(git rev-parse --short HEAD 2>/dev/null || print unknown)"
 ASSETBOARD_PRO_DEV=1 zsh desktop/build.sh

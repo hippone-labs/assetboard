@@ -7,19 +7,14 @@ if [[ "${SIGNING_IDENTITY:-}" != 'Developer ID Application:'* ]]; then
 fi
 
 project_dir="${0:A:h:h}"
-# One package: the official build (free without a licence). A build without the Pro modules is for building from source, never published.
+# One package: the official build, with Assetboard Pro (free, no licence). A build without the Pro modules is for building from source, never published.
 if [[ "${ASSETBOARD_EDITION:-}" == free ]]; then
   print -u2 'ASSETBOARD_EDITION=free is not packaged: only the official build is published. Unset it.'
   exit 1
 fi
-# A developer build (ASSETBOARD_PRO_DEV=1, Pro without a licence) is for one Mac only and is never packaged.
+# A developer build (ASSETBOARD_PRO_DEV=1) is for one Mac only and is never packaged.
 if [[ -n "${ASSETBOARD_PRO_DEV:-}" ]]; then
   print -u2 'ASSETBOARD_PRO_DEV is set: developer builds are not packaged. Unset it and build again.'
-  exit 1
-fi
-# A signed build must carry the production licence key: with the placeholder in pro/desktop/License.swift no licence verifies.
-if [[ -f "$project_dir/pro/desktop/License.swift" ]] && grep -q 'PRODUCTION_PUBLIC_KEY_PLACEHOLDER' "$project_dir/pro/desktop/License.swift"; then
-  print -u2 'Put the production public key into ProLicense.publicKeyBase64 (pro/desktop/License.swift) first: node pro/worker/keygen.mjs'
   exit 1
 fi
 "$project_dir/desktop/build.sh"

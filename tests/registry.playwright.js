@@ -15,7 +15,7 @@ async (page) => {
    if(m?.action==='evidenceList')setTimeout(()=>window.assetboardEvidenceList?.([]),5);
    if(m?.action==='rdap'&&window.__rdap)setTimeout(()=>window.assetboardRdap({requestId:m.requestId,ok:true,json:window.__rdap}),5);
   }}}};
-  window.__ASSETBOARD_NATIVE__={pro:{on:true,kind:'licensed',id:'K3Q7NVHM'},demo:false,cloudflareConnected:false,githubConnected:false,data:{paymentsSince:day(-800),blocks:[{id:'domain'}],assets:[
+  window.__ASSETBOARD_NATIVE__={pro:{on:true,kind:'official'},demo:false,cloudflareConnected:false,githubConnected:false,data:{paymentsSince:day(-800),blocks:[{id:'domain'}],assets:[
    {id:'held',type:'domain',name:'held.example',date:day(200),dateKind:'expire',source:'manual',registryHold:'client',registryCheckedAt:new Date().toISOString(),art:'generic'},
    {id:'moved',type:'domain',name:'moved.example',date:day(300),dateKind:'expire',source:'manual',registryRegistrar:'Other Registrar',registryNS:['park1.example.org'],registryChange:{at:new Date().toISOString(),ns:['ns1.example.net','ns2.example.net']},art:'generic'},
    {id:'lapsed',type:'domain',name:'lapsed.example',date:day(-430),dateKind:'expire',cycle:'yearly',createdAt:new Date(Date.now()-500*86400000).toISOString(),source:'manual',art:'generic'},
