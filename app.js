@@ -3446,6 +3446,8 @@ function dayRender(){
 }
 setInterval(dayRollover,60000);document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')dayRollover();});window.addEventListener('focus',dayRollover);
 new ResizeObserver(([entry])=>{const w=entry.contentRect.width,size=w<600?'s':w<860?'m':'l';if($('#board').dataset.size!==size)$('#board').dataset.size=size;}).observe($('#main'));
+// The bar's real height, for what sticks under it (material.css, .action-banner): a narrow window wraps the bar to two or three rows.
+new ResizeObserver(([entry])=>{const h=Math.ceil(entry.borderBoxSize?.[0]?.blockSize??entry.target.offsetHeight);$('#main').style.setProperty('--topbar-h',h+'px');}).observe($('#topbar'));
 render();
 // What came due while the board was not in front of anyone (U3): checked on opening, on coming back to the front and every few minutes
 // (a Mac that slept with the window open comes back without a visibility change). The last look is this viewer's, in localStorage.

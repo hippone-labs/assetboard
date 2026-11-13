@@ -1273,7 +1273,7 @@ body.first-paint #sidebar,body.first-paint .group{animation:v12-fade .15s var(--
  .nav-item.active{background:var(--selected-strong)}
  :root #main{margin-left:0;box-shadow:none}
  :root #main .appbar{flex-wrap:wrap;gap:8px 10px;padding:10px 16px}
- :root #main .appbar .toolbar{order:3;flex:1;width:auto;min-width:0}
+ :root #main .appbar .toolbar{order:3;flex:1 0 auto;width:auto}
  .view-head{flex:1 1 100%}
  .layout-toggle{order:4}
  :root #main .search{flex:1;width:auto}
@@ -1281,6 +1281,24 @@ body.first-paint #sidebar,body.first-paint .group{animation:v12-fade .15s var(--
  .group-head{position:static}
  :root :is(#detail,.detail-leave){width:100%;border-radius:0}
 }
+/* The narrow window's bar sticks to the top of the page. Its controls keep their size and wrap to a new row rather than shrink under
+   each other: the title on its own row, then the actions and the toggles. Under 560px the actions join the title (the head's basis
+   leaves room for them and no more, so the toggles start the next row), the meta gives way first and a long title takes a second
+   line rather than an ellipsis, and the layout toggle keeps to the right. The bar stays on top of the board in every skin, a banner
+   under it sits below its real height, and with Reduce transparency it is solid. */
+@media(max-width:760px){
+ :root[data-skin=magnet] body.wall-shown #main>#topbar{position:sticky;z-index:12}
+ :root .action-banner{top:calc(var(--topbar-h,var(--bar-h)) + 8px);z-index:11}
+}
+@media(max-width:560px){
+ :root #main .appbar .view-head{flex:1 1 calc(100% - 140px);min-width:0}
+ :root #main .appbar #view-title{min-width:0;white-space:normal;overflow-wrap:anywhere}
+ :root #main .appbar #view-meta{flex-shrink:999}
+ :root #main .appbar .view-head>:not(#view-title,#view-meta){flex:none}
+ :root #main .appbar .toolbar{order:1;flex:none}
+ :root #main .appbar>#layout-toggle{margin-left:auto}
+}
+@media(max-width:760px) and (prefers-reduced-transparency:reduce){:root #main .appbar{background:rgb(var(--tone-card));backdrop-filter:none;-webkit-backdrop-filter:none}}
 @media(prefers-reduced-motion:reduce){.g-chevron .ui-icon,.row,.gcard,.nav-item{transition:none}.nav-item.drop-flash{animation:none}}
 
 /* Add and edit form: small fixed choices are buttons, rarely used fields fold away, the add panel takes anything pasted or dropped. */
