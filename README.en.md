@@ -152,7 +152,7 @@ Prerequisites (versions come from `desktop/Info.plist` and `.github/workflows/bu
 
 | Need | Version | For |
 |---|---|---|
-| macOS and chip | Apple silicon (arm64) only; the app runs on macOS 15.0 or later (`LSMinimumSystemVersion`). CI builds on macOS 26 and checks on macOS 15 | building and running the app |
+| macOS and chip | Apple silicon (arm64) only; the app runs on macOS 15.0 or later (`LSMinimumSystemVersion`). CI builds on macOS 26; before a release the Swift job is also run by hand on macOS 15 | building and running the app |
 | Xcode / Swift | Minimum: Xcode command line tools with `swiftc` (`./desktop/build.sh` calls `xcrun swiftc`). Verified: Xcode 26.6 on CI; the full Xcode is needed only to compile the macOS 26 app icon (`Assets.car`), otherwise the committed one is used | `./desktop/build.sh` |
 | Node | Verified: 22 in CI (`node --test` needs no packages) | unit tests |
 | Python 3 | Any recent 3 (CI uses the runner default); no packages | browser version local server, `tools/` tests |
