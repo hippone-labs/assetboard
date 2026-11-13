@@ -21,7 +21,7 @@ async (page) => {
    return {pro:{probe:proSlots.serverProbe,platform:proSlots.platformProbe,methods:Object.keys(proSlots.agentMethods)},
     missing:missing.every(r=>!r.ok&&/未知方法/.test(r.error)),reads:reads.map(r=>r.ok),cli:call('list',{},'cli').ok,
     costMore:cost.includes('cost-more'),menu:assetMenuItems(state.assets[0],true).map(x=>x.action).filter(Boolean),
-    proPane:proBuilt(),edition:(prefsDialog('about'),document.querySelector('#modal .prefs-edition')?.textContent||'')};
+    proPane:proBuilt(),edition:(prefsDialog('about'),document.querySelector('#prefs-pane-about .prefs-edition')?.textContent||'')};
   });
   check(!seen.pro.probe&&!seen.pro.platform&&!seen.pro.methods.length,'Pro filled something in ?free: '+JSON.stringify(seen.pro));
   check(seen.missing,'Pro agent methods answer in ?free');
