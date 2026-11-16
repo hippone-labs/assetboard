@@ -1,14 +1,16 @@
-<!-- The disk image's window background (desktop/dmg/settings.py). 660×400 points; the app icon sits at (180,190), Applications at
-     (480,190), both 128 pt, and Finder writes their names below them. Rendered to background.png and background@2x.png. -->
+<!-- The disk image's window background. 660×400 points; the app icon sits at (180,190), Applications at (480,190), both 128 pt,
+     and Finder writes their names below them. Rendered to background.png and background@2x.png. -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 660 400" width="660" height="400">
-  <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fbfbfc"/><stop offset="1" stop-color="#eef0f3"/></linearGradient>
-    <radialGradient id="glow" cx=".5" cy="0" r=".8"><stop offset="0" stop-color="#7aa9f2" stop-opacity=".16"/><stop offset="1" stop-color="#7aa9f2" stop-opacity="0"/></radialGradient>
-  </defs>
+  <defs><linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fcfbf8"/><stop offset="1" stop-color="#eeeae2"/></linearGradient></defs>
   <rect width="660" height="400" fill="url(#bg)"/>
-  <rect width="660" height="400" fill="url(#glow)"/>
-  <path d="M262 190 C 300 168, 360 168, 398 190" fill="none" stroke="#5f93ea" stroke-width="3.5" stroke-linecap="round" stroke-dasharray="1 9"/>
-  <path d="M386 178 L 401 191 L 383 199" fill="none" stroke="#5f93ea" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
-  <text x="330" y="330" text-anchor="middle" font-family="-apple-system, 'SF Pro Text', 'PingFang SC', 'Helvetica Neue', sans-serif" font-size="14" fill="#5d6370">拖到 Applications 文件夹即可安装</text>
-  <text x="330" y="352" text-anchor="middle" font-family="-apple-system, 'SF Pro Text', 'Helvetica Neue', sans-serif" font-size="12" fill="#8a8f99">Drag Assetboard to Applications to install</text>
+  <rect x="112" y="122" width="136" height="136" rx="32" fill="#fff" fill-opacity=".55" stroke="#1c1b19" stroke-opacity=".08"/>
+  <rect x="412" y="122" width="136" height="136" rx="32" fill="#3b63c4" fill-opacity=".05" stroke="#3b63c4" stroke-opacity=".6" stroke-width="1.5" stroke-dasharray="5 6" stroke-linecap="round"/>
+  <g font-family="ui-monospace, 'SF Mono', Menlo, 'DejaVu Sans Mono', monospace" font-size="10" fill="#1c1b19" fill-opacity=".38" letter-spacing=".5"><text x="118" y="112">01</text><text x="418" y="112">02</text></g>
+  <rect x="261.5" y="178" width="1" height="8" fill="#1c1b19" opacity="0.38"/><rect x="271.5" y="182" width="1" height="4" fill="#1c1b19" opacity="0.22"/><rect x="281.5" y="182" width="1" height="4" fill="#1c1b19" opacity="0.22"/><rect x="291.5" y="182" width="1" height="4" fill="#1c1b19" opacity="0.22"/><rect x="301.5" y="182" width="1" height="4" fill="#1c1b19" opacity="0.22"/><rect x="311.5" y="178" width="1" height="8" fill="#1c1b19" opacity="0.38"/><rect x="321.5" y="182" width="1" height="4" fill="#1c1b19" opacity="0.22"/><rect x="331.5" y="182" width="1" height="4" fill="#1c1b19" opacity="0.22"/><rect x="341.5" y="182" width="1" height="4" fill="#1c1b19" opacity="0.22"/><rect x="351.5" y="182" width="1" height="4" fill="#1c1b19" opacity="0.22"/><rect x="361.5" y="178" width="1" height="8" fill="#1c1b19" opacity="0.38"/><rect x="371.5" y="182" width="1" height="4" fill="#1c1b19" opacity="0.22"/><rect x="381.5" y="182" width="1" height="4" fill="#1c1b19" opacity="0.22"/><rect x="391.5" y="182" width="1" height="4" fill="#1c1b19" opacity="0.22"/>
+  <rect x="262" y="189.25" width="134" height="1.5" rx=".75" fill="#1c1b19" opacity=".22"/>
+  <rect x="262" y="188.75" width="58" height="2.5" rx="1.25" fill="#3b63c4"/>
+  <circle cx="320" cy="190" r="9" fill="#1c1b19"/><circle cx="320" cy="190" r="5.5" fill="#f0a64b"/>
+  <path d="M389 182 L 398 190 L 389 198" fill="none" stroke="#1c1b19" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="330" y="330" text-anchor="middle" font-family="-apple-system, 'SF Pro Text', Inter, 'PingFang SC', 'Noto Sans CJK SC', sans-serif" font-size="14" fill="#3a3833">拖到 Applications 文件夹即可安装</text>
+  <text x="330" y="352" text-anchor="middle" font-family="-apple-system, 'SF Pro Text', Inter, sans-serif" font-size="12" fill="#8a857b">Drag Assetboard to Applications to install</text>
 </svg>
