@@ -183,7 +183,7 @@ python3 -m http.server 4317 --bind 127.0.0.1    # 打开 http://127.0.0.1:4317�
 
 ## 参与
 
-问题、服务商规则（比如某家云服务器过期几天后释放）和建议可以用 [issue 表单](https://github.com/hippone-labs/assetboard/issues/new/choose)提交，也欢迎 Pull Request，见 [CONTRIBUTING.md](CONTRIBUTING.md)。邮件：assetboard@163.com。
+问题、服务商规则（比如某家云服务器过期几天后释放）和建议可以用 [issue 表单](https://github.com/hippone-labs/assetboard/issues/new/choose)提交，也欢迎 Pull Request，见 [CONTRIBUTING.md](CONTRIBUTING.md)。邮件：lihaosong1109@gmail.com。
 
 ## 许可证
 

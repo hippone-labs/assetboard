@@ -181,7 +181,7 @@ python3 -m http.server 4317 --bind 127.0.0.1    # open http://127.0.0.1:4317; ?d
 
 ## Contributing
 
-Bug reports, provider rules (for example, how many days after expiry a cloud provider deletes a server) and suggestions can go through the [issue forms](https://github.com/hippone-labs/assetboard/issues/new/choose); pull requests are welcome, see [CONTRIBUTING.md](CONTRIBUTING.md). Mail: assetboard@163.com.
+Bug reports, provider rules (for example, how many days after expiry a cloud provider deletes a server) and suggestions can go through the [issue forms](https://github.com/hippone-labs/assetboard/issues/new/choose); pull requests are welcome, see [CONTRIBUTING.md](CONTRIBUTING.md). Mail: lihaosong1109@gmail.com.
 
 ## License
 

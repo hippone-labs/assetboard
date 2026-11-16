@@ -323,7 +323,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
     /// 反馈与建议: a mail to the project address (the site's contact page says the same); GitHub issues work too.
     /// 操作记录 keeps this many rows; older ones are dropped.
     static let agentLogKeep = 1000
-    static let feedbackURL = URL(string: "mailto:assetboard@163.com?subject=Assetboard%20%E5%8F%8D%E9%A6%88")!
+    static let feedbackURL = URL(string: "mailto:lihaosong1109@gmail.com?subject=Assetboard%20%E5%8F%8D%E9%A6%88")!
 
     func publishConnectionState() {
         guard boardLoaded, let connectionStateJSON else { return }
