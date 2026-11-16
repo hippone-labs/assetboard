@@ -1949,17 +1949,17 @@ func testAppIcon() {
     guard let icns = NSImage(contentsOf: resources.appendingPathComponent("AppIcon.icns")) else { return check(false, "AppIcon.icns does not load") }
     let flat = render(icns, 1024)
     save(flat, "AppIcon.icns.png")
-    // 100 px of transparent margin, the body opaque from there; the drawing's ground is a dark blue-grey.
+    // 100 px of transparent margin, the body opaque from there; the drawing's blue tile fills the top left up to the edge.
     for (x, y) in [(0.01, 0.01), (0.5, 0.05), (0.05, 0.5), (0.95, 0.5), (0.11, 0.11)] { check(pixel(flat, x, y).alphaComponent < 0.05, "AppIcon.icns must be transparent at \(x), \(y)") }
     for (x, y) in [(0.5, 0.11), (0.11, 0.5), (0.89, 0.5), (0.5, 0.88)] { check(pixel(flat, x, y).alphaComponent > 0.98, "AppIcon.icns must be opaque at \(x), \(y)") }
-    let ground = pixel(flat, 0.5, 0.14)
-    check(ground.blueComponent - ground.redComponent > 0.05 && ground.brightnessComponent < 0.5, "AppIcon.icns must show the drawing's ground near its top edge: \(ground)")
+    let ground = pixel(flat, 0.25, 0.14)
+    check(ground.blueComponent - ground.redComponent > 0.05, "AppIcon.icns must show the drawing's blue tile near its top edge: \(ground)")
     let system = render(NSWorkspace.shared.icon(forFile: bundle.bundlePath), 512)
     save(system, "system.png")
     if ProcessInfo.processInfo.isOperatingSystemAtLeast(OperatingSystemVersion(majorVersion: 26, minorVersion: 0, patchVersion: 0)) {
         check(pixel(system, 0.01, 0.01).alphaComponent < 0.05, "The system icon must have transparent corners")
         // On a grey plate the drawing sits shrunk in the middle and this point, just inside the rounded edge, is neutral grey.
-        let edge = pixel(system, 0.5, 0.14)
+        let edge = pixel(system, 0.25, 0.14)
         check(edge.alphaComponent > 0.9 && edge.blueComponent - edge.redComponent > 0.05, "The system icon must show the drawing up to its edge, not a grey plate: \(edge)")
     }
     print("PASS: app icon in Assets.car (CFBundleIconName) and AppIcon.icns on the macOS grid")
