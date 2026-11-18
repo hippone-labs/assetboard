@@ -2784,3 +2784,29 @@ button.pj-fig:hover{background:var(--hover)}
  :root #sidebar,:root body.sidebar-rail #sidebar{padding-right:0}
  html.native-app #sidebar{--sb-start:var(--shell-radius);--sb-end:var(--shell-radius)}
 }
+
+/* 正在做 (sessions-view.js): the AI coding sessions on this Mac, under the overview. The figure on the left is set like the
+   overview's; each tool's sessions follow as lines. Neutral: a busy session has a solid dot, an idle one is grey. */
+.doing{display:grid;grid-template-columns:minmax(120px,max-content) minmax(0,1fr);gap:4px 28px;align-items:start;margin:0 -4px 6px;padding:12px 4px 14px;box-shadow:0 1px 0 var(--hairline)}
+.doing-main{display:flex;flex-direction:column;align-items:flex-start;min-width:0}
+.doing-tools,.doing-sessions{margin:0;padding:0;list-style:none}
+.doing-tools{display:grid;grid-template-columns:max-content minmax(0,1fr);max-width:640px;gap:8px 20px;min-width:0;padding-top:2px;font-size:13px;line-height:20px}
+.doing-tool{display:grid;grid-template-columns:subgrid;grid-column:1/-1;align-items:start}
+.doing-name{display:flex;align-items:baseline;gap:8px;min-width:0;white-space:nowrap}
+.doing-name b{font-weight:600;color:var(--ink)}
+.doing-n{font-size:12px;color:var(--muted);font-family:var(--num)}
+.doing-sessions{display:flex;flex-direction:column;gap:2px;min-width:0}
+.doing-session{display:flex;align-items:center;gap:8px;min-width:0;color:var(--ink)}
+.doing-dot{flex:none;width:6px;height:6px;border-radius:50%;background:rgba(var(--tone-ink),.72)}
+.doing-session.idle .doing-dot{background:none;box-shadow:inset 0 0 0 1.25px var(--muted)}
+.doing-session.running .doing-dot{background:rgba(var(--tone-ink),.34)}
+.doing-where{display:flex;align-items:baseline;gap:8px;min-width:0;flex:0 1 auto}
+.doing-repo{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.doing-branch{min-width:0;font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.doing-time{display:flex;align-items:baseline;gap:6px;flex:none;margin-left:auto;font-size:12px;color:var(--muted);font-family:var(--num);white-space:nowrap}
+.doing-session.idle,.doing-session.idle .doing-repo{color:var(--muted)}
+.doing-session.idle .doing-repo{font-weight:400}
+#board[data-size=s] .doing{grid-template-columns:minmax(0,1fr)}
+#board[data-size=s] .doing-tools{grid-template-columns:minmax(0,1fr);gap:8px}
+#board[data-size=s] .doing-tool{grid-template-columns:minmax(0,1fr);gap:2px}
+:root[data-skin=magnet] body.wall-shown #board .doing{margin:6px 0;padding:10px 16px 12px;border-radius:14px;background:var(--mag-fill);box-shadow:0 1px 0 var(--mag-edge),0 2px 0 var(--mag-edge),var(--mag-shadow)}
