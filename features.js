@@ -15,8 +15,9 @@ const FEATURES={
  // 待合并的 PR (pulls-view.js): free and on until switched; it reads with the GitHub login the person already has (gh or the saved token).
  pulls:{name:tr('待合并的 PR'),note:tr('用本机 gh 或已保存的令牌读 GitHub 仓库打开的 PR：App 打开时、每 15 分钟和同步 GitHub 后各读一次。只读，结果只存在这台 Mac'),on:true,mac:true},
  // 正在做 (coding-sessions.js, sessions-view.js): free and on until switched. It reads which AI coding tools run on this Mac, never
- // what is said in them. Not 外部工具接入 below (what tools do to the board) and not AI 额度与用量 above (plan limits and usage).
- codingSessions:{name:tr('正在做'),note:tr('本机正在运行的 AI 编码会话（Claude Code、Codex、Cursor 等）：全部资产顶上显示有几个、各在哪个仓库和分支、运行了多久。只读进程名、工作目录、启动时间和会话文件的修改时间；不读对话内容和命令行参数，不联网，读数只在内存里，不交给 AI 工具'),on:true,mac:true},
+ // what is said in them. The current board does not draw them; later views (the object panorama) read codingData(). Not 外部工具接入
+ // below (what tools do to the board) and not AI 额度与用量 above (plan limits and usage).
+ codingSessions:{name:tr('正在做'),note:tr('本机正在运行的 AI 编码会话（Claude Code、Codex、Cursor 等）：有几个、各在哪个仓库和分支、运行了多久。只读进程名、工作目录、启动时间和会话文件的修改时间；不读对话内容和命令行参数，不联网，读数只在内存里，不交给 AI 工具。设置里可关'),on:true,mac:true},
  agent:{name:tr('外部工具接入（MCP）'),note:tr('让 Claude、ChatGPT、Cursor 等工具或脚本通过 assetboard-cli 查询和修改资产；关掉后它们的调用一律被拒绝'),on:true,mac:true},
  // Under 外部工具接入, shown while it is on. Off until switched, in a demo too: they decide what leaves the Mac.
  agentAddresses:{name:tr('把地址和联系方式交给 AI 工具'),note:tr('关着时，AI 工具读到的 IP、SSH 主机和用户、手机号和邮箱都是遮住的；搜索仍按真实值匹配'),on:false,mac:true,under:'agent'},

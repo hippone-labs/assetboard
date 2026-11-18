@@ -507,8 +507,7 @@ function boardHtml(v){
   return {html:list.length?band+groupHtml({id:v,title:cats[v].name,list,reorder:true,head:false}):viewEmpty(`<span class="g-icon">${icon(v)}</span>`,tr('还没有{name}',{name:esc(cats[v].name)}),`<button class="button" data-action="add-asset" data-id="${v}">${ui('plus')}${tr('添加')}</button>`),count:list.length};
  }
  const html=shownLayout(v)==='wall'?live.length?wallBoardHtml(live):'':categoryIds().map(id=>{const list=arranged(id,live.filter(a=>a.type===id));if(!list.length)return '';const folded=!!state.blocks.find(b=>b.id===id)?.folded;return groupHtml({id,title:cats[id].name,glyph:typeGlyph(id),list,fold:true,folded,reorder:true,summary:groupSummary(list)+groupCostHtml(list),actions:categoryActions(id),note:groupNote(id,list)});}).join('');
- // 正在做 (sessions-view.js): the AI coding sessions running on this Mac, under the overview.
- return {html:html?overviewHtml(live)+(typeof codingHtml==='function'?codingHtml():'')+html:viewEmpty(ui('stack'),tr('没有显示中的资产')),count:live.length};
+ return {html:html?overviewHtml(live)+html:viewEmpty(ui('stack'),tr('没有显示中的资产')),count:live.length};
 }
 let layoutFrame=0,renderedKey='',skipLayoutAnimation=false;
 function render(){
