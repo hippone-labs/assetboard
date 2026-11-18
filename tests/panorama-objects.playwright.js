@@ -69,6 +69,8 @@ async (page) => {
   ].map(a=>({...base,links:[],...a}));
   save=()=>{};state={blocks:[],assets,cardOrder:{}};render();
  });
+ // No reading of 正在做: the demo's made-up one is gone, and a page that has coding-sessions.js reads nothing.
+ const noWork=p=>p.evaluate(()=>{window.assetboardDemoWork=null;if(typeof codingData==='function')window.codingData=()=>[];});
  try{
   // ---- The switch: cards until chosen, objects after, remembered on this device --------------------------------------------------
   const p=await open();
@@ -147,7 +149,7 @@ async (page) => {
   check(mac.form==='laptop'&&mac.n==='4'&&mac.head==='正在做 · 4 个会话'&&mac.lines.join('|')==='Claude Code · 2 个会话 · atlas-ui · 38 分钟|Codex · 1 个会话 · pixel-kit · 12 分钟|Cursor · 1 个会话 · 260 分钟','The Mac\'s screen lists the demo\'s sessions by tool: '+JSON.stringify(mac));
   check(mac.role==='group'&&/^本机，正在做 · 4 个会话，Claude Code/.test(mac.label)&&!mac.button&&!mac.nav,'The Mac is a labelled group, not an asset: nothing to open: '+mac.label);
   check(await p.evaluate(()=>!/\/Users\/|\/home\//.test(document.querySelector('[data-mac]').innerText)),'No path is shown on the screen');
-  await p.evaluate(()=>{window.assetboardDemoWork=null;panoramaRender();});
+  await noWork(p);await p.evaluate(()=>panoramaRender());
   const idle=await p.evaluate(()=>{const m=document.querySelector('[data-mac]');return {n:m.dataset.sessions,cls:m.className,text:m.querySelector('.po-screen').innerText.replace(/\s+/g,' ').trim(),label:m.getAttribute('aria-label'),h:m.offsetHeight,tone:m.querySelectorAll('.red,.amber,.po-stamp').length};});
   check(idle.n==='0'&&/no-work/.test(idle.cls)&&idle.text==='本机 正在做 现在没有会话'&&idle.label==='本机，正在做，现在没有会话'&&!idle.tone&&idle.h>150,'Without a reading the screen keeps its place and says so quietly, with no fault colour: '+JSON.stringify(idle));
   cr=await contrast(p,'light empty screen');check(!cr.found.length,'The empty screen keeps its contrast:\n'+cr.found.join('\n'));
@@ -248,7 +250,7 @@ async (page) => {
   const night=await d.evaluate(()=>{const w=document.querySelector('.po-window');return {scheme:document.documentElement.dataset.scheme,sun:getComputedStyle(w.querySelector('.sun')).display,moon:getComputedStyle(w.querySelector('.moon')).display,painted:document.querySelector('#panorama').dataset.style,sky:getComputedStyle(w.querySelector('.sky')).fill};});
   check(night.scheme==='dark'&&night.painted==='objects'&&night.sun==='none'&&night.moon!=='none','By night (dark) the window shows the moon: '+JSON.stringify(night));
   cr=await contrast(d,'dark demo');check(cr.checked>100&&!cr.found.length,`Dark: text keeps its contrast (${cr.checked} checked):\n`+cr.found.join('\n'));
-  await d.evaluate(()=>{window.assetboardDemoWork=null;});await fullBoard(d);await d.waitForTimeout(200);
+  await noWork(d);await fullBoard(d);await d.waitForTimeout(200);
   cr=await contrast(d,'dark full');check(!cr.found.length,`Dark, every category and the empty screen: contrast (${cr.checked} checked):\n`+cr.found.join('\n'));
   lay=await layout(d);check(!lay.out.length&&!lay.over.length,'Dark: nothing overlaps: '+JSON.stringify(lay));
   // The dark fridge door is night as well: the drawing follows the board's light or dark, whatever sets it.
@@ -259,12 +261,15 @@ async (page) => {
   cr=await contrast(e,'dark door');check(!cr.found.length,'On the dark door:\n'+cr.found.join('\n'));
 
   // ---- A new reading from coding-sessions.js redraws the screen and only the screen ----------------------------------------------
+  // Stood in for here on a page without the module (with it, the demo board's reading never changes).
+  if(!await p.evaluate(()=>typeof parseCodingAnswer==='function')){
   const f=await open({init:()=>{window.__readings=[];window.codingData=()=>window.__readings;window.assetboardCodingSessions=reading=>{window.__readings=[reading];};}});
   await f.keyboard.press('p');await f.waitForTimeout(250);await f.click('.pano-style [data-style="objects"]');await f.waitForTimeout(250);
   check(await f.evaluate(()=>document.querySelector('[data-mac]').dataset.sessions)==='0','The module is on the page and has read nothing yet: the empty state, not the demo\'s reading');
   await f.evaluate(()=>{document.querySelector('[data-chip="demo-s1"]').dataset.kept='1';const at=m=>new Date(Date.now()-m*60000-5000).toISOString();window.assetboardCodingSessions({host:{id:'local',kind:'local',name:''},at:at(0),sessions:[{tool:'claude',pid:1,repo:'atlas-ui',branch:'main',detached:false,path:'~/projects/atlas-ui',startedAt:at(4),activeAt:at(0),tracked:true}]});});
   const pushed=await f.evaluate(()=>({head:document.querySelector('[data-mac] .po-work').textContent,line:document.querySelector('[data-mac] .po-work-l').textContent,kept:document.querySelector('[data-chip="demo-s1"]').dataset.kept,stored:window.__readings.length}));
   check(pushed.head==='正在做 · 1 个会话'&&pushed.line==='Claude Code · 1 个会话 · atlas-ui · 4 分钟'&&pushed.kept==='1'&&pushed.stored===1,'A reading handed to assetboardCodingSessions reaches the module and the screen, and the rest of the scene is left alone: '+JSON.stringify(pushed));
+  }
 
   // ---- English -------------------------------------------------------------------------------------------------------------------
   const en=await open({query:'?demo&lang=en'});
