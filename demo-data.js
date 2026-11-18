@@ -177,6 +177,14 @@ window.assetboardDemoAgentClients=function(){
  const at=minutes=>new Date(Date.now()-minutes*60000).toISOString();
  return [{id:'claude-code',name:'Claude Code',first:at(9000),last:at(4),calls:46,by:'clientInfo',version:'2.1.4'},{id:'codex',name:'Codex',first:at(4000),last:at(38),calls:12,by:'clientInfo',version:'0.58.0'},{id:'grok',name:'Grok',first:at(95),last:at(95),calls:1,by:'process'},{id:'unknown',name:'未知客户端',first:at(130),last:at(130),calls:1,by:'none'}];
 };
+// 正在做 on the Mac in the object panorama (panorama-objects-view.js objWorkReadings): one reading of this machine in
+// coding-sessions.js's shape. Two Claude Code sessions (one busy in atlas-ui, one idle in notes-api), a Codex session in pixel-kit,
+// and Cursor open. Made up; no process is looked at.
+window.assetboardDemoWork=function(){
+ const at=minutes=>new Date(Date.now()-minutes*60000-20000).toISOString();
+ const session=(tool,pid,repo,branch,started,active)=>({tool,pid,repo,branch,detached:false,path:repo?'~/projects/'+repo:'',startedAt:at(started),activeAt:active==null?'':at(active),tracked:active!=null});
+ return {host:{id:'local',kind:'local',name:''},at:new Date().toISOString(),sessions:[session('claude',4101,'atlas-ui','feat/column-widths',38,.5),session('claude',4201,'notes-api','fix/token-refresh',135,47),session('codex',4301,'pixel-kit','main',12,1),session('cursor',5001,'','',260,null)]};
+};
 // 待合并的 PR (pulls-view.js) as the Mac app passes GitHub's answer on: one ready and one draft on atlas-ui, a failing check next to
 // a ready one on notes-api, a ready one nobody has touched for days on pixel-kit, a conflict on studio-site, and a repository
 // this login cannot see. The links are never opened from the demo.

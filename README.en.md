@@ -59,7 +59,7 @@ The sidebar holds Upcoming, All assets, Panorama, the categories, projects and H
 | Timeline: expiries and charges over 12 months from this month ![Timeline](screenshots/timeline-en.webp) | Panorama: one card per server with the assets on it ![Panorama](screenshots/panorama-en.webp) |
 | Live status (Pro, off by default): a server's memory, traffic and load ![Live status](screenshots/live-en.webp) | A free tier's sleep rule and keep-alive settings ![Sleep rule](screenshots/sleep-en.webp) |
 
-The panorama has four lenses: where it runs, who pays, which login, by project. Drag an asset between cards or press `L` to change a link.
+The panorama has four lenses: where it runs, who pays, which login, by project. Drag an asset between cards or press `L` to change a link. Its Drawing switch can show objects instead: servers as chassis, domains as plates hung under their registrar, subscriptions as tickets, bank cards with only their last digits; a window too small for them goes back to cards ([how it is drawn](OBJECT-PANORAMA.md), in Chinese).
 
 ## Themes
 
