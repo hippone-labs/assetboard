@@ -193,3 +193,19 @@ window.assetboardDemoPulls=function(){
   ['acme-labs/plain-auth',{error:'denied'}]
  ])};
 };
+// 正在做 (sessions-view.js) as the Mac app passes the facts on: two Claude Code sessions (one busy in atlas-ui, one idle in a linked
+// worktree of notes-api), a Codex session in pixel-kit, and Cursor open. Made up; no process is looked at in the demo.
+window.assetboardDemoCodingSessions=function(){
+ const now=Date.now()/1000,ago=minutes=>Math.round(now-minutes*60-20),home='/Users/demo',at=name=>`${home}/projects/${name}`;
+ return {ok:true,at:new Date().toISOString(),home,
+  processes:[{pid:1,ppid:0},{pid:400,ppid:1},{pid:410,ppid:400},{pid:420,ppid:400},{pid:430,ppid:400},{pid:500,ppid:1},
+   {pid:4101,ppid:410,name:'2.1.40',path:`${home}/.local/share/claude/versions/2.1.40`,cwd:at('atlas-ui'),start:ago(38)},
+   {pid:4201,ppid:420,name:'2.1.40',path:`${home}/.local/share/claude/versions/2.1.40`,cwd:at('notes-api-refresh'),start:ago(135)},
+   {pid:4301,ppid:430,name:'codex',path:'/opt/homebrew/bin/codex',cwd:at('pixel-kit'),start:ago(12)},
+   {pid:5001,ppid:500,name:'Cursor',path:'/Applications/Cursor.app/Contents/MacOS/Cursor',cwd:'/',start:ago(260)}],
+  repos:{[at('atlas-ui')]:{root:at('atlas-ui'),gitdir:at('atlas-ui')+'/.git',head:'ref: refs/heads/feat/column-widths'},
+   [at('notes-api-refresh')]:{root:at('notes-api-refresh'),gitdir:at('notes-api')+'/.git/worktrees/notes-api-refresh',head:'ref: refs/heads/fix/token-refresh'},
+   [at('pixel-kit')]:{root:at('pixel-kit'),gitdir:at('pixel-kit')+'/.git',head:'ref: refs/heads/main'}},
+  files:{claude:[{dir:'-Users-demo-projects-atlas-ui',mtime:ago(0.5),birth:ago(38)},{dir:'-Users-demo-projects-notes-api-refresh',mtime:ago(47),birth:ago(134)}],
+   codex:[{dir:'18',mtime:ago(1),birth:ago(12)}]}};
+};

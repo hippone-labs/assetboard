@@ -132,6 +132,7 @@ Scripts can put JSON in this format into `~/Library/Application Support/Assetboa
 - Network log: lists every request the app makes.
 - An MCP server and the `assetboard-cli` command line for Claude Code, Codex, Cursor and other tools to read and write assets. Every external call goes into a local MCP activity log (which client, when, which tool, what changed), shown in Settings › MCP.
 - AI usage and limits: plan limits and usage of Claude Code, Codex, Cursor, GitHub Copilot, Grok CLI, opencode and Antigravity, read from their local files and shown on the matching AI subscription: close to the limit, idle, worth its price at API rates or not. Only numbers, model names and times are read.
+- In progress (Mac): the AI coding sessions running on this Mac (Claude Code, Codex, Cursor and others): how many, in which repository and branch, and for how long. Reads only process names, working directories, start times and when session files were last written, never conversations.
 - Repositories (Mac, off by default): a GitHub sync also reads branches and the latest Actions run; a failed or running run leads the row, and new branches show for 14 days.
 - Keyboard control; `?` lists the shortcuts.
 - Accent themes, two tile-wall skins (Quiet; Fridge magnets, with four fridge doors whose colours the whole window takes, and panels you place anywhere) and three densities; light and dark follow the system.

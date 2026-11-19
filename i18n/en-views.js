@@ -450,6 +450,9 @@ Object.assign(I18N.en,{
  '订阅已结束':'Subscription ended',
  '实时读数，只在内存里，不进资产数据、备份和导出':'Live reading, kept in memory only, never in the board, backups or exports',
  '读数':'Reading',
+ // 正在做 (sessions-view.js, features.js)
+ '正在做':'In progress',
+ '本机正在运行的 AI 编码会话（Claude Code、Codex、Cursor 等）：有几个、各在哪个仓库和分支、运行了多久。只读进程名、工作目录、启动时间和会话文件的修改时间；不读对话内容和命令行参数，不联网，读数只在内存里，不交给 AI 工具。设置里可关':'The AI coding sessions running on this Mac (Claude Code, Codex, Cursor and others): how many, in which repository and branch, and for how long. Reads only process names, working directories, start times and when session files were last written; never conversations or command-line arguments, nothing goes online, readings stay in memory and are not given to AI tools. Can be switched off in Settings',
  // 待合并的 PR (pulls-view.js, features.js)
  '待合并的 PR':'Pull requests to merge',
  '用本机 gh 或已保存的令牌读 GitHub 仓库打开的 PR：App 打开时、每 15 分钟和同步 GitHub 后各读一次。只读，结果只存在这台 Mac':'Reads the open pull requests of your GitHub repositories with the local gh or the saved token: when the app opens, every 15 minutes and after a GitHub sync. Read-only; the results stay on this Mac',
