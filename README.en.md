@@ -4,41 +4,67 @@
 
 # Assetboard
 
-A macOS app that records the expiry dates, costs and relations of digital assets such as domains, servers, repositories and subscriptions.
+Reminds you before domains, subscriptions and servers expire. Import with a token, then leave the app closed.
 
 [![build](https://github.com/hippone-labs/assetboard/actions/workflows/build.yml/badge.svg)](https://github.com/hippone-labs/assetboard/actions/workflows/build.yml)
 [![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
 [![macOS 15+](https://img.shields.io/badge/macOS-15%2B%20arm64-lightgrey)](https://assetboard.app/)
-[![Version](https://img.shields.io/badge/version-2026.11.8-lightgrey)](https://assetboard.app/)
+[![Version](https://img.shields.io/github/v/release/hippone-labs/assetboard?label=version&color=lightgrey)](https://github.com/hippone-labs/assetboard/releases/latest)
 
 [Website](https://assetboard.app/) · [User guide (Chinese)](GUIDE.md) · [简体中文](README.md) · [Issues](https://github.com/hippone-labs/assetboard/issues/new/choose)
 
 </div>
 
-![The All assets view: due this month, expiring within 30 days, needs attention, yearly total and live status on top, a tile wall below with one panel per category (domains, servers with live readings, repositories with their Actions state, subscriptions, AI plans with their usage, databases, bank cards), and one domain's details at the right](screenshots/board-en.webp)
+![Upcoming: charges to confirm, an overdue domain, and subscriptions due or charging within 7 and 30 days](screenshots/upcoming-en.webp)
 
 <sub>Screenshots are from demo mode; the data is fictional.</sub>
 
+Download the `.dmg` from [assetboard.app](https://assetboard.app/). Requires macOS 15 or later on Apple Silicon. Data stays on the Mac; there is no account. The interface is in English by default and can be switched to Simplified Chinese in Settings.
+
 ## Contents
 
-- [Overview](#overview)
+- [Get started](#get-started)
+- [What it reminds you of](#what-it-reminds-you-of)
+- [Data and network](#data-and-network)
 - [What it records](#what-it-records)
 - [Interface](#interface)
 - [Themes](#themes)
 - [Data sources](#data-sources)
 - [Other features](#other-features)
 - [Free and Pro](#free-and-pro)
-- [Data and network](#data-and-network)
 - [Install](#install)
 - [Build from source](#build-from-source)
 - [Contributing](#contributing)
 - [License](#license)
 
-## Overview
+## Get started
 
-Assetboard is a local app. Each asset has a date (expiry, auto-renew charge, trial end or cancel-by, optionally repeating monthly or yearly), a cost, a provider, an account and a management link, and assets can be linked to each other. From those dates the app lists what is due and sends system notifications; from the costs it computes totals.
+1. Download from the site and drag Assetboard into Applications.
+2. Import records that come with an expiry date. In the Mac app, paste a domain or a URL; it looks up the expiry date and registrar at the registry and fills the empty fields. Some TLDs have no such lookup (for example cn, io and de), so you fill those dates in yourself. You can also import with a read-only Cloudflare token: expiry dates come only for domains registered at Cloudflare, and only if the token can read Registrar data; a Zone that is just DNS will not have a date. New finds are listed first; they are written only after you tick them.
+3. Once a record has a date, the app asks for notification permission. Allow it. You don't have to keep the window open; a notification appears at 9:00 on the morning of each reminder.
 
-Data is kept in a SQLite file on the Mac; there is no account. The interface is one set of HTML/CSS/JS pages that the Mac app loads in a WKWebView; the same pages also run in a browser with fewer features. The interface is in English (the default) and Simplified Chinese, switched in Settings.
+GitHub and `~/.ssh/config` can import repositories or servers, but they don't bring expiry dates, so they won't produce reminders. Subscriptions are added by hand, or imported from a table, an email or a screenshot. The browser version has no system notifications and does not query the registry.
+
+## What it reminds you of
+
+Reminders only cover dates already stored on an asset:
+
+- Expiry and charges: 30, 7 and 1 days ahead
+- Monthly charges, trial ends and cancel-by dates: 3 and 1 days ahead
+- A one-off expiry or a number kept alive: on the day, then again on the 3rd and 14th day after
+- An auto-renewal whose expiry has passed: a reminder the next day, and it stays under "renewals to confirm" until you mark it renewed or not
+
+Notifications go out at 9:00 that morning; a date added after 9:00 will not get that day's reminder. Clicking a notification opens Upcoming. The menu bar (optional) shows how many fall in the next 7 days. A record with no date is not scheduled. Certificate expiry, traffic caps and usage quotas do not send notifications yet.
+
+## Data and network
+
+- Data is in `~/Library/Application Support/Assetboard/`: `assetboard.sqlite`, with a JSON mirror `board.json`. No cloud sync or telemetry.
+- Tokens and API keys are stored in the macOS Keychain.
+- Hosts the app contacts on its own: update checks (assetboard.app), site icons of known providers, exchange rates (api.frankfurter.dev), and Cloudflare once connected. Other connections (RDAP, AI, the AI tools' quota endpoints, live status, GitHub, Namecheap, Porkbun, Hetzner, DigitalOcean, Vercel) happen only after you turn them on or click.
+- The page itself is barred from the network by its Content-Security-Policy; every request goes through the Swift side and is recorded in the network log.
+- Data given to external AI tools has IPs, hosts, phone numbers and emails masked by default and leaves out bank card and phone records.
+
+The full host list is in the [user guide](GUIDE.md#隐私与网络) (Chinese).
 
 ## What it records
 
@@ -55,7 +81,7 @@ The sidebar holds Upcoming, All assets, Panorama, the categories, projects and H
 
 | | |
 | --- | --- |
-| Upcoming: grouped into overdue, within 7 days, within 30 days and later ![Upcoming](screenshots/upcoming-en.webp) | Cost: monthly and yearly totals by category, in a chosen currency ![Cost panel](screenshots/cost-en.webp) |
+| All assets: a tile wall grouped by category, with one record's details at the right ![All assets](screenshots/board-en.webp) | Cost: monthly and yearly totals by category, in a chosen currency ![Cost panel](screenshots/cost-en.webp) |
 | Timeline: expiries and charges over 12 months from this month ![Timeline](screenshots/timeline-en.webp) | Panorama: one card per server with the assets on it ![Panorama](screenshots/panorama-en.webp) |
 | Live status (Pro, off by default): a server's memory, traffic and load ![Live status](screenshots/live-en.webp) | A free tier's sleep rule and keep-alive settings ![Sleep rule](screenshots/sleep-en.webp) |
 
@@ -76,12 +102,15 @@ Two skins: Quiet, and Fridge magnets. Fridge magnets comes with four doors, and 
 | Source | Where |
 | --- | --- |
 | Manual: pick a category and fill in the form | App, browser |
+| Paste a domain or URL: the Mac app fills empty expiry dates and registrars from the registry (RDAP); some TLDs have no RDAP (for example cn, io and de) | App, browser (the browser does not look them up) |
 | CSV / TSV / JSON files or a pasted table, previewed before writing | App, browser |
 | `.eml` mail and pasted renewal notices, recognised by rules and confirmed one by one | App, browser |
 | Screenshots and PDF, recognised on the Mac with macOS text recognition | App |
-| Cloudflare (read-only API token): zones, Pages, Workers, R2 | App |
-| GitHub (local `gh` or a read-only token): repositories | App |
-| `~/.ssh/config`: Host, HostName, User, Port; code hosting such as github.com (or `User git`) is not taken as a server | App |
+| Cloudflare (read-only API token): zones, Pages, Workers, R2; expiry dates only for domains registered at Cloudflare when the token can read Registrar data | App |
+| GitHub (local `gh` or a read-only token): repositories, with no expiry date | App |
+| Namecheap, Porkbun: domains, expiry dates and auto-renew. Not yet verified with a real account | App |
+| Hetzner, DigitalOcean, Vercel: servers or projects; domains registered at Vercel can include an expiry date. Not yet verified with a real account | App |
+| `~/.ssh/config`: Host, HostName, User, Port; code hosting such as github.com (or `User git`) is not taken as a server. No expiry date | App |
 | An AI model you configure (Claude, OpenAI-compatible or Ollama) for screenshots, mail and text | App |
 
 Scripts can put JSON in this format into `~/Library/Application Support/Assetboard/Inbox/` or drop it on the window; each file is confirmed in the import preview. Write it under a temporary name, then rename it to `.json`; at most 100 items and 1 MB; other fields are ignored:
@@ -96,10 +125,8 @@ Scripts can put JSON in this format into `~/Library/Application Support/Assetboa
 
 ## Other features
 
-- System notifications: 30, 7 and 1 days before an expiry; 3 and 1 days before a monthly charge, trial end or cancel-by date.
-- An auto-renewal on its charge day waits in Upcoming until you confirm whether it was charged.
 - Renewal records, payment records and price changes.
-- RDAP checks of a domain's expiry date and status at the registry; pasting a domain, a web address or a list of domains makes the records and fills their expiry dates and registrars from the registry.
+- RDAP checks of a domain's expiry date and status at the registry.
 - Exports: JSON backup (can be imported again), calendar .ics, payment ledger .csv, handover list .html.
 - Privacy mode: masks names, accounts and IPs.
 - Network log: lists every request the app makes.
@@ -123,16 +150,6 @@ The app and the read-only MCP are free and open source, with no time or record l
 | Links, panorama, AI usage, privacy mode, network log, backups and exports | |
 
 Getting Pro: download the official build from [assetboard.app](https://assetboard.app/). Pro is already inside and on, with no sign-up and no license to enter; Settings › Assetboard Pro shows its state. This repository is the whole code of the free part; what you build from it is the complete free edition, without the Pro plugin. See the [user guide](GUIDE.md#assetboard-pro) (Chinese).
-
-## Data and network
-
-- Data is in `~/Library/Application Support/Assetboard/`: `assetboard.sqlite`, with a JSON mirror `board.json`. No cloud sync or telemetry.
-- Tokens and API keys are stored in the macOS Keychain.
-- Hosts the app contacts on its own: update checks (assetboard.app), site icons of known providers, exchange rates (api.frankfurter.dev), and Cloudflare once connected. Other connections (RDAP, AI, the AI tools' quota endpoints, live status, GitHub, Namecheap, Porkbun, Hetzner, DigitalOcean, Vercel) happen only after you turn them on or click.
-- The page itself is barred from the network by its Content-Security-Policy; every request goes through the Swift side and is recorded in the network log.
-- Data given to external AI tools has IPs, hosts, phone numbers and emails masked by default and leaves out bank card and phone records.
-
-The full host list is in the [user guide](GUIDE.md#隐私与网络) (Chinese).
 
 ## Install
 
