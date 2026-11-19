@@ -4,41 +4,67 @@
 
 # Assetboard
 
-记录域名、服务器、代码仓库、订阅等数字资产的到期日、费用和相互关系的 macOS App。
+到期前提醒你：域名、订阅、服务器。装上用令牌导入，平时不用打开。
 
 [![build](https://github.com/hippone-labs/assetboard/actions/workflows/build.yml/badge.svg)](https://github.com/hippone-labs/assetboard/actions/workflows/build.yml)
 [![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
 [![macOS 15+](https://img.shields.io/badge/macOS-15%2B%20arm64-lightgrey)](https://assetboard.app/zh/)
-[![Version](https://img.shields.io/badge/version-2026.11.8-lightgrey)](https://assetboard.app/zh/)
+[![Version](https://img.shields.io/github/v/release/hippone-labs/assetboard?label=version&color=lightgrey)](https://github.com/hippone-labs/assetboard/releases/latest)
 
 [官网](https://assetboard.app/zh/) · [使用手册](GUIDE.md) · [English](README.en.md) · [问题反馈](https://github.com/hippone-labs/assetboard/issues/new/choose)
 
 </div>
 
-![全部资产视图：上方是本月待付、30 天内到期、需要处理、每年合计和实时状态，下面是磁贴墙，每个类别一块面板（域名、带实时读数的服务器、带 Actions 状态的代码仓库、订阅、带用量的 AI 订阅、数据库、银行卡），右边是一条域名记录的详情](screenshots/board-zh.webp)
+![即将到来：待确认的扣款、已过期的域名，以及 7 天内和 30 天内要到期或扣款的订阅](screenshots/upcoming-zh.webp)
 
 <sub>截图来自演示模式，数据是虚构的。</sub>
 
+从 [assetboard.app](https://assetboard.app/zh/) 下载 `.dmg`，需要 macOS 15 或更高、Apple 芯片。数据只留本机，不需要账号。界面默认英文，可在「设置」里换成简体中文。
+
 ## 目录
 
-- [概述](#概述)
+- [三步上手](#三步上手)
+- [会提醒什么](#会提醒什么)
+- [数据与网络](#数据与网络)
 - [记录什么](#记录什么)
 - [界面](#界面)
 - [主题](#主题)
 - [数据来源](#数据来源)
 - [其他功能](#其他功能)
 - [免费版与 Pro](#免费版与-pro)
-- [数据与网络](#数据与网络)
 - [安装](#安装)
 - [从源码构建](#从源码构建)
 - [参与](#参与)
 - [许可证](#许可证)
 
-## 概述
+## 三步上手
 
-Assetboard 是一个本地 App：每条资产记下一个日期（到期、自动续费扣款、试用结束或取消截止，可以按月或按年重复）、费用、平台、账号和管理链接，资产之间可以建立关联。App 按这些日期排出待办、发系统通知，按费用算出合计。
+1. 从官网下载，把 Assetboard 拖进「应用程序」。
+2. 导入带到期日的记录。在 Mac App 里粘贴域名或网址，会向注册局查询，把到期日和注册商填进空着的栏。一部分后缀没有开放查询（比如 cn、io、de），这时要自己填。也可以用只读令牌从 Cloudflare 导入：只有在 Cloudflare 注册的域名、并且令牌带 Registrar 读权限，才会带上到期日；只做 DNS 托管的 Zone 不会。新找到的会先列出来，勾选后再写入。
+3. 有到期日之后，App 才会申请系统通知。允许即可。之后窗口不必一直开着，到期前会在早上 9 点弹出通知。
 
-数据存在本机的 SQLite 文件里，不需要账号。界面是一套 HTML/CSS/JS，Mac App 用 WKWebView 加载它，同一套页面也能直接在浏览器里运行（功能少一些）。界面默认英文，可在「设置」里换成简体中文。
+GitHub 和 `~/.ssh/config` 也能导入仓库或服务器，但带不来到期日，不会进入提醒。订阅目前要手填，或从表格、邮件、截图里导入。浏览器版没有系统通知，也不会向注册局查询。
+
+## 会提醒什么
+
+提醒只针对已经记在资产上的日期：
+
+- 到期和扣款：提前 30、7、1 天
+- 按月扣款、试用结束、取消截止：提前 3、1 天
+- 一次性到期和保号：当天、过期第 3 天和第 14 天再提醒一次
+- 开了自动续费且到期日已经过了：第二天提醒，并留在「待确认续费」里，直到你点「已续上」或「没续上」
+
+通知在当天早上 9 点发出；9 点以后才加上的日期，当天那一条不会补发。点通知会打开「即将到来」。菜单栏（可关）显示 7 天内的数量。没有日期的记录不会排提醒。证书到期、流量超标、额度用尽目前也不会发通知。
+
+## 数据与网络
+
+- 数据在 `~/Library/Application Support/Assetboard/`：`assetboard.sqlite`，另有 JSON 镜像 `board.json`。没有云同步和遥测。
+- 令牌和 API key 存在 macOS 钥匙串。
+- App 自己会连的主机：检查更新（assetboard.app）、已知平台的网站图标、汇率（api.frankfurter.dev）、连上之后的 Cloudflare。其余连接（RDAP、AI、AI 工具的额度接口、实时状态、GitHub、Namecheap、Porkbun、Hetzner、DigitalOcean、Vercel）在你打开或点击之后才发生。
+- 网页本身由 Content-Security-Policy 禁止联网，所有请求经过 Swift 一侧，记在网络记录里。
+- 交给外部 AI 工具的数据默认遮住 IP、主机、手机号和邮箱，不含银行卡和手机号两类记录。
+
+完整的主机列表见[使用手册 · 隐私与网络](GUIDE.md#隐私与网络)。
 
 ## 记录什么
 
@@ -55,7 +81,7 @@ Assetboard 是一个本地 App：每条资产记下一个日期（到期、自�
 
 | | |
 | --- | --- |
-| 即将到来：按已过期、7 天内、30 天内、更晚分组 ![即将到来](screenshots/upcoming-zh.webp) | 费用：每月和每年合计，按类别拆分，可换计价币种 ![费用面板](screenshots/cost-zh.webp) |
+| 全部资产：按类别分块的磁贴墙，右边是一条记录的详情 ![全部资产](screenshots/board-zh.webp) | 费用：每月和每年合计，按类别拆分，可换计价币种 ![费用面板](screenshots/cost-zh.webp) |
 | 时间线：从本月起 12 个月的到期和扣款 ![时间线](screenshots/timeline-zh.webp) | 全景：每台服务器一张卡，列出挂在上面的资产 ![全景](screenshots/panorama-zh.webp) |
 | 实时状态（Pro，默认关闭）：服务器的内存、流量和负载 ![实时状态](screenshots/live-zh.webp) | 免费套餐的休眠规则和保活配置 ![休眠规则](screenshots/sleep-zh.webp) |
 
@@ -76,12 +102,15 @@ Assetboard 是一个本地 App：每条资产记下一个日期（到期、自�
 | 来源 | 平台 |
 | --- | --- |
 | 手动添加：选类别后填表 | App、浏览器 |
+| 粘贴域名或网址：Mac App 向注册局（RDAP）填写空着的到期日和注册商；部分后缀没有 RDAP（如 cn、io、de） | App、浏览器（浏览器不查询） |
 | CSV / TSV / JSON 文件或粘贴的表格，先预览再写入 | App、浏览器 |
 | `.eml` 邮件和粘贴的续费通知，按规则识别后逐条确认 | App、浏览器 |
 | 截图和 PDF，用 macOS 的文字识别在本机识别 | App |
-| Cloudflare（只读 API 令牌）：Zone、Pages、Workers、R2 | App |
-| GitHub（本机 `gh` 或只读令牌）：仓库 | App |
-| `~/.ssh/config`：Host、HostName、User、Port；github.com 这类代码托管（或 `User git`）不当作服务器 | App |
+| Cloudflare（只读 API 令牌）：Zone、Pages、Workers、R2；在 Cloudflare 注册的域名且令牌含 Registrar 读权限时带到期日 | App |
+| GitHub（本机 `gh` 或只读令牌）：仓库，无到期日 | App |
+| Namecheap、Porkbun：域名、到期日和自动续费。尚未用真实账号验证 | App |
+| Hetzner、DigitalOcean、Vercel：服务器或项目；Vercel 上注册的域名可带到期日。尚未用真实账号验证 | App |
+| `~/.ssh/config`：Host、HostName、User、Port；github.com 这类代码托管（或 `User git`）不当作服务器。无到期日 | App |
 | 自己配置的 AI 模型（Claude、OpenAI 兼容接口或 Ollama）识别截图、邮件和文字 | App |
 
 每种导入方式的细节见[使用手册 · 导入方式](GUIDE.md#导入方式)。
@@ -98,10 +127,8 @@ Assetboard 是一个本地 App：每条资产记下一个日期（到期、自�
 
 ## 其他功能
 
-- 系统通知：到期前 30、7、1 天；按月扣款、试用结束和取消截止前 3、1 天。
-- 自动续费到了扣款日，在即将到来里等你确认是否扣款。
 - 续费记录、付款记录和价格变动。
-- 通过 RDAP 核对域名在注册局的到期日和状态；粘贴一个域名、网址或一串域名就新建记录，到期日和注册商从注册局填。
+- 通过 RDAP 核对域名在注册局的到期日和状态。
 - 导出：JSON 备份（可以导回）、日历 .ics、付款账本 .csv、交接清单 .html。
 - 隐私模式：遮住名称、账号和 IP。
 - 网络记录：列出 App 发出的每个请求。
@@ -125,16 +152,6 @@ App 和只读 MCP 免费、开源，不限时间和条数。Assetboard Pro 是�
 | 关联、全景、AI 额度与用量、隐私模式、网络记录、备份和导出 | |
 
 怎么拿到 Pro：从 [assetboard.app](https://assetboard.app/) 下载官方安装包，Pro 已经内置并默认启用，不用注册，也不用输入许可证；在「设置 › Assetboard Pro」可以看到它的状态。这个仓库是免费部分的全部代码，自己编译得到的版本就是完整的免费版，不含 Pro 插件。见[使用手册 · Assetboard Pro](GUIDE.md#assetboard-pro)。
-
-## 数据与网络
-
-- 数据在 `~/Library/Application Support/Assetboard/`：`assetboard.sqlite`，另有 JSON 镜像 `board.json`。没有云同步和遥测。
-- 令牌和 API key 存在 macOS 钥匙串。
-- App 自己会连的主机：检查更新（assetboard.app）、已知平台的网站图标、汇率（api.frankfurter.dev）、连上之后的 Cloudflare。其余连接（RDAP、AI、AI 工具的额度接口、实时状态、GitHub、Namecheap、Porkbun、Hetzner、DigitalOcean、Vercel）在你打开或点击之后才发生。
-- 网页本身由 Content-Security-Policy 禁止联网，所有请求经过 Swift 一侧，记在网络记录里。
-- 交给外部 AI 工具的数据默认遮住 IP、主机、手机号和邮箱，不含银行卡和手机号两类记录。
-
-完整的主机列表见[使用手册 · 隐私与网络](GUIDE.md#隐私与网络)。
 
 ## 安装
 
