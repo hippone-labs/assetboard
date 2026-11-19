@@ -924,6 +924,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         }
     }
 
+    /// 正在做 (coding-sessions.js): the facts about the AI coding tools running on this Mac, one read at a time, off the main thread.
+    /// The answer goes to `assetboardCodingSessions` with the page's requestId and is kept nowhere on this side.
+    private var codingSessionsReading = false
+    func readCodingSessions(_ body: [String: Any]) {
+        let requestId = body["requestId"] as? Int ?? 0
+        guard !demoMode, !codingSessionsReading else { return }
+        codingSessionsReading = true
+        DispatchQueue.global(qos: .utility).async {
+            var reply = CodingSessions.read()
+            reply["requestId"] = requestId
+            DispatchQueue.main.async {
+                self.codingSessionsReading = false
+                guard let data = try? JSONSerialization.data(withJSONObject: reply), let json = String(data: data, encoding: .utf8) else { return }
+                self.webView.evaluateJavaScript("window.assetboardCodingSessions?.(\(json))")
+            }
+        }
+    }
+
     func syncGitHubWithLocalCLI(users: [String]? = nil, details: Bool = false) {
         DispatchQueue.global(qos: .userInitiated).async {
             guard let path = LocalCLI.ghPath() else {
@@ -1286,6 +1304,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         }
         if body["action"] as? String == "githubPulls" {
             readPulls(body)
+            return
+        }
+        if body["action"] as? String == "codingSessions" {
+            readCodingSessions(body)
             return
         }
         if body["action"] as? String == "githubSync" {
@@ -2568,6 +2590,8 @@ if CommandLine.arguments.contains(Updater.launchCheckFlag) {
 } else if CommandLine.arguments.contains("--test-github") {
     testGitHub()
     testGitHubPulls()
+} else if CommandLine.arguments.contains("--test-coding-sessions") {
+    testCodingSessions()
 } else if CommandLine.arguments.contains("--test-registrar") {
     testRegistrars()
 } else if CommandLine.arguments.contains("--test-cloud-import") {
