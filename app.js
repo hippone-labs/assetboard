@@ -1701,7 +1701,7 @@ const agentMethods={
   if(planned.length){
    checkpoint();
    for(const a of planned){state.assets.push(a);if(state.cardOrder?.[a.type]?.length)state.cardOrder[a.type].unshift(a.id);ensureBlock(state,a.type);}
-   for(const {index,record,linkTo} of linkPlans)for(const id of linkTo){const problem=agentLinkProblem(record,id,true)||(proOff&&agentLinkReplaces(record,id)?tr('这台服务器已经关联了别的账号；换掉它要用 Assetboard Pro 插件'):'');if(problem)warnings.push({index,link:id,error:problem});else linkRelation(state.assets,record.id,id);}
+   for(const {index,record,linkTo} of linkPlans)for(const id of linkTo){const problem=agentLinkProblem(record,id,true)||(proOff&&agentLinkReplaces(record,id)?tr('这台服务器已经关联了别的账号；换掉它只在官方安装包里能做'):'');if(problem)warnings.push({index,link:id,error:problem});else linkRelation(state.assets,record.id,id);}
    save();render();
    toast(planned.length===1?tr('外部工具添加了「{name}」',{name:planned[0].name}):tr('外部工具添加了 {n} 项',{n:planned.length}),true);
   }
@@ -2066,11 +2066,11 @@ Object.assign(agentMethods,{
 });
 // Free for every external tool, MCP and the command line alike: every reading, adding records (a name the board already has is
 // skipped, never overwritten), picking from 待引入 and a Cloudflare sync. Changing or deleting records that are there, and Pro's own
-// methods, need the Assetboard Pro plugin (free, in the official build); a build from source alone refuses them.
+// methods, are in the official build only (free); a build from source alone refuses them.
 const AGENT_PRO_METHODS=['update','updateMany','updateProject','delete','deleteMany','recordPayment','renew'];
 function agentProRefusal(call){
  if(!proOff)return '';
- if(AGENT_PRO_METHODS.includes(call?.method)||Object.hasOwn(proSlots.agentMethods,call?.method))return tr('修改和删除已有资产要用 Assetboard Pro 插件（官方版自带，免费）；这个版本可以查询和添加');
+ if(AGENT_PRO_METHODS.includes(call?.method)||Object.hasOwn(proSlots.agentMethods,call?.method))return tr('修改和删除已有资产只在官方安装包里能做（免费）；这个版本可以查询和添加');
  return '';
 }
 window.assetboardAgent=call=>{
@@ -2231,7 +2231,7 @@ function setChoice(form,name,value){
  for(const button of input.parentElement.querySelectorAll('.choice[data-choice]'))button.setAttribute('aria-checked',String(button.dataset.value===value));
  input.dispatchEvent(new Event('change',{bubbles:true}));
 }
-function markProviderPick(form){const value=form.elements.provider?.value.trim();for(const b of form.querySelectorAll('[data-provider]'))b.setAttribute('aria-pressed',String(b.dataset.provider===value));const picks=form.querySelector('#plan-picks');if(picks)picks.innerHTML=planPicks(value,{name:form.elements.name.value,cycle:form.elements.cycle?.value});}
+function markProviderPick(form){const value=form.elements.provider?.value.trim();for(const b of form.querySelectorAll('[data-provider]'))b.setAttribute('aria-pressed',String(b.dataset.provider===value));const picks=form.querySelector('#plan-picks');if(picks)picks.innerHTML=planPicks(value,{name:form.elements.name.value,cycle:form.elements.cycle?.value,channel:form.dataset.planStore||''});}
 document.addEventListener('input',e=>{if(e.target.name==='provider'&&e.target.form)markProviderPick(e.target.form);});
 // AI plans (AI_PLANS): the vendor's plans as chips under its name; one click fills name, vendor, price, cycle and link, and the
 // person only sets the next charge date. A plan also sold by the year offers 按月 / 按年 once picked.
@@ -2241,18 +2241,36 @@ const planTitle=p=>[p.name,planCost(p,'monthly'),p.yearly&&planCost(p,'yearly'),
 function planPicks(provider,v={}){
  const plans=aiPlansFor(provider);if(!plans.length)return '';
  const chosen=plans.find(p=>p.name===String(v.name||'').trim());
- return `<div class="chip-group" role="group" aria-label="${tr('常见套餐')}">${plans.map(p=>`<button type="button" class="choice plan-pick" data-plan="${esc(p.name)}" aria-pressed="${p===chosen}" title="${esc(planTitle(p))}">${esc(p.plan)}<span class="plan-price">${esc(planPrice(p,'monthly'))}</span></button>`).join('')}</div>${chosen?.yearly?`<div class="chip-group plan-cycle" role="group" aria-label="${tr('付费方式')}">${['monthly','yearly'].map(c=>`<button type="button" class="choice" data-plan-cycle="${c}" aria-pressed="${(v.cycle==='yearly'?'yearly':'monthly')===c}">${c==='yearly'?tr('按年'):tr('按月')}<span class="plan-price">${esc(planPrice(chosen,c))}</span></button>`).join('')}</div>`:''}`;
+ return `<div class="chip-group" role="group" aria-label="${tr('常见套餐')}">${plans.map(p=>`<button type="button" class="choice plan-pick" data-plan="${esc(p.name)}" aria-pressed="${p===chosen}" title="${esc(planTitle(p))}">${esc(p.plan)}<span class="plan-price">${esc(planPrice(p,'monthly'))}</span></button>`).join('')}</div>${chosen?.yearly?`<div class="chip-group plan-cycle" role="group" aria-label="${tr('付费方式')}">${['monthly','yearly'].map(c=>`<button type="button" class="choice" data-plan-cycle="${c}" aria-pressed="${(v.cycle==='yearly'?'yearly':'monthly')===c}">${c==='yearly'?tr('按年'):tr('按月')}<span class="plan-price">${esc(planPrice(chosen,c))}</span></button>`).join('')}</div>`:''}${chosen?planChannels(chosen,v.channel||''):''}`;
 }
-function applyPlan(form,plan,cycle='monthly'){
- const f=aiPlanFields(plan,cycle),el=form.elements,parts=costParts(f.cost);
+// Where the plan is bought: the vendor's site, or a store whose price differs (an app store's, a cheaper region's). A store price
+// kept in US dollars because the app has no such currency says so, with the store's own figure in the tip.
+function planChannels(plan,picked){
+ const list=aiPlanChannels(plan);if(!list.length)return '';
+ const chip=(id,name,price,tip)=>`<button type="button" class="choice" data-plan-channel="${id}" aria-pressed="${id===picked}"${tip?` title="${esc(tip)}"`:''}>${esc(name)}<span class="plan-price">${esc(price)}</span></button>`;
+ return `<div class="chip-group plan-channel" role="group" aria-label="${tr('购买渠道')}">${chip('',tr('官网'),planPrice(plan,'monthly'))}${list.map(c=>{const p=aiPlanChannelPrice(plan,c.id);
+  return chip(c.id,tr(AI_PLAN_CHANNELS[c.id]),(p.listed?'':'≈ ')+formatCostParts(p.currency,String(p.value),''),p.local?tr('商店标价 {local}，按 {date} 的汇率折成美元',{local:`${p.local.amount} ${p.local.currency}`,date:p.rateDate}):'');}).join('')}</div>`;
+}
+// The form keeps its currency when the vendor sells the plan in it; otherwise the plan's own.
+function applyPlan(form,plan,cycle='monthly',channel=''){
+ const el=form.elements,f=aiPlanFields(plan,cycle,el.currency?.value||plan.currency,channel),parts=costParts(f.cost);form.dataset.planStore=aiPlanChannelPrice(plan,channel)?channel:'';
  if(!el.name.value.trim()||findAiPlan(el.name.value))el.name.value=f.name;
  el.provider.value=f.provider;el.amount.value=parts.value;setChoice(form,'currency',parts.currency);setChoice(form,'cycle',f.cycle);setChoice(form,'dateKind','renew');
  if(el.url&&(!el.url.value.trim()||AI_PLANS.some(p=>p.url===el.url.value.trim())))el.url.value=f.url||'';
  markProviderPick(form);el.date?.focus();
 }
+// Another currency on a form that holds a plan's price: the number follows, to the vendor's own price in that currency or, where
+// it has none, its listed price at the app's rates. A number the person typed stays.
+function planCurrency(form,before){
+ const el=form.elements,plan=findAiPlan(el.name?.value);if(!plan||!el.amount||before===el.currency.value)return;
+ const cycle=el.cycle?.value==='yearly'?'yearly':'monthly',rates=fx.rates,was=aiPlanPriceIn(plan,before,cycle,rates),now=aiPlanPriceIn(plan,el.currency.value,cycle,rates);
+ if(now&&was&&Number(el.amount.value)===was.value)el.amount.value=String(now.value);
+}
 document.addEventListener('click',e=>{
- const plan=e.target.closest('[data-plan]'),planCycle=e.target.closest('[data-plan-cycle]');
- if(plan||planCycle){const form=(plan||planCycle).closest('form'),p=plan?findAiPlan(plan.dataset.plan):findAiPlan(form?.elements.name.value);if(form&&p)applyPlan(form,p,planCycle?planCycle.dataset.planCycle:'monthly');return;}
+ const plan=e.target.closest('[data-plan]'),planCycle=e.target.closest('[data-plan-cycle]'),planChannel=e.target.closest('[data-plan-channel]');
+ if(plan||planCycle||planChannel){const at=plan||planCycle||planChannel,form=at.closest('form'),p=plan?findAiPlan(plan.dataset.plan):findAiPlan(form?.elements.name.value);
+  // 按月 / 按年 keeps the store; a store keeps the cycle; another plan starts at the vendor's site, monthly.
+  if(form&&p)applyPlan(form,p,planCycle?planCycle.dataset.planCycle:planChannel&&form.elements.cycle?.value==='yearly'?'yearly':'monthly',planChannel?planChannel.dataset.planChannel:planCycle?form.dataset.planStore||'':'');return;}
  const pick=e.target.closest('[data-provider]');
  if(pick){const form=pick.closest('form'),input=form?.elements.provider;if(!input)return;input.value=pick.dataset.provider;input.dispatchEvent(new Event('input',{bubbles:true}));markProviderPick(form);return;}
  const unfold=e.target.closest('[data-unfold]');
@@ -2262,7 +2280,9 @@ document.addEventListener('click',e=>{
   const group=button.closest('.chip-group'),input=group.querySelector('input[type="hidden"]'),on=button.getAttribute('aria-checked')==='true';
   if(group.classList.contains('folded')){group.classList.remove('folded');modalScrollState();return;}
   if(input.name==='type')input.form.dataset.typeTouched='1';
+  const before=input.value;
   setChoice(input.form,input.name,on&&group.dataset.clearable==='true'?'':button.dataset.value);
+  if(input.name==='currency')planCurrency(input.form,before);
   if(group.dataset.foldable){group.classList.add('folded');modalScrollState();}
   return;
  }
@@ -2965,7 +2985,7 @@ function prefsDialog(section){
  // The connectors, AI and MCP are in every build; the 12-hour sync and the probes come with the Pro plugin. The demo board shows the platform rows too:
  // demo-data.js answers for the platforms, so connecting and picking can be tried.
  const linkable=mac||demoMode;
- const connections=linkable?[link('Cloudflare',!!hostStore.cloudflareConnected,'cloudflare-import',proOff?tr('只读 API 令牌，点同步时读取；每 12 小时自动同步要用 Assetboard Pro 插件'):tr('只读 API 令牌，每 12 小时同步'),'cloudflare'),
+ const connections=linkable?[link('Cloudflare',!!hostStore.cloudflareConnected,'cloudflare-import',proOff?tr('只读 API 令牌，点同步时读取；每 12 小时自动同步只在官方安装包里'):tr('只读 API 令牌，每 12 小时同步'),'cloudflare'),
   link('GitHub',!!hostStore.githubConnected,'github-import',tr('本机 gh 或只读令牌'),'github'),
   ...(Object.entries(REGISTRARS).map(([id,r])=>link(r.name,registrarConnected(id),'registrar-import',tr('只读 API Key，读取域名和到期日'),id).replace('data-action="registrar-import"',`data-action="registrar-import" data-id="${id}"`))),
   ...(Object.entries(CLOUD_IMPORTS).map(([id,c])=>link(c.name,cloudConnected(id),'cloud-import',c.wide?tr('令牌权限大，只用来读取项目和域名'):tr('只读令牌，读取服务器和部署'),id).replace('data-action="cloud-import"',`data-action="cloud-import" data-id="${id}"`))),
@@ -2981,12 +3001,11 @@ function prefsDialog(section){
   row(tr('风格'),radios(tr('风格'),BOARD_SKINS,boardSkin,'prefs-skin'),tr('只改磁贴墙的样子和摆法；内容、字段和密度不变')),
   boardSkin==='magnet'?row(tr('冰箱门'),radios(tr('冰箱门'),FRIDGE_SCENES.map(([id,name,,note])=>[id,name,note]),fridgeScene,'prefs-scene'),tr('冰箱贴下面板可以拖到任意位置，位置只存在这台设备上；顶栏的「排整齐」让它们回到列上')):'',
   row(tr('磁贴密度'),radios(tr('磁贴密度'),WALL_DENSITIES.map(id=>[id,WALL_DENSITY_NAMES[id]]),wallDensity,'prefs-density'),tr('全局只留名称和天数，详细把每条的属性都摊开；⌘− 和 ⌘= 或在触控板上捏合也能切换'))].join('');
- const edition=row(tr('版本类型'),`<span class="prefs-edition">${esc(typeof proEditionText==='function'&&proBuilt()?proEditionText():tr('源码构建 · 不含 Pro 插件'))}</span>`);
+ const edition=row(tr('版本类型'),`<span class="prefs-edition">${esc(typeof proEditionText==='function'&&proBuilt()?proEditionText():tr('源码构建'))}</span>`);
  const about=[edition,nativeStore?row(tr('版本'),`<span class="prefs-version">${esc(nativeStore.version||'')}${mac?`<button class="button" data-action="check-updates">${tr('检查更新…')}</button>`:''}</span>`):'',
   mac?row(tr('自动检查更新'),toggle('prefs-native',nativeStore.autoUpdate!==false,tr('自动检查更新'),' data-id="autoUpdate"'),tr('每天最多读一次官网的版本文件')):''].join('');
- const proPane=proBuilt()?proSection(row):'';
  const mcp=mac||demoMode?agentMcpSection(row):'';
- const sections=[['general',tr('通用'),'gear',general],['look',tr('外观'),'palette',look],['features',tr('功能'),'spark',features],['connections',tr('连接'),'cloud',connections],['mcp','MCP','terminal',mcp],['pro','Assetboard Pro','check',proPane,'Pro'],['about',tr('关于'),'info',about]].filter(s=>s[3]);
+ const sections=[['general',tr('通用'),'gear',general],['look',tr('外观'),'palette',look],['features',tr('功能'),'spark',features],['connections',tr('连接'),'cloud',connections],['mcp','MCP','terminal',mcp],['about',tr('关于'),'info',about]].filter(s=>s[3]);
  if(!sections.some(s=>s[0]===prefsSection))prefsSection='general';
  const nav=sections.map(([id,name,icon,,short])=>`<button type="button" class="prefs-tab" role="tab" id="prefs-tab-${id}" aria-controls="prefs-pane-${id}" aria-selected="${id===prefsSection}" tabindex="${id===prefsSection?0:-1}" data-action="prefs-section" data-id="${id}"${short?` title="${name}"`:''}>${ui(icon)}<span>${short||name}</span></button>`).join('');
  const panes=sections.map(([id,name,,html])=>`<section class="prefs-group" role="tabpanel" id="prefs-pane-${id}" aria-labelledby="prefs-tab-${id}"${id===prefsSection?'':' hidden'}><h3>${name}</h3>${html}</section>`).join('');

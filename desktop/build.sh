@@ -13,7 +13,7 @@ swift_flags=()
 pro=0
 pro_swift=()
 if [[ -f "$project_dir/pro/web/pro.js" ]] && (( ! free )); then pro=1; pro_swift=("$project_dir"/pro/desktop/*.swift(N)); swift_flags+=(-D ASSETBOARD_PRO); fi
-# ASSETBOARD_PRO_DEV=1: a developer build for this Mac (设置 › Assetboard Pro says so). Its Info.plist carries AssetboardDeveloperBuild,
+# ASSETBOARD_PRO_DEV=1: a developer build for this Mac (设置 › 关于 says so). Its Info.plist carries AssetboardDeveloperBuild,
 # and desktop/package.sh refuses to package it, so it is never signed or published.
 dev=0
 [[ "${ASSETBOARD_PRO_DEV:-}" == 1 ]] && (( pro )) && { dev=1; swift_flags+=(-D ASSETBOARD_PRO_DEV); }

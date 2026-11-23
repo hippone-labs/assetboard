@@ -31,7 +31,7 @@ Download the `.dmg` from [assetboard.app](https://assetboard.app/). Requires mac
 - [Themes](#themes)
 - [Data sources](#data-sources)
 - [Other features](#other-features)
-- [Free and Pro](#free-and-pro)
+- [Official download and building from source](#official-download-and-building-from-source)
 - [Install](#install)
 - [Build from source](#build-from-source)
 - [Contributing](#contributing)
@@ -83,7 +83,7 @@ The sidebar holds Upcoming, All assets, Panorama, the categories, projects and H
 | --- | --- |
 | All assets: a tile wall grouped by category, with one record's details at the right ![All assets](screenshots/board-en.webp) | Cost: monthly and yearly totals by category, in a chosen currency ![Cost panel](screenshots/cost-en.webp) |
 | Timeline: expiries and charges over 12 months from this month ![Timeline](screenshots/timeline-en.webp) | Panorama: one card per server with the assets on it ![Panorama](screenshots/panorama-en.webp) |
-| Live status (Pro, off by default): a server's memory, traffic and load ![Live status](screenshots/live-en.webp) | A free tier's sleep rule and keep-alive settings ![Sleep rule](screenshots/sleep-en.webp) |
+| Live status (off by default): a server's memory, traffic and load ![Live status](screenshots/live-en.webp) | A free tier's sleep rule and keep-alive settings ![Sleep rule](screenshots/sleep-en.webp) |
 
 The panorama has four lenses: where it runs, who pays, which login, by project. Drag an asset between cards or press `L` to change a link.
 
@@ -136,20 +136,16 @@ Scripts can put JSON in this format into `~/Library/Application Support/Assetboa
 - Keyboard control; `?` lists the shortcuts.
 - Accent themes, two tile-wall skins (Quiet; Fridge magnets, with four fridge doors whose colours the whole window takes, and panels you place anywhere) and three densities; light and dark follow the system.
 
-## Free and Pro
+## Official download and building from source
 
-The app and the read-only MCP are free and open source, with no time or record limit. Assetboard Pro is the official plugin that lets AI change, delete and tidy up existing records in bulk through MCP and the command line, plus a few background jobs. Pro is free for now.
+Assetboard is free and open source, with no time or record limit. The official download from [assetboard.app](https://assetboard.app/) needs no sign-up and no license, and carries a few features that are not in this repository, also free:
 
-| Free and open source | Pro (official plugin, free for now) |
-| --- | --- |
-| Asset board, Upcoming, local reminders, renewal and charge confirmations | AI changing, deleting and tidying up existing records in bulk through MCP and the command line |
-| Payment ledger, 12-month forecast, price changes | Weekly automatic registry check |
-| Projects, revenue and shared costs, shutdown list, periodic review | Cloudflare sync every 12 hours, with a note when new assets appear |
-| Every import; connecting Cloudflare, GitHub, Namecheap, Porkbun, Hetzner, DigitalOcean and Vercel, then picking and syncing by hand; AI recognition with your own key | Live status (SSH reads, monitoring panels, platform status) |
-| Read-only MCP and the `assetboard-cli` command line: look up; also add new records (same names skipped) and import what waits; the Inbox folder | Planned: encrypted snapshots, a handover pack |
-| Links, panorama, AI usage, privacy mode, network log, backups and exports | |
+- AI changing, deleting and tidying up existing records in bulk through MCP and the command line
+- Weekly automatic registry checks
+- Cloudflare sync every 12 hours, with a note when new assets appear
+- Live status (SSH reads, monitoring panels, platform status)
 
-Getting Pro: download the official build from [assetboard.app](https://assetboard.app/). Pro is already inside and on, with no sign-up and no license to enter; Settings › Assetboard Pro shows its state. This repository is the whole code of the free part; what you build from it is the complete free edition, without the Pro plugin. See the [user guide](GUIDE.md#assetboard-pro) (Chinese).
+This repository is the whole code of the rest (GPL-3.0). What you build from it has the board, Upcoming, local reminders, the payment ledger, projects, every import, picking and manual sync after connecting a platform, AI recognition with your own key, the read-only MCP and command line (look up, add new records, bring in what waits), relations, the panorama, AI usage and limits, backups and exports. See the [user guide](GUIDE.md#官方安装包与源码构建) (Chinese).
 
 ## Install
 
