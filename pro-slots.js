@@ -14,7 +14,7 @@
 // Single overrides (a function or null):
 //   serverProbe                  {status(a) → {text, tone, online} | null, rowHtml(a), panoHtml(a)}: a server card's live state from a
 //                                probe data source (探针), shown in place of the hand-set 运行中/已停用; null: no probe anywhere
-// Features still to come, each null until a script fills it (设置 › Assetboard Pro lists the Pro ones as coming):
+// Features still to come, each null until a script fills it :
 //   remindersApp                 {write(items)}: dated records written into the Reminders app as well as the local notifications (free)
 //   snapshot                     {save()}: an encrypted copy of the board written to a folder the person picks (several Macs)
 //   handoverPack                 {html()}: the 如果我出事 pack, the handover list with what to stop and when
@@ -41,7 +41,7 @@ function proRegister(fn){proRegistrars.push(fn);if(!proOff)fn();}
 function proEnable(){if(proFree||!proOff)return;proOff=false;for(const fn of proRegistrars)fn();}
 function proOn(){return !proOff;}
 // Whether the Pro modules are there (the pro/web scripts are loaded and not ?free); without them there is no Pro section in 设置.
-function proBuilt(){return !proFree&&typeof proSection==='function';}
+function proBuilt(){return !proFree&&typeof proEditionText==='function';}
 function slotHtml(name,...args){return proSlots[name].map(fn=>fn(...args)||'').join('');}
 // 实时状态 for one record: a server's probe or SSH reading, or a database's or deployment's platform state (null when there is none).
 function probeState(a){if(!a)return null;if(a.type==='server')return proSlots.serverProbe?proSlots.serverProbe.status(a):null;return proSlots.platformProbe?proSlots.platformProbe.status(a):null;}

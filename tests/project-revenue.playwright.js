@@ -25,7 +25,7 @@ async (page) => {
   const call=(method,params={})=>p.evaluate(([method,params])=>assetboardAgent({requestId:'t',via:'mcp',method,params}),[method,params]);
   // Without Pro update_project is refused like every change to a record that is there, and nothing changes.
   const refused=await call('updateProject',{name:'web',revenue:{amount:40,currency:'USD'}});
-  check(refused.ok===false&&/Pro/.test(refused.error)&&await p.evaluate(()=>state.projects.web.revenue.amount)===30,'Without Pro update_project is refused: '+JSON.stringify(refused));
+  check(refused.ok===false&&/官方安装包/.test(refused.error)&&await p.evaluate(()=>state.projects.web.revenue.amount)===30,'Without Pro update_project is refused: '+JSON.stringify(refused));
   // Reading the figures is free; the writes below turn Pro on in place, as an activation does.
   let reply=await call('projects',{currency:'USD'});
   await p.evaluate(()=>proEnable());

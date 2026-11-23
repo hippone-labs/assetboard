@@ -1701,7 +1701,7 @@ const agentMethods={
   if(planned.length){
    checkpoint();
    for(const a of planned){state.assets.push(a);if(state.cardOrder?.[a.type]?.length)state.cardOrder[a.type].unshift(a.id);ensureBlock(state,a.type);}
-   for(const {index,record,linkTo} of linkPlans)for(const id of linkTo){const problem=agentLinkProblem(record,id,true)||(proOff&&agentLinkReplaces(record,id)?tr('这台服务器已经关联了别的账号；换掉它要用 Assetboard Pro 插件'):'');if(problem)warnings.push({index,link:id,error:problem});else linkRelation(state.assets,record.id,id);}
+   for(const {index,record,linkTo} of linkPlans)for(const id of linkTo){const problem=agentLinkProblem(record,id,true)||(proOff&&agentLinkReplaces(record,id)?tr('这台服务器已经关联了别的账号；换掉它只在官方安装包里能做'):'');if(problem)warnings.push({index,link:id,error:problem});else linkRelation(state.assets,record.id,id);}
    save();render();
    toast(planned.length===1?tr('外部工具添加了「{name}」',{name:planned[0].name}):tr('外部工具添加了 {n} 项',{n:planned.length}),true);
   }
@@ -2066,11 +2066,11 @@ Object.assign(agentMethods,{
 });
 // Free for every external tool, MCP and the command line alike: every reading, adding records (a name the board already has is
 // skipped, never overwritten), picking from 待引入 and a Cloudflare sync. Changing or deleting records that are there, and Pro's own
-// methods, need the Assetboard Pro plugin (free, in the official build); a build from source alone refuses them.
+// methods, are in the official build only (free); a build from source alone refuses them.
 const AGENT_PRO_METHODS=['update','updateMany','updateProject','delete','deleteMany','recordPayment','renew'];
 function agentProRefusal(call){
  if(!proOff)return '';
- if(AGENT_PRO_METHODS.includes(call?.method)||Object.hasOwn(proSlots.agentMethods,call?.method))return tr('修改和删除已有资产要用 Assetboard Pro 插件（官方版自带，免费）；这个版本可以查询和添加');
+ if(AGENT_PRO_METHODS.includes(call?.method)||Object.hasOwn(proSlots.agentMethods,call?.method))return tr('修改和删除已有资产只在官方安装包里能做（免费）；这个版本可以查询和添加');
  return '';
 }
 window.assetboardAgent=call=>{
@@ -2965,7 +2965,7 @@ function prefsDialog(section){
  // The connectors, AI and MCP are in every build; the 12-hour sync and the probes come with the Pro plugin. The demo board shows the platform rows too:
  // demo-data.js answers for the platforms, so connecting and picking can be tried.
  const linkable=mac||demoMode;
- const connections=linkable?[link('Cloudflare',!!hostStore.cloudflareConnected,'cloudflare-import',proOff?tr('只读 API 令牌，点同步时读取；每 12 小时自动同步要用 Assetboard Pro 插件'):tr('只读 API 令牌，每 12 小时同步'),'cloudflare'),
+ const connections=linkable?[link('Cloudflare',!!hostStore.cloudflareConnected,'cloudflare-import',proOff?tr('只读 API 令牌，点同步时读取；每 12 小时自动同步只在官方安装包里'):tr('只读 API 令牌，每 12 小时同步'),'cloudflare'),
   link('GitHub',!!hostStore.githubConnected,'github-import',tr('本机 gh 或只读令牌'),'github'),
   ...(Object.entries(REGISTRARS).map(([id,r])=>link(r.name,registrarConnected(id),'registrar-import',tr('只读 API Key，读取域名和到期日'),id).replace('data-action="registrar-import"',`data-action="registrar-import" data-id="${id}"`))),
   ...(Object.entries(CLOUD_IMPORTS).map(([id,c])=>link(c.name,cloudConnected(id),'cloud-import',c.wide?tr('令牌权限大，只用来读取项目和域名'):tr('只读令牌，读取服务器和部署'),id).replace('data-action="cloud-import"',`data-action="cloud-import" data-id="${id}"`))),
@@ -2981,12 +2981,11 @@ function prefsDialog(section){
   row(tr('风格'),radios(tr('风格'),BOARD_SKINS,boardSkin,'prefs-skin'),tr('只改磁贴墙的样子和摆法；内容、字段和密度不变')),
   boardSkin==='magnet'?row(tr('冰箱门'),radios(tr('冰箱门'),FRIDGE_SCENES.map(([id,name,,note])=>[id,name,note]),fridgeScene,'prefs-scene'),tr('冰箱贴下面板可以拖到任意位置，位置只存在这台设备上；顶栏的「排整齐」让它们回到列上')):'',
   row(tr('磁贴密度'),radios(tr('磁贴密度'),WALL_DENSITIES.map(id=>[id,WALL_DENSITY_NAMES[id]]),wallDensity,'prefs-density'),tr('全局只留名称和天数，详细把每条的属性都摊开；⌘− 和 ⌘= 或在触控板上捏合也能切换'))].join('');
- const edition=row(tr('版本类型'),`<span class="prefs-edition">${esc(typeof proEditionText==='function'&&proBuilt()?proEditionText():tr('源码构建 · 不含 Pro 插件'))}</span>`);
+ const edition=row(tr('版本类型'),`<span class="prefs-edition">${esc(typeof proEditionText==='function'&&proBuilt()?proEditionText():tr('源码构建'))}</span>`);
  const about=[edition,nativeStore?row(tr('版本'),`<span class="prefs-version">${esc(nativeStore.version||'')}${mac?`<button class="button" data-action="check-updates">${tr('检查更新…')}</button>`:''}</span>`):'',
   mac?row(tr('自动检查更新'),toggle('prefs-native',nativeStore.autoUpdate!==false,tr('自动检查更新'),' data-id="autoUpdate"'),tr('每天最多读一次官网的版本文件')):''].join('');
- const proPane=proBuilt()?proSection(row):'';
  const mcp=mac||demoMode?agentMcpSection(row):'';
- const sections=[['general',tr('通用'),'gear',general],['look',tr('外观'),'palette',look],['features',tr('功能'),'spark',features],['connections',tr('连接'),'cloud',connections],['mcp','MCP','terminal',mcp],['pro','Assetboard Pro','check',proPane,'Pro'],['about',tr('关于'),'info',about]].filter(s=>s[3]);
+ const sections=[['general',tr('通用'),'gear',general],['look',tr('外观'),'palette',look],['features',tr('功能'),'spark',features],['connections',tr('连接'),'cloud',connections],['mcp','MCP','terminal',mcp],['about',tr('关于'),'info',about]].filter(s=>s[3]);
  if(!sections.some(s=>s[0]===prefsSection))prefsSection='general';
  const nav=sections.map(([id,name,icon,,short])=>`<button type="button" class="prefs-tab" role="tab" id="prefs-tab-${id}" aria-controls="prefs-pane-${id}" aria-selected="${id===prefsSection}" tabindex="${id===prefsSection?0:-1}" data-action="prefs-section" data-id="${id}"${short?` title="${name}"`:''}>${ui(icon)}<span>${short||name}</span></button>`).join('');
  const panes=sections.map(([id,name,,html])=>`<section class="prefs-group" role="tabpanel" id="prefs-pane-${id}" aria-labelledby="prefs-tab-${id}"${id===prefsSection?'':' hidden'}><h3>${name}</h3>${html}</section>`).join('');

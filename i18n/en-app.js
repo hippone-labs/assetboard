@@ -970,13 +970,13 @@ Object.assign(I18N.en,{
  '已添加 {n} 个套餐，下次扣款日期在各自的资料里填':['Added {n} plan; set its next charge date in its details','Added {n} plans; set each next charge date in its details'],
  '同一订阅含 Grok、Cursor 与 X':'One subscription covers Grok, Cursor and X',
  '原 Windsurf':'Formerly Windsurf',
- // Assetboard Pro (the official plugin): what a build without it says
- '这台服务器已经关联了别的账号；换掉它要用 Assetboard Pro 插件':'This server is already linked to another account; replacing it needs the Assetboard Pro plugin',
- '修改和删除已有资产要用 Assetboard Pro 插件（官方版自带，免费）；这个版本可以查询和添加':'Changing and deleting existing assets needs the Assetboard Pro plugin (free, included in the official build); this build can look up and add',
+ // What a build from source says about what only the official build does
+ '这台服务器已经关联了别的账号；换掉它只在官方安装包里能做':'This server is already linked to another account; replacing it works in the official download only',
+ '修改和删除已有资产只在官方安装包里能做（免费）；这个版本可以查询和添加':'Changing and deleting existing assets works in the official download only (free); this build can look up and add',
  '新增的域名和资源点「重新同步」读入。':'New domains and resources come in with Sync again.',
- '只读 API 令牌，点同步时读取；每 12 小时自动同步要用 Assetboard Pro 插件':'Read-only API token, read when you click Sync; automatic sync every 12 hours needs the Assetboard Pro plugin',
+ '只读 API 令牌，点同步时读取；每 12 小时自动同步只在官方安装包里':'Read-only API token, read when you click Sync; automatic sync every 12 hours is in the official download only',
  '版本类型':'Edition',
- '源码构建 · 不含 Pro 插件':'Built from source · without the Pro plugin',
+ '源码构建':'Built from source',
  '另有 {n} 条':['{n} more','{n} more'],
  '已隐藏和已停用的不算':'Hidden and stopped assets are left out',
  '{n} 小时':['{n} hour','{n} hours'],
