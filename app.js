@@ -2231,7 +2231,7 @@ function setChoice(form,name,value){
  for(const button of input.parentElement.querySelectorAll('.choice[data-choice]'))button.setAttribute('aria-checked',String(button.dataset.value===value));
  input.dispatchEvent(new Event('change',{bubbles:true}));
 }
-function markProviderPick(form){const value=form.elements.provider?.value.trim();for(const b of form.querySelectorAll('[data-provider]'))b.setAttribute('aria-pressed',String(b.dataset.provider===value));const picks=form.querySelector('#plan-picks');if(picks)picks.innerHTML=planPicks(value,{name:form.elements.name.value,cycle:form.elements.cycle?.value});}
+function markProviderPick(form){const value=form.elements.provider?.value.trim();for(const b of form.querySelectorAll('[data-provider]'))b.setAttribute('aria-pressed',String(b.dataset.provider===value));const picks=form.querySelector('#plan-picks');if(picks)picks.innerHTML=planPicks(value,{name:form.elements.name.value,cycle:form.elements.cycle?.value,channel:form.dataset.planStore||''});}
 document.addEventListener('input',e=>{if(e.target.name==='provider'&&e.target.form)markProviderPick(e.target.form);});
 // AI plans (AI_PLANS): the vendor's plans as chips under its name; one click fills name, vendor, price, cycle and link, and the
 // person only sets the next charge date. A plan also sold by the year offers 按月 / 按年 once picked.
@@ -2241,11 +2241,19 @@ const planTitle=p=>[p.name,planCost(p,'monthly'),p.yearly&&planCost(p,'yearly'),
 function planPicks(provider,v={}){
  const plans=aiPlansFor(provider);if(!plans.length)return '';
  const chosen=plans.find(p=>p.name===String(v.name||'').trim());
- return `<div class="chip-group" role="group" aria-label="${tr('常见套餐')}">${plans.map(p=>`<button type="button" class="choice plan-pick" data-plan="${esc(p.name)}" aria-pressed="${p===chosen}" title="${esc(planTitle(p))}">${esc(p.plan)}<span class="plan-price">${esc(planPrice(p,'monthly'))}</span></button>`).join('')}</div>${chosen?.yearly?`<div class="chip-group plan-cycle" role="group" aria-label="${tr('付费方式')}">${['monthly','yearly'].map(c=>`<button type="button" class="choice" data-plan-cycle="${c}" aria-pressed="${(v.cycle==='yearly'?'yearly':'monthly')===c}">${c==='yearly'?tr('按年'):tr('按月')}<span class="plan-price">${esc(planPrice(chosen,c))}</span></button>`).join('')}</div>`:''}`;
+ return `<div class="chip-group" role="group" aria-label="${tr('常见套餐')}">${plans.map(p=>`<button type="button" class="choice plan-pick" data-plan="${esc(p.name)}" aria-pressed="${p===chosen}" title="${esc(planTitle(p))}">${esc(p.plan)}<span class="plan-price">${esc(planPrice(p,'monthly'))}</span></button>`).join('')}</div>${chosen?.yearly?`<div class="chip-group plan-cycle" role="group" aria-label="${tr('付费方式')}">${['monthly','yearly'].map(c=>`<button type="button" class="choice" data-plan-cycle="${c}" aria-pressed="${(v.cycle==='yearly'?'yearly':'monthly')===c}">${c==='yearly'?tr('按年'):tr('按月')}<span class="plan-price">${esc(planPrice(chosen,c))}</span></button>`).join('')}</div>`:''}${chosen?planChannels(chosen,v.channel||''):''}`;
+}
+// Where the plan is bought: the vendor's site, or a store whose price differs (an app store's, a cheaper region's). A store price
+// kept in US dollars because the app has no such currency says so, with the store's own figure in the tip.
+function planChannels(plan,picked){
+ const list=aiPlanChannels(plan);if(!list.length)return '';
+ const chip=(id,name,price,tip)=>`<button type="button" class="choice" data-plan-channel="${id}" aria-pressed="${id===picked}"${tip?` title="${esc(tip)}"`:''}>${esc(name)}<span class="plan-price">${esc(price)}</span></button>`;
+ return `<div class="chip-group plan-channel" role="group" aria-label="${tr('购买渠道')}">${chip('',tr('官网'),planPrice(plan,'monthly'))}${list.map(c=>{const p=aiPlanChannelPrice(plan,c.id);
+  return chip(c.id,tr(AI_PLAN_CHANNELS[c.id]),(p.listed?'':'≈ ')+formatCostParts(p.currency,String(p.value),''),p.local?tr('商店标价 {local}，按 {date} 的汇率折成美元',{local:`${p.local.amount} ${p.local.currency}`,date:p.rateDate}):'');}).join('')}</div>`;
 }
 // The form keeps its currency when the vendor sells the plan in it; otherwise the plan's own.
-function applyPlan(form,plan,cycle='monthly'){
- const el=form.elements,f=aiPlanFields(plan,cycle,el.currency?.value||plan.currency),parts=costParts(f.cost);
+function applyPlan(form,plan,cycle='monthly',channel=''){
+ const el=form.elements,f=aiPlanFields(plan,cycle,el.currency?.value||plan.currency,channel),parts=costParts(f.cost);form.dataset.planStore=aiPlanChannelPrice(plan,channel)?channel:'';
  if(!el.name.value.trim()||findAiPlan(el.name.value))el.name.value=f.name;
  el.provider.value=f.provider;el.amount.value=parts.value;setChoice(form,'currency',parts.currency);setChoice(form,'cycle',f.cycle);setChoice(form,'dateKind','renew');
  if(el.url&&(!el.url.value.trim()||AI_PLANS.some(p=>p.url===el.url.value.trim())))el.url.value=f.url||'';
@@ -2259,8 +2267,10 @@ function planCurrency(form,before){
  if(now&&was&&Number(el.amount.value)===was.value)el.amount.value=String(now.value);
 }
 document.addEventListener('click',e=>{
- const plan=e.target.closest('[data-plan]'),planCycle=e.target.closest('[data-plan-cycle]');
- if(plan||planCycle){const form=(plan||planCycle).closest('form'),p=plan?findAiPlan(plan.dataset.plan):findAiPlan(form?.elements.name.value);if(form&&p)applyPlan(form,p,planCycle?planCycle.dataset.planCycle:'monthly');return;}
+ const plan=e.target.closest('[data-plan]'),planCycle=e.target.closest('[data-plan-cycle]'),planChannel=e.target.closest('[data-plan-channel]');
+ if(plan||planCycle||planChannel){const at=plan||planCycle||planChannel,form=at.closest('form'),p=plan?findAiPlan(plan.dataset.plan):findAiPlan(form?.elements.name.value);
+  // 按月 / 按年 keeps the store; a store keeps the cycle; another plan starts at the vendor's site, monthly.
+  if(form&&p)applyPlan(form,p,planCycle?planCycle.dataset.planCycle:planChannel&&form.elements.cycle?.value==='yearly'?'yearly':'monthly',planChannel?planChannel.dataset.planChannel:planCycle?form.dataset.planStore||'':'');return;}
  const pick=e.target.closest('[data-provider]');
  if(pick){const form=pick.closest('form'),input=form?.elements.provider;if(!input)return;input.value=pick.dataset.provider;input.dispatchEvent(new Event('input',{bubbles:true}));markProviderPick(form);return;}
  const unfold=e.target.closest('[data-unfold]');

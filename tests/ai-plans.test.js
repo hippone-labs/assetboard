@@ -67,3 +67,22 @@ test('AI plans: a price in another currency is the vendor\'s own where it has on
   assert.match(x.source||'',/^https:\/\//,`${p.name} ${code} source`);
  }
 });
+
+test('AI plans: a store price, and a store in a currency the app does not keep, in US dollars at the day\'s rate',()=>{
+ const plan={name:'Sample Plus',provider:'Sample',amount:20,yearly:200,currency:'USD',channels:[{id:'app-store',amount:24.99,currency:'USD',source:'https://apps.apple.com/us/app/x/id1'},{id:'app-store-tr',amount:500,currency:'TRY',source:'https://apps.apple.com/tr/app/x/id1'},{id:'nowhere',amount:1,currency:'USD'}]};
+ assert.deepEqual(D.aiPlanChannelPrice(plan,'app-store'),{currency:'USD',value:24.99,cycle:'monthly',listed:true});
+ assert.equal(D.aiPlanChannelPrice(plan,'app-store','yearly').cycle,'monthly','no yearly price in the store: its monthly one');
+ assert.equal(D.aiPlanChannelPrice(plan,'google-play'),null);assert.equal(D.aiPlanFields(plan,'monthly','USD','app-store').cost,'$24.99 / 月');
+ assert.equal(D.aiPlanFields(plan,'monthly','USD','google-play').cost,'$20 / 月','a store the plan is not sold in is the site');
+ // Lira without a rate is no price; with one it is dollars, the store's own figure kept beside it.
+ const had=D.AI_STORE_RATES.TRY;delete D.AI_STORE_RATES.TRY;assert.equal(D.aiPlanChannelPrice(plan,'app-store-tr'),null);assert.deepEqual(D.aiPlanChannels(plan).map(c=>c.id),['app-store']);
+ D.AI_STORE_RATES.TRY={perUSD:40,date:'2026-11-23',source:'https://rates.example/'};
+ assert.deepEqual(D.aiPlanChannelPrice(plan,'app-store-tr'),{currency:'USD',value:12.5,cycle:'monthly',listed:false,local:{currency:'TRY',amount:500},rateDate:'2026-11-23'});
+ if(had)D.AI_STORE_RATES.TRY=had;else delete D.AI_STORE_RATES.TRY;
+ // The table's own: a known store, a positive price, the store's page, and a rate for every currency the app does not keep.
+ for(const p of D.AI_PLANS)for(const c of p.channels||[]){
+  assert.ok(D.AI_PLAN_CHANNELS[c.id]&&c.amount>0,`${p.name} ${c.id}`);assert.match(c.source||'',/^https:\/\/(apps\.apple\.com|play\.google\.com)\//,`${p.name} ${c.id} source`);
+  assert.ok(D.aiPlanChannelPrice(p,c.id),`${p.name} ${c.id} has a price`);
+ }
+ for(const [code,r] of Object.entries(D.AI_STORE_RATES)){assert.ok(r.perUSD>0&&/^\d{4}-\d\d-\d\d$/.test(r.date)&&/^https:\/\//.test(r.source),code);}
+});
