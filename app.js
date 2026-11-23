@@ -1644,7 +1644,7 @@ function agentFields(input,type,base=null){
 }
 function agentFind(id){const a=state.assets.find(x=>x.id===id);if(!a)throw new Error(tr('找不到资产 {id}',{id:String(id).slice(0,100)}));if(!agentSees(a))throw new Error(tr('资产 {id} 是银行卡或手机号，不交给外部工具；要交给它们，在 Assetboard 的 设置 › 功能 里打开「把银行卡和手机号交给 AI 工具」',{id:String(id).slice(0,100)}));return a;}
 const agentMethods={
- types:()=>Object.entries(cats).map(([id,c])=>({id,name:c.name,hint:c.hint,...(assetProfiles[id]?.fixedProvider?{provider:assetProfiles[id].fixedProvider}:{providers:providerPresets(id)}),...(id==='ai'?{plans:AI_PLANS.map(p=>({name:p.name,provider:p.provider,cost:aiPlanFields(p).cost,...(p.yearly?{yearlyCost:aiPlanFields(p,'yearly').cost}:{}),checked:p.checked}))}:{})})),
+ types:()=>Object.entries(cats).map(([id,c])=>({id,name:c.name,hint:c.hint,...(assetProfiles[id]?.fixedProvider?{provider:assetProfiles[id].fixedProvider}:{providers:providerPresets(id)}),...((id==='ai'?AI_PLANS:SERVICE_PLANS.filter(p=>p.type===id)).length?{plans:(id==='ai'?AI_PLANS:SERVICE_PLANS.filter(p=>p.type===id)).map(p=>({name:p.name,provider:p.provider,cost:aiPlanFields(p).cost,...(p.yearly?{yearlyCost:aiPlanFields(p,'yearly').cost}:{}),checked:p.checked}))}:{})})),
  list:({type='',query:text='',includeHidden=false,limit=100,offset=0,project='',billingType=''})=>{
   if(billingType&&!BILLING_TYPES.includes(billingType))throw new Error(tr('{key} 只能是 {values}',{key:'billingType',values:BILLING_TYPES.join(tr('、'))}));
   const needle=String(text||'').trim().toLowerCase();
@@ -1675,8 +1675,8 @@ const agentMethods={
   list.forEach((item,index)=>{
    // A plan name ("Claude Max") fills name, vendor, price, cycle and link; fields given beside it win.
    if(item&&typeof item==='object'&&!Array.isArray(item)&&item.plan!=null){
-    const plan=findAiPlan(item.plan);if(!plan){errors.push({index,error:tr('未知套餐 {plan}，可用：{names}',{plan:String(item.plan).slice(0,60),names:AI_PLANS.map(p=>p.name).join(tr('、'))})});return;}
-    const {plan:_,cycle,...rest}=item;item={type:'ai',...aiPlanFields(plan,cycle==='yearly'?'yearly':'monthly'),...rest};
+    const plan=findPlan(item.plan);if(!plan){errors.push({index,error:tr('未知套餐 {plan}，可用：{names}',{plan:String(item.plan).slice(0,60),names:[...AI_PLANS,...SERVICE_PLANS].map(p=>p.name).join(tr('、'))})});return;}
+    const {plan:_,cycle,...rest}=item;item={type:planType(plan),...aiPlanFields(plan,cycle==='yearly'?'yearly':'monthly'),...rest};
    }
    const name=typeof item?.name==='string'?item.name.trim():'';
    if(!name){errors.push({index,error:tr('缺少 name')});return;}
@@ -2231,44 +2231,46 @@ function setChoice(form,name,value){
  for(const button of input.parentElement.querySelectorAll('.choice[data-choice]'))button.setAttribute('aria-checked',String(button.dataset.value===value));
  input.dispatchEvent(new Event('change',{bubbles:true}));
 }
-function markProviderPick(form){const value=form.elements.provider?.value.trim();for(const b of form.querySelectorAll('[data-provider]'))b.setAttribute('aria-pressed',String(b.dataset.provider===value));const picks=form.querySelector('#plan-picks');if(picks)picks.innerHTML=planPicks(value,{name:form.elements.name.value,cycle:form.elements.cycle?.value,channel:form.dataset.planStore||''});}
+function markProviderPick(form){const value=form.elements.provider?.value.trim();for(const b of form.querySelectorAll('[data-provider]'))b.setAttribute('aria-pressed',String(b.dataset.provider===value));const picks=form.querySelector('#plan-picks');if(picks)picks.innerHTML=planPicks(value,{name:form.elements.name.value,cycle:form.elements.cycle?.value,channel:form.dataset.planStore||''},form.dataset.type||'ai');}
 document.addEventListener('input',e=>{if(e.target.name==='provider'&&e.target.form)markProviderPick(e.target.form);});
 // AI plans (AI_PLANS): the vendor's plans as chips under its name; one click fills name, vendor, price, cycle and link, and the
 // person only sets the next charge date. A plan also sold by the year offers 按月 / 按年 once picked.
-const planPrice=(p,cycle)=>formatCostParts(p.currency,String(cycle==='yearly'?p.yearly:p.amount),'');
-const planCost=(p,cycle)=>cycle==='yearly'?tr('{money} / 年',{money:planPrice(p,cycle)}):tr('{money} / 月',{money:planPrice(p,cycle)});
+const planPrice=(p,cycle)=>formatCostParts(p.currency,String(cycle==='yearly'&&p.yearly?p.yearly:p.amount),'');
+const planCost=(p,cycle)=>cycle==='yearly'||p.cycle==='yearly'?tr('{money} / 年',{money:planPrice(p,cycle)}):tr('{money} / 月',{money:planPrice(p,cycle)});
+// The chip's price: a plan sold by the year only says so.
+const planChipPrice=p=>p.cycle==='yearly'?planCost(p,'yearly'):planPrice(p,'monthly');
 const planTitle=p=>[p.name,planCost(p,'monthly'),p.yearly&&planCost(p,'yearly'),p.note&&tr(p.note),tr('价格核对于 {date}',{date:p.checked})].filter(Boolean).join(' · ');
-function planPicks(provider,v={}){
- const plans=aiPlansFor(provider);if(!plans.length)return '';
+function planPicks(provider,v={},type='ai'){
+ const plans=plansFor(provider,type);if(!plans.length)return '';
  const chosen=plans.find(p=>p.name===String(v.name||'').trim());
- return `<div class="chip-group" role="group" aria-label="${tr('常见套餐')}">${plans.map(p=>`<button type="button" class="choice plan-pick" data-plan="${esc(p.name)}" aria-pressed="${p===chosen}" title="${esc(planTitle(p))}">${esc(p.plan)}<span class="plan-price">${esc(planPrice(p,'monthly'))}</span></button>`).join('')}</div>${chosen?.yearly?`<div class="chip-group plan-cycle" role="group" aria-label="${tr('付费方式')}">${['monthly','yearly'].map(c=>`<button type="button" class="choice" data-plan-cycle="${c}" aria-pressed="${(v.cycle==='yearly'?'yearly':'monthly')===c}">${c==='yearly'?tr('按年'):tr('按月')}<span class="plan-price">${esc(planPrice(chosen,c))}</span></button>`).join('')}</div>`:''}${chosen?planChannels(chosen,v.channel||''):''}`;
+ return `<div class="chip-group" role="group" aria-label="${tr('常见套餐')}">${plans.map(p=>`<button type="button" class="choice plan-pick" data-plan="${esc(p.name)}" aria-pressed="${p===chosen}" title="${esc(planTitle(p))}">${esc(p.plan)}<span class="plan-price">${esc(planChipPrice(p))}</span></button>`).join('')}</div>${chosen?.yearly?`<div class="chip-group plan-cycle" role="group" aria-label="${tr('付费方式')}">${['monthly','yearly'].map(c=>`<button type="button" class="choice" data-plan-cycle="${c}" aria-pressed="${(v.cycle==='yearly'?'yearly':'monthly')===c}">${c==='yearly'?tr('按年'):tr('按月')}<span class="plan-price">${esc(planPrice(chosen,c))}</span></button>`).join('')}</div>`:''}${chosen?planChannels(chosen,v.channel||''):''}`;
 }
 // Where the plan is bought: the vendor's site, or a store whose price differs (an app store's, a cheaper region's). A store price
 // kept in US dollars because the app has no such currency says so, with the store's own figure in the tip.
 function planChannels(plan,picked){
  const list=aiPlanChannels(plan);if(!list.length)return '';
  const chip=(id,name,price,tip)=>`<button type="button" class="choice" data-plan-channel="${id}" aria-pressed="${id===picked}"${tip?` title="${esc(tip)}"`:''}>${esc(name)}<span class="plan-price">${esc(price)}</span></button>`;
- return `<div class="chip-group plan-channel" role="group" aria-label="${tr('购买渠道')}">${chip('',tr('官网'),planPrice(plan,'monthly'))}${list.map(c=>{const p=aiPlanChannelPrice(plan,c.id);
+ return `<div class="chip-group plan-channel" role="group" aria-label="${tr('购买渠道')}">${chip('',tr('官网'),planChipPrice(plan))}${list.map(c=>{const p=aiPlanChannelPrice(plan,c.id);
   return chip(c.id,tr(AI_PLAN_CHANNELS[c.id]),(p.listed?'':'≈ ')+formatCostParts(p.currency,String(p.value),''),p.local?tr('商店标价 {local}，按 {date} 的汇率折成美元',{local:`${p.local.amount} ${p.local.currency}`,date:p.rateDate}):'');}).join('')}</div>`;
 }
 // The form keeps its currency when the vendor sells the plan in it; otherwise the plan's own.
 function applyPlan(form,plan,cycle='monthly',channel=''){
  const el=form.elements,f=aiPlanFields(plan,cycle,el.currency?.value||plan.currency,channel),parts=costParts(f.cost);form.dataset.planStore=aiPlanChannelPrice(plan,channel)?channel:'';
- if(!el.name.value.trim()||findAiPlan(el.name.value))el.name.value=f.name;
+ if(!el.name.value.trim()||findPlan(el.name.value))el.name.value=f.name;
  el.provider.value=f.provider;el.amount.value=parts.value;setChoice(form,'currency',parts.currency);setChoice(form,'cycle',f.cycle);setChoice(form,'dateKind','renew');
- if(el.url&&(!el.url.value.trim()||AI_PLANS.some(p=>p.url===el.url.value.trim())))el.url.value=f.url||'';
+ if(el.url&&(!el.url.value.trim()||[...AI_PLANS,...SERVICE_PLANS].some(p=>p.url===el.url.value.trim())))el.url.value=f.url||'';
  markProviderPick(form);el.date?.focus();
 }
 // Another currency on a form that holds a plan's price: the number follows, to the vendor's own price in that currency or, where
 // it has none, its listed price at the app's rates. A number the person typed stays.
 function planCurrency(form,before){
- const el=form.elements,plan=findAiPlan(el.name?.value);if(!plan||!el.amount||before===el.currency.value)return;
+ const el=form.elements,plan=findPlan(el.name?.value,form.dataset.type||'');if(!plan||!el.amount||before===el.currency.value)return;
  const cycle=el.cycle?.value==='yearly'?'yearly':'monthly',rates=fx.rates,was=aiPlanPriceIn(plan,before,cycle,rates),now=aiPlanPriceIn(plan,el.currency.value,cycle,rates);
  if(now&&was&&Number(el.amount.value)===was.value)el.amount.value=String(now.value);
 }
 document.addEventListener('click',e=>{
  const plan=e.target.closest('[data-plan]'),planCycle=e.target.closest('[data-plan-cycle]'),planChannel=e.target.closest('[data-plan-channel]');
- if(plan||planCycle||planChannel){const at=plan||planCycle||planChannel,form=at.closest('form'),p=plan?findAiPlan(plan.dataset.plan):findAiPlan(form?.elements.name.value);
+ if(plan||planCycle||planChannel){const at=plan||planCycle||planChannel,form=at.closest('form'),p=plan?findPlan(plan.dataset.plan):findPlan(form?.elements.name.value,form?.dataset.type||'');
   // 按月 / 按年 keeps the store; a store keeps the cycle; another plan starts at the vendor's site, monthly.
   if(form&&p)applyPlan(form,p,planCycle?planCycle.dataset.planCycle:planChannel&&form.elements.cycle?.value==='yearly'?'yearly':'monthly',planChannel?planChannel.dataset.planChannel:planCycle?form.dataset.planStore||'':'');return;}
  const pick=e.target.closest('[data-provider]');
@@ -2451,7 +2453,7 @@ function profileFields(type,v,cost=''){
  if(p.plain&&!held)cost='';
  const presets=providerPresets(type),current=v.provider==='平台待补充'?'':v.provider||'';
  // Common vendors as chips (the first few) and as suggestions while typing (all of them); any other name can still be typed.
- const provider=p.fixedProvider?'':`<label>${p.provider?.[0]||tr('平台')}<input name="provider" maxlength="80" autocomplete="off"${presets.length?' list="provider-list"':''} value="${esc(current)}" placeholder="${p.provider?.[1]||tr('例如 Cloudflare')}"></label>${presets.length?`<datalist id="provider-list">${presets.map(n=>`<option value="${esc(n)}">${tr(n)===n?'':esc(tr(n))}`).join('')}</datalist><div class="chip-group provider-picks" role="group" aria-label="${tr('常用平台')}">${(type==='ai'?aiPlanProviders():presets.slice(0,8)).map(n=>`<button type="button" class="choice" data-provider="${esc(n)}" aria-pressed="${n===current}">${esc(tr(n))}</button>`).join('')}</div>`:''}${type==='ai'?`<div class="plan-picks" id="plan-picks">${planPicks(current,v)}</div>`:''}`;
+ const provider=p.fixedProvider?'':`<label>${p.provider?.[0]||tr('平台')}<input name="provider" maxlength="80" autocomplete="off"${presets.length?' list="provider-list"':''} value="${esc(current)}" placeholder="${p.provider?.[1]||tr('例如 Cloudflare')}"></label>${presets.length?`<datalist id="provider-list">${presets.map(n=>`<option value="${esc(n)}">${tr(n)===n?'':esc(tr(n))}`).join('')}</datalist><div class="chip-group provider-picks" role="group" aria-label="${tr('常用平台')}">${(type==='ai'?aiPlanProviders():[...new Set([...planProviders(type),...presets])].slice(0,8)).map(n=>`<button type="button" class="choice" data-provider="${esc(n)}" aria-pressed="${n===current}">${esc(tr(n))}</button>`).join('')}</div>`:''}${planProviders(type).length?`<div class="plan-picks" id="plan-picks">${planPicks(current,v,type)}</div>`:''}`;
  const account=`<label>${p.account?.[0]||tr('账号')}<input name="account" maxlength="100" autocomplete="off" value="${esc(v.account||'')}" placeholder="${p.account?.[1]||tr('用于区分同平台的账号')}"></label>`;
  const region=extra.includes('region')?`<label>${tr('国家 / 地区')}<input name="regionText" list="region-list" autocomplete="off" placeholder="${tr('输入国家或地区')}" value="${esc(v.region?regionName(v.region):'')}"><input type="hidden" name="region" value="${esc(v.region||'')}"><datalist id="region-list">${regionList.map(([code])=>`<option value="${esc(regionName(code))}">${regionFlag(code)} ${code}</option>`).join('')}</datalist></label>`:'';
  const phone=extra.includes('phone')?`<label>${tr('完整号码')}<input name="phone" type="tel" inputmode="tel" maxlength="30" autocomplete="off" value="${esc(v.phone||'')}" placeholder="+44 7700 900123"></label><span class="form-note">${tr('卡片只显示区号和后 4 位')}</span>${extra.includes('phoneStatus')?`<div class="field"><span class="field-label" title="${tr('不是「正常」时，靠它验证的每个账号都会标出风险')}">${tr('状态')}</span>${chipGroup('phoneStatus',[['',tr('正常')],...Object.entries(PHONE_STATUSES)],PHONE_STATUSES[v.phoneStatus]?v.phoneStatus:'',tr('号码状态'))}</div>`:''}`:'';

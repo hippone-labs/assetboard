@@ -86,3 +86,24 @@ test('AI plans: a store price, and a store in a currency the app does not keep, 
  }
  for(const [code,r] of Object.entries(D.AI_STORE_RATES)){assert.ok(r.perUSD>0&&/^\d{4}-\d\d-\d\d$/.test(r.date)&&/^https:\/\//.test(r.source),code);}
 });
+
+test('Plans of the other categories: a valid plan from the vendor\'s page, in a category of the board, by the month or the year',()=>{
+ assert.ok(D.SERVICE_PLANS.length>=15);
+ const names=[...D.AI_PLANS,...D.SERVICE_PLANS].map(p=>p.name.toLowerCase());assert.equal(new Set(names).size,names.length,'names are unique over both tables');
+ for(const p of D.SERVICE_PLANS){
+  assert.ok(['subscription','deployment','database','storage','license'].includes(p.type),`${p.name}: category`);
+  assert.ok(D.PROVIDER_PRESETS[p.type].includes(p.provider),`${p.name}: ${p.provider} is a ${p.type} preset`);
+  assert.ok(p.amount>0&&p.currency==='USD'&&['monthly','yearly'].includes(p.cycle)&&p.name.includes(p.plan),p.name);
+  if(p.yearly!=null)assert.ok(p.cycle==='monthly'&&p.yearly>p.amount&&p.yearly<p.amount*12,`${p.name}: a yearly price is a discount on 12 months`);
+  assert.match(p.source,/^https:\/\/[a-z0-9.-]+\//);if(p.url)assert.match(p.url,/^https:\/\/[a-z0-9.-]+\//);assert.equal(p.checked,D.SERVICE_PLANS_CHECKED);
+  assert.equal(D.findPlan(p.name),p);assert.equal(D.findPlan(p.name,p.type),p);assert.equal(D.findPlan(p.name,'ai'),null);assert.equal(D.planType(p),p.type);
+  assert.ok(D.plansFor(p.provider,p.type).includes(p)&&D.planProviders(p.type).includes(p.provider));
+  const f=D.aiPlanFields(p),money=D.costAmount(f);assert.equal(money.value,p.amount,f.cost);assert.equal(money.months,p.cycle==='yearly'?12:1,f.cost);assert.equal(f.cycle,p.cycle);
+ }
+ // A plan sold by the year only is a year whichever cycle is asked; one with both follows the cycle.
+ assert.deepEqual(D.aiPlanFields(D.findPlan('apple developer program'),'monthly'),{name:'Apple Developer Program',provider:'Apple',cost:'$99 / 年',cycle:'yearly',dateKind:'renew',url:'https://developer.apple.com/account'});
+ assert.equal(D.aiPlanFields(D.findPlan('Cloudflare Pro'),'yearly').cost,'$240 / 年');assert.equal(D.aiPlanFields(D.findPlan('Cloudflare Pro')).cost,'$25 / 月');
+ // The same vendor in two categories keeps them apart; AI plans stay where they were.
+ assert.deepEqual(D.plansFor('Cloudflare','deployment').map(p=>p.plan),['Workers Paid','Pro']);assert.deepEqual(D.plansFor('Cloudflare','storage'),[]);
+ assert.equal(D.planType(D.findPlan('Claude Max')),'ai');assert.equal(D.findPlan('Claude Max','deployment'),null);assert.deepEqual(D.planProviders('domain'),[]);
+});
