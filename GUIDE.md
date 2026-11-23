@@ -178,7 +178,7 @@ App 会连的主机见[隐私与网络](#隐私与网络)，每个请求都记�
 | GitHub Copilot | Copilot CLI 的 `~/.copilot/session-state/*/events.jsonl`：token、高级请求次数 | `api.github.com/copilot_internal/user`，用本机 `gh` 的登录：高级请求额度、每月重置日、套餐 |
 | Grok CLI | `~/.grok/sessions/*/*/usage.json`（xAI 的 grok）和 `~/.grok/grok.db`（社区版 grok-cli）：token、花费 | `cli-chat-proxy.grok.com` 的额度，用 `~/.grok/auth.json`：本周或本月已用比例、按量上限 |
 | opencode | `~/.local/share/opencode/opencode.db` 和旧版 `storage/message`：每条回答的 token 和花费；用的是 Claude、ChatGPT 等订阅时记到那家订阅上 | `opencode.ai` 的 Go 额度（5 小时、每周、每月），用 opencode 里 Go 的 key |
-| Antigravity | 本机没有可读的文件 | Antigravity 运行时它在 `127.0.0.1` 上的本机服务：5 小时和每周额度、套餐 |
+| Antigravity | 本机没有可读的文件 | Antigravity 运行时它在 `127.0.0.1` 上的本机服务：5 小时和每周额度、套餐；没开时运行本机的 `agy -p /usage --output-format json`（agy 1.1.11 或更新，已在终端里登录过），由 agy 自己去问 Google：5 小时和每周额度 |
 
 - 对应哪条订阅：按服务商自动对应（Anthropic → Claude、OpenAI → ChatGPT、Cursor、GitHub Copilot、Grok、Gemini → Google AI）；同一家有几条时显示在第一条在用的上。想指定，用 MCP 的 `update_asset` 设 `usageSource`；`none` 表示这条不显示用量。读到套餐但资产板里没有这条订阅时，“全部用量…”里可以一键添加。
 - 本期用量是“按各家 API 标价折算”的金额，订阅本身不按这个收费；用来回答“这个月值不值订阅价”。没有标价的模型只计 token。
@@ -277,7 +277,7 @@ App 自己会连的：
 | 探针（“设置 › 功能 › 实时状态”） | 你自己添加的监控面板，只读固定的几个接口，按你设的读取间隔 |
 | SSH 直读（同上，每台主机另外打开） | 你的服务器，用系统 `ssh`、你的 `~/.ssh/config` 和密钥，只跑一条固定的只读命令，按你设的读取间隔 |
 | SSH 直读写的主机条目 | 勾选「写进 ~/.ssh/assetboard.conf」的服务器记录：App 把它的 Host 写进 `~/.ssh/assetboard.conf`（并在 `~/.ssh/config` 顶部加一行 `Include assetboard.conf`），删除记录时删掉；只动这一个文件和那一行 | 本机 |
-| AI 额度的额度接口（“设置 › 连接 › AI 额度”里逐个工具打开） | `api.anthropic.com`、`chatgpt.com`、`cursor.com`、`api.github.com`、`cli-chat-proxy.grok.com`、`opencode.ai` 的用量接口，或 Antigravity 在 `127.0.0.1` 的本机服务；每个工具最多 10 分钟一次，用该工具自己的登录，不保存 |
+| AI 额度的额度接口（“设置 › 连接 › AI 额度”里逐个工具打开） | `api.anthropic.com`、`chatgpt.com`、`cursor.com`、`api.github.com`、`cli-chat-proxy.grok.com`、`opencode.ai` 的用量接口，或 Antigravity 在 `127.0.0.1` 的本机服务（没开时是本机 `agy` 自己的用量报告，由 agy 联网）；每个工具最多 10 分钟一次，用该工具自己的登录，不保存 |
 | 平台状态（同上，在“设置 › 连接 › 平台状态”里连接） | `api.supabase.com`、`api.vercel.com`、`api.render.com`、`api.upstash.com`，只发固定的读取请求，按你给每个平台设的间隔（1 到 60 分钟）；回答在 App 里裁成名称和状态，邮箱、主机名、环境变量和数据库密码不进页面 |
 
 你点了才会连的：同步 GitHub（`api.github.com`，或本机 `gh` 命令）、第一次连 Cloudflare、从注册商导入（`api.namecheap.com` 或 `api.porkbun.com`，只读域名列表）、从云平台导入（`api.hetzner.cloud`、`api.digitalocean.com` 或 `api.vercel.com`，只读列表）、“核对注册局日期”、粘贴域名或点“从注册局填写到期日和注册商”时的注册局查询、“获取网站图标”批量补齐、“检查更新…”。打开资产的管理链接由你的浏览器完成，不经过 Assetboard。

@@ -38,13 +38,15 @@ const AI_SOURCE_NOTES={
  copilot:()=>tr('用本机 gh 的登录'),
  grok:()=>tr('用 ~/.grok/auth.json 里 Grok CLI 自己的登录'),
  opencode:()=>tr('用 opencode 里 Go 的 key'),
- antigravity:()=>tr('从 Antigravity 进程的命令行读它本机服务的 CSRF 令牌，只连 127.0.0.1，由它去问 Google')
+ antigravity:()=>tr('Antigravity 开着时问它在 127.0.0.1 上的本机服务（令牌从它的进程命令行读）；没开就运行本机的 agy -p /usage，由 agy 用它自己的登录去问 Google')
 };
 
 // MARK: Per record
 // The record's price a month in USD, or null when it has none that counts (free, no cycle, no rate).
 function aiMonthlyUsd(a){const t=costTotals([{...a,hiddenAt:null,stopped:false}],{currency:'USD',rates:fx.rates});return t.monthly>0?t.monthly:null;}
 // The reading a record shows, or null: only the record that owns its vendor (aiUsageOwners) shows one.
+// What an endpoint's answer lacked, said under the tool's name.
+const AI_SOURCE_STATES={noPercent:()=>tr('接口答了，但没给出这个周期用了多少')};
 function aiQuotaFor(a){
  const snap=aiUsageSnap();if(!snap||a?.type!=='ai')return null;
  const vendor=aiVendorOf(a);if(!vendor||aiUsageOwners(state.assets).get(vendor)!==a.id)return null;
@@ -141,7 +143,7 @@ function aiUsageDialog(){
   const st=snap.sources?.[id]||{},set=settings.find(x=>x.id===id)||{local:s.local.length>0,api:false,hasLocal:s.local.length>0};
   const chip=st.error?`<span class="chip bad" title="${esc(st.error)}">${tr('出错')}</span>`:st.found||st.apiAt?`<span class="chip ok">${tr('读到')}</span>`:`<span class="chip">${tr('没找到')}</span>`;
   const host=(()=>{try{return new URL(s.api).host;}catch{return s.api;}})();
-  return `<tr><th scope="row"><span class="aq-s-name">${esc(s.name)}</span>${st.error?`<span class="aq-s-error">${esc(st.error)}</span>`:st.last?`<span class="aq-s-when">${esc(tr('最近 {when}',{when:aiAgoText(st.last)}))}</span>`:''}</th><td>${chip}</td><td>${set.hasLocal?`<input type="checkbox" class="prefs-switch" role="switch" data-action="ai-usage-local" data-id="${id}" aria-label="${esc(tr('读 {name} 的本机文件',{name:s.name}))}" title="${esc(s.local.join('\n'))}"${set.local?' checked':''}>`:'<span class="quiet-fact">—</span>'}</td><td><input type="checkbox" class="prefs-switch" role="switch" data-action="ai-usage-api" data-id="${id}" aria-label="${esc(tr('用 {name} 的登录读额度接口',{name:s.name}))}" title="${esc(host)}"${set.api?' checked':''}></td></tr>`;
+  return `<tr><th scope="row"><span class="aq-s-name">${esc(s.name)}</span>${st.error?`<span class="aq-s-error">${esc(st.error)}</span>`:st.note&&AI_SOURCE_STATES[st.note]?`<span class="aq-s-when">${esc(AI_SOURCE_STATES[st.note]())}</span>`:st.last?`<span class="aq-s-when">${esc(tr('最近 {when}',{when:aiAgoText(st.last)}))}</span>`:''}</th><td>${chip}</td><td>${set.hasLocal?`<input type="checkbox" class="prefs-switch" role="switch" data-action="ai-usage-local" data-id="${id}" aria-label="${esc(tr('读 {name} 的本机文件',{name:s.name}))}" title="${esc(s.local.join('\n'))}"${set.local?' checked':''}>`:'<span class="quiet-fact">—</span>'}</td><td><input type="checkbox" class="prefs-switch" role="switch" data-action="ai-usage-api" data-id="${id}" aria-label="${esc(tr('用 {name} 的登录读额度接口',{name:s.name}))}" title="${esc(host)}"${set.api?' checked':''}></td></tr>`;
  }).join('');
  modal(tr('AI 额度与用量'),`<div class="ai-usage">${vendors?`<ul class="aq-vendors">${vendors}</ul>`:`<p class="form-note">${tr('还没有读到用量。装了 Claude Code、Codex 这类工具并用过以后，这里会自动出现')}</p>`}<table class="aq-sources"><thead><tr><th scope="col">${tr('工具')}</th><th scope="col">${tr('状态')}</th><th scope="col" title="${tr('只读本机文件里的数字，不读对话内容，不联网')}">${tr('本机文件')}</th><th scope="col" title="${tr('用这个工具自己的登录请求它的用量接口；默认关')}">${tr('额度接口')}</th></tr></thead><tbody>${rows}</tbody></table><p class="form-note" role="note">${ui('lock')}${tr('读数只在内存里，不进资产数据、备份和导出；额度接口用的登录只在请求时读取，不保存，每次请求都在网络记录里')}</p><div class="form-actions">${nativeStore&&!demoMode?`<button class="button" data-action="ai-usage-read">${ui('refresh')}${tr('立即读取')}</button>`:''}<span class="form-note">${tr('读于 {when}',{when:snap.at?aiAgoText(snap.at):'—'})}</span></div></div>`,'ai-usage');
 }
