@@ -44,3 +44,26 @@ test('AI plans: a plan becomes record fields in the stored cost format, monthly 
   assert.equal(D.iconVendor({type:'ai',...f}).host,(f.url?D.vendorForHost(new URL(f.url).hostname):D.iconVendor({type:'ai',name:'x',provider:p.provider})).host,`${p.name}: icon follows the vendor`);
  }
 });
+
+test('AI plans: a price in another currency is the vendor\'s own where it has one, else its listed price at the rates',()=>{
+ const plan={name:'Sample Plus',provider:'Sample',amount:20,yearly:200,currency:'USD',prices:{EUR:{amount:22,yearly:216},GBP:{amount:18}}},rates={USD:1,EUR:.9,GBP:.75,JPY:158.13,HKD:7.85};
+ assert.deepEqual(D.aiPlanPrice(plan,'USD'),{currency:'USD',value:20,cycle:'monthly',listed:true});
+ assert.deepEqual(D.aiPlanPrice(plan,'EUR','yearly'),{currency:'EUR',value:216,cycle:'yearly',listed:true});
+ // No yearly price in pounds: the monthly one, never the dollar year.
+ assert.deepEqual(D.aiPlanPrice(plan,'GBP','yearly'),{currency:'GBP',value:18,cycle:'monthly',listed:true});
+ assert.equal(D.aiPlanPrice(plan,'JPY'),null);assert.equal(D.aiPlanPrice(null,'USD'),null);
+ assert.deepEqual(D.aiPlanPriceIn(plan,'EUR','monthly',rates),{currency:'EUR',value:22,cycle:'monthly',listed:true});
+ assert.deepEqual(D.aiPlanPriceIn(plan,'HKD','monthly',rates),{currency:'HKD',value:157,cycle:'monthly',listed:false});
+ assert.deepEqual(D.aiPlanPriceIn(plan,'JPY','yearly',rates),{currency:'JPY',value:31626,cycle:'yearly',listed:false});
+ assert.equal(D.aiPlanPriceIn(plan,'XXX','monthly',rates),null);
+ assert.equal(D.aiPlanFields(plan,'monthly','EUR').cost,'€22 / 月');assert.equal(D.aiPlanFields(plan,'yearly','EUR').cost,'€216 / 年');
+ assert.equal(D.aiPlanFields(plan,'monthly','JPY').cost,'$20 / 月','a currency the vendor does not sell in falls back to the listed one');
+ const plus=D.findAiPlan('ChatGPT Plus'),gpro=D.findAiPlan('Google AI Pro');
+ assert.equal(D.aiPlanFields(plus,'monthly','EUR').cost,'€23 / 月');assert.equal(D.aiPlanFields(plus,'monthly','GBP').cost,'£20 / 月');assert.equal(D.aiPlanPrice(plus,'JPY'),null);
+ assert.equal(D.aiPlanPrice(gpro,'JPY').value,2900);assert.equal(D.aiPlanPrice(gpro,'GBP').value,18.99);assert.equal(D.aiPlanPrice(D.findAiPlan('Claude Max'),'EUR'),null);
+ // Every other price in the table: a main currency, a positive amount, an official page; a yearly price only beside the plan's own.
+ for(const p of D.AI_PLANS)for(const [code,x] of Object.entries(p.prices||{})){
+  assert.ok(D.MAIN_CURRENCIES.includes(code)&&code!==p.currency,`${p.name} ${code}`);assert.ok(x.amount>0&&(x.yearly==null||x.yearly>x.amount&&p.yearly>0),`${p.name} ${code} amount`);
+  assert.match(x.source||'',/^https:\/\//,`${p.name} ${code} source`);
+ }
+});

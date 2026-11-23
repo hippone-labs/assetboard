@@ -2243,12 +2243,20 @@ function planPicks(provider,v={}){
  const chosen=plans.find(p=>p.name===String(v.name||'').trim());
  return `<div class="chip-group" role="group" aria-label="${tr('常见套餐')}">${plans.map(p=>`<button type="button" class="choice plan-pick" data-plan="${esc(p.name)}" aria-pressed="${p===chosen}" title="${esc(planTitle(p))}">${esc(p.plan)}<span class="plan-price">${esc(planPrice(p,'monthly'))}</span></button>`).join('')}</div>${chosen?.yearly?`<div class="chip-group plan-cycle" role="group" aria-label="${tr('付费方式')}">${['monthly','yearly'].map(c=>`<button type="button" class="choice" data-plan-cycle="${c}" aria-pressed="${(v.cycle==='yearly'?'yearly':'monthly')===c}">${c==='yearly'?tr('按年'):tr('按月')}<span class="plan-price">${esc(planPrice(chosen,c))}</span></button>`).join('')}</div>`:''}`;
 }
+// The form keeps its currency when the vendor sells the plan in it; otherwise the plan's own.
 function applyPlan(form,plan,cycle='monthly'){
- const f=aiPlanFields(plan,cycle),el=form.elements,parts=costParts(f.cost);
+ const el=form.elements,f=aiPlanFields(plan,cycle,el.currency?.value||plan.currency),parts=costParts(f.cost);
  if(!el.name.value.trim()||findAiPlan(el.name.value))el.name.value=f.name;
  el.provider.value=f.provider;el.amount.value=parts.value;setChoice(form,'currency',parts.currency);setChoice(form,'cycle',f.cycle);setChoice(form,'dateKind','renew');
  if(el.url&&(!el.url.value.trim()||AI_PLANS.some(p=>p.url===el.url.value.trim())))el.url.value=f.url||'';
  markProviderPick(form);el.date?.focus();
+}
+// Another currency on a form that holds a plan's price: the number follows, to the vendor's own price in that currency or, where
+// it has none, its listed price at the app's rates. A number the person typed stays.
+function planCurrency(form,before){
+ const el=form.elements,plan=findAiPlan(el.name?.value);if(!plan||!el.amount||before===el.currency.value)return;
+ const cycle=el.cycle?.value==='yearly'?'yearly':'monthly',rates=fx.rates,was=aiPlanPriceIn(plan,before,cycle,rates),now=aiPlanPriceIn(plan,el.currency.value,cycle,rates);
+ if(now&&was&&Number(el.amount.value)===was.value)el.amount.value=String(now.value);
 }
 document.addEventListener('click',e=>{
  const plan=e.target.closest('[data-plan]'),planCycle=e.target.closest('[data-plan-cycle]');
@@ -2262,7 +2270,9 @@ document.addEventListener('click',e=>{
   const group=button.closest('.chip-group'),input=group.querySelector('input[type="hidden"]'),on=button.getAttribute('aria-checked')==='true';
   if(group.classList.contains('folded')){group.classList.remove('folded');modalScrollState();return;}
   if(input.name==='type')input.form.dataset.typeTouched='1';
+  const before=input.value;
   setChoice(input.form,input.name,on&&group.dataset.clearable==='true'?'':button.dataset.value);
+  if(input.name==='currency')planCurrency(input.form,before);
   if(group.dataset.foldable){group.classList.add('folded');modalScrollState();}
   return;
  }
