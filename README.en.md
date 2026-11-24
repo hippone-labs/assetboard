@@ -164,7 +164,7 @@ Prerequisites (versions come from `desktop/Info.plist` and `.github/workflows/bu
 | Xcode / Swift | Minimum: Xcode command line tools with `swiftc` (`./desktop/build.sh` calls `xcrun swiftc`). Verified: Xcode 26.6 on CI; the full Xcode is needed only to compile the macOS 26 app icon (`Assets.car`), otherwise the committed one is used | `./desktop/build.sh` |
 | Node | Verified: 22 in CI (`node --test` needs no packages) | unit tests |
 | Python 3 | Any recent 3 (CI uses the runner default); no packages | browser version local server, `tools/` tests |
-| Playwright | Verified: 1.64.1 with Chromium; install once with `npm install --no-save playwright && npx playwright install chromium`, then `node tools/browser-tests.js` | UI tests (`tests/*.playwright.js`) |
+| Playwright | Verified: 1.64.1 with Chromium; install once with `npm install --no-save playwright && npx playwright install chromium`, then `node tools/browser-tests.js` (runs half the cores, at most 6 files, at once; `--jobs 1` runs one at a time, as CI does) | UI tests (`tests/*.playwright.js`) |
 
 There is no package.json, bundler or third-party dependency.
 
