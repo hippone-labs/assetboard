@@ -605,7 +605,7 @@ document.addEventListener('contextmenu',e=>{
 addEventListener('scroll',()=>closeMenu(false),{passive:true});
 // 手动录入 is the default and says nothing, so the detail names a source only for what came from elsewhere.
 function shownSource(a){return !a.source||a.source==='manual'?'':sourceLabel(a);}
-function sourceLabel(a){if(a.source==='local')return tr('本机读取');if(a.syncMissing)return tr('{source} 本次未返回',{source:SYNC_SOURCE_NAMES[a.source]||a.source});if(Object.hasOwn(REGISTRARS,a.source||''))return `${REGISTRARS[a.source].name} · ${a.syncStatus?tr(a.syncStatus):tr('状态未知')}`;if(Object.hasOwn(CLOUD_IMPORTS,a.source||''))return `${CLOUD_IMPORTS[a.source].name} · ${a.syncStatus?tr(a.syncStatus):tr('状态未知')}`;if(a.source==='github')return tr('GitHub 仓库 · {status}',{status:a.syncStatus?tr(a.syncStatus):tr('状态未知')});if(a.source==='cloudflare')return `Cloudflare ${a.resourceKind||'Zone'} · ${a.syncStatus?tr(a.syncStatus):tr('状态未知')}`;return {manual:tr('手动录入'),agent:tr('外部工具添加'),demo:tr('演示资产'),ssh:'~/.ssh/config',csv:a.importedFrom?tr('{file} 导入',{file:tr(a.importedFrom)}):tr('表格导入')}[a.source]||tr('导入');}
+function sourceLabel(a){if(a.source==='local')return tr('本机读取');if(a.source==='peer')return tr('从配对的 Mac 读取');if(a.syncMissing)return tr('{source} 本次未返回',{source:SYNC_SOURCE_NAMES[a.source]||a.source});if(Object.hasOwn(REGISTRARS,a.source||''))return `${REGISTRARS[a.source].name} · ${a.syncStatus?tr(a.syncStatus):tr('状态未知')}`;if(Object.hasOwn(CLOUD_IMPORTS,a.source||''))return `${CLOUD_IMPORTS[a.source].name} · ${a.syncStatus?tr(a.syncStatus):tr('状态未知')}`;if(a.source==='github')return tr('GitHub 仓库 · {status}',{status:a.syncStatus?tr(a.syncStatus):tr('状态未知')});if(a.source==='cloudflare')return `Cloudflare ${a.resourceKind||'Zone'} · ${a.syncStatus?tr(a.syncStatus):tr('状态未知')}`;return {manual:tr('手动录入'),agent:tr('外部工具添加'),demo:tr('演示资产'),ssh:'~/.ssh/config',csv:a.importedFrom?tr('{file} 导入',{file:tr(a.importedFrom)}):tr('表格导入')}[a.source]||tr('导入');}
 function dateText(a){const status=assetDateStatus(a);if(status.level==='none')return a.date||tr('待补充');return [status.label.startsWith(status.date)?status.label:`${status.date} · ${status.label}`,billingCycles[a.cycle]?billingCycles[a.cycle].label:''].filter(Boolean).join(' · ');}
 // Manual display order from the inspector menu: bring one record to the front of its category, or go back to recency order.
 function manualOrder(type){return !!state.cardOrder?.[type]?.length;}
@@ -2995,6 +2995,7 @@ function prefsDialog(section){
   mac&&featureOn('agent')?link(tr('MCP 接入'),null,'agent-setup',tr('给外部工具的配置')):'',
   mac&&typeof probeOn==='function'&&probeOn()?link(tr('探针数据源'),null,'probe-sources',tr('监控面板的地址和账号')):'',
   mac&&typeof sshOn==='function'&&sshOn()?link(tr('SSH 直读'),null,'ssh-probe-open',tr('逐台开启、读取间隔')):'',
+  mac&&typeof peersDialog==='function'?link(tr('其他设备'),featureOn('peers')?peersNow.peers.length>0:null,'peers-open',tr('和你的其他 Mac 配对，互相读本机信息和“正在做”')):'',
   featureOn('aiUsage')&&typeof aiUsageDialog==='function'?link(tr('AI 额度'),null,'ai-usage-open',tr('本机 AI 工具的用量和订阅额度；默认也用各工具自己的登录读额度接口')):'',
   mac&&typeof platformOn==='function'&&platformOn()?link(tr('平台状态'),platform.sources.length>0,'platform-sources',tr('Supabase、Vercel、Render、Upstash 上的项目状态')):''].join(''):'';
  // 外观: the accent (the 主题 dialog), the wall's skin (theme.js) and its density (board-wall.js); all kept on this device only.
@@ -3037,6 +3038,7 @@ function setFeatureNow(key,on){
  if(key==='pulls'&&on&&typeof pullsRefresh==='function')pullsRefresh(true);
  if(key==='codingSessions'&&typeof codingSwitch==='function')codingSwitch(on);
  if(key==='localDevice'&&typeof deviceSwitch==='function')deviceSwitch(on);
+ if(key==='peers'&&typeof peersSwitch==='function')peersSwitch(on);
  if(key==='probe'&&on){if(typeof probeStart==='function')probeStart();if(typeof sshStart==='function')sshStart();if(typeof platformStart==='function')platformStart();}
  drawTopnavActions();render();prefsChanged();toast(on?tr('{name}：已打开',{name:FEATURES[key].name}):tr('{name}：已关闭',{name:FEATURES[key].name}));
 }

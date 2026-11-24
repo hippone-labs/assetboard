@@ -27,7 +27,7 @@ window.assetboardCodingSessions=result=>{
  codingBusy=0;if(!codingOn())return;
  const read=parseCodingAnswer(result);
  // A read that failed leaves nothing behind: sessions that may have ended are not shown on.
- if(read)codingReadings={...codingReadings,[read.host.id]:read};else codingReadings={};
+ if(read)codingReadings={...codingReadings,[read.host.id]:read};else{const {local,...others}=codingReadings;codingReadings=others;}
 };
 // 设置 › 功能: off forgets what was read; on reads at once.
 function codingSwitch(on){codingReadings={};codingDemoData=null;if(on){codingAsked=0;codingRefresh();}}

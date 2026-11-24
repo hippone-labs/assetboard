@@ -294,6 +294,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
     /// Method and start of each waiting call, for 网络记录.
     var agentCalls: [String: (method: String, started: Date)] = [:]
     let cloudflare = CloudflareConnector()
+    /// 其他设备 (DevicePairing.swift): nil in a demo; listens only while the page has the feature on.
+    var pairing: DevicePairing?
     let github = GitHubConnector()
     let probes = ProbeSources()
     /// Sources being read now: a refresh asked again while one runs is dropped, not queued.
@@ -495,6 +497,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
                 agentInbox = inbox
                 NetworkLog.shared.database = store.database
                 exchangeRates = ExchangeRates(directory: store.directory)
+                if let peers = try? PeerStore(directory: store.directory.appendingPathComponent("devices", isDirectory: true)) {
+                    let pairing = DevicePairing(store: peers, name: Host.current().localizedName ?? "Mac")
+                    pairing.answer = { ["device": DeviceInfo.read(), "sessions": pruneSessions(CodingSessions.read())] }
+                    pairing.events = { [weak self] event in self?.sendToPage("assetboardPeers", event) }
+                    pairing.log = { direction, name, address, ok, note in
+                        NetworkLog.shared.record(direction: direction, service: L("其他设备"), method: note.hasPrefix("pair") ? "PAIR" : "READ", host: name, path: note, ok: ok, address: address)
+                    }
+                    self.pairing = pairing
+                }
                 NetworkLog.shared.onEntry = { [weak self] entry in
                     guard let self, self.boardLoaded, let data = try? JSONSerialization.data(withJSONObject: entry),
                           let json = String(data: data, encoding: .utf8) else { return }
@@ -938,6 +949,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         }
     }
 
+    /// 其他设备: the page's requests (DEVICE-PAIRING.md). Answers come back through assetboardPeers and assetboardPeerFacts.
+    func handlePeers(_ body: [String: Any]) {
+        guard let pairing, !demoMode else { return }
+        let text = { (key: String, limit: Int) in String((body[key] as? String ?? "").prefix(limit)) }
+        switch body["op"] as? String {
+        case "enable": if body["on"] as? Bool == true { pairing.start() } else { pairing.stop() }; pairing.list()
+        case "list": pairing.list()
+        case "pair": pairing.pair(service: text("service", 100), host: text("host", 260))
+        case "confirm": pairing.confirm(body["ok"] as? Bool == true)
+        case "unpair": pairing.unpair(text("id", 32))
+        case "read": pairing.read(text("id", 32)) { [weak self] reply in self?.sendToPage("assetboardPeerFacts", reply) }
+        default: break
+        }
+    }
+    func sendToPage(_ callback: String, _ value: [String: Any]) {
+        guard let data = try? JSONSerialization.data(withJSONObject: value), let json = String(data: data, encoding: .utf8) else { return }
+        webView.evaluateJavaScript("window.\(callback)?.(\(json))")
+    }
+
     /// 本机设备 (device-local.js): this Mac's model, chip, memory, macOS version, disk and battery, one read at a time, off the main
     /// thread. The answer goes to `assetboardDeviceInfo`; the page keeps it as this Mac's record. Never in a demo.
     private var deviceInfoReading = false
@@ -1318,6 +1348,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         }
         if body["action"] as? String == "githubPulls" {
             readPulls(body)
+            return
+        }
+        if body["action"] as? String == "peers" {
+            handlePeers(body)
             return
         }
         if body["action"] as? String == "deviceInfo" {
@@ -2605,6 +2639,8 @@ if CommandLine.arguments.contains(Updater.launchCheckFlag) {
     testGitHubPulls()
 } else if CommandLine.arguments.contains("--test-coding-sessions") {
     testCodingSessions()
+} else if CommandLine.arguments.contains("--test-device-pairing") {
+    testDevicePairing()
 } else if CommandLine.arguments.contains("--test-device") {
     testDeviceInfo()
 } else if CommandLine.arguments.contains("--test-registrar") {

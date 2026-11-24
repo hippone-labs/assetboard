@@ -231,6 +231,7 @@ let englishStrings: [String: [String]] = [
     "页面没有响应": ["The page did not respond"],
     "Assetboard 没有及时回复": ["Assetboard did not answer in time"],
     "本机 assetboard-cli": ["assetboard-cli on this Mac"],
+    "其他设备": ["Other devices"],
     "Assetboard 正在退出": ["Assetboard is quitting"],
     "发送失败": ["Sending failed"],
     "Assetboard 没有回复": ["Assetboard did not answer"],

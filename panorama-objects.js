@@ -73,8 +73,9 @@
  }
  // What the Mac's screen shows: this machine's readings only (host.kind local). total 0 = the empty state.
  //   → {total, active, lines:[{id,name,count,repo,minutes}], more, host}   a line per tool, its leading session's repository and minutes
- function workScreen(readings,{now=Date.now(),summary=null,cap=3}={}){
-  const list=(Array.isArray(readings)?readings:[readings]).filter(r=>r&&Array.isArray(r.sessions)&&(r.host?.kind||'local')==='local');
+ // hostId: another machine's reading (its host id) instead of this Mac's.
+ function workScreen(readings,{now=Date.now(),summary=null,cap=3,hostId=''}={}){
+  const list=(Array.isArray(readings)?readings:[readings]).filter(r=>r&&Array.isArray(r.sessions)&&(hostId?r.host?.id===hostId:(r.host?.kind||'local')==='local'));
   const s=(typeof summary==='function'?summary:sessionSummary)(list,now),host=String(list[0]?.host?.name||'');
   if(!s||!s.total||!Array.isArray(s.tools))return {total:0,active:0,lines:[],more:0,host};
   return {total:s.total,active:s.active||0,lines:s.tools.slice(0,cap).map(t=>({id:t.id,name:t.name,count:t.count,repo:String(t.sessions?.[0]?.repo||''),minutes:t.sessions?.[0]?.minutes??null})),more:Math.max(0,s.tools.length-cap),host};

@@ -21,6 +21,9 @@ const FEATURES={
  // 本机设备 (device-local.js, device-view.js): on until switched. It reads this Mac's own facts through calls that ask for no
  // permission, and keeps them on this Mac's device record; nothing goes over the network.
  localDevice:{name:tr('本机设备'),note:tr('把这台 Mac 记成一条设备：型号、芯片、内存、系统版本、磁盘、电池和序列号。App 打开或回到前台时读，最多 10 分钟一次；只读本机，不联网，不弹权限'),on:true,mac:true},
+ // 其他设备 (device-peers.js, device-peers-view.js, desktop/DevicePairing.swift): off until switched, since on it listens on the
+ // network and macOS asks about the local network.
+ peers:{name:tr('其他设备'),note:tr('和配对过的其他 Mac 互相读取本机信息和“正在做”。打开后这台 Mac 在局域网上可被发现，第一次会弹“本地网络”授权'),on:false,mac:true},
  agent:{name:tr('外部工具接入（MCP）'),note:tr('让 Claude、ChatGPT、Cursor 等工具或脚本通过 assetboard-cli 查询和修改资产；关掉后它们的调用一律被拒绝'),on:true,mac:true},
  // Under 外部工具接入, shown while it is on. Off until switched, in a demo too: they decide what leaves the Mac.
  agentAddresses:{name:tr('把地址和联系方式交给 AI 工具'),note:tr('关着时，AI 工具读到的 IP、SSH 主机和用户、手机号和邮箱都是遮住的；搜索仍按真实值匹配'),on:false,mac:true,under:'agent'},
