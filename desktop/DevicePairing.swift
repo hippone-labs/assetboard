@@ -15,7 +15,8 @@ import CryptoKit
 ///
 /// Frames: a four-byte big-endian length, then that many bytes of JSON. One exchange per connection.
 enum PeerWire {
-    static let limit = 4 << 20
+    /// A board with its site icons can run to a few MB.
+    static let limit = 24 << 20
     static func send(_ c: NWConnection, _ object: [String: Any], done: ((Bool) -> Void)? = nil) {
         guard let body = try? JSONSerialization.data(withJSONObject: object), body.count <= limit else { done?(false); return }
         var length = UInt32(body.count).bigEndian
@@ -79,6 +80,12 @@ final class PeerStore {
         var host: String
         var service: String
         var pairedAt: String
+        /// 同步资产板: this Mac lets that one read its board. Both sides must allow it for the boards to merge.
+        var sync: Bool?
+        /// How this Mac's page folds that board in the first time ('here', 'there', 'merge'), since when (ms), and whether it has.
+        var syncFirst: String?
+        var syncSince: Double?
+        var syncDone: Bool?
     }
     let directory: URL
     let identity: Curve25519.KeyAgreement.PrivateKey
@@ -113,6 +120,20 @@ final class PeerStore {
     func peer(publicKey: Data) -> Peer? { peers.first { $0.publicKey == publicKey.base64EncodedString() } }
     func add(_ peer: Peer) { peers.removeAll { $0.id == peer.id }; peers.append(peer); save() }
     func remove(id: String) { peers.removeAll { $0.id == id }; save() }
+    func setSync(id: String, on: Bool, first: String? = nil, since: Double? = nil, done: Bool? = nil) {
+        guard let at = peers.firstIndex(where: { $0.id == id }) else { return }
+        peers[at].sync = on
+        if !on { peers[at].syncFirst = nil; peers[at].syncSince = nil; peers[at].syncDone = nil }
+        if let first, ["here", "there", "merge"].contains(first) { peers[at].syncFirst = first }
+        if let since, since > 0 { peers[at].syncSince = since }
+        if let done { peers[at].syncDone = done }
+        save()
+    }
+    /// 其他设备 on or off, kept here because the page's own storage does not outlive the app.
+    var enabled: Bool {
+        get { ((try? JSONSerialization.jsonObject(with: Data(contentsOf: directory.appendingPathComponent("settings.json")))) as? [String: Any])?["enabled"] as? Bool == true }
+        set { try? PeerStore.write(["enabled": newValue], to: directory.appendingPathComponent("settings.json")) }
+    }
     func remember(id: String, host: String) {
         guard let at = peers.firstIndex(where: { $0.id == id }), !host.isEmpty, peers[at].host != host else { return }
         peers[at].host = host; save()
@@ -132,6 +153,8 @@ final class DevicePairing {
     let queue = DispatchQueue(label: "studio.assetboard.pairing")
     /// What this Mac answers a paired Mac with ({device, sessions}); read off the main thread.
     var answer: () -> [String: Any] = { [:] }
+    /// This Mac's saved board, for a paired Mac this one syncs with; nil when there is none.
+    var board: () -> [String: Any]? = { nil }
     /// Events for the page: {pairing:{…}}, {found:[…]}, {paired:{…}}; called on the main queue.
     var events: ([String: Any]) -> Void = { _ in }
     /// 网络记录: one entry per exchange (direction, peer name, address, ok, note); never the content.
@@ -150,6 +173,8 @@ final class DevicePairing {
         var name = "", publicKey = Data(), theirOnce = Data(), code = "", host = "", service = ""
         var key: SymmetricKey?
         var localOK: Bool?
+        /// The answer of the Mac asked: start from the other board ('there') or merge both ('merge').
+        var adopt = "there"
         var remoteConfirmed = false
         let deadline = Date().addingTimeInterval(DevicePairing.window)
         init(role: String, connection: NWConnection) { self.role = role; self.connection = connection }
@@ -161,7 +186,12 @@ final class DevicePairing {
     }
 
     private func emit(_ event: [String: Any]) { DispatchQueue.main.async { self.events(event) } }
-    var peerList: [[String: Any]] { store.peers.map { ["id": $0.id, "name": $0.name, "host": $0.host, "pairedAt": $0.pairedAt] } }
+    var peerList: [[String: Any]] { store.peers.map { p in
+        var out: [String: Any] = ["id": p.id, "name": p.name, "host": p.host, "pairedAt": p.pairedAt, "sync": p.sync == true, "syncDone": p.syncDone == true]
+        if let first = p.syncFirst { out["syncFirst"] = first }
+        if let since = p.syncSince { out["syncSince"] = since }
+        return out
+    } }
 
     // MARK: Listening and finding
 
@@ -222,12 +252,12 @@ final class DevicePairing {
         if !service.isEmpty, let e = found[service] { return e }
         return DevicePairing.endpoint(host, port: port)
     }
+    /// The other end of a connection as an address to reach it again: host, with the port when it is not the usual one.
     private static func address(_ c: NWConnection) -> String {
-        if case let .hostPort(host, _)? = c.currentPath?.remoteEndpoint {
-            let text = "\(host)"
-            return text.split(separator: "%").first.map(String.init) ?? text
-        }
-        return ""
+        guard case let .hostPort(host, port)? = c.currentPath?.remoteEndpoint else { return "" }
+        let text = "\(host)", bare = text.split(separator: "%").first.map(String.init) ?? text
+        guard port.rawValue != DevicePairing.defaultPort else { return bare }
+        return bare.contains(":") ? "[\(bare)]:\(port.rawValue)" : "\(bare):\(port.rawValue)"
     }
 
     // MARK: Pairing
@@ -264,7 +294,18 @@ final class DevicePairing {
         p.name = String((reply?["name"] as? String ?? "Mac").prefix(100)); p.publicKey = pub; p.theirOnce = once; p.key = agreed.key
         p.code = PeerCrypto.code(client: store.publicKey, server: pub, clientOnce: p.once.publicKey.rawRepresentation, serverOnce: once, shared: agreed.shared)
         if p.host.isEmpty { p.host = DevicePairing.address(p.connection) }
-        emit(["pairing": ["state": "code", "role": "client", "code": p.code, "name": p.name]])
+        // The person who started the pairing has already said yes; the code is shown here to compare with the other screen,
+        // where the one confirmation happens.
+        p.localOK = true
+        guard let key = p.key else { fail(p, "refused"); return }
+        PeerWire.send(p.connection, ["t": "confirm", "mac": PeerCrypto.mac(key, "client")])
+        emit(["pairing": ["state": "waiting", "role": "client", "code": p.code, "name": p.name]])
+        PeerWire.receive(p.connection) { reply in
+            self.queue.async {
+                guard self.pending === p else { return }
+                if reply?["t"] as? String == "confirm", reply?["mac"] as? String == PeerCrypto.mac(key, "server") { p.remoteConfirmed = true; self.settle(p) } else { self.fail(p, "declined") }
+            }
+        }
     }
     private func serverHello(_ c: NWConnection, _ hello: [String: Any]) {
         guard pending == nil else { PeerWire.send(c, ["t": "busy"]) { _ in c.cancel() }; return }
@@ -274,7 +315,8 @@ final class DevicePairing {
         guard let agreed = PeerCrypto.onceKey(p.once, once) else { c.cancel(); return }
         p.name = String((hello["name"] as? String ?? "Mac").prefix(100)); p.publicKey = pub; p.theirOnce = once; p.key = agreed.key
         p.code = PeerCrypto.code(client: pub, server: store.publicKey, clientOnce: once, serverOnce: p.once.publicKey.rawRepresentation, shared: agreed.shared)
-        p.host = DevicePairing.address(c)
+        // The client's source port is not where it listens: keep only its host.
+        p.host = DevicePairing.address(c).replacingOccurrences(of: #":\d+$"#, with: "", options: .regularExpression).trimmingCharacters(in: CharacterSet(charactersIn: "[]"))
         pending = p
         PeerWire.send(c, ["t": "hello", "name": name, "pub": store.publicKey.base64EncodedString(), "once": p.once.publicKey.rawRepresentation.base64EncodedString()])
         emit(["pairing": ["state": "code", "role": "server", "code": p.code, "name": p.name]])
@@ -288,39 +330,31 @@ final class DevicePairing {
         }
         queue.asyncAfter(deadline: .now() + DevicePairing.window) { self.fail(p, "timeout") }
     }
-    /// The person's answer on this Mac: the codes match (ok) or not.
-    func confirm(_ ok: Bool) {
+    /// The answer of the person asked on this Mac (the one being paired with): allow or not. On the Mac that started it, false cancels.
+    func confirm(_ ok: Bool, adopt: String = "there") {
         queue.async {
             guard let p = self.pending else { return }
+            p.adopt = adopt == "merge" ? "merge" : "there"
             guard ok else {
                 PeerWire.send(p.connection, ["t": "no"]) { _ in p.connection.cancel() }
                 self.pending = nil; self.emit(["pairing": ["state": "cancelled"]]); return
             }
+            guard p.role == "server" else { return }
             p.localOK = true
-            if p.role == "client", let key = p.key {
-                PeerWire.send(p.connection, ["t": "confirm", "mac": PeerCrypto.mac(key, "client")])
-                self.emit(["pairing": ["state": "waiting", "role": "client", "code": p.code, "name": p.name]])
-                PeerWire.receive(p.connection) { reply in
-                    self.queue.async {
-                        guard self.pending === p else { return }
-                        if reply?["t"] as? String == "confirm", reply?["mac"] as? String == PeerCrypto.mac(key, "server") { p.remoteConfirmed = true; self.settle(p) } else { self.fail(p, "declined") }
-                    }
-                }
-            } else {
-                if !p.remoteConfirmed { self.emit(["pairing": ["state": "waiting", "role": "server", "code": p.code, "name": p.name]]) }
-                self.settle(p)
-            }
+            if !p.remoteConfirmed { self.emit(["pairing": ["state": "waiting", "role": "server", "code": p.code, "name": p.name]]) }
+            self.settle(p)
         }
     }
     private func settle(_ p: Pending) {
         guard pending === p, p.localOK == true, p.remoteConfirmed else { return }
         let peer = PeerStore.Peer(id: PeerCrypto.id(p.publicKey), name: p.name, publicKey: p.publicKey.base64EncodedString(), host: p.host,
-                                  service: p.role == "client" ? p.service : p.name, pairedAt: ISO8601DateFormatter().string(from: Date()))
+                                  service: p.role == "client" ? p.service : p.name, pairedAt: ISO8601DateFormatter().string(from: Date()), sync: true,
+                                  syncFirst: p.role == "client" ? "here" : p.adopt, syncSince: Date().timeIntervalSince1970 * 1000, syncDone: false)
         store.add(peer)
         if p.role == "server", let key = p.key { PeerWire.send(p.connection, ["t": "confirm", "mac": PeerCrypto.mac(key, "server")]) { _ in p.connection.cancel() } } else { p.connection.cancel() }
         pending = nil
         log(p.role == "client" ? "out" : "in", p.name, p.host, true, "pair")
-        emit(["pairing": ["state": "paired", "name": p.name, "id": peer.id], "peers": peerList])
+        emit(["pairing": ["state": "paired", "role": p.role, "name": p.name, "id": peer.id], "peers": peerList])
     }
     private func fail(_ p: Pending, _ why: String) {
         guard pending === p else { return }
@@ -329,7 +363,8 @@ final class DevicePairing {
         emit(["pairing": ["state": "failed", "error": why]])
     }
     /// Sends the page what it lists: paired Macs, Macs found on this network, whether this Mac listens.
-    func list() { queue.async { self.emit(["peers": self.peerList, "found": self.found.keys.sorted(), "listening": self.listener != nil]) } }
+    func list() { queue.async { self.emit(["peers": self.peerList, "found": self.found.keys.sorted(), "listening": self.listener != nil, "enabled": self.store.enabled]) } }
+    func setSync(_ id: String, _ on: Bool, first: String? = nil, since: Double? = nil, done: Bool? = nil) { queue.async { self.store.setSync(id: id, on: on, first: first, since: since, done: done); self.emit(["peers": self.peerList]) } }
     func unpair(_ id: String) { queue.async { self.store.remove(id: id); self.emit(["peers": self.peerList]) } }
 
     // MARK: Reading
@@ -352,24 +387,26 @@ final class DevicePairing {
         let host = DevicePairing.address(c)
         guard let from = (message["from"] as? String).flatMap({ Data(base64Encoded: $0) }), let peer = store.peer(publicKey: from),
               let key = PeerCrypto.peerKey(store.identity, from), let ask = PeerCrypto.open(message["box"], key),
-              ask["ask"] as? String == "facts", let nonce = ask["n"] as? String, nonce.count >= 16, nonce.count <= 64,
+              let kind = ask["ask"] as? String, kind == "facts" || kind == "board", let nonce = ask["n"] as? String, nonce.count >= 16, nonce.count <= 64,
               let at = (ask["at"] as? String).flatMap({ ISO8601DateFormatter().date(from: $0) }), abs(at.timeIntervalSinceNow) <= DevicePairing.freshness else {
             log("in", "?", host, false, "refused"); c.cancel(); return
         }
         seen = seen.filter { $0.value.timeIntervalSinceNow > -2 * DevicePairing.freshness }
         guard seen[nonce] == nil else { log("in", peer.name, host, false, "replayed"); c.cancel(); return }
         seen[nonce] = Date()
+        // The board only to a Mac this one syncs with.
+        guard kind == "facts" || peer.sync == true else { log("in", peer.name, host, false, "board: not synced"); PeerWire.send(c, ["t": "res", "box": PeerCrypto.seal(["n": nonce, "error": "not-synced"], key) ?? ""]) { _ in c.cancel() }; return }
         DispatchQueue.global(qos: .utility).async {
-            var facts = self.answer()
+            var facts: [String: Any] = kind == "board" ? (self.board().map { ["board": $0] } ?? ["error": "no-board"]) : self.answer()
             facts["n"] = nonce
             self.queue.async {
                 guard let box = PeerCrypto.seal(facts, key) else { c.cancel(); return }
-                PeerWire.send(c, ["t": "res", "box": box]) { ok in c.cancel(); self.log("in", peer.name, host, ok, "facts") }
+                PeerWire.send(c, ["t": "res", "box": box]) { ok in c.cancel(); self.log("in", peer.name, host, ok, kind) }
             }
         }
     }
     /// Reads one paired Mac → done({ok, id, name, device?, sessions?, error?}) on the main queue.
-    func read(_ id: String, done: @escaping ([String: Any]) -> Void) {
+    func read(_ id: String, kind: String = "facts", done: @escaping ([String: Any]) -> Void) {
         queue.async {
             let finish: ([String: Any]) -> Void = { r in DispatchQueue.main.async { done(r) } }
             guard let peer = self.store.peers.first(where: { $0.id == id }), let pub = Data(base64Encoded: peer.publicKey),
@@ -378,7 +415,7 @@ final class DevicePairing {
             var nonceBytes = [UInt8](repeating: 0, count: 18)
             _ = SecRandomCopyBytes(kSecRandomDefault, nonceBytes.count, &nonceBytes)
             let nonce = Data(nonceBytes).base64EncodedString()
-            guard let box = PeerCrypto.seal(["ask": "facts", "at": ISO8601DateFormatter().string(from: Date()), "n": nonce], key) else { finish(["ok": false, "id": id, "error": "seal"]); return }
+            guard let box = PeerCrypto.seal(["ask": kind, "at": ISO8601DateFormatter().string(from: Date()), "n": nonce], key) else { finish(["ok": false, "id": id, "error": "seal"]); return }
             let c = NWConnection(to: endpoint, using: .tcp)
             var over = false
             let end: ([String: Any]) -> Void = { r in
@@ -386,7 +423,7 @@ final class DevicePairing {
                     guard !over else { return }
                     over = true; c.cancel()
                     let address = DevicePairing.address(c)
-                    self.log("out", peer.name, address.isEmpty ? peer.host : address, r["ok"] as? Bool == true, (r["error"] as? String) ?? "facts")
+                    self.log("out", peer.name, address.isEmpty ? peer.host : address, r["ok"] as? Bool == true, (r["error"] as? String).map { "\(kind): \($0)" } ?? kind)
                     if r["ok"] as? Bool == true, !address.isEmpty { self.store.remember(id: id, host: address) }
                     finish(r)
                 }
@@ -400,6 +437,7 @@ final class DevicePairing {
                             end(["ok": false, "id": id, "name": peer.name, "error": "refused"]); return
                         }
                         facts.removeValue(forKey: "n")
+                        if let error = facts["error"] as? String { end(["ok": false, "id": id, "name": peer.name, "error": error]); return }
                         end(["ok": true, "id": id, "name": peer.name, "at": ISO8601DateFormatter().string(from: Date())].merging(facts) { a, _ in a })
                     }
                 case .failed, .waiting: end(["ok": false, "id": id, "name": peer.name, "error": "unreachable"])
@@ -450,17 +488,19 @@ func testDevicePairing() {
     var up = 0
     a.start { if $0 { up += 1 } }; b.start { if $0 { up += 1 } }
     waitFor("listeners") { up == 2 }
-    let code: ([[String: Any]]) -> String? = { list in list.compactMap { ($0["pairing"] as? [String: Any]).flatMap { $0["state"] as? String == "code" ? $0["code"] as? String : nil } }.last }
+    let code: ([[String: Any]]) -> String? = { list in list.compactMap { ($0["pairing"] as? [String: Any]).flatMap { ["code", "waiting"].contains($0["state"] as? String ?? "") ? $0["code"] as? String : nil } }.last }
     a.pair(host: "127.0.0.1:47392")
     waitFor("codes") { code(aEvents) != nil && code(bEvents) != nil }
     precondition(code(aEvents) == code(bEvents), "both screens show the same code")
-    a.confirm(true)
-    waitFor("waiting for the other side") { aEvents.contains { ($0["pairing"] as? [String: Any])?["state"] as? String == "waiting" } }
-    precondition(a.store.peers.isEmpty && b.store.peers.isEmpty, "nothing is kept until both confirm")
+    waitFor("the starting side waits") { aEvents.contains { ($0["pairing"] as? [String: Any])?["state"] as? String == "waiting" } }
+    precondition(a.store.peers.isEmpty && b.store.peers.isEmpty, "nothing is kept until the Mac asked allows it")
     b.confirm(true)
     let paired: ([[String: Any]]) -> Bool = { $0.contains { ($0["pairing"] as? [String: Any])?["state"] as? String == "paired" } }
     waitFor("paired") { paired(aEvents) && paired(bEvents) }
     precondition(a.store.peers.first?.name == "mac-b" && b.store.peers.first?.name == "mac-a" && a.store.peers.first?.id == b.store.id)
+    precondition(a.store.peers.first?.sync == true && b.store.peers.first?.sync == true, "a pairing syncs from the start")
+    precondition(a.store.peers.first?.syncFirst == "here" && b.store.peers.first?.syncFirst == "there" && b.store.peers.first?.syncDone == false, "the Mac that started keeps its board; the Mac asked takes it once")
+    precondition(!a.store.enabled); a.store.enabled = true; precondition(try! PeerStore(directory: root.appendingPathComponent("a")).enabled, "on or off is kept across a restart")
     let reopened = try! PeerStore(directory: root.appendingPathComponent("a"))
     precondition(reopened.id == a.store.id && reopened.peers == a.store.peers, "the key and the pairing survive a restart")
     let mode = (try? FileManager.default.attributesOfItem(atPath: root.appendingPathComponent("a/identity.json").path)[.posixPermissions] as? Int) ?? 0
@@ -469,6 +509,22 @@ func testDevicePairing() {
     a.read(b.store.id) { answer = $0 }
     waitFor("read") { answer != nil }
     precondition(answer?["ok"] as? Bool == true && (answer?["device"] as? [String: Any])?["model"] as? String == "Mac14,3", "a reads b: \(answer ?? [:])")
+
+    // The board: only to a Mac b syncs with (a pairing starts syncing; stopping it on b stops answering).
+    b.board = { ["assets": [["id": "x1", "type": "domain", "name": "one.example.com"]], "blocks": [["id": "domain"]]] }
+    b.setSync(a.store.id, false)
+    waitFor("sync off") { b.store.peers.first?.sync == false }
+    answer = nil
+    a.read(b.store.id, kind: "board") { answer = $0 }
+    waitFor("board refused") { answer != nil }
+    precondition(answer?["ok"] as? Bool == false && answer?["error"] as? String == "not-synced", "no board before b syncs with a: \(answer ?? [:])")
+    b.setSync(a.store.id, true)
+    waitFor("sync on") { b.store.peers.first?.sync == true }
+    answer = nil
+    a.read(b.store.id, kind: "board") { answer = $0 }
+    waitFor("board read") { answer != nil }
+    precondition(((answer?["board"] as? [String: Any])?["assets"] as? [[String: Any]])?.first?["name"] as? String == "one.example.com", "a reads b's board once b syncs: \(answer ?? [:])")
+    precondition(answer?["device"] == nil, "a board answer carries only the board")
 
     // Raw requests to b: from a key b never paired with, tampered, stale, and replayed — none is answered.
     func raw(_ frame: [String: Any]) -> [String: Any]? {
@@ -497,7 +553,7 @@ func testDevicePairing() {
     bEvents = []
     c.pair(host: "127.0.0.1:47392")
     waitFor("second codes") { code(cEvents) != nil && code(bEvents) != nil }
-    c.confirm(true); b.confirm(false)
+    b.confirm(false)
     waitFor("declined") { cEvents.contains { ($0["pairing"] as? [String: Any])?["state"] as? String == "failed" } }
     precondition(stranger.peers.isEmpty && b.store.peers.count == 1, "a declined pairing keeps nothing")
     b.unpair(a.store.id)
@@ -507,5 +563,5 @@ func testDevicePairing() {
     waitFor("read after unpairing") { answer != nil }
     precondition(answer?["ok"] as? Bool == false, "after unpairing nothing is answered")
     a.stop(); b.stop(); c.stop()
-    print("PASS: device pairing: one code on both screens, nothing kept until both confirm, key 0600 and kept across restarts, sealed read; unpaired, tampered, stale and replayed requests unanswered; declined pairing and unpairing")
+    print("PASS: device pairing: board only to a Mac that syncs, one code on both screens, one confirmation on the Mac asked, syncing from the start, key 0600 and kept across restarts, sealed read; unpaired, tampered, stale and replayed requests unanswered; declined pairing and unpairing")
 }

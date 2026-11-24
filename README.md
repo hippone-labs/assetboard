@@ -58,9 +58,9 @@ GitHub 和 `~/.ssh/config` 也能导入仓库或服务器，但带不来到期�
 
 ## 数据与网络
 
-- 数据在 `~/Library/Application Support/Assetboard/`：`assetboard.sqlite`，另有 JSON 镜像 `board.json`。没有云同步和遥测。
+- 数据在 `~/Library/Application Support/Assetboard/`：`assetboard.sqlite`，另有 JSON 镜像 `board.json`。没有云同步和遥测；配对了其他 Mac 时，资产板只在这些 Mac 之间直接同步。
 - 令牌和 API key 存在 macOS 钥匙串。
-- App 自己会连的主机：检查更新（assetboard.app）、已知平台的网站图标、汇率（api.frankfurter.dev）、连上之后的 Cloudflare、本机 AI 工具的额度接口（用各工具自己的登录，可逐个关）。其余连接（RDAP、AI、实时状态、GitHub、Namecheap、Porkbun、Hetzner、DigitalOcean、Vercel）在你打开或点击之后才发生。
+- App 自己会连的主机：检查更新（assetboard.app）、已知平台的网站图标、汇率（api.frankfurter.dev）、连上之后的 Cloudflare、本机 AI 工具的额度接口（用各工具自己的登录，可逐个关）。其余连接（RDAP、AI、实时状态、其他设备、GitHub、Namecheap、Porkbun、Hetzner、DigitalOcean、Vercel）在你打开或点击之后才发生。
 - 网页本身由 Content-Security-Policy 禁止联网，所有请求经过 Swift 一侧，记在网络记录里。
 - 交给外部 AI 工具的数据默认遮住 IP、主机、手机号和邮箱，不含银行卡和手机号两类记录。
 
@@ -135,6 +135,7 @@ GitHub 和 `~/.ssh/config` 也能导入仓库或服务器，但带不来到期�
 - MCP 服务和命令行 `assetboard-cli`，供 Claude Code、Codex、Cursor 等工具读写资产，见[使用手册 · MCP 接入](GUIDE.md#mcp-接入外部-ai-工具与命令行)。每次外部调用都记在本机的 MCP 操作记录里（哪个客户端、什么时间、调了哪个工具、改了什么），在「设置 › MCP」查看。
 - AI 额度与用量：从本机的 Claude Code、Codex、Cursor、GitHub Copilot、Grok CLI、opencode、Antigravity 的文件和额度接口读出额度和用量，显示在对应的 AI 订阅上：快用完、闲置、按 API 价折算值不值。只读数字、模型名和时间。
 - 本机设备（Mac）：把这台 Mac 记成一条设备，写明型号、芯片、内存、系统版本、磁盘、电池和序列号；App 打开或回到前台时读，磁盘快满时标黄。只读本机，不联网，不弹权限。
+- 其他设备（Mac，默认关）：两台装了 Assetboard 的 Mac 配对后，互相读对方的本机信息和“正在做”，各自记成一条设备，资产板自动同步（每条以较新的修改为准，删除也同步）。配对时被点的那台核对 6 位数字后点允许；之后直接加密连接，同一网络自动发现，不在同一网络时填 Tailscale 地址。不经过任何服务器。
 - 正在做（Mac）：本机正在运行的 AI 编码会话（Claude Code、Codex、Cursor 等）有几个、各在哪个仓库和分支、运行了多久；只读进程名、工作目录、启动时间和会话文件的修改时间，不读对话内容。
 - 代码仓库（Mac，默认关闭）：GitHub 同步时一并读取分支和最近一次 Actions，失败或运行中的排在行首，新分支显示 14 天。
 - 键盘操作，按 `?` 查看快捷键，见[使用手册 · 快捷键](GUIDE.md#快捷键)。

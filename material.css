@@ -2971,3 +2971,4 @@ button.pj-fig:hover{background:var(--hover)}
 .peer-list{margin:6px 0 14px;padding:0;list-style:none}
 .peer-list li{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;border-top:1px solid var(--border)}
 .peer-add{display:flex;gap:8px;margin-bottom:12px}.peer-add input{flex:1;min-width:0}
+.peer-sync-choices{display:grid;gap:8px;margin-top:10px}.peer-sync-choices .button{display:flex;flex-direction:column;align-items:flex-start;gap:2px;height:auto;padding:10px 12px;text-align:left}.peer-sync-choices small{font-weight:400;opacity:.8}
