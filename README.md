@@ -165,7 +165,7 @@ open /Applications/Assetboard.app --args --demo
 | Xcode / Swift | 最低：带 `swiftc` 的 Xcode 命令行工具（`./desktop/build.sh` 调 `xcrun swiftc`）。已验证：CI 用 Xcode 26.6；只有要编译 macOS 26 应用图标（`Assets.car`）才需要完整 Xcode，否则用仓库里已提交的 | `./desktop/build.sh` |
 | Node | 已验证：CI 用 22（`node --test` 不需要装任何包） | 单元测试 |
 | Python 3 | 近期的 3 即可（CI 用 runner 自带版本），不需要装包 | 浏览器版本地服务、`tools/` 里的测试 |
-| Playwright | 已验证：1.64.1 加 Chromium；首次安装 `npm install --no-save playwright && npx playwright install chromium`，然后 `node tools/browser-tests.js` | 界面测试（`tests/*.playwright.js`） |
+| Playwright | 已验证：1.64.1 加 Chromium；首次安装 `npm install --no-save playwright && npx playwright install chromium`，然后 `node tools/browser-tests.js`（默认同时跑一半核心数、最多 6 个文件，`--jobs 1` 逐个跑；CI 上逐个跑） | 界面测试（`tests/*.playwright.js`） |
 
 没有 package.json、打包工具或第三方依赖。
 
