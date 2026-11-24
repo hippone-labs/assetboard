@@ -1,6 +1,8 @@
 // Panorama view (v13b P2): the read-only whole-board overview. Everything is derived from `state` by panorama.js; this file only draws it.
 // Status here is the registered status (expiry, manual stop), never a live probe, and the view says so (DESIGN-PRINCIPLES: no probing, not real-time).
 // v22: one card per hub (server, deployment, storage, or a bank card in the pay lens), sized by what it holds, so one server never fills the screen.
+// Two ways of drawing (画法): cards (this file) and objects (panorama-objects-view.js, OBJECT-PANORAMA.md). Objects need room: a window
+// they do not fit draws cards, the choice stays, and the bar says so.
 uiGlyphs.treemap='<rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M11 4.5v15M11 11.5h9.5M15.5 11.5v8"/>';
 uiGlyphs.expand='<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>';
 icons.project='<path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/>';
@@ -8,12 +10,14 @@ uiGlyphs.eyeOff='<path d="M3.5 12s3-5.5 8.5-5.5c1.2 0 2.3.3 3.2.7M20.5 12s-1.1 2
 let panoNative=false,panoShow=false,panoAlt=false,panoIdleTimer=0,panoFocus=null,panoOrigin=null,panoOpen=false,panoReturn=null,panoFrame=0,panoObserver=null,panoKey='',panoLooseOpen=false,panoCompact=false;
 const panoExpanded=new Set();
 const PANO_FOCUS_CAP=6;
-// The lens and the types switched off in each lens are remembered per viewer (their own key, so the board's view prefs never overwrite them).
+// The lens, the types switched off in each lens and the way of drawing are remembered per viewer (their own key, so the board's view prefs never overwrite them).
 const PANO_PREFS='assetboard.panorama';
-const panoPrefs=(()=>{try{const p=JSON.parse(localStorage.getItem(PANO_PREFS)||'{}');return {lens:typeof p.lens==='string'?p.lens:'',hide:p.hide&&typeof p.hide==='object'?p.hide:{}};}catch{return {lens:'',hide:{}};}})();
+const panoPrefs=(()=>{try{const p=JSON.parse(localStorage.getItem(PANO_PREFS)||'{}');return {lens:typeof p.lens==='string'?p.lens:'',hide:p.hide&&typeof p.hide==='object'?p.hide:{},style:p.style==='objects'?'objects':'cards'};}catch{return {lens:'',hide:{},style:'cards'};}})();
 let panoLens=panoPrefs.lens;
+// panoStyle is the chosen way of drawing, panoPainted the one on screen (cards whenever objects do not fit, and in the focused state).
+let panoStyle=panoPrefs.style,panoPainted='cards';
 const panoHide=panoPrefs.hide;
-function panoSaveLens(){try{localStorage.setItem(PANO_PREFS,JSON.stringify({lens:panoLens,hide:panoHide}));}catch{}}
+function panoSaveLens(){try{localStorage.setItem(PANO_PREFS,JSON.stringify({lens:panoLens,hide:panoHide,style:panoStyle}));}catch{}}
 const panoLensDef=()=>PANORAMA_LENSES.find(l=>l.key===panoLens)||PANORAMA_LENSES[0];
 const panoHidden=()=>Array.isArray(panoHide[panoLens])?panoHide[panoLens]:[];
 const panoModel=()=>buildPanorama(state.assets,{lens:panoLens,cardOrder:state.cardOrder||{},hide:panoHidden()});
@@ -115,6 +119,16 @@ function panoLensSwitch(){
  const open=panoramaLenses(state.assets);if(open.length<2)return '';
  return `<div class="pano-lens" role="group" aria-label="${tr('视角')}">${PANORAMA_LENSES.filter(l=>open.includes(l.key)).map(l=>`<button class="seg" data-lens="${l.key}" aria-pressed="${l.key===panoLens}">${tr(l.name)}</button>`).join('')}</div>`;
 }
+function panoStyleSwitch(){
+ const fell=panoStyle==='objects'&&panoPainted!=='objects';
+ return `<div class="pano-style" role="group" aria-label="${tr('画法')}">${[['cards',tr('卡片')],['objects',tr('实物')]].map(([key,name])=>`<button class="seg" data-style="${key}" aria-pressed="${key===panoStyle}"${fell&&key==='objects'?` title="${tr('放不下，先用卡片')}"`:''}>${name}</button>`).join('')}</div>${fell?`<span class="pano-fell" role="note" title="${tr('实物画法要更大的窗口；窗口放得下时会自动换回')}">${tr('放不下，先用卡片')}</span>`:''}`;
+}
+function panoSetStyle(key){
+ if(key===panoStyle||!['cards','objects'].includes(key))return;
+ panoStyle=key;panoSaveLens();panoFocus=null;panoramaRender();
+ $('#panorama')?.querySelector(`[data-style="${CSS.escape(key)}"]`)?.focus({preventScroll:true});
+ panoSay(panoPainted==='objects'?tr('实物画法'):key==='objects'?tr('放不下，先用卡片'):tr('卡片画法'));
+}
 
 // Focused state (v13b P3): one hub is the protagonist. Left rail = every hub of the lens, centre = the hero card with its addresses, a column per group.
 function panoRail(model,id){
@@ -171,26 +185,34 @@ function panoCardsHtml(model){
  const grid=model.accounts.flatMap(b=>b.lanes).map(l=>panoLane(l,bands)).join('')+panoLoose(model);
  return `<div class="pano-wrap"><div class="pano-grid">${grid}</div>${side?panoNext():''}</div>`;
 }
-function panoramaHtml(model){
- const sync=panoSyncTime(),tag=tr('登记状态 · 非实时')+(sync?' · '+tr('同步 {time}',{time:sync}):'');
+// scene = the objects drawing ({live, tally, body}, objectsScene) in place of the cards.
+function panoramaHtml(model,scene=null){
+ const sync=panoSyncTime(),tag=(scene?.live?tr('登记状态 · 含实时读数'):tr('登记状态 · 非实时'))+(sync?' · '+tr('同步 {time}',{time:sync}):'');
  const body=model.lanes.length?panoCardsHtml(model):`<div class="pano-empty"><p>${(PANO_WORDS[model.lens]||PANO_WORDS.host).empty}</p><button class="button icon-only" data-action="pano-add" aria-label="${tr('添加服务器')}" title="${tr('添加服务器')}">${ui('plus')}</button></div>${panoLoose(model)}`;
  const focusLane=panoFocus&&model.lanes.find(l=>l.id===panoFocus);if(panoFocus&&!focusLane)panoFocus=null;
  // Focused: the title becomes the way back, a breadcrumb to the whole map (Esc does the same).
  const title=focusLane?`<h2 class="pano-title"><button class="pano-back" data-action="pano-back" aria-label="${tr('返回全景')}" title="${tr('返回全景（Esc）')}">${ui('back')}${tr('全景')}</button><span class="pano-crumb" aria-hidden="true">/</span><span class="pano-here">${esc(displayName(focusLane.hub))}</span></h2>`:`<h2 class="pano-title">${ui('treemap')}${tr('全景')}</h2>`;
- return `<header class="pano-bar">${title}<div class="pano-totals">${panoTotals(model.totals)}</div><span class="pano-spacer"></span>${focusLane?'':panoLensSwitch()}<div class="pano-legend" aria-hidden="true"><span>${panoDot('red')}${tr('已过期')}</span><span>${panoDot('amber')}${tr('即将到期')}</span><span>${panoDot('')}${tr('登记中')}</span><span>${panoDot('',true)}${tr('已停用')}</span></div><span class="pano-tag" title="${tr('只显示你登记和同步的数据，不探测网络')}">${tag}</span><button class="button icon-only pano-show" data-action="pano-show" aria-pressed="${panoShow}" aria-label="${tr('展示模式')}" title="${tr('展示模式：遮住地址中间两段，顶栏自动淡出')}">${ui('expand')}</button><button class="button icon-only pano-close" data-action="pano-close" aria-label="${tr('关闭全景')}" title="${tr('关闭全景（Esc）')}">×</button></header>${focusLane?panoFocusHtml(model,focusLane):`<div class="pano-body cards${panoCompact?' compact':''}" data-layout="cards">${body}</div>`}`;
+ return `<header class="pano-bar">${title}<div class="pano-totals">${scene?scene.tally:panoTotals(model.totals)}</div><span class="pano-spacer"></span>${focusLane||scene?'':panoLensSwitch()}${focusLane?'':panoStyleSwitch()}<div class="pano-legend" aria-hidden="true"${scene?' hidden':''}><span>${panoDot('red')}${tr('已过期')}</span><span>${panoDot('amber')}${tr('即将到期')}</span><span>${panoDot('')}${tr('登记中')}</span><span>${panoDot('',true)}${tr('已停用')}</span></div><span class="pano-tag" title="${scene?.live?tr('登记和同步的数据，加上你打开的实时状态的读数'):tr('只显示你登记和同步的数据，不探测网络')}">${tag}</span><button class="button icon-only pano-show" data-action="pano-show" aria-pressed="${panoShow}" aria-label="${tr('展示模式')}" title="${tr('展示模式：遮住地址中间两段，顶栏自动淡出')}">${ui('expand')}</button><button class="button icon-only pano-close" data-action="pano-close" aria-label="${tr('关闭全景')}" title="${tr('关闭全景（Esc）')}">×</button></header>${focusLane?panoFocusHtml(model,focusLane):scene?scene.body:`<div class="pano-body cards${panoCompact?' compact':''}" data-layout="cards">${body}</div>`}`;
 }
 function panoramaRender(){
  const root=$('#panorama');if(!panoOpen||!root)return;
  if(panoDrag)panoDragEnd(true);if(panoLink)panoLinkEnd();
  if(!panoramaLenses(state.assets).includes(panoLens))panoLens=pickLens(state.assets,panoLens);
  const model=panoModel();panoShared=model.shared;
- const keep=document.activeElement?.closest?.('#panorama')?document.activeElement:null,saved=keep&&{lens:keep.dataset.lens,pick:keep.dataset.pick,hero:'heroHead' in keep.dataset,open:keep.dataset.open,chip:keep.dataset.chip,lane:keep.dataset.laneHead,more:keep.dataset.more,loose:'looseMore' in keep.dataset,add:keep.dataset.add,toggle:keep.dataset.toggle,close:keep.classList.contains('pano-close')};
+ const keep=document.activeElement?.closest?.('#panorama')?document.activeElement:null,saved=keep&&{lens:keep.dataset.lens,pick:keep.dataset.pick,hero:'heroHead' in keep.dataset,open:keep.dataset.open,chip:keep.dataset.chip,style:keep.dataset.style,lane:keep.dataset.laneHead,more:keep.dataset.more,loose:'looseMore' in keep.dataset,add:keep.dataset.add,toggle:keep.dataset.toggle,close:keep.classList.contains('pano-close')};
  const draw=()=>{root.innerHTML=panoramaHtml(model);const z=panoZoom(),body=root.querySelector('.pano-body');if(body&&z!==1)body.style.zoom=z;};
  // Cards first; when they overflow the window, step down to compact cards (head and a dot per thing) so a big board still fits on one screen.
- panoCompact=false;draw();
- const grid=root.querySelector('.pano-grid');if(grid&&model.lanes.length>3&&grid.scrollHeight>grid.clientHeight+2){panoCompact=true;draw();}
+ // Objects when chosen and they fit; else cards. The scene is measured, so the panorama takes its presenting size first.
  root.classList.toggle('show',panoShow);
- if(saved){const sel=saved.add?`[data-add="${CSS.escape(saved.add)}"]`:saved.toggle?`[data-toggle="${CSS.escape(saved.toggle)}"]`:saved.lens?`[data-lens="${CSS.escape(saved.lens)}"]`:saved.pick?`[data-pick="${CSS.escape(saved.pick)}"]`:saved.hero?'[data-hero-head]':saved.open?`[data-open="${CSS.escape(saved.open)}"]`:saved.chip?`[data-chip="${CSS.escape(saved.chip)}"]`:saved.lane?`[data-lane-head="${CSS.escape(saved.lane)}"]`:saved.more?`[data-more="${CSS.escape(saved.more)}"]`:saved.loose?'[data-loose-more]':saved.close?'.pano-close':'';(sel&&root.querySelector(sel)||root.querySelector('[data-nav]')||root.querySelector('.pano-close'))?.focus({preventScroll:true});}
+ panoPainted=panoStyle==='objects'&&!panoFocus?'objects':'cards';
+ if(panoPainted==='objects'&&!objectsPaint(root,model))panoPainted='cards';
+ if(panoPainted==='cards'){
+  panoCompact=false;draw();
+  const grid=root.querySelector('.pano-grid');if(grid&&model.lanes.length>3&&grid.scrollHeight>grid.clientHeight+2){panoCompact=true;draw();}
+ }
+ root.dataset.style=panoPainted;
+ root.classList.toggle('show',panoShow);
+ if(saved){const sel=saved.add?`[data-add="${CSS.escape(saved.add)}"]`:saved.toggle?`[data-toggle="${CSS.escape(saved.toggle)}"]`:saved.lens?`[data-lens="${CSS.escape(saved.lens)}"]`:saved.style?`[data-style="${CSS.escape(saved.style)}"]`:saved.pick?`[data-pick="${CSS.escape(saved.pick)}"]`:saved.hero?'[data-hero-head]':saved.open?`[data-open="${CSS.escape(saved.open)}"]`:saved.chip?`[data-chip="${CSS.escape(saved.chip)}"]`:saved.lane?`[data-lane-head="${CSS.escape(saved.lane)}"]`:saved.more?`[data-more="${CSS.escape(saved.more)}"]`:saved.loose?'[data-loose-more]':saved.close?'.pano-close':'';(sel&&root.querySelector(sel)||root.querySelector('[data-nav]')||root.querySelector('.pano-close'))?.focus({preventScroll:true});}
 }
 function panoramaOpen(show=!panoOpen,serverId=null){
  const root=$('#panorama');if(!root||show===panoOpen)return;
@@ -201,17 +223,19 @@ function panoramaOpen(show=!panoOpen,serverId=null){
   // Opening on a server (P on a board card) shows it where it runs; otherwise the remembered lens, or the one with the most links.
   const server=serverId&&state.assets.find(a=>a.id===serverId&&a.type==='server'&&!a.hiddenAt);
   panoLens=server?'host':pickLens(state.assets,panoLens);
-  panoReturn=document.activeElement;panoOpen=true;panoShow=panoNative;panoFocus=server?serverId:null;panoLooseOpen=false;panoExpanded.clear();
+  panoReturn=document.activeElement;panoOpen=true;panoShow=panoNative;panoFocus=server&&panoStyle!=='objects'?serverId:null;panoLooseOpen=false;panoExpanded.clear();
   root.hidden=false;document.body.classList.add('pano-open');$('main').inert=true;
-  renderSidebar();panoramaRender();(root.querySelector(panoFocus?'.ph-head':'[data-nav]')||root.querySelector('.pano-close')).focus({preventScroll:true});
-  panoObserver||=new ResizeObserver(()=>{if(!panoOpen||panoFrame)return;panoFrame=requestAnimationFrame(()=>{panoFrame=0;const key=innerWidth+'x'+innerHeight;if(key===panoKey)return;panoKey=key;panoramaRender();});});
-  panoKey=innerWidth+'x'+innerHeight;panoObserver.observe(root);
+  renderSidebar();panoramaRender();(root.querySelector(panoFocus?'.ph-head':server&&panoPainted==='objects'?`[data-chip="${CSS.escape(serverId)}"]`:'[data-nav]')||root.querySelector('.pano-close')).focus({preventScroll:true});
+  panoObserver||=new ResizeObserver(()=>{if(!panoOpen||panoFrame)return;panoFrame=requestAnimationFrame(()=>{panoFrame=0;const key=panoSizeKey();if(key===panoKey)return;panoKey=key;panoramaRender();});});
+  panoKey=panoSizeKey();panoObserver.observe(root);
  }else{
   panoOpen=false;panoFocus=null;panoShow=panoNative;panoAlt=false;clearTimeout(panoIdleTimer);root.classList.remove('show','idle');panoObserver?.disconnect();cancelAnimationFrame(panoFrame);panoFrame=0;
   root.hidden=true;root.innerHTML='';document.body.classList.remove('pano-open');$('main').inert=false;renderSidebar();
   if(panoReturn?.isConnected)panoReturn.focus({preventScroll:true});panoReturn=null;
  }
 }
+// What a redraw depends on: the window's size, and for objects (which are measured to fit) the panorama's own, which the sidebar changes.
+function panoSizeKey(){const root=$('#panorama');return innerWidth+'x'+innerHeight+(panoStyle==='objects'&&root?'/'+root.clientWidth+'x'+root.clientHeight:'');}
 const togglePanorama=show=>panoramaOpen(show);
 function panoWake(){const root=$('#panorama');if(!root)return;root.classList.remove('idle');clearTimeout(panoIdleTimer);if(panoShow&&panoOpen)panoIdleTimer=setTimeout(()=>root.classList.add('idle'),3000);}
 // Native full screen drives the same mode: entering it turns presentation on, leaving turns it off.
@@ -243,6 +267,7 @@ function panoMoveFocus(from,key){
  if(loose.includes(from))step(loose,d)?.focus();
 }
 function panoMove(from,key){
+ if(panoPainted==='objects')return objectsMove(from,key);
  if(panoFocus)return panoMoveFocus(from,key);
  const items=panoNavItems(),at=items.indexOf(from);if(at<0)return;
  const laneOf=n=>n.dataset.laneHead||n.dataset.lane||(n.closest('.pano-loose')?'~':''),heads=items.filter(n=>n.dataset.laneHead);
@@ -285,6 +310,7 @@ document.addEventListener('click',e=>{
  if(e.target.closest('[data-action="pano-add"]')){panoramaOpen(false);assetForm('server');return;}
  const more=e.target.closest('[data-more]');if(more){const k=more.dataset.more;panoExpanded.has(k)?panoExpanded.delete(k):panoExpanded.add(k);panoramaRender();return;}
  const lens=e.target.closest('.pano-lens [data-lens]');if(lens){panoSetLens(lens.dataset.lens);return;}
+ const style=e.target.closest('.pano-style [data-style]');if(style){panoSetStyle(style.dataset.style);return;}
  const toggle=e.target.closest('[data-toggle]');if(toggle){panoToggle(toggle.dataset.toggle);return;}
  const add=e.target.closest('[data-add]');if(add){panoPicker(add.dataset.add);return;}
  if(e.target.closest('[data-loose-more]')){panoLooseOpen=!panoLooseOpen;panoramaRender();return;}

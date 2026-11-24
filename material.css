@@ -2778,3 +2778,182 @@ button.pj-fig:hover{background:var(--hover)}
  :root #sidebar,:root body.sidebar-rail #sidebar{padding-right:0}
  html.native-app #sidebar{--sb-start:var(--shell-radius);--sb-end:var(--shell-radius)}
 }
+
+/* Object panorama (OBJECT-PANORAMA.md): the panorama's 实物 drawing. Every asset is a thing; the board stays neutral (metal, paper,
+   screens) and only state takes a colour: the due amber and overdue red of the cards, and green for a reading that says up.
+   Text sits on flat fills so it keeps its contrast in light and dark. Nothing here moves. */
+.pano-style{display:inline-flex;flex:none;padding:2px;border-radius:8px;background:var(--surface-tray);box-shadow:var(--tray-inset)}
+.pano-style .seg{border:0;background:none;color:var(--muted);font:inherit;font-size:12px;padding:3px 10px;border-radius:6px;cursor:pointer;white-space:nowrap}
+.pano-style .seg[aria-pressed=true]{background:var(--card-top);color:var(--ink);box-shadow:var(--shadow-card)}
+.pano-style .seg:focus-visible{outline:2px solid rgb(var(--tone-primary));outline-offset:1px}
+.pano-fell{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;font-size:11px;color:var(--muted);white-space:nowrap}
+.pano-legend[hidden]{display:none}
+@media(max-width:1280px){.pano-fell{display:none}}
+/* The bar holds one more control: when it runs out of room the counts give way first, then the lenses scroll; the title, the way
+   of drawing and the close button always stay. */
+.pano-title{flex:none;white-space:nowrap}
+.pano-totals{flex:0 100 auto;min-width:0;overflow:hidden}
+.pano-lens{flex:0 1 auto;min-width:0;overflow-x:auto;scrollbar-width:none}
+.pano-lens .seg{flex:none}
+.panorama .pano-body.objects{position:relative;display:block;padding:0;overflow:hidden;
+ --po-ground:var(--surface-content);--po-metal:#d9d6cf;--po-metal-2:#c0bcb4;--po-paper:#f8f5ee;--po-paper-2:#e9e5db;--po-ink:#2b2a27;--po-muted:#55534e;--po-line:rgba(60,54,46,.18);--po-line-2:rgba(60,54,46,.34);
+ --po-screen:#1b1c1e;--po-screen-ink:#f1efe9;--po-screen-muted:#a9a7a1;--po-dark:#3d3f44;--po-dark-ink:#f1efe9;--po-dark-muted:#cbc8c1;--po-chip:#cfcabd;--po-shadow:0 5px 14px rgba(40,38,32,.1);
+ --po-green:#2e8b4f;--po-warn:#734600;--po-bad:#a11f15;--po-amber-bg:#f6edcf;--po-amber-edge:#e3d49c;--po-amber-ink:#5e4a0c;--po-red-bg:#f4e2de;--po-red-edge:#e2c3bd;--po-red-ink:#862b22;
+ --po-sky:#e6eef4;--po-orb:#eedba6;--po-frame:rgba(70,64,56,.17);--po-wash:rgba(255,236,200,.18);--po-shelf:#d8d2c6;--po-shelf-edge:#c4bdaf;--po-cloud:#e8eff4}
+:root[data-scheme=dark] .panorama .pano-body.objects{--po-metal:#3b3d41;--po-metal-2:#2c2e32;--po-paper:#2d2f33;--po-paper-2:#26282b;--po-ink:#eceae6;--po-muted:#b7b5af;--po-line:rgba(226,230,236,.16);--po-line-2:rgba(226,230,236,.32);
+ --po-screen:#101112;--po-dark:#4b4e54;--po-chip:#b9b5aa;--po-shadow:0 5px 14px rgba(0,0,0,.3);
+ --po-green:#5fc487;--po-warn:#f0bd6a;--po-bad:#ff9a8d;--po-amber-bg:#3c3623;--po-amber-edge:#5c5133;--po-amber-ink:#f1dea0;--po-red-bg:#40292a;--po-red-edge:#603e3c;--po-red-ink:#f5b8af;
+ --po-sky:#1a2334;--po-orb:#dde3ec;--po-frame:rgba(220,224,230,.16);--po-wash:rgba(186,204,230,.07);--po-shelf:#34363a;--po-shelf-edge:#26282b;--po-cloud:#8f9dab}
+/* The window: a frame, a patch of sky, the sun by day (light) and the moon by night (dark), and a little of its light on the wall. */
+.pano-body.objects::after{content:"";position:absolute;inset:0;z-index:2;pointer-events:none;background:linear-gradient(225deg,var(--po-wash) 6%,transparent 44%)}
+.panorama .po-window{position:absolute;z-index:0;top:16px;right:30px;width:min(40%,520px);pointer-events:none;stroke:none}
+.panorama .po-window .sky{fill:var(--po-sky)}.panorama .po-window .sun,.panorama .po-window .moon{fill:var(--po-orb);opacity:.6}
+.panorama .po-window .frame{fill:none;stroke:var(--po-frame);stroke-width:3}
+.panorama .po-window .moon,:root[data-scheme=dark] .panorama .po-window .sun{display:none}
+:root[data-scheme=dark] .panorama .po-window .moon{display:inline}
+.po-scene{position:relative;z-index:1;display:flex;flex-wrap:wrap;align-items:flex-start;align-content:flex-start;gap:16px 30px;padding:16px 26px 14px;color:var(--po-ink)}
+.pz{display:flex;flex-direction:column;gap:7px;min-width:0;max-width:100%}
+.pz-label{margin:0;font-size:11px;font-weight:500;letter-spacing:.08em;color:var(--muted)}
+.pz-items{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px 12px}
+.pz-domain .pz-items{align-items:flex-start;gap:10px 20px}
+.pz-repository .pz-items{gap:14px 8px;max-width:1000px}
+/* One object. Shapes set their own fill; text inside is one of these lines. */
+.po{position:relative;display:flex;flex-direction:column;flex:none;min-width:0;margin:0;padding:0;border:0;font:inherit;font-size:12px;line-height:1.35;text-align:left;color:var(--po-ink);background:none;box-shadow:var(--po-shadow);cursor:pointer}
+.po:hover{filter:brightness(1.03)}
+.po:focus-visible{outline:2px solid rgb(var(--tone-primary));outline-offset:2px}
+.po.stopped,.po.stopped .po-face,.po.stopped .po-keytag{color:var(--po-muted);box-shadow:none}.po.stopped .po-nm b{font-weight:500}
+.po-nm{display:flex;align-items:center;gap:6px;min-width:0;max-width:100%;font-size:13px}
+.po-nm b{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;letter-spacing:.01em}
+.po-nm .ui-icon{flex:none;width:11px;height:11px;color:var(--po-muted)}
+.po-cap,.po-when,.po-stat,.po-price,.po-stub,.po-num,.po-exp,.po-net,.po-kind{display:block;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11.5px}
+.po-cap,.po-stub,.po-kind{color:var(--po-muted)}
+.po-when,.po-stat,.po-price{font-weight:600}
+.po-when.amber,.po-stat.amber{color:var(--po-warn)}.po-when.red,.po-stat.red{color:var(--po-bad)}
+.po .ip-text,.po-pan,.po-num,.po-exp{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-variant-numeric:tabular-nums}
+.po-led{flex:none;display:inline-block;width:7px;height:7px;border-radius:50%;box-shadow:inset 0 0 0 1.25px var(--po-muted)}
+.po-led.green{background:var(--po-green);box-shadow:none}.po-led.amber{background:var(--dot-amber);box-shadow:none}.po-led.red{background:var(--dot-red);box-shadow:none}
+.po-led.off{box-shadow:inset 0 0 0 1.25px var(--po-line-2)}
+.po .pano-probe{padding:3px 0 0;font-size:11px}
+/* Servers: a 1U chassis in a stack for the cloud, a tower on feet for a machine at home. */
+.po-stack{display:flex;flex-direction:column;gap:6px}
+.po-rack{flex-direction:row;align-items:center;gap:10px;width:320px;min-height:52px;padding:6px 12px 6px 0;border-radius:5px;background-color:var(--po-metal)}
+.po-rack::before{content:"";position:absolute;left:7px;right:7px;top:0;height:3px;border-radius:5px 5px 0 0;background:rgba(255,255,255,.26)}
+:root[data-scheme=dark] .po-rack::before{background:rgba(255,255,255,.08)}
+.po-grill{flex:none;align-self:stretch;width:26px;border-radius:5px 0 0 5px;background:repeating-linear-gradient(90deg,transparent 0 2px,var(--po-line-2) 2px 3px)}
+.po-main{flex:1;min-width:0;display:flex;flex-direction:column}
+.po-rack .po-stat{flex:none;max-width:44%;text-align:right}
+.po-tower{width:132px;min-height:128px;margin-bottom:5px;padding:9px 10px 9px;border-radius:7px 7px 3px 3px;background-color:var(--po-metal)}
+.po-tower::after{content:"";position:absolute;left:12px;right:12px;bottom:-5px;height:5px;border:solid var(--po-metal-2);border-width:0 20px}
+.po-bays{display:flex;flex-direction:column;gap:4px;margin-bottom:8px}
+.po-bays i{height:5px;border-radius:2px;background:var(--po-line-2)}
+.po-foot{display:flex;flex-direction:column;align-items:flex-start;gap:2px;margin-top:auto;padding-top:6px}
+.po-tag{font-style:normal;font-size:10.5px;padding:0 6px;border:1px solid var(--po-line-2);border-radius:999px;color:var(--po-muted)}
+/* Domains: plates on cords under their registrar. */
+.po-home{display:flex;flex-direction:column;align-items:center;min-width:0}
+.po-roof{position:relative;align-self:stretch;display:flex;align-items:center;justify-content:center;height:22px;padding:0 12px;border-radius:4px;background-color:var(--po-metal);font-size:11.5px;color:var(--po-ink)}
+.po-roof b{position:relative;font-weight:600;white-space:nowrap}
+.po-home.on-cloud .po-roof b{padding:0 5px;border-radius:3px;background-color:var(--po-cloud)}
+.po-home.on-none .po-roof{background:none;border:1px dashed var(--po-line-2);color:var(--po-muted)}
+.po-home.on-cloud .po-roof{align-self:center;width:178px;height:54px;padding-top:12px;background:none}
+.panorama .po-cloud{position:absolute;inset:0;width:100%;height:100%;fill:var(--po-cloud);stroke:var(--po-line-2);stroke-width:1.2}
+:root[data-scheme=dark] .po-home.on-cloud .po-roof{color:#1d2026}
+.po-signs{display:flex;gap:10px}
+.po-plate{align-items:center;width:140px;box-shadow:none}
+.po-cord{width:1px;height:13px;background:var(--po-line-2)}
+.po-face{align-self:stretch;display:flex;flex-direction:column;align-items:center;gap:1px;padding:7px 8px 6px;border:1px solid var(--po-line);border-radius:3px;background-color:var(--po-paper);box-shadow:var(--po-shadow);text-align:center}
+.po-plate .po-nm{font-size:12px}.po-plate .po-when{font-size:13px}
+.po-plate.amber .po-face{background-color:var(--po-amber-bg);border-color:var(--po-amber-edge);color:var(--po-amber-ink)}
+.po-plate.red .po-face{background-color:var(--po-red-bg);border-color:var(--po-red-edge);color:var(--po-red-ink)}
+.po-plate.amber .po-cap,.po-plate.red .po-cap{color:inherit}
+/* Paper: tickets with a punched hole and a tear-off stub, passes on a clip, deeds with a seal. */
+.po-ticket,.po-pass{width:112px;height:150px;padding:21px 10px 8px;border-radius:5px;background-color:var(--po-paper)}
+.po-ticket .po-nm,.po-pass .po-nm,.po-deed .po-nm{margin-bottom:1px}
+.po-ticket .po-nm b,.po-pass .po-nm b,.po-deed .po-nm b,.po-passport .po-nm b,.po-sim .po-nm b{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;white-space:normal;line-height:1.25}
+.po-price{margin-top:8px}.po-ticket .po-when,.po-pass .po-when,.po-deed .po-when,.po-sim .po-when{margin-top:2px;white-space:normal;line-height:1.25}
+.po-hole{position:absolute;top:7px;left:50%;width:10px;height:10px;margin-left:-5px;border-radius:50%;background:var(--po-ground);box-shadow:inset 0 0 0 1px var(--po-line)}
+.po-perf{position:absolute;left:6px;right:6px;bottom:27px;border-top:1px dashed var(--po-line-2)}
+.po-perf::before,.po-perf::after{content:"";position:absolute;top:-5px;width:9px;height:9px;border-radius:50%;background:var(--po-ground)}
+.po-perf::before{left:-11px}.po-perf::after{right:-11px}
+.po-stub{position:absolute;left:10px;right:10px;bottom:6px;font-size:10.5px}
+.po-pass{margin-top:7px;height:143px;padding-top:24px;border-radius:9px;border-bottom:6px solid var(--po-metal-2)}
+.po-clip{position:absolute;top:-7px;left:50%;width:18px;height:13px;margin-left:-9px;border-radius:3px 3px 1px 1px;background:var(--po-metal-2)}
+.po-slot{position:absolute;top:10px;left:50%;width:30px;height:6px;margin-left:-15px;border-radius:3px;background:var(--po-ground);box-shadow:inset 0 0 0 1px var(--po-line)}
+.po-deed{width:170px;height:108px;padding:13px 14px;border-radius:2px;background-color:var(--po-paper)}
+.po-deed::before{content:"";position:absolute;inset:4px;border:1px solid var(--po-line-2);pointer-events:none}
+.po-deed .po-price{margin-top:4px}.po-deed .po-nm{padding-right:26px}
+.po-seal{position:absolute;right:11px;top:11px;width:20px;height:20px;border-radius:50%;background:var(--po-metal-2);box-shadow:0 0 0 2px var(--po-paper),0 0 0 3px var(--po-metal-2)}
+.po-curl{position:absolute;top:0;right:0;width:0;height:0;border-left:20px solid var(--po-amber-edge);border-top:20px solid var(--po-ground)}
+.po-ticket.red,.po-pass.red,.po-deed.red{background-color:var(--po-paper-2)}
+.po-stamp{position:absolute;right:7px;bottom:32px;padding:1px 5px;border:1.5px solid var(--po-bad);border-radius:2px;background-color:var(--po-paper-2);color:var(--po-bad);font-size:11px;font-weight:700;letter-spacing:.12em;transform:rotate(-14deg)}
+.po-deed .po-stamp{right:10px;bottom:12px}
+/* Bank cards and SIMs: neutral, the number shows its tail only. */
+.po-card{width:170px;height:106px;padding:12px 13px 10px;border-radius:10px;background-color:var(--po-dark);color:var(--po-dark-ink)}
+.po-chip{width:25px;height:19px;border-radius:4px;background:var(--po-chip)}
+.po-net{position:absolute;top:12px;right:13px;max-width:60%;color:var(--po-dark-muted)}
+.po-pan{margin-top:11px;font-size:15px;font-weight:500;letter-spacing:.1em}
+.po-card .po-when.amber{color:#f6cf80}.po-card .po-when.red{color:#ffb0a5}
+.po-row{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-top:auto}
+.po-card .po-nm{font-size:11.5px}.po-card .po-nm b{font-weight:500}
+.po-exp{flex:none;color:var(--po-dark-muted)}
+.po-sim{width:116px;height:126px;padding:10px 9px 8px;border-radius:8px;background-color:var(--po-paper)}
+.po-sim::after{content:"";position:absolute;top:0;right:0;border-top:20px solid var(--po-ground);border-left:20px solid transparent}
+.po-pads{width:30px;height:24px;margin-bottom:8px;border-radius:5px;background:linear-gradient(var(--po-line-2),var(--po-line-2)) 50% 0/1px 100% no-repeat,linear-gradient(var(--po-line-2),var(--po-line-2)) 0 50%/100% 1px no-repeat,var(--po-chip)}
+.po-num{font-size:12px;font-weight:600}
+/* Sign-in accounts: a passport for an Apple ID, a key with a name tag for a Google account. */
+.po-passport{width:116px;height:138px;padding:12px 10px 9px 12px;border-radius:3px 9px 9px 3px;border-left:5px solid rgba(0,0,0,.28);background-color:var(--po-dark);color:var(--po-dark-ink)}
+.po-crest{align-self:center;width:26px;height:26px;margin-bottom:8px;border:1.5px solid var(--po-dark-muted);border-radius:50%;box-shadow:inset 0 0 0 4px var(--po-dark),inset 0 0 0 5px var(--po-dark-muted)}
+.po-passport .po-kind,.po-passport .po-cap{color:var(--po-dark-muted)}
+.po-passport .po-kind{align-self:center;font-size:10.5px;letter-spacing:.1em}
+.po-passport .po-when.amber{color:#f6cf80}.po-passport .po-when.red{color:#ffb0a5}
+.po-key{flex-direction:row;align-items:center;box-shadow:none}
+.po-keycut{flex:none;display:flex;align-items:center}
+.po-shaft{position:relative;width:26px;height:6px;border-radius:3px 0 0 3px;background:var(--po-metal-2)}
+.po-shaft::after{content:"";position:absolute;left:4px;top:6px;width:4px;height:6px;background:var(--po-metal-2);box-shadow:7px 0 0 var(--po-metal-2)}
+.po-bow{width:30px;height:30px;border:7px solid var(--po-metal-2);border-radius:50%;box-sizing:border-box}
+.po-keytag{display:flex;flex-direction:column;min-width:112px;max-width:168px;margin-left:-3px;padding:7px 11px 7px 12px;border:1px solid var(--po-line);border-radius:4px 11px 11px 4px;background-color:var(--po-paper);box-shadow:var(--po-shadow)}
+/* Vessels: a drum for a database, a pail for object storage, a shipping container for a deployment service. */
+.po-body{position:relative;display:flex;flex-direction:column;align-items:center;min-width:0;max-width:100%;text-align:center}
+.po-drum{width:124px;min-height:112px;padding:27px 9px 15px;border-radius:50%/13px;background-color:var(--po-metal);justify-content:center}
+.po-drum::before{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;background:linear-gradient(90deg,rgba(0,0,0,.07),transparent 28%,transparent 64%,rgba(0,0,0,.13))}
+.po-drumtop{position:absolute;top:0;left:0;right:0;height:24px;border-radius:50%;background:var(--po-metal-2);box-shadow:inset 0 0 0 1px var(--po-line)}
+.po-drum .po-nm,.po-bucket .po-nm{justify-content:center}
+.po-bucket .po-body{background-color:var(--po-metal)}
+.po-bucket{width:124px;min-height:94px;margin-top:16px;padding:14px 19px 9px;box-shadow:none;isolation:isolate;justify-content:center}
+.po-bucket::before{content:"";position:absolute;z-index:-1;inset:0;border-top:94px solid var(--po-metal);border-left:9px solid transparent;border-right:9px solid transparent;height:0;min-height:100%;box-sizing:border-box;border-radius:0 0 12px 12px}
+.po-bucket::after{content:"";position:absolute;top:0;left:-1px;right:-1px;height:6px;border-radius:3px;background:var(--po-metal-2)}
+.po-bail{position:absolute;top:-15px;left:18px;right:18px;height:30px;border:2px solid var(--po-metal-2);border-bottom:0;border-radius:50% 50% 0 0/100% 100% 0 0}
+.po-container{width:184px;min-height:70px;padding:9px 38px 9px 8px;border-radius:3px;background-color:var(--po-metal);justify-content:center}
+.po-container::before{content:"";position:absolute;inset:0;pointer-events:none;border-radius:inherit;background:repeating-linear-gradient(90deg,transparent 0 10px,var(--po-line) 10px 11px)}
+.po-doors{position:absolute;top:6px;bottom:6px;right:9px;width:16px;border:solid var(--po-metal-2);border-width:0 3px}
+.po-container .po-body{align-items:flex-start;align-self:flex-start;padding:3px 8px;border-radius:2px;background-color:var(--po-metal);text-align:left}
+/* Repositories: folders with a tab. */
+.po-folder{width:112px;height:46px;padding:7px 9px 5px;border-radius:2px 6px 5px 5px;background-color:var(--po-paper-2);justify-content:center}
+.po-tab{position:absolute;top:-6px;left:0;width:40px;height:7px;border-radius:5px 8px 0 0;background:var(--po-paper-2)}
+.po-folder .po-nm{font-size:12px}.po-folder .po-cap,.po-folder .po-when{font-size:10.5px}
+/* This Mac and its 正在做 screen. */
+.po-mac{display:flex;flex-direction:column;align-items:center;flex:none;width:312px;font-size:12px;line-height:1.35}
+.po-lid{align-self:center;width:290px;padding:8px 8px 7px;border-radius:10px 10px 3px 3px;background:var(--po-metal);box-shadow:var(--po-shadow)}
+.po-screen{display:flex;flex-direction:column;gap:3px;min-height:132px;padding:12px 15px 12px;border-radius:4px;background-color:var(--po-screen);color:var(--po-screen-ink)}
+.po-screen .po-cap{color:var(--po-screen-muted)}
+.po-work{margin-top:9px;font-size:16px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.po-work-l{display:block;font-size:11.5px;color:#d3d0c9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.po-mac.no-work .po-work{font-weight:500;color:#d3d0c9}.po-mac.no-work .po-work-l{color:var(--po-screen-muted)}
+.po-base{align-self:stretch;height:30px;padding:6px 16px 0;border-radius:0 0 11px 11px;background:var(--po-metal-2);box-shadow:var(--po-shadow)}
+.po-deck{display:block;height:10px;border-radius:2px;background:var(--po-line)}
+.po-pad{display:block;width:60px;height:9px;margin:3px auto 0;border-radius:2px;background:var(--po-line)}
+.po-stand{width:44px;height:14px;background:var(--po-metal-2)}
+.po-box{display:flex;align-items:center;justify-content:flex-start;width:120px;height:20px;padding:0 10px;border-radius:5px;background:var(--po-metal);box-shadow:var(--po-shadow)}
+.po-box i{width:5px;height:5px;border-radius:50%;background:var(--po-line-2)}
+/* The bar's tally. */
+.po-tally{display:inline-flex;gap:12px;padding:3px 6px;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.po-tally span{display:inline-flex;align-items:center;gap:5px}.po-tally b{font-weight:600;color:var(--ink)}
+.po-tally .po-led{box-shadow:inset 0 0 0 1.25px var(--muted)}.po-tally .po-led.amber,.po-tally .po-led.red{box-shadow:none}
+
+/* Shelves: each zone stands on a neutral board, and the zones stretch so a row of them reads as one shelf across the room. */
+.po-scene{gap:22px 26px}
+.pz{flex:1 1 auto}
+.pz-items{position:relative;padding:0 6px 12px}
+.pz-items::after{content:"";position:absolute;left:0;right:0;bottom:0;height:7px;border-radius:2px;background:var(--po-shelf);box-shadow:0 2px 0 var(--po-shelf-edge),0 6px 10px -6px rgba(0,0,0,.35);pointer-events:none}
+.pz-label{font-size:12px}
+/* The window stays a hint behind whatever zone is in front of it. */
+.panorama .po-window{opacity:.4}

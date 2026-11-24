@@ -3033,6 +3033,7 @@ function setFeatureNow(key,on){
  if(key==='panorama'&&!on&&typeof panoOpen!=='undefined'&&panoOpen)panoramaOpen(false);
  if(key==='aiUsage'&&typeof aiUsageSwitch==='function')aiUsageSwitch(on);
  if(key==='pulls'&&on&&typeof pullsRefresh==='function')pullsRefresh(true);
+ if(key==='codingSessions'&&typeof codingSwitch==='function')codingSwitch(on);
  if(key==='probe'&&on){if(typeof probeStart==='function')probeStart();if(typeof sshStart==='function')sshStart();if(typeof platformStart==='function')platformStart();}
  drawTopnavActions();render();prefsChanged();toast(on?tr('{name}：已打开',{name:FEATURES[key].name}):tr('{name}：已关闭',{name:FEATURES[key].name}));
 }
