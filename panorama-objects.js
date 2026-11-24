@@ -14,8 +14,9 @@
  const ZONES=[{key:'server',types:['server']},{key:'data',types:['database','storage','deployment']},{key:'domain',types:['domain']},{key:'wallet',types:['bankcard','phone']},{key:'id',types:['appleid','google']},{key:'pass',types:['subscription','ai','license']},{key:'repository',types:['repository']}];
  // What a thing can sit on, as the 运行在哪 lens has it: a database on a server or a deployment service, a bucket on a deployment service.
  const HOSTS={database:['server','deployment'],storage:['deployment']};
- // The scene needs room: under this width or height the panorama draws cards. It is tried at each scale in turn.
- const MIN_W=900,MIN_H=520,TIERS=[1,.86];
+ // The scene needs room: under this width or height the panorama draws cards. It is tried at each scale in turn, largest first, so
+ // a big window gets bigger objects and type instead of empty floor.
+ const MIN_W=900,MIN_H=520,TIERS=[1.4,1.25,1.12,1,.86];
  const LOCAL_HOST=/^(localhost|.+\.(local|lan|internal|home\.arpa))$/i,LOCAL_WORDS=/自建|本机|本地|家里|家用|self-?hosted|\bhome\b|homelab|\blocal\b|on-?prem/i;
  // A server is local when it says so (its provider), when every address it has is an inner one, or when its host is a local name.
  function serverPlace(a){

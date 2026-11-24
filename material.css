@@ -2799,11 +2799,11 @@ button.pj-fig:hover{background:var(--hover)}
  --po-ground:var(--surface-content);--po-metal:#d9d6cf;--po-metal-2:#c0bcb4;--po-paper:#f8f5ee;--po-paper-2:#e9e5db;--po-ink:#2b2a27;--po-muted:#55534e;--po-line:rgba(60,54,46,.18);--po-line-2:rgba(60,54,46,.34);
  --po-screen:#1b1c1e;--po-screen-ink:#f1efe9;--po-screen-muted:#a9a7a1;--po-dark:#3d3f44;--po-dark-ink:#f1efe9;--po-dark-muted:#cbc8c1;--po-chip:#cfcabd;--po-shadow:0 5px 14px rgba(40,38,32,.1);
  --po-green:#2e8b4f;--po-warn:#734600;--po-bad:#a11f15;--po-amber-bg:#f6edcf;--po-amber-edge:#e3d49c;--po-amber-ink:#5e4a0c;--po-red-bg:#f4e2de;--po-red-edge:#e2c3bd;--po-red-ink:#862b22;
- --po-sky:#e6eef4;--po-orb:#eedba6;--po-frame:rgba(70,64,56,.17);--po-wash:rgba(255,236,200,.18);--po-cloud:#e8eff4}
+ --po-sky:#e6eef4;--po-orb:#eedba6;--po-frame:rgba(70,64,56,.17);--po-wash:rgba(255,236,200,.18);--po-shelf:#d8d2c6;--po-shelf-edge:#c4bdaf;--po-cloud:#e8eff4}
 :root[data-scheme=dark] .panorama .pano-body.objects{--po-metal:#3b3d41;--po-metal-2:#2c2e32;--po-paper:#2d2f33;--po-paper-2:#26282b;--po-ink:#eceae6;--po-muted:#b7b5af;--po-line:rgba(226,230,236,.16);--po-line-2:rgba(226,230,236,.32);
  --po-screen:#101112;--po-dark:#4b4e54;--po-chip:#b9b5aa;--po-shadow:0 5px 14px rgba(0,0,0,.3);
  --po-green:#5fc487;--po-warn:#f0bd6a;--po-bad:#ff9a8d;--po-amber-bg:#3c3623;--po-amber-edge:#5c5133;--po-amber-ink:#f1dea0;--po-red-bg:#40292a;--po-red-edge:#603e3c;--po-red-ink:#f5b8af;
- --po-sky:#1a2334;--po-orb:#dde3ec;--po-frame:rgba(220,224,230,.16);--po-wash:rgba(186,204,230,.07);--po-cloud:#8f9dab}
+ --po-sky:#1a2334;--po-orb:#dde3ec;--po-frame:rgba(220,224,230,.16);--po-wash:rgba(186,204,230,.07);--po-shelf:#34363a;--po-shelf-edge:#26282b;--po-cloud:#8f9dab}
 /* The window: a frame, a patch of sky, the sun by day (light) and the moon by night (dark), and a little of its light on the wall. */
 .pano-body.objects::after{content:"";position:absolute;inset:0;z-index:2;pointer-events:none;background:linear-gradient(225deg,var(--po-wash) 6%,transparent 44%)}
 .panorama .po-window{position:absolute;z-index:0;top:16px;right:30px;width:min(40%,520px);pointer-events:none;stroke:none}
@@ -2948,3 +2948,12 @@ button.pj-fig:hover{background:var(--hover)}
 .po-tally{display:inline-flex;gap:12px;padding:3px 6px;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
 .po-tally span{display:inline-flex;align-items:center;gap:5px}.po-tally b{font-weight:600;color:var(--ink)}
 .po-tally .po-led{box-shadow:inset 0 0 0 1.25px var(--muted)}.po-tally .po-led.amber,.po-tally .po-led.red{box-shadow:none}
+
+/* Shelves: each zone stands on a neutral board, and the zones stretch so a row of them reads as one shelf across the room. */
+.po-scene{gap:22px 26px}
+.pz{flex:1 1 auto}
+.pz-items{position:relative;padding:0 6px 12px}
+.pz-items::after{content:"";position:absolute;left:0;right:0;bottom:0;height:7px;border-radius:2px;background:var(--po-shelf);box-shadow:0 2px 0 var(--po-shelf-edge),0 6px 10px -6px rgba(0,0,0,.35);pointer-events:none}
+.pz-label{font-size:12px}
+/* The window stays a hint behind whatever zone is in front of it. */
+.panorama .po-window{opacity:.4}

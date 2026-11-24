@@ -90,7 +90,7 @@ test('the scene: every visible asset once, in zones, with its host and a tally',
 test('the scene needs room: narrow or short windows draw cards',()=>{
  assert.equal(O.objectsRoom(O.OBJECT_MIN_W,O.OBJECT_MIN_H),true);
  assert.equal(O.objectsRoom(O.OBJECT_MIN_W-1,2000),false);assert.equal(O.objectsRoom(2000,O.OBJECT_MIN_H-1),false);
- assert.deepEqual(O.OBJECT_TIERS,[1,.86]);
+ assert.deepEqual(O.OBJECT_TIERS,[1.4,1.25,1.12,1,.86]);
 });
 
 const now=Date.parse('2026-11-18T08:00:00Z'),at=minutes=>new Date(now-minutes*60000).toISOString();
