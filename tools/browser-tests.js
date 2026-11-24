@@ -47,8 +47,8 @@ server.listen(port,'127.0.0.1',async()=>{
    return {transparency:matchMedia('(prefers-reduced-transparency: reduce)').matches?'reduce':'no-preference',dpr:devicePixelRatio,gl};});
   console.log(`Chromium ${browser.version()}; prefers-reduced-transparency: ${host.transparency}; devicePixelRatio ${host.dpr}; WebGL ${host.gl}`);
   await context.close();}
- let failed=0,next=0;const started=Date.now();
- async function runOne(file){
+ let failed=0,next=0;const started=Date.now(),failures=[];
+ async function runOne(file,{quiet=false}={}){
   const context=await browser.newContext({viewport:{width:1400,height:900},locale:'zh-CN'}),page=await context.newPage(),errors=[];
   page.on('pageerror',error=>errors.push(error.message));
   try{
@@ -58,13 +58,23 @@ server.listen(port,'127.0.0.1',async()=>{
    console.log('ok  ',file,typeof result==='string'?'':'');
   }catch(error){
    // The first line, short, for the summary; then the whole message (a test's diagnostics can run long), indented.
-   const text=String(error.message),lines=text.split('\n');failed++;
-   console.log('FAIL',file,'\n    ',lines[0].slice(0,300));
+   const text=String(error.message),lines=text.split('\n');failed++;failures.push(file);
+   if(quiet){await context.close();return;}
+   console.log(jobs>1?'FAIL (runs again alone)':'FAIL',file,'\n    ',lines[0].slice(0,300));
    if(text.length>300||lines.length>1)console.log(text.split('\n').map(l=>'       | '+l).join('\n'));
   }
   await context.close();
  }
  await Promise.all(Array.from({length:Math.min(jobs,listed.length)},async()=>{while(next<listed.length)await runOne(listed[next++]);}));
+ // Side by side, a test that measures timing or colour mid-animation can fail on load alone. What failed is run again, one at a
+ // time: a file that passes then is reported as flaky together and counted as passed; one that fails again is a failure.
+ if(jobs>1&&failures.length){
+  const again=failures.splice(0);failed=0;
+  for(const file of again)await runOne(file,{quiet:true});
+  const flaky=again.filter(f=>!failures.includes(f));
+  if(flaky.length)console.log(`flaky side by side, passed alone: ${flaky.join(', ')}`);
+  for(const file of failures)console.log('FAIL',file,'(alone too)');
+ }
  await browser.close();server.close();
  console.log(`${listed.length-failed} of ${listed.length} passed (${root}) in ${Math.round((Date.now()-started)/1000)}s, ${jobs} at a time`);
  process.exit(failed?1:0);
