@@ -28,8 +28,9 @@
    at:typeof r.at==='string'&&!isNaN(Date.parse(r.at))?r.at:new Date().toISOString()
   };
  }
- const deviceAssetId=hardwareId=>'device-local-'+hardwareId;
- const deviceSyncKey=hardwareId=>D.syncKey('local',hardwareId);
+ // source 'local' is this Mac; 'peer' a paired Mac read over the network (device-peers.js), which keeps peerId, its pairing.
+ const deviceAssetId=(hardwareId,source='local')=>`device-${source}-${hardwareId}`;
+ const deviceSyncKey=(hardwareId,source='local')=>D.syncKey(source,hardwareId);
  // The facts a read writes; an empty one is left out, so a fact the system stopped giving goes away.
  function deviceFacts(info){
   const out={};
@@ -37,19 +38,21 @@
   return out;
  }
  const isLocalDevice=a=>a?.type==='device'&&a.source==='local';
- const localDeviceOf=(assets,hardwareId)=>assets.find(a=>isLocalDevice(a)&&a.externalId===hardwareId)||null;
+ const isPeerDevice=a=>a?.type==='device'&&a.source==='peer';
+ const localDeviceOf=(assets,hardwareId,source='local')=>assets.find(a=>a?.type==='device'&&a.source===source&&a.externalId===hardwareId)||null;
  // Folds a read into the board → {assets, changed, added?, skipped?}. Only a changed fact, or a day since the last one, is a change:
  // reading every ten minutes does not save the board every ten minutes.
- function mergeLocalDevice(board,info,{now=Date.now()}={}){
+ function mergeLocalDevice(board,info,{now=Date.now(),source='local',name='',peerId=''}={}){
   const assets=board.assets||[];
-  if(!info||D.isBlacklisted(board,deviceSyncKey(info.hardwareId)))return {assets,changed:false,skipped:!!info};
-  const facts=deviceFacts(info),old=localDeviceOf(assets,info.hardwareId);
+  if(!info||D.isBlacklisted(board,deviceSyncKey(info.hardwareId,source)))return {assets,changed:false,skipped:!!info};
+  const facts={...deviceFacts(info),...(peerId?{peerId}:{})},old=localDeviceOf(assets,info.hardwareId,source);
   if(!old){
-   const added={id:deviceAssetId(info.hardwareId),type:'device',name:info.name||'Mac',provider:'Apple',source:'local',externalId:info.hardwareId,...facts,seenAt:info.at};
+   const added={id:deviceAssetId(info.hardwareId,source),type:'device',name:name||info.name||'Mac',provider:'Apple',source,externalId:info.hardwareId,...facts,seenAt:info.at};
    return {assets:[...assets,added],changed:true,added};
   }
   const next={...old};for(const key of FACTS)delete next[key];Object.assign(next,facts);
-  const same=FACTS.every(key=>JSON.stringify(next[key])===JSON.stringify(old[key])),fresh=now-(Date.parse(old.seenAt)||0)<SEEN_EVERY_MS;
+  if(peerId)next.peerId=peerId;
+  const same=[...FACTS,'peerId'].every(key=>JSON.stringify(next[key])===JSON.stringify(old[key])),fresh=now-(Date.parse(old.seenAt)||0)<SEEN_EVERY_MS;
   if(same&&fresh)return {assets,changed:false};
   next.seenAt=info.at;
   return {assets:assets.map(a=>a===old?next:a),changed:true};
@@ -59,8 +62,8 @@
  // amber when the disk is nearly full; '' otherwise. A device has no dates of its own, so this is its only state.
  const deviceTone=a=>(deviceDiskUsed(a)??0)>=DISK_FULL?'amber':'';
  // This Mac read without a battery is a desktop (a Mac mini, Studio, iMac or Mac Pro); anything else is drawn as a laptop.
- const deviceForm=a=>isLocalDevice(a)&&!a.battery?'desktop':'laptop';
+ const deviceForm=a=>(isLocalDevice(a)||isPeerDevice(a))&&!a.battery?'desktop':'laptop';
 
- const api={DEVICE_REFRESH_MS:REFRESH_MS,DEVICE_DISK_FULL:DISK_FULL,DEVICE_FACTS:FACTS,parseDeviceInfo,deviceAssetId,deviceSyncKey,deviceFacts,isLocalDevice,localDeviceOf,mergeLocalDevice,deviceDiskUsed,deviceTone,deviceForm};
+ const api={DEVICE_REFRESH_MS:REFRESH_MS,DEVICE_DISK_FULL:DISK_FULL,DEVICE_FACTS:FACTS,parseDeviceInfo,deviceAssetId,deviceSyncKey,deviceFacts,isLocalDevice,isPeerDevice,localDeviceOf,mergeLocalDevice,deviceDiskUsed,deviceTone,deviceForm};
  if(typeof module!=='undefined'&&module.exports)module.exports=api;else Object.assign(window,api);
 })();

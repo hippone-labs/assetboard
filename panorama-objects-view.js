@@ -83,12 +83,16 @@ function objWorkReadings(){
 let poLocal=null;
 function poMac(o=null){
  const w=workScreen(objWorkReadings(),{summary:typeof codingSummary==='function'?codingSummary:null}),form=o?(deviceForm(o.asset)==='desktop'?'mini':'laptop'):macForm(w.host);
- const row=l=>[l.name,tr('{n} 个会话',{n:l.count}),veil(l.repo),l.minutes!=null?tr('{n} 分钟',{n:l.minutes}):''].filter(Boolean).join(' · ');
- const head=w.total?tr('正在做 · {n} 个会话',{n:w.total}):tr('正在做'),lines=w.total?[...w.lines.map(row),w.more?tr('另有 {n} 个工具',{n:w.more}):''].filter(Boolean):[tr('现在没有会话')];
+ const {head,lines}=poWork(w);
  const screen=`<span class="po-screen"><span class="po-cap">${tr('本机')}</span><b class="po-work">${esc(head)}</b>${lines.map(t=>`<span class="po-work-l">${esc(t)}</span>`).join('')}</span>`;
  const body=`<span class="po-lid">${screen}</span>${poMacBody(form)}`;
  if(!o)return `<div class="po-mac is-${form}${w.total?'':' no-work'}" data-mac="${form}" data-sessions="${w.total}" role="group" aria-label="${esc([tr('本机'),head,...lines].join(tr('，')))}">${body}</div>`;
  return poMacButton(o,form,body+poDeviceCaption(o),`${w.total?'':' no-work'}" data-mac="${form}" data-sessions="${w.total}`,[head,...lines]);
+}
+// A screen's words for 正在做: the heading and a line per tool, or the quiet empty state.
+function poWork(w){
+ const row=l=>[l.name,tr('{n} 个会话',{n:l.count}),veil(l.repo),l.minutes!=null?tr('{n} 分钟',{n:l.minutes}):''].filter(Boolean).join(' · ');
+ return {head:w.total?tr('正在做 · {n} 个会话',{n:w.total}):tr('正在做'),lines:w.total?[...w.lines.map(row),w.more?tr('另有 {n} 个工具',{n:w.more}):''].filter(Boolean):[tr('现在没有会话')]};
 }
 const poMacBody=form=>form==='mini'?'<span class="po-stand" aria-hidden="true"></span><span class="po-box" aria-hidden="true"><i></i></span>':'<span class="po-base" aria-hidden="true"><i class="po-deck"></i><i class="po-pad"></i></span>';
 const poDeviceCaption=o=>`<span class="po-dev-cap">${poName(o)}${poLine('po-cap',deviceLine(o.asset))}${poLine('po-when',[deviceTone(o.asset)?deviceDiskText(o.asset):'',o.stopped?tr('已停用'):''].filter(Boolean).join(' · '),deviceTone(o.asset))}</span>`;
@@ -97,11 +101,18 @@ function poMacButton(o,form,inner,more,extra){
  const a=o.asset,tone=deviceTone(a),label=[displayName(a),cats[a.type].one,deviceLine(a),...extra,tone?deviceDiskText(a):''].filter(Boolean).join(tr('，'));
  return `<button class="po po-mac is-${form}${tone?' '+tone:''}${o.stopped?' stopped':''}${more}" data-nav data-chip="${esc(a.id)}" data-obj="mac" aria-label="${esc(label)}" title="${esc(label)}">${inner}</button>`;
 }
-// A device: this Mac's record carries the 正在做 screen; any other is a computer whose screen shows its name.
+// A device: this Mac's record carries the 正在做 screen; a paired Mac (其他设备) its own 正在做 once read; any other device's
+// screen shows its name.
 function poDevice(o){
  if(o===poLocal)return poMac(o);
- const form=deviceForm(o.asset)==='desktop'?'mini':'laptop';
- const screen=`<span class="po-screen"><span class="po-cap">${esc(cats.device.one)}</span><b class="po-work">${esc(veil(displayName(o.asset)))}</b>${poLine('po-work-l',deviceLine(o.asset))}</span>`;
+ const a=o.asset,form=deviceForm(a)==='desktop'?'mini':'laptop';
+ const w=isPeerDevice(a)&&a.peerId&&typeof peerHost==='function'?workScreen(objWorkReadings(),{summary:typeof codingSummary==='function'?codingSummary:null,hostId:peerHost(a.peerId)}):null;
+ if(w?.total){
+  const {head,lines}=poWork(w);
+  const screen=`<span class="po-screen"><span class="po-cap">${esc(veil(displayName(a)))}</span><b class="po-work">${esc(head)}</b>${lines.map(t=>`<span class="po-work-l">${esc(t)}</span>`).join('')}</span>`;
+  return poMacButton(o,form,`<span class="po-lid">${screen}</span>${poMacBody(form)}${poDeviceCaption(o)}`,` other-device" data-sessions="${w.total}`,[head,...lines]);
+ }
+ const screen=`<span class="po-screen"><span class="po-cap">${esc(cats.device.one)}</span><b class="po-work">${esc(veil(displayName(a)))}</b>${poLine('po-work-l',deviceLine(a))}</span>`;
  return poMacButton(o,form,`<span class="po-lid">${screen}</span>${poMacBody(form)}${poDeviceCaption(o)}`,' other-device',[]);
 }
 const poZone=(key,inner)=>`<section class="pz pz-${key}" data-zone="${key}" aria-label="${PO_ZONE[key]}"><h3 class="pz-label">${PO_ZONE[key]}</h3><div class="pz-items">${inner}</div></section>`;

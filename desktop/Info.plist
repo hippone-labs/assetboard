@@ -52,6 +52,12 @@
 	<string>42</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>15.0</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>与你配对过的其他 Mac 互相读取本机信息和“正在做”。</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_assetboard._tcp</string>
+	</array>
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSServices</key>
