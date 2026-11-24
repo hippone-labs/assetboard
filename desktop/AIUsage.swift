@@ -6,11 +6,11 @@ import SQLite3
 /// AI 额度与用量: what the AI tools signed in on this Mac have used, and how much of their plans' limits is left, shown on the
 /// person's AI subscription records. The readers are the page's own ai-usage.js, run here in a JavaScriptCore context of their
 /// own: this file only finds the tools' files, reads what was appended since the last pass, runs fixed read-only SQLite queries and,
-/// for a tool the person turned it on for, makes one fixed GET (for Antigravity a local POST to its own language server, or agy's own usage report) with that
+/// for each tool whose endpoint is on, makes one fixed GET (for Antigravity a local POST to its own language server, or agy's own usage report) with that
 /// tool's own login. The readers keep numbers, model names and times; prompts, replies, paths and tokens never reach the page.
 ///
-/// Local reading is on unless switched off per tool (设置 › 连接 › AI 额度); the endpoints are off until turned on per tool, and
-/// only the page can turn one on, after the person read what it does (an agent cannot). Credentials are read from the tool's own
+/// Local reading and the endpoints are on unless switched off per tool (设置 › 连接 › AI 额度); only the page can turn an endpoint
+/// back on, after the person read what it does (an agent cannot). Credentials are read from the tool's own
 /// store at the moment of the request, kept in memory for that request only, never written anywhere and never logged.
 enum AIUsageSource: String, CaseIterable {
     case claude, codex, cursor, copilot, grok, opencode, antigravity
@@ -33,7 +33,7 @@ enum AIUsageSource: String, CaseIterable {
     var hasLocal: Bool { self != .antigravity }
 }
 
-/// Per tool: local reading (default on) and the endpoint (default off). A viewer setting in UserDefaults, never in the board.
+/// Per tool: local reading and the endpoint, both on unless switched off. A viewer setting in UserDefaults, never in the board.
 final class AIUsageSettings {
     static let key = "aiUsageSources"
     private let defaults: UserDefaults
@@ -41,7 +41,7 @@ final class AIUsageSettings {
 
     private var stored: [String: [String: Bool]] { defaults.dictionary(forKey: Self.key) as? [String: [String: Bool]] ?? [:] }
     func local(_ source: AIUsageSource) -> Bool { source.hasLocal && (stored[source.rawValue]?["local"] ?? true) }
-    func api(_ source: AIUsageSource) -> Bool { stored[source.rawValue]?["api"] ?? false }
+    func api(_ source: AIUsageSource) -> Bool { stored[source.rawValue]?["api"] ?? true }
     func set(_ source: AIUsageSource, local: Bool? = nil, api: Bool? = nil) {
         var all = stored, one = all[source.rawValue] ?? [:]
         if let local { one["local"] = local }
@@ -610,7 +610,7 @@ extension AppDelegate {
         case "aiUsageSet":
             guard let source = AIUsageSource(rawValue: body["id"] as? String ?? "") else { return }
             let api = body["api"] as? Bool
-            // An endpoint is turned on only with the page's confirmation (the person saw what it reads and with which login).
+            // An endpoint switched off is turned back on only with the page's confirmation (the person saw what it reads and with which login).
             if api == true && body["confirm"] as? Bool != true { aiUsageResult(snapshot: nil); return }
             aiUsageMonitor.settings.set(source, local: body["local"] as? Bool, api: api)
             aiUsageMonitor.changed(source)
@@ -643,7 +643,9 @@ func testAIUsage() {
     let defaults = UserDefaults(suiteName: suite)!
     defer { defaults.removePersistentDomain(forName: suite) }
     let settings = AIUsageSettings(defaults: defaults)
-    precondition(AIUsageSource.allCases.allSatisfy { settings.api($0) == false } && settings.local(.claude) && !settings.local(.antigravity), "local on, endpoints off by default")
+    precondition(AIUsageSource.allCases.allSatisfy { settings.api($0) } && settings.local(.claude) && !settings.local(.antigravity), "local reading and endpoints on by default")
+    for source in AIUsageSource.allCases { settings.set(source, api: false) }
+    precondition(AIUsageSource.allCases.allSatisfy { !settings.api($0) }, "an endpoint switched off stays off")
     let scanner = AIUsageScanner(home: home, env: [:])
     let configuration = URLSessionConfiguration.ephemeral
     configuration.protocolClasses = [MockPlatformProtocol.self]
@@ -653,7 +655,7 @@ func testAIUsage() {
     var json = ""
     monitor.onSnapshot = { json = $0 }
     monitor.pass(force: true)
-    precondition(asked.isEmpty, "no endpoint is called until it is turned on")
+    precondition(asked.isEmpty, "no endpoint is called while it is switched off")
     precondition(json.contains("\"anthropic\"") && json.contains("\"openai\"") && json.contains("\"grok\"") && json.contains("\"plus\"") && json.contains("\"pro\""), "local readings: \(json.prefix(300))")
     for leak in ["PROMPT-TEXT", "SECRET-TOKEN-VALUE", home.path, "%2Fwork"] { precondition(!json.contains(leak), "the snapshot leaks \(leak)") }
     let size = engine.size
@@ -692,5 +694,5 @@ func testAIUsage() {
     precondition(AntigravityCLI.candidates(home: agyHome, env: ["ANTIGRAVITY_CLI_PATH": "/opt/x/agy"]) == ["/opt/x/agy"] && AntigravityCLI.candidates(home: agyHome, env: [:]).count == 3, "agy paths")
     let agyEnv = AntigravityCLI.environment(["PATH": "/usr/bin"], binary: "/opt/homebrew/bin/agy", directory: URL(fileURLWithPath: "/tmp/probe"))
     precondition(agyEnv["AGY_CLI_DISABLE_AUTO_UPDATE"] == "true" && agyEnv["PATH"]?.hasPrefix("/tmp/probe:/opt/homebrew/bin:/usr/bin") == true && agyEnv["BROWSER"] == "/tmp/probe/open", "agy environment")
-    print("PASS: AI usage: readers in JavaScriptCore on made-up Claude Code, Codex, Grok and Cursor files, appended lines read once, nothing but numbers in the snapshot (no prompt, token or path), endpoints off by default and then a fixed GET with the tool's own login, the wait between reads, a 429, Antigravity's local server found from ps and lsof output, agy's usage report and the version it needs")
+    print("PASS: AI usage: readers in JavaScriptCore on made-up Claude Code, Codex, Grok and Cursor files, appended lines read once, nothing but numbers in the snapshot (no prompt, token or path), endpoints on by default and none called once switched off, a fixed GET with the tool's own login, the wait between reads, a 429, Antigravity's local server found from ps and lsof output, agy's usage report and the version it needs")
 }

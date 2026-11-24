@@ -131,7 +131,7 @@ function aiQuotaBandHtml(list){
 
 // MARK: The dialog: every vendor read, the record it shows on, and every tool with its two switches.
 function aiUsageDialog(){
- const snap=aiUsageSnap()||{vendors:{},sources:{}},owners=aiUsageOwners(state.assets),settings=demoMode?Object.keys(AI_USAGE_SOURCES).map(id=>({id,local:id!=='antigravity',api:id==='claude',hasLocal:id!=='antigravity'})):aiUsageNow.sources||nativeStore?.aiUsage?.sources||[];
+ const snap=aiUsageSnap()||{vendors:{},sources:{}},owners=aiUsageOwners(state.assets),settings=demoMode?Object.keys(AI_USAGE_SOURCES).map(id=>({id,local:id!=='antigravity',api:true,hasLocal:id!=='antigravity'})):aiUsageNow.sources||nativeStore?.aiUsage?.sources||[];
  const vendors=Object.values(snap.vendors||{}).sort((x,y)=>(y.last||0)-(x.last||0)).map(v=>{
   const id=owners.get(v.vendor),a=id&&state.assets.find(x=>x.id===id),name=AI_USAGE_VENDORS[v.vendor]?.name||v.vendor,top=[...(v.windows||[])].sort((x,y)=>y.used-x.used)[0];
   const month=Object.entries(v.days||{}).filter(([day])=>day>=aiDayKey(Date.now()-30*86400000)).reduce((s,[,d])=>s+d.cost,0);
@@ -140,12 +140,12 @@ function aiUsageDialog(){
   return `<li class="aq-vendor"><span class="aq-v-name">${esc(name)}</span><span class="aq-v-read live-line${top&&top.used>=AI_TIGHT?' amber':''}">${top?`${aiMeter(top)}<span class="live-text">${esc(aiWindowName(top))} ${Math.round(top.used)}%</span>`:''}<span class="live-text">${esc(tr('30 天 {money}',{money:aiUsd(month)}))}${v.last?` · ${esc(aiAgoText(v.last))}`:''}</span></span><span class="aq-v-target">${target}</span></li>`;
  }).join('');
  const rows=Object.entries(AI_USAGE_SOURCES).map(([id,s])=>{
-  const st=snap.sources?.[id]||{},set=settings.find(x=>x.id===id)||{local:s.local.length>0,api:false,hasLocal:s.local.length>0};
+  const st=snap.sources?.[id]||{},set=settings.find(x=>x.id===id)||{local:s.local.length>0,api:true,hasLocal:s.local.length>0};
   const chip=st.error?`<span class="chip bad" title="${esc(st.error)}">${tr('出错')}</span>`:st.found||st.apiAt?`<span class="chip ok">${tr('读到')}</span>`:`<span class="chip">${tr('没找到')}</span>`;
   const host=(()=>{try{return new URL(s.api).host;}catch{return s.api;}})();
   return `<tr><th scope="row"><span class="aq-s-name">${esc(s.name)}</span>${st.error?`<span class="aq-s-error">${esc(st.error)}</span>`:st.note&&AI_SOURCE_STATES[st.note]?`<span class="aq-s-when">${esc(AI_SOURCE_STATES[st.note]())}</span>`:st.last?`<span class="aq-s-when">${esc(tr('最近 {when}',{when:aiAgoText(st.last)}))}</span>`:''}</th><td>${chip}</td><td>${set.hasLocal?`<input type="checkbox" class="prefs-switch" role="switch" data-action="ai-usage-local" data-id="${id}" aria-label="${esc(tr('读 {name} 的本机文件',{name:s.name}))}" title="${esc(s.local.join('\n'))}"${set.local?' checked':''}>`:'<span class="quiet-fact">—</span>'}</td><td><input type="checkbox" class="prefs-switch" role="switch" data-action="ai-usage-api" data-id="${id}" aria-label="${esc(tr('用 {name} 的登录读额度接口',{name:s.name}))}" title="${esc(host)}"${set.api?' checked':''}></td></tr>`;
  }).join('');
- modal(tr('AI 额度与用量'),`<div class="ai-usage">${vendors?`<ul class="aq-vendors">${vendors}</ul>`:`<p class="form-note">${tr('还没有读到用量。装了 Claude Code、Codex 这类工具并用过以后，这里会自动出现')}</p>`}<table class="aq-sources"><thead><tr><th scope="col">${tr('工具')}</th><th scope="col">${tr('状态')}</th><th scope="col" title="${tr('只读本机文件里的数字，不读对话内容，不联网')}">${tr('本机文件')}</th><th scope="col" title="${tr('用这个工具自己的登录请求它的用量接口；默认关')}">${tr('额度接口')}</th></tr></thead><tbody>${rows}</tbody></table><p class="form-note" role="note">${ui('lock')}${tr('读数只在内存里，不进资产数据、备份和导出；额度接口用的登录只在请求时读取，不保存，每次请求都在网络记录里')}</p><div class="form-actions">${nativeStore&&!demoMode?`<button class="button" data-action="ai-usage-read">${ui('refresh')}${tr('立即读取')}</button>`:''}<span class="form-note">${tr('读于 {when}',{when:snap.at?aiAgoText(snap.at):'—'})}</span></div></div>`,'ai-usage');
+ modal(tr('AI 额度与用量'),`<div class="ai-usage">${vendors?`<ul class="aq-vendors">${vendors}</ul>`:`<p class="form-note">${tr('还没有读到用量。装了 Claude Code、Codex 这类工具并用过以后，这里会自动出现')}</p>`}<table class="aq-sources"><thead><tr><th scope="col">${tr('工具')}</th><th scope="col">${tr('状态')}</th><th scope="col" title="${tr('只读本机文件里的数字，不读对话内容，不联网')}">${tr('本机文件')}</th><th scope="col" title="${tr('用这个工具自己的登录请求它的用量接口；默认开')}">${tr('额度接口')}</th></tr></thead><tbody>${rows}</tbody></table><p class="form-note" role="note">${ui('lock')}${tr('读数只在内存里，不进资产数据、备份和导出；额度接口用的登录只在请求时读取，不保存，每次请求都在网络记录里')}</p><div class="form-actions">${nativeStore&&!demoMode?`<button class="button" data-action="ai-usage-read">${ui('refresh')}${tr('立即读取')}</button>`:''}<span class="form-note">${tr('读于 {when}',{when:snap.at?aiAgoText(snap.at):'—'})}</span></div></div>`,'ai-usage');
 }
 async function aiUsageApiToggle(input){
  const id=input.dataset.id,s=AI_USAGE_SOURCES[id];if(!s)return;
@@ -166,7 +166,7 @@ document.addEventListener('click',e=>{
  else if(action==='ai-usage-add'){const plan=findAiPlan(id);if(!plan)return;checkpoint();const asset={id:'asset-'+crypto.randomUUID(),type:'ai',...aiPlanFields(plan),account:'',date:'',source:'manual',event:'日期待补充',art:'generic',createdAt:new Date().toISOString()};state.assets.push(asset);if(state.cardOrder?.ai?.length)state.cardOrder.ai.unshift(asset.id);ensureBlock(state,'ai');save();render();aiUsageDialog();toast(tr('已添加「{name}」',{name:plan.name}),true);}
 });
 
-// MARK: The MCP tools (list_ai_usage, set_ai_usage_source): readings and the local switches; an endpoint is only turned on in the app.
+// MARK: The MCP tools (list_ai_usage, set_ai_usage_source): readings and the local switches; an endpoint is only switched in the app.
 agentMethods.aiUsage=({vendor=''}={})=>{
  if(!featureOn('aiUsage'))throw new Error(tr('AI 额度与用量在 设置 › 功能 里关着'));
  const snap=aiUsageSnap();if(!snap)throw new Error(tr('还没有读数：AI 额度与用量只在 Mac App 里读取'));

@@ -2993,7 +2993,7 @@ function prefsDialog(section){
   mac&&featureOn('agent')?link(tr('MCP 接入'),null,'agent-setup',tr('给外部工具的配置')):'',
   mac&&typeof probeOn==='function'&&probeOn()?link(tr('探针数据源'),null,'probe-sources',tr('监控面板的地址和账号')):'',
   mac&&typeof sshOn==='function'&&sshOn()?link(tr('SSH 直读'),null,'ssh-probe-open',tr('逐台开启、读取间隔')):'',
-  featureOn('aiUsage')&&typeof aiUsageDialog==='function'?link(tr('AI 额度'),null,'ai-usage-open',tr('本机 AI 工具的用量和订阅额度；用登录凭据读额度接口默认关')):'',
+  featureOn('aiUsage')&&typeof aiUsageDialog==='function'?link(tr('AI 额度'),null,'ai-usage-open',tr('本机 AI 工具的用量和订阅额度；默认也用各工具自己的登录读额度接口')):'',
   mac&&typeof platformOn==='function'&&platformOn()?link(tr('平台状态'),platform.sources.length>0,'platform-sources',tr('Supabase、Vercel、Render、Upstash 上的项目状态')):''].join(''):'';
  // 外观: the accent (the 主题 dialog), the wall's skin (theme.js) and its density (board-wall.js); all kept on this device only.
  const radios=(label,list,on,action)=>`<div class="chip-group" role="radiogroup" aria-label="${label}">${list.map(([id,name,note])=>`<button type="button" class="choice" role="radio" aria-checked="${id===on}" data-action="${action}" data-id="${id}"${note?` title="${esc(note)}"`:''}>${esc(name)}</button>`).join('')}</div>`;
