@@ -1,7 +1,7 @@
 #!/bin/zsh
-# Build the Pro developer build of this checkout and install it over /Applications/Assetboard.app on this Mac (the Mac mini or the
-# MacBook Pro after a release, from .github/workflows/mini-dev.yml or mbp-dev.yml, or by hand: zsh desktop/dev-install.sh). It needs the private Pro checkout
-# at pro/ and fails without it, rather than installing a free build. The build is ad-hoc signed, never with the release identity,
+# Build the developer build of this checkout and install it over /Applications/Assetboard.app on this Mac (the Mac mini or the
+# MacBook Pro after a release, from .github/workflows/mini-dev.yml or mbp-dev.yml, or by hand: zsh desktop/dev-install.sh). It needs pro/ (part of this
+# repository) and fails without it, rather than installing a build without those modules. The build is ad-hoc signed, never with the release identity,
 # and stays on this Mac. A running Assetboard is asked to quit; one that does not quit in time is left running and nothing is
 # installed. The replaced app is kept for rollback; the board's data (~/Library/Application Support/Assetboard) is never touched.
 # ASSETBOARD_INSTALL_DIR (default /Applications) and ASSETBOARD_DEV_BACKUP_DIR are for trying it out elsewhere.
@@ -21,7 +21,7 @@ running() { /usr/bin/pgrep -f "^$dest/Contents/MacOS/Assetboard( |$)" >/dev/null
 launch() { /usr/bin/env -i HOME="$HOME" USER="${USER:-$(id -un)}" PATH=/usr/bin:/bin:/usr/sbin:/sbin TMPDIR="${TMPDIR:-/tmp}" LANG="${LANG:-en_US.UTF-8}" /usr/bin/open "$1"; }
 
 # Without Pro, build.sh quietly builds the board without the plugin and without the developer flag.
-[[ -f pro/web/pro.js ]] || fail "the private Pro checkout is missing at pro/ (pro/web/pro.js)"
+[[ -f pro/web/pro.js ]] || fail "pro/web/pro.js is missing from this checkout"
 unset SIGNING_IDENTITY NOTARY_PROFILE NOTARY_KEYCHAIN ASSETBOARD_EDITION
 commit="$(git rev-parse --short HEAD 2>/dev/null || print unknown)"
 ASSETBOARD_PRO_DEV=1 zsh desktop/build.sh

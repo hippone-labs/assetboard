@@ -1,4 +1,4 @@
-# Installs the Pro developer build (desktop/dev-install.sh) on the MacBook Pro labelled assetboard-mbp, for the same
+# Installs the developer build (desktop/dev-install.sh) on the MacBook Pro labelled assetboard-mbp, for the same
 # commit release-app just published. release-app.yml does not call this workflow. A job called from there would keep
 # that run in progress while this one waited for a runner, and concurrency group app-production-release would stay
 # occupied. timeout-minutes does not limit a wait for a runner. This workflow starts when release-app completes, and
@@ -46,19 +46,10 @@ jobs:
         run: |
           git fetch --quiet --no-tags origin main
           git merge-base --is-ancestor HEAD FETCH_HEAD
-      - name: Pro modules (private checkout beside the board)
-        # The same as in release-app.yml: the runner's gh login, or a PRO_REPO_TOKEN secret when set.
-        env:
-          PRO_REPO_TOKEN: ${{ secrets.PRO_REPO_TOKEN }}
-        run: |
-          if [ -n "${PRO_REPO_TOKEN:-}" ]; then export GH_TOKEN="$PRO_REPO_TOKEN"; fi
-          rm -rf pro
-          gh repo clone "${{ vars.PRO_REPO || 'hippone-labs/assetboard-pro' }}" pro -- --depth=1 --quiet
-          test -f pro/web/pro.js
       - name: Build and install the developer build
         run: zsh desktop/dev-install.sh | tee "$RUNNER_TEMP/dev-install.log"
       - name: Summary
         if: ${{ always() }}
         run: |
           { echo '### MBP dev build'; tail -3 "$RUNNER_TEMP/dev-install.log" 2>/dev/null || echo 'not installed'; } >> "$GITHUB_STEP_SUMMARY"
-          rm -rf pro dist
+          rm -rf dist

@@ -141,11 +141,10 @@ test('notarize runs the helper of its own commit, whatever ref it builds', () =>
  assert.equal(step(notarize.jobs.notarize, 'actions/checkout@v7').with.ref, '${{ inputs.ref }}');
 });
 
-test('the Pro checkout steps are unchanged in the hosted jobs', () => {
+test('the hosted jobs build pro/ from this checkout, with no second clone', () => {
  for (const job of [release.jobs.release, notarize.jobs.notarize]) {
-  const pro = step(job, 'Pro modules (private checkout beside the board)');
-  assert.deepEqual(pro.env, {PRO_REPO_TOKEN: '${{ secrets.PRO_REPO_TOKEN }}'});
-  assert.match(pro.run, /gh repo clone/);
+  assert.equal(JSON.stringify(job.steps).includes('PRO_REPO_TOKEN'), false);
+  assert.equal(JSON.stringify(job.steps).includes('gh repo clone'), false);
  }
  assert.equal(release.jobs['mini-dev'].uses, './.github/workflows/mini-dev.yml');
 });

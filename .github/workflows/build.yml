@@ -81,8 +81,7 @@ jobs:
 
   # The browser tests as release-app.yml's "Browser regression" runs them: the same runner image, Playwright and command. Chromium
   # there draws in software on three cores and the image has Reduce transparency and Reduce motion on, none of which the Ubuntu job
-  # shows. The Pro modules come from a private repository that a pull request has no token for, so this is tests/ alone: the runner
-  # adds pro/tests/ only when pro/ is there.
+  # shows. It runs tests/ and pro/tests/, as the runner does for this checkout.
   browser-mac:
     runs-on: macos-26
     timeout-minutes: 40

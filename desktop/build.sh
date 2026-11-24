@@ -1,15 +1,14 @@
 #!/bin/zsh
 set -euo pipefail
 project_dir="${0:A:h:h}"
-# ASSETBOARD_EDITION=free builds without the Pro modules even when this checkout has pro/ (what building the public repository alone
-# gives), into dist/free/, so both builds can sit side by side.
+# ASSETBOARD_EDITION=free builds without the modules in pro/, into dist/free/, so both builds can sit side by side.
 out_dir="$project_dir/dist"
 free=0
 [[ "${ASSETBOARD_EDITION:-}" == free ]] && free=1
 (( free )) && out_dir="$out_dir/free"
 swift_flags=()
-# Assetboard Pro, the official plugin (free, no licence), when this checkout has pro/: -D ASSETBOARD_PRO makes the app say Pro is on
-# and adds its menu item, plus any Swift of its own in pro/desktop/. ASSETBOARD_EDITION=free leaves it out.
+# The modules in pro/ (part of this repository): -D ASSETBOARD_PRO turns them on and adds their menu item, plus any Swift of their
+# own in pro/desktop/. ASSETBOARD_EDITION=free leaves them out.
 pro=0
 pro_swift=()
 if [[ -f "$project_dir/pro/web/pro.js" ]] && (( ! free )); then pro=1; pro_swift=("$project_dir"/pro/desktop/*.swift(N)); swift_flags+=(-D ASSETBOARD_PRO); fi

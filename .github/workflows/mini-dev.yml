@@ -1,4 +1,4 @@
-# Installs the Pro developer build (desktop/dev-install.sh) on the Mac mini: after every release (release-app.yml calls this
+# Installs the developer build (desktop/dev-install.sh) on the Mac mini: after every release (release-app.yml calls this
 # workflow once the release job has succeeded), or by hand from the Actions tab for any commit of main. It runs on the runner
 # labelled assetboard-mini. Like release-app.yml it has no pull_request trigger. The build is ad-hoc signed, is not uploaded and
 # never leaves the Mac; a failure here says nothing about the release, which is already published by then.
@@ -12,9 +12,6 @@ on:
         description: Commit to build
         required: true
         type: string
-    secrets:
-      PRO_REPO_TOKEN:
-        required: false
   workflow_dispatch:
 
 permissions:
@@ -42,19 +39,10 @@ jobs:
         run: |
           git fetch --quiet --no-tags origin main
           git merge-base --is-ancestor HEAD FETCH_HEAD
-      - name: Pro modules (private checkout beside the board)
-        # The same as in release-app.yml: the runner's gh login, or a PRO_REPO_TOKEN secret when set.
-        env:
-          PRO_REPO_TOKEN: ${{ secrets.PRO_REPO_TOKEN }}
-        run: |
-          if [ -n "${PRO_REPO_TOKEN:-}" ]; then export GH_TOKEN="$PRO_REPO_TOKEN"; fi
-          rm -rf pro
-          gh repo clone "${{ vars.PRO_REPO || 'hippone-labs/assetboard-pro' }}" pro -- --depth=1 --quiet
-          test -f pro/web/pro.js
       - name: Build and install the developer build
         run: zsh desktop/dev-install.sh | tee "$RUNNER_TEMP/dev-install.log"
       - name: Summary
         if: ${{ always() }}
         run: |
           { echo '### Mini dev build'; tail -3 "$RUNNER_TEMP/dev-install.log" 2>/dev/null || echo 'not installed'; } >> "$GITHUB_STEP_SUMMARY"
-          rm -rf pro dist
+          rm -rf dist

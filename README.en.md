@@ -139,14 +139,7 @@ Scripts can put JSON in this format into `~/Library/Application Support/Assetboa
 
 ## Official download and building from source
 
-Assetboard is free and open source, with no time or record limit. The official download from [assetboard.app](https://assetboard.app/) needs no sign-up and no license, and carries a few features that are not in this repository, also free:
-
-- AI changing, deleting and tidying up existing records in bulk through MCP and the command line
-- Weekly automatic registry checks
-- Cloudflare sync every 12 hours, with a note when new assets appear
-- Live status (SSH reads, monitoring panels, platform status)
-
-This repository is the whole code of the rest (GPL-3.0). What you build from it has the board, Upcoming, local reminders, the payment ledger, projects, every import, picking and manual sync after connecting a platform, AI recognition with your own key, the read-only MCP and command line (look up, add new records, bring in what waits), relations, the panorama, AI usage and limits, backups and exports. See the [user guide](GUIDE.md#官方安装包与源码构建) (Chinese).
+Assetboard is free and open source (GPL-3.0), with no time or record limit. The download from [assetboard.app](https://assetboard.app/) needs no sign-up and no license. This repository is its whole code: what you build from it is the same app as the download. See the [user guide](GUIDE.md#官方安装包与源码构建) (Chinese).
 
 ## Install
 
