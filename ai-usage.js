@@ -34,7 +34,7 @@ const AI_USAGE_SOURCES={
  copilot:{name:'GitHub Copilot',vendor:'copilot',local:['~/.copilot/session-state'],gives:['tokens','cost','premium'],api:'https://api.github.com/copilot_internal/user',apiGives:['premium','plan','month']},
  grok:{name:'Grok CLI',vendor:'grok',local:['~/.grok/sessions','~/.grok/grok.db','$GROK_HOME/sessions'],gives:['tokens','cost'],api:'https://cli-chat-proxy.grok.com/v1/billing?format=credits',apiGives:['week','month','onDemand','plan']},
  opencode:{name:'opencode',vendor:'opencode',local:['~/.local/share/opencode/opencode.db','~/.local/share/opencode/storage/message'],gives:['tokens','cost'],api:'https://opencode.ai/zen/go/v1/usage',apiGives:['5h','week','month']},
- antigravity:{name:'Antigravity',vendor:'google',local:[],gives:[],api:'http://127.0.0.1 (Antigravity language server)',apiGives:['5h','week','models','plan']}
+ antigravity:{name:'Antigravity',vendor:'google',local:[],gives:[],api:'http://127.0.0.1 (Antigravity language server, agy)',apiGives:['5h','week','models','plan']}
 };
 // opencode talks to many providers; its usage goes to the vendor whose plan it spends (a Claude or ChatGPT login inside opencode
 // uses that subscription). Anything else stays with opencode itself (Zen / Go, or an API key).
@@ -181,26 +181,33 @@ const AI_API={
   return out;
  },
  // Grok cli-chat-proxy billing?format=credits: creditUsagePercent of the current (weekly or monthly) period, on-demand cap in cents.
+ // An answer with a period and no percent is unknown usage (note noPercent), never 0.
  grok(j){
   const c=j?.config||j||{},p=c.currentPeriod||{},id=/WEEK/.test(p.type||'')?'week':/MONTH/.test(p.type||'')?'month':'period';
   const out={windows:[aiWindow(id,c.creditUsagePercent??(aiNum(c.onDemandCap?.val)>0?aiPos(c.onDemandUsed?.val)/aiNum(c.onDemandCap.val)*100:null),p.end||c.billingPeriodEnd,id==='week'?10080:null)].filter(Boolean)};
   const tier=aiText(c.subscriptionTier||j?.subscription_tier);if(tier)out.plan=tier;
   if(aiNum(c.onDemandCap?.val)>0)out.extra={used:aiPos(c.onDemandUsed?.val)/100,limit:aiPos(c.onDemandCap.val)/100,currency:'USD'};
+  if(!out.windows.length&&aiTime(p.end||c.billingPeriodEnd))out.note='noPercent';
   return out;
  },
  // opencode Go zen/go/v1/usage: rolling (5 hours), weekly and monthly percent with resetsAt.
  opencode(j){
   const u=j?.usage||{};return {windows:[['rolling','5h',300],['weekly','week',10080],['monthly','month',null]].map(([k,id,m])=>u[k]&&aiWindow(id,u[k].percent,u[k].resetsAt,m)).filter(Boolean),plan:'Go'};
  },
- // Antigravity's local language server: RetrieveUserQuotaSummary groups[].buckets[] (remainingFraction flat or nested), or
- // GetUserStatus with the tier name and per-model quotaInfo. A missing fraction is unknown, never 0 or 100.
+ // Antigravity: the app's local language server (RetrieveUserQuotaSummary groups[].buckets[], remainingFraction flat or nested;
+ // GetUserStatus with the tier name and per-model quotaInfo) or the report of `agy -p /usage --output-format json`
+ // ({status:'SUCCESS', command:{name:'usage', data:{groups}}}, snake_case, id and name for bucketId and displayName).
+ // A missing fraction is unknown, never 0 or 100.
  antigravity(j){
-  const out={windows:[]},groups=j?.response?.groups||j?.groups||[];
-  const frac=b=>aiNum(b?.remainingFraction)??aiNum(b?.remaining?.remainingFraction)??(b?.remaining?.case==='remainingFraction'?aiNum(b.remaining.value):null);
+  if(j?.command){if(j.status!=='SUCCESS'||j.command?.name!=='usage')return null;j={response:j.command.data};}
+  const out={windows:[]},groups=j?.response?.groups||j?.summary?.groups||j?.groups||[];
+  const frac=b=>aiNum(b?.remainingFraction)??aiNum(b?.remaining_fraction)??aiNum(b?.remaining?.remainingFraction)??aiNum(b?.remaining?.remaining_fraction)??(b?.remaining?.case==='remainingFraction'?aiNum(b.remaining.value):null);
   for(const g of Array.isArray(groups)?groups:[])for(const b of Array.isArray(g?.buckets)?g.buckets:[]){
-   if(b?.disabled)continue;const f=frac(b);if(f==null)continue;const key=`${b.bucketId||''} ${b.window||''} ${b.displayName||''}`.toLowerCase();
-   const kind=/5h|five hour|session/.test(key)?'5h':/week/.test(key)?'week':'window',lane=/3p|claude|gpt/.test(`${b.bucketId||''} ${g.displayName||''}`.toLowerCase())?'other':'gemini';
-   const x=aiWindow(`${kind}-${lane}`,(1-Math.min(Math.max(f,0),1))*100,b.resetTime,kind==='5h'?300:kind==='week'?10080:null,aiText(g.displayName,30));if(x)out.windows.push(x);
+   if(b?.disabled)continue;const f=frac(b);if(f==null)continue;const bid=String(b.bucketId||b.bucket_id||b.id||''),group=g.displayName||g.display_name||g.name||'',key=`${bid} ${b.window||''} ${b.displayName||b.display_name||b.name||''}`.toLowerCase();
+   const kind=/5h|five hour|session/.test(key)?'5h':/week/.test(key)?'week':'window',lane=/3p|claude|gpt/.test(`${bid} ${group}`.toLowerCase())?'other':'gemini';
+   // A model with its own allowance (its own group beside the shared Gemini one) keeps its own id.
+   let id=`${kind}-${lane}`;if(out.windows.some(w=>w.id===id))id=`${kind}-${bid.toLowerCase().replace(/[^a-z0-9]+/g,'-')||out.windows.length}`;if(out.windows.some(w=>w.id===id))continue;
+   const x=aiWindow(id,(1-Math.min(Math.max(f,0),1))*100,b.resetTime||b.reset_time,kind==='5h'?300:kind==='week'?10080:null,aiText(group,30));if(x)out.windows.push(x);
   }
   const us=j?.userStatus;if(us){const tier=aiText(us.userTier?.name||us.planStatus?.planInfo?.planName);if(tier)out.plan=tier;
    if(!out.windows.length)for(const mc of us.cascadeModelConfigData?.clientModelConfigs||[]){const f=aiNum(mc?.quotaInfo?.remainingFraction);if(f==null)continue;const x=aiWindow('model-'+out.windows.length,(1-f)*100,mc.quotaInfo.resetTime,null,aiText(mc.label,30));if(x)out.windows.push(x);}}
@@ -239,7 +246,7 @@ function aiUsageStore(){
     }
    }else if(kind==='json'){const res=parse(payload,o=>source==='grok'?AI_LOCAL.grokUsage(o):source==='opencode'?AI_LOCAL.opencode(o,fileKey):null);if(res){keep(source,res,now);n++;}}
    else if(kind==='rows'){for(const row of Array.isArray(payload)?payload:[]){const res=source==='grok'?AI_LOCAL.grokRow(row):source==='opencode'?parse(row?.data,o=>AI_LOCAL.opencode(o,row.id)):source==='cursor'?AI_LOCAL.cursorRow(row):null;if(res){keep(source,res,now);n++;}}}
-   else if(kind==='api'){const res=parse(payload,o=>AI_API[source]?.(o));if(res){const m=metaOf(source);if(res.windows?.length||!m.windows){m.windows=res.windows;m.windowsAt=now;m.windowsFrom='api';}for(const k of ['plan','credits','extra','overage','ended'])if(res[k]!=null)m[k]=res[k];m.apiAt=now;n=1;}}
+   else if(kind==='api'){const res=parse(payload,o=>AI_API[source]?.(o));if(res){const m=metaOf(source);if(res.windows?.length||!m.windows){m.windows=res.windows;m.windowsAt=now;m.windowsFrom='api';}for(const k of ['plan','credits','extra','overage','ended'])if(res[k]!=null)m[k]=res[k];m.apiAt=now;delete m.error;delete m.errorAt;if(res.note)m.note=res.note;else delete m.note;n=1;}}
    return n;
   },
   // A source was found but could not be read (permission, a locked database, an endpoint that refused): said in 设置.
@@ -268,7 +275,7 @@ function aiSum(list){let tokens=0,cost=0,priced=0,n=0,premium=0;for(const r of l
 // endpoint answer), per-day cost and tokens, the models, when it was last used and the local five-hour block.
 function aiUsageSnapshot(records,meta,seen,now=Date.now()){
  const vendors={},sources={};
- for(const [id,src] of Object.entries(AI_USAGE_SOURCES)){const m=meta[id]||{};sources[id]={found:!!seen[id],...(m.last?{last:m.last}:{}),...(m.error?{error:m.error}:{}),...(m.apiAt?{apiAt:m.apiAt}:{})};
+ for(const [id,src] of Object.entries(AI_USAGE_SOURCES)){const m=meta[id]||{};sources[id]={found:!!seen[id],...(m.last?{last:m.last}:{}),...(m.error?{error:m.error}:{}),...(m.note?{note:m.note}:{}),...(m.apiAt?{apiAt:m.apiAt}:{})};
   if(!seen[id]&&!m.windows&&!m.plan)continue;
   const v=vendors[src.vendor]||(vendors[src.vendor]={vendor:src.vendor,sources:[],windows:[],days:{},models:{},bySource:{}});v.sources.push(id);
   if(m.windows&&(!v.windowsAt||m.windowsAt>v.windowsAt)){v.windows=m.windows;v.windowsAt=m.windowsAt;v.windowsFrom=m.windowsFrom;v.windowsSource=id;}

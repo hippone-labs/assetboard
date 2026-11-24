@@ -1,5 +1,5 @@
 // Run with the browser tool's filename option. AI 额度与用量: the demo's made-up readings on the AI 订阅 view (band order, row lines,
-// detail facts, the dialog and its confirmation before an endpoint is turned on), contrast in light and dark, 390px; then a faked
+// detail facts, the dialog with the endpoints on by default), contrast in light and dark, 390px; then a faked
 // Mac host (not demo): readings arrive through window.assetboardAiUsage from the same readers, the MCP methods (read, the local
 // switch only, usageSource on update_asset), and switching the feature off. Never writes data.
 async (page) => {
@@ -46,17 +46,12 @@ async (page) => {
    check(await p.evaluate(()=>document.querySelectorAll('#detail .aq-win').length===3),'three windows');
    const low=[...await audit(p,'.aq-band *,.ai-quota *,.ai-quota,#detail .aq-wins *,#detail .fact *')].filter(r=>r.ratio<4.5);
    check(!low.length,`${scheme}: low contrast `+JSON.stringify(low.slice(0,4)));
-   // The dialog: every vendor and the record it lands on, every tool with its switches; an endpoint asks before it is on.
+   // The dialog: every vendor and the record it lands on, every tool with its switches, the endpoints on by default.
    await p.evaluate(()=>aiUsageDialog());
    check(await p.evaluate(()=>document.querySelectorAll('.aq-sources tbody tr').length===7&&document.querySelectorAll('.aq-vendor').length===5),'7 tools, 5 vendors');
    check(await p.evaluate(()=>!!document.querySelector('.aq-vendor [data-action="detail"][data-id="demo-a2"]')),'Claude lands on Claude Max');
    check(await p.evaluate(()=>!document.querySelector('[data-action="ai-usage-local"][data-id="antigravity"]')),'Antigravity has no local files');
-   await p.click('[data-action="ai-usage-api"][data-id="codex"]');
-   await until(p,()=>document.querySelector('#modal').dataset.view==='confirm');
-   check(/不是公开 API/.test(await p.textContent('#modal-content')),'the confirmation says what it does');
-   await p.click('#confirm-no');
-   await until(p,()=>document.querySelector('#modal').open&&document.querySelector('#modal').dataset.view==='ai-usage');
-   check(!(await p.isChecked('[data-action="ai-usage-api"][data-id="codex"]')),'cancel keeps it off');
+   check(await p.evaluate(()=>[...document.querySelectorAll('[data-action="ai-usage-api"]')].every(x=>x.checked)),'endpoints on by default');
    const lowDialog=(await audit(p,'#modal .ai-usage *')).filter(r=>r.ratio<4.5);
    check(!lowDialog.length,`${scheme}: low contrast in the dialog `+JSON.stringify(lowDialog.slice(0,4)));
    check(!errors.length,errors.join(' | '));
@@ -95,8 +90,14 @@ async (page) => {
   check(await p.evaluate(()=>{try{agentMethods.update({id:'c1',fields:{usageSource:'nobody'}});return false;}catch(e){return /usageSource/.test(e.message);}}),'a bad usageSource is refused');
   await p.evaluate(()=>agentMethods.update({id:'c1',fields:{usageSource:'none'}}));
   check(await p.evaluate(()=>!document.querySelector('.row[data-asset="c1"] .ai-quota')&&state.assets.find(a=>a.id==='c1').usageSource==='none'),'usageSource none hides the reading');
-  // The page turns an endpoint on only with the confirmation.
+  // An endpoint switched off is turned back on only with the confirmation; cancel keeps it off.
   await p.evaluate(()=>aiUsageDialog());await p.click('[data-action="ai-usage-api"][data-id="claude"]');
+  await until(p,()=>document.querySelector('#modal').dataset.view==='confirm');
+  check(/不是公开 API/.test(await p.textContent('#modal-content')),'the confirmation says what it does');
+  await p.click('#confirm-no');
+  await until(p,()=>document.querySelector('#modal').open&&document.querySelector('#modal').dataset.view==='ai-usage');
+  check(!(await p.isChecked('[data-action="ai-usage-api"][data-id="claude"]'))&&!(await p.evaluate(()=>window.__sent.some(m=>m.action==='aiUsageSet'&&m.api===true))),'cancel keeps it off');
+  await p.click('[data-action="ai-usage-api"][data-id="claude"]');
   await until(p,()=>document.querySelector('#modal').dataset.view==='confirm');await p.click('#confirm-yes');
   check(await until(p,()=>window.__sent.some(m=>m.action==='aiUsageSet'&&m.id==='claude'&&m.api===true&&m.confirm===true)),'endpoint on after the confirmation');
   // Off in 设置 › 功能: the app is told to stop and the lines go.

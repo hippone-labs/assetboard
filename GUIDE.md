@@ -5,7 +5,7 @@
 ## 目录
 
 - [功能一览](#功能一览)
-- [Assetboard Pro](#assetboard-pro)
+- [官方安装包与源码构建](#官方安装包与源码构建)
 - [下载与安装](#下载与安装)
 - [快速上手](#快速上手)
 - [导入方式](#导入方式)
@@ -27,17 +27,17 @@
 - 导入：粘贴或拖入 CSV / JSON / 邮件，粘贴域名或网址，识别截图和 PDF，接 GitHub、Cloudflare、Namecheap、Porkbun、Hetzner、DigitalOcean、Vercel，读 `~/.ssh/config`。有冲突、没读懂或丢弃了东西时先预览，整批可撤销。
 - 待合并的 PR（Mac App，免费）：从 GitHub 同步或手动记下的 GitHub 仓库，行上显示打开的 PR 数，后面的 ✓ 和数字是可以合并的（非草稿、无冲突、CI 全绿或没有 CI）；有 PR 的 CI 失败时这一行标红，有 PR 3 天以上没动时标琥珀色，草稿不着色；没有 PR 的仓库照旧显示最近推送。“代码仓库”分组标题下一行汇总，例如“4 个仓库共 6 个 PR 待合并 · 3 个可以合并 · 最老 6 天”。详情里列出每个 PR：编号、标题、草稿、CI、能否合并、多久没动，点一下用默认浏览器打开它在 GitHub 上的页面；App 里不合并、不关闭、不评论。用本机 `gh` 的登录读，没有 `gh` 或没登录时用 GitHub 连接里保存的令牌（细粒度令牌加 Pull requests 和 Commit statuses 的只读权限）；App 打开时、每 15 分钟、同步 GitHub 后各读一次，汇总行右边的按钮立即刷新。没登录、令牌失效、限流、断网时汇总行和详情里各说一句，上次读到的保留。结果只存在这台 Mac，不进资产数据、备份和导出，也不给 MCP。在“设置 › 功能”里关掉。
 - 正在做（Mac App，免费）：采集本机正在运行的 AI 编码会话（Claude Code、Codex、Cursor 和 Cursor Agent、opencode、Gemini CLI、Copilot CLI、Grok CLI），得到每个工具的会话数、所在仓库、当前分支和已运行时长；会话文件 3 分钟内有过写入算活动，更久算空闲，没有会话文件可看的工具只算在运行。App 在前台时每 30 秒读一次。只读四样：进程名和可执行文件路径、工作目录、启动时间、会话文件的修改时间，另外读工作目录上方 `.git/HEAD` 的第一行得到分支。不读命令行参数和环境变量，不打开会话文件，不读对话内容、提示词和令牌；不碰“桌面”“文稿”“下载”、iCloud 和外接磁盘里的目录（在那里工作的会话只有目录名，没有分支），所以不会弹出权限请求。不联网，读数只在内存里，不进资产数据、备份和导出，也不给外部工具（MCP 和命令行）。用 Node 运行的工具（进程名是 `node`）认不出来。在“设置 › 功能”关闭。本版只提供数据和开关，由全景等界面接入。它和“AI 额度与用量”（额度和用量数字）、“外部工具接入”（工具对资产的操作记录）是三件事，各有开关。
-- AI 额度与用量（Mac App）：读本机 Claude Code、Codex、GitHub Copilot CLI、Grok CLI、opencode 的用量文件和 Cursor 的套餐，在对应的 AI 订阅上显示额度条（5 小时、本周、本月、高级请求）、重置倒计时、本期用量按 API 价折算值不值订阅价、多久没用。“AI 订阅”视图顶上按轻重列出要留意的：快用完、照现在的速度会用完、本机两周没用的付费订阅、用得远不到订阅价的。只读数字，不读对话内容，不联网；用各工具自己的登录去读它的额度接口（更准、还能读 Cursor、Copilot、Antigravity 的额度）要在“设置 › 连接 › AI 额度”里逐个打开，默认关。见下面的 [AI 额度与用量](#ai-额度与用量)。
+- AI 额度与用量（Mac App）：读本机 Claude Code、Codex、GitHub Copilot CLI、Grok CLI、opencode 的用量文件和 Cursor 的套餐，在对应的 AI 订阅上显示额度条（5 小时、本周、本月、高级请求）、重置倒计时、本期用量按 API 价折算值不值订阅价、多久没用。“AI 订阅”视图顶上按轻重列出要留意的：快用完、照现在的速度会用完、本机两周没用的付费订阅、用得远不到订阅价的。只读数字，不读对话内容；默认也用各工具自己的登录去读它的额度接口（更准、还能读 Cursor、Copilot、Antigravity 的额度），不想要的在“设置 › 连接 › AI 额度”里逐个关掉。见下面的 [AI 额度与用量](#ai-额度与用量)。
 - 键盘：搜索、导入、关联、全景、隐藏、置前都有单键快捷键，`?` 查看全部。
 
-## Assetboard Pro
+## 官方安装包与源码构建
 
-- 是什么： Assetboard Pro 是官方插件，现在免费。它让外部 AI 工具通过 MCP 和命令行修改、删除、批量整理已有记录，另外负责后台自动做的事：每周核对注册局、Cloudflare 每 12 小时自动同步和新资产提醒、实时状态。
-- 不用 Pro 也有的： App 和只读 MCP 免费、开源。手动增改删、导入、连接平台后挑选、手动同步、AI 识别、付款账本、项目、关停清单、定期清理、Inbox 文件夹，以及 MCP 和命令行的查询、添加和引入待引入。
-- 怎么拿到： 从 [assetboard.app](https://assetboard.app/) 下载官方安装包，Pro 已经内置并默认启用，不用注册，也不用输入许可证。
-- 在哪看： “设置 › Assetboard Pro”显示“官方插件”和状态“已启用”，“设置 › 关于”的版本类型是“官方版 · 含 Assetboard Pro”。演示模式显示全部 Pro 功能。
-- 没有 Pro 时（自己从源码编译的版本）： Pro 的开关（例如每周核对注册局）不显示，你之前的选择照样保留；外部工具修改或删除已有资产会被拒绝并说明原因；数据一样不少。
-- 源码： 这个仓库是免费部分的全部代码（GPL-3.0），自己编译得到的就是完整的免费版。Pro 插件不在仓库里，随官方签名的安装包提供。
+- 官方安装包： 从 [assetboard.app](https://assetboard.app/) 下载，免费，不用注册，也不用输入许可证。
+- 只在官方安装包里的： 外部 AI 工具通过 MCP 和命令行修改、删除、批量整理已有记录，以及后台自动做的事：每周核对注册局、Cloudflare 每 12 小时自动同步和新资产提醒、实时状态。
+- 源码构建也有的： 手动增改删、导入、连接平台后挑选、手动同步、AI 识别、付款账本、项目、关停清单、定期清理、Inbox 文件夹，以及 MCP 和命令行的查询、添加和引入待引入。
+- 在哪看： “设置 › 关于”的版本类型是“官方版”或“源码构建”。演示模式显示全部功能。
+- 源码构建里： 只在官方安装包里的开关（例如每周核对注册局）不显示，你之前的选择照样保留；外部工具修改或删除已有资产会被拒绝并说明原因；数据一样不少。
+- 源码： 这个仓库是其余部分的全部代码（GPL-3.0）。上面那几项不在仓库里，随官方签名的安装包提供。
 
 ## 下载与安装
 
@@ -77,11 +77,11 @@ open /Applications/Assetboard.app --args --demo
 | Hetzner、DigitalOcean、Vercel | 「导入 › 云平台」或菜单「文件 → 从云平台导入…」：粘贴 API 令牌，只调用读取列表的接口。Hetzner 读一个项目的服务器（令牌在 Hetzner Console 的项目 › Security › API tokens 里建，权限选 Read；项目名可选，记在“账号”里）；DigitalOcean 读 Droplet、App Platform 应用和托管数据库（建 Custom Scopes 令牌，只勾 droplet、app、database、account 的 read，没勾的类别跳过并说明）；Vercel 读项目和在 Vercel 注册的域名（到期日和自动续费，自动续费开着的按年重复；只是指向 Vercel 的域名不读，请从注册商导入）。服务器带公网 IP、所在国家和列表月价（Hetzner 按项目币种的含税价，DigitalOcean 按美元；不含流量、备份和另计的附加项），月价只填进空着的费用，之后以你填的为准。Vercel 的令牌没有只读的，能改动所属账号或团队，连接前要勾选确认，列表里标“权限大”。令牌验证通过后存入钥匙串，点“重新同步”再读；同名的先问你，删掉的不会再加回来，平台上没了的标“本次未返回”，令牌读不了的类别不标。尚未用真实账号验证 | App |
 | `~/.ssh/config` | 只读 Host、HostName、User、Port，生成服务器；添加服务器时也能直接从里面选一台。github.com、gitlab.com 这类代码托管（以及 `User git` 的 Host）不当作服务器，仓库从 GitHub 连接来 | App |
 | 服务菜单、Dock | 在任何软件里选中文字，右键 → 服务 →「添加到 Assetboard」，文字会填进添加面板，点「识别」才处理。把邮件、截图、PDF、CSV、JSON 拖到 Dock 图标上，或用“打开方式”选 Assetboard：表格和 JSON 一律先进导入预览，截图和 PDF 在本机识别后进待确认。正在编辑或核对时不会打断，收到的内容在「待确认」里排队，可打开或丢弃。首次安装后若菜单里没有，注销再登录一次 | App |
-| MCP 接入 / 命令行 | 查询、添加和引入待引入免费；修改和删除已有资产要用 Pro 插件（官方安装包自带，免费）。App 内置 `assetboard-cli`：Claude Code、Claude Desktop 等 MCP 客户端或脚本可以查询、添加、修改资产，新增和修改立即生效（`⌘Z` 撤销），删除要你在 App 里确认。通道在本机，但你的 AI 工具会把读到的内容发给它的模型服务商；地址和联系方式默认遮住，银行卡和手机号默认不给。菜单「文件 → MCP 接入…」里有可复制的配置。见下 | App |
+| MCP 接入 / 命令行 | 查询、添加和引入待引入免费；修改和删除已有资产只在官方安装包里（免费）。App 内置 `assetboard-cli`：Claude Code、Claude Desktop 等 MCP 客户端或脚本可以查询、添加、修改资产，新增和修改立即生效（`⌘Z` 撤销），删除要你在 App 里确认。通道在本机，但你的 AI 工具会把读到的内容发给它的模型服务商；地址和联系方式默认遮住，银行卡和手机号默认不给。菜单「文件 → MCP 接入…」里有可复制的配置。见下 | App |
 | Inbox 文件夹 | 把 JSON 文件放进 `~/Library/Application Support/Assetboard/Inbox/`，App 打开或回到前台时读取，一律先进导入预览，确认才写入，同名的跳过、不覆盖；导入或丢弃后原文件才移到 `Inbox/handled/`（保留 30 天），取消预览或退出 App 时文件留在原处。这个格式拖进窗口或 Dock 也能识别。格式见下 | App |
 | AI 识别（可选） | 接入你自己的模型（Claude、OpenAI 兼容接口或本机 Ollama），配置后，导入的截图、PDF、邮件和粘贴的文字会自动发给它识别（AI 识别设置里可关掉，关掉后只在你点“用 AI 识别”时发送）。本地规则只认中文账单和通知，英文的靠 AI。尚未用真实 API key 验证 | App |
 
-连接平台后挑选： Cloudflare、GitHub、注册商和云平台读完之后，已经在大板里的记录当场更新；新找到的不直接写进来，而是马上列出来让你挑（默认全选，已在大板里的标“已引入”，按类别分组，多了可以筛选），点“引入 N 项”才写入，`⌘Z` 撤销。没勾的、或点了“稍后”的，留在侧边栏的「待引入」（只显示数量，不着色）和「设置 › 连接」那一行里，随时打开再挑；“没勾的不再提醒”会把它们放进跳过名单，之后的读取也不会再列出（在导入窗口的“已删除的同步项”里能恢复）。每次读取都以平台的最新列表为准：平台上没了的不再列出；第一次读取之后才出现的标“新”。Cloudflare 每 12 小时的自动同步（Pro）找到新的 Zone 或域名时，只放进「待引入」并提示一句，不自动加进大板。添加资产时选域名、代码仓库、服务器、部署、数据库或存储，表单顶部会列出已连接平台上待引入的同类资产，选一项就直接引入；没有待引入的就给“从 X 重新读取”或“连接 X，拉取列表来选”，手动填写作兜底。断开某个平台会清掉它的待引入列表。
+连接平台后挑选： Cloudflare、GitHub、注册商和云平台读完之后，已经在大板里的记录当场更新；新找到的不直接写进来，而是马上列出来让你挑（默认全选，已在大板里的标“已引入”，按类别分组，多了可以筛选），点“引入 N 项”才写入，`⌘Z` 撤销。没勾的、或点了“稍后”的，留在侧边栏的「待引入」（只显示数量，不着色）和「设置 › 连接」那一行里，随时打开再挑；“没勾的不再提醒”会把它们放进跳过名单，之后的读取也不会再列出（在导入窗口的“已删除的同步项”里能恢复）。每次读取都以平台的最新列表为准：平台上没了的不再列出；第一次读取之后才出现的标“新”。Cloudflare 每 12 小时的自动同步（官方安装包）找到新的 Zone 或域名时，只放进「待引入」并提示一句，不自动加进大板。添加资产时选域名、代码仓库、服务器、部署、数据库或存储，表单顶部会列出已连接平台上待引入的同类资产，选一项就直接引入；没有待引入的就给“从 X 重新读取”或“连接 X，拉取列表来选”，手动填写作兜底。断开某个平台会清掉它的待引入列表。
 
 Agent / 脚本的 JSON 格式（先写成临时名，写完再改名为 `.json`；一份最多 100 项、1 MB，只认下列字段，其余忽略）：
 
@@ -146,7 +146,7 @@ Mac App 在菜单栏有一个小日历图标：显示 7 天内到期和待确认
 菜单“Assetboard → 设置…”（`⌘,`）或侧边栏底部“设置”，一处管所有开关。左边是分区，右边是选中分区的设置：
 
 - 通用： 语言（简体中文或 English，默认 English，选过的语言会一直保留；切换后当场生效，菜单也一起换）、计价币种、隐私模式、在菜单栏显示、系统通知状态。
-- 功能： 全景、AI 额度与用量（默认开，只读本机文件）、实时状态（默认关闭；打开后可调读取间隔，15 秒到 60 分钟）、仓库分支和 Actions（默认关闭，Mac App）、待合并的 PR（默认开，Mac App）、正在做（默认开，Mac App，只读本机进程和会话文件的时间）、外部工具接入（MCP，关掉后一律拒绝调用；下面两个开关默认关：把地址和联系方式交给 AI 工具、把银行卡和手机号交给 AI 工具）、自动获取网站图标、每周核对域名到期日。功能开关按此设备记住，不进资产数据，不随备份走。
+- 功能： 全景、AI 额度与用量（默认开，读本机文件和各工具的额度接口）、实时状态（默认关闭；打开后可调读取间隔，15 秒到 60 分钟）、仓库分支和 Actions（默认关闭，Mac App）、待合并的 PR（默认开，Mac App）、正在做（默认开，Mac App，只读本机进程和会话文件的时间）、外部工具接入（MCP，关掉后一律拒绝调用；下面两个开关默认关：把地址和联系方式交给 AI 工具、把银行卡和手机号交给 AI 工具）、自动获取网站图标、每周核对域名到期日。功能开关按此设备记住，不进资产数据，不随备份走。
 - 连接： Cloudflare、GitHub、Namecheap、Porkbun、Hetzner、DigitalOcean、Vercel、AI 识别、MCP 接入、AI 额度、探针数据源，各自显示是否已连接，点“设置…”打开对应面板；有待引入的资产时多一个“N 项待引入”，点开挑选。
 - MCP： 已接入的工具和操作记录，见下面的 [MCP 接入](#mcp-接入外部-ai-工具与命令行)。
 - 关于： 当前版本、检查更新、自动检查更新。
@@ -171,7 +171,7 @@ App 会连的主机见[隐私与网络](#隐私与网络)，每个请求都记�
 
 只在 Mac App 里有，“设置 › 功能 › AI 额度与用量”默认开；不用配置，装过、用过这些工具就会读到。
 
-| 工具 | 本机读什么（默认开） | 额度接口（默认关，逐个打开） |
+| 工具 | 本机读什么（默认开） | 额度接口（默认开，可逐个关） |
 |---|---|---|
 | Claude Code | `~/.claude/projects`、`~/.config/claude/projects`（或 `CLAUDE_CONFIG_DIR`）里的会话日志：每次回答的 token、模型；用量上限提示里的重置时间；按日志估算的 5 小时块 | `api.anthropic.com` 的用量接口，用 Claude Code 的登录（Mac 上在钥匙串里，macOS 会先问你）：5 小时、本周、按模型的周额度和按量花费 |
 | Codex | `~/.codex/sessions`（或 `CODEX_HOME`）里的会话日志：token、模型，以及服务器最后一次报的 5 小时和每周额度、套餐 | `chatgpt.com` 的用量接口，用 `~/.codex/auth.json` |
@@ -179,12 +179,12 @@ App 会连的主机见[隐私与网络](#隐私与网络)，每个请求都记�
 | GitHub Copilot | Copilot CLI 的 `~/.copilot/session-state/*/events.jsonl`：token、高级请求次数 | `api.github.com/copilot_internal/user`，用本机 `gh` 的登录：高级请求额度、每月重置日、套餐 |
 | Grok CLI | `~/.grok/sessions/*/*/usage.json`（xAI 的 grok）和 `~/.grok/grok.db`（社区版 grok-cli）：token、花费 | `cli-chat-proxy.grok.com` 的额度，用 `~/.grok/auth.json`：本周或本月已用比例、按量上限 |
 | opencode | `~/.local/share/opencode/opencode.db` 和旧版 `storage/message`：每条回答的 token 和花费；用的是 Claude、ChatGPT 等订阅时记到那家订阅上 | `opencode.ai` 的 Go 额度（5 小时、每周、每月），用 opencode 里 Go 的 key |
-| Antigravity | 本机没有可读的文件 | Antigravity 运行时它在 `127.0.0.1` 上的本机服务：5 小时和每周额度、套餐 |
+| Antigravity | 本机没有可读的文件 | Antigravity 运行时它在 `127.0.0.1` 上的本机服务：5 小时和每周额度、套餐；没开时运行本机的 `agy -p /usage --output-format json`（agy 1.1.11 或更新，已在终端里登录过），由 agy 自己去问 Google：5 小时和每周额度 |
 
 - 对应哪条订阅：按服务商自动对应（Anthropic → Claude、OpenAI → ChatGPT、Cursor、GitHub Copilot、Grok、Gemini → Google AI）；同一家有几条时显示在第一条在用的上。想指定，用 MCP 的 `update_asset` 设 `usageSource`；`none` 表示这条不显示用量。读到套餐但资产板里没有这条订阅时，“全部用量…”里可以一键添加。
 - 本期用量是“按各家 API 标价折算”的金额，订阅本身不按这个收费；用来回答“这个月值不值订阅价”。没有标价的模型只计 token。
-- 读数只在内存里，不进资产数据、备份、导出和交接清单。额度接口用的登录只在请求时读取，不保存、不写日志、不经过 MCP；接口不是公开 API，随时可能变，条款也没说允许别的应用读，打开前会再说一遍。每个请求都在网络记录里（服务名“AI 额度”），每个工具最多 10 分钟一次，被拒或请求太频繁时等 30 分钟。
-- MCP：`list_ai_usage` 读额度、用量和要留意的订阅；`set_ai_usage_source` 只能开关某个工具的本机读取，额度接口只能你自己在 App 里开。
+- 读数只在内存里，不进资产数据、备份、导出和交接清单。额度接口用的登录只在请求时读取，不保存、不写日志、不经过 MCP；接口不是公开 API，随时可能变，条款也没说允许别的应用读；关掉后再打开前会再说一遍。每个请求都在网络记录里（服务名“AI 额度”），每个工具最多 10 分钟一次，被拒或请求太频繁时等 30 分钟。
+- MCP：`list_ai_usage` 读额度、用量和要留意的订阅；`set_ai_usage_source` 只能开关某个工具的本机读取，额度接口只能你自己在 App 里开关。
 
 ### MCP 接入（外部 AI 工具与命令行）
 
@@ -211,7 +211,7 @@ MCP 工具：`list_ai_usage`、`set_ai_usage_source`、`list_asset_types`、`lis
 
 图标与同步的 MCP 工具：`list_icon_platforms`、`set_icon_site`、`fetch_icons`、`get_cloudflare_sync_status`、`sync_cloudflare`、`list_sync_blocklist`、`unblock_sync_item`。
 
-没有 Pro 时，改动已有资产的工具会被拒绝并说明原因：`update_asset`、`update_assets`、`update_project`、`record_payment`、`renew_asset`、`delete_asset`、`request_delete_assets`、`set_icon_site`、`fetch_icons`、`unblock_sync_item`，命令行的 `update`、`delete` 等同样。查询、`add_assets`（同类别已有同名的跳过、不覆盖）、`import_candidates` 和 `sync_cloudflare` 免费。
+源码构建里，改动已有资产的工具会被拒绝并说明原因：`update_asset`、`update_assets`、`update_project`、`record_payment`、`renew_asset`、`delete_asset`、`request_delete_assets`、`set_icon_site`、`fetch_icons`、`unblock_sync_item`，命令行的 `update`、`delete` 等同样。查询、`add_assets`（同类别已有同名的跳过、不覆盖）、`import_candidates` 和 `sync_cloudflare` 免费。
 
 操作记录与待引入的 MCP 工具：`list_agent_activity`、`list_agents`、`list_import_candidates`（只读），`import_candidates`（引入待引入的资产）。命令行对应 `activity`、`agents`、`candidates`、`import-candidates`。
 
@@ -268,18 +268,18 @@ App 自己会连的：
 | 新添加的资产认出是已知平台时，取它的图标（同平台已有图标就复用，不再联网） | 内置名单里该平台的官网，如 `github.com`；不带 Cookie | “设置 › 功能”关掉自动获取网站图标 |
 | 费用合计要换算币种时取汇率，每天最多一次 | `api.frankfurter.dev`（欧洲央行参考汇率） | 资产和计价币种都是同一种时不会去取 |
 | 有 GitHub 仓库、本机 `gh` 已登录或保存了 GitHub 令牌时：App 打开时、在前台时每 15 分钟、同步 GitHub 之后，读这些仓库打开的 PR | `api.github.com`（GraphQL，一条固定的只读查询，每次最多 100 个仓库、每个仓库 30 个 PR） | “设置 › 功能”关掉待合并的 PR |
-| 连上 Cloudflare 之后（Pro）：App 打开或回到前台时，距上次同步满 12 小时就同步一次 | `api.cloudflare.com` | 断开 Cloudflare |
+| 连上 Cloudflare 之后（官方安装包）：App 打开或回到前台时，距上次同步满 12 小时就同步一次 | `api.cloudflare.com` | 断开 Cloudflare |
+| 本机装过、登录过 AI 工具时，读它们的额度：每个工具最多 10 分钟一次，用该工具自己的登录，不保存 | `api.anthropic.com`、`chatgpt.com`、`cursor.com`、`api.github.com`、`cli-chat-proxy.grok.com`、`opencode.ai` 的用量接口，或 Antigravity 在 `127.0.0.1` 的本机服务（没开时是本机 `agy` 自己的用量报告，由 agy 联网） | “设置 › 连接 › AI 额度”里逐个关掉额度接口，或“设置 › 功能”关掉 AI 额度与用量 |
 
 打开以后才会连的（都默认关，或要你先配置）：
 
 | 什么 | 连到哪 |
 |---|---|
-| 每周核对域名到期日（“设置 › 功能”，Pro） | `data.iana.org` 的注册局列表和各后缀注册局的 RDAP 服务，只发域名 |
+| 每周核对域名到期日（“设置 › 功能”，官方安装包） | `data.iana.org` 的注册局列表和各后缀注册局的 RDAP 服务，只发域名 |
 | AI 识别（配置模型后） | 你填的模型服务（Claude、OpenAI 兼容接口，或本机 Ollama）；导入的截图、PDF、邮件和粘贴的文字会自动发给它，在 AI 识别设置里可以改成只在你点“用 AI 识别”时发送 |
 | 探针（“设置 › 功能 › 实时状态”） | 你自己添加的监控面板，只读固定的几个接口，按你设的读取间隔 |
 | SSH 直读（同上，每台主机另外打开） | 你的服务器，用系统 `ssh`、你的 `~/.ssh/config` 和密钥，只跑一条固定的只读命令，按你设的读取间隔 |
 | SSH 直读写的主机条目 | 勾选「写进 ~/.ssh/assetboard.conf」的服务器记录：App 把它的 Host 写进 `~/.ssh/assetboard.conf`（并在 `~/.ssh/config` 顶部加一行 `Include assetboard.conf`），删除记录时删掉；只动这一个文件和那一行 | 本机 |
-| AI 额度的额度接口（“设置 › 连接 › AI 额度”里逐个工具打开） | `api.anthropic.com`、`chatgpt.com`、`cursor.com`、`api.github.com`、`cli-chat-proxy.grok.com`、`opencode.ai` 的用量接口，或 Antigravity 在 `127.0.0.1` 的本机服务；每个工具最多 10 分钟一次，用该工具自己的登录，不保存 |
 | 平台状态（同上，在“设置 › 连接 › 平台状态”里连接） | `api.supabase.com`、`api.vercel.com`、`api.render.com`、`api.upstash.com`，只发固定的读取请求，按你给每个平台设的间隔（1 到 60 分钟）；回答在 App 里裁成名称和状态，邮箱、主机名、环境变量和数据库密码不进页面 |
 
 你点了才会连的：同步 GitHub（`api.github.com`，或本机 `gh` 命令）、第一次连 Cloudflare、从注册商导入（`api.namecheap.com` 或 `api.porkbun.com`，只读域名列表）、从云平台导入（`api.hetzner.cloud`、`api.digitalocean.com` 或 `api.vercel.com`，只读列表）、“核对注册局日期”、粘贴域名或点“从注册局填写到期日和注册商”时的注册局查询、“获取网站图标”批量补齐、“检查更新…”。打开资产的管理链接由你的浏览器完成，不经过 Assetboard。

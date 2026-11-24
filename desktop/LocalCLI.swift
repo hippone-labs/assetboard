@@ -12,10 +12,13 @@ enum LocalCLI {
         candidates.first { FileManager.default.isExecutableFile(atPath: $0) }
     }
 
-    static func run(executable: String, arguments: [String], timeout: TimeInterval = 20) throws -> (status: Int32, stdout: String, stderr: String) {
+    static func run(executable: String, arguments: [String], timeout: TimeInterval = 20, environment: [String: String]? = nil,
+                    directory: URL? = nil) throws -> (status: Int32, stdout: String, stderr: String) {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: executable)
         process.arguments = arguments
+        if let environment { process.environment = environment }
+        if let directory { process.currentDirectoryURL = directory }
         let out = Pipe(), err = Pipe()
         process.standardOutput = out
         process.standardError = err

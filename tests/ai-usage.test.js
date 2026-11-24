@@ -104,6 +104,17 @@ test('AI usage: the usage endpoints, read leniently',()=>{
  const ag=U.AI_API.antigravity(api('antigravity-quota-summary.json'));
  // Three spellings of the remaining fraction; a bucket without one is left out, not read as empty or full.
  assert.deepEqual(ag.windows.map(w=>[w.id,w.used]),[['week-gemini',18],['5h-gemini',91],['week-other',36]]);
+ // agy's own usage report: snake_case, a model with its own weekly allowance keeps its own window, a disabled bucket is left out.
+ const agy=U.AI_API.antigravity(api('antigravity-cli-usage.json'));
+ assert.deepEqual(agy.windows.map(w=>[w.id,w.used,w.label]),[['week-gemini',14,'Gemini Models'],['5h-gemini',5,'Gemini Models'],['week-gemini-argon-wtu-weekly',47,'Gemini 4 Argon'],['week-other',0,'Claude and GPT models']]);
+ assert.equal(agy.windows[0].resetsAt,Date.parse('2026-11-12T08:00:00Z'));
+ assert.equal(U.AI_API.antigravity({status:'ERROR',command:{name:'usage',data:{groups:[]}}}),null,'a failed report is no reading');
+ // Grok names the period and no percent: unknown, said as a note, and never a 0% window.
+ const quiet=U.AI_API.grok({config:{currentPeriod:{type:'USAGE_PERIOD_TYPE_WEEKLY',start:'2026-11-05T00:00:00Z',end:'2026-11-12T00:00:00Z'},prepaidBalance:{}}});
+ assert.deepEqual(quiet.windows,[]);assert.equal(quiet.note,'noPercent');assert.equal(grok.note,undefined);
+ const st=U.aiUsageStore();st.fail('grok','HTTP 401',NOW);assert.equal(st.snapshot(NOW).sources.grok.error,'HTTP 401');
+ st.feed('grok','api',JSON.stringify({config:{currentPeriod:{end:'2026-11-12T00:00:00Z'}}}),'',NOW);assert.deepEqual([st.snapshot(NOW).sources.grok.error,st.snapshot(NOW).sources.grok.note],[undefined,'noPercent'],'an answer clears the earlier failure');
+ st.feed('grok','api',read('api/grok-billing-credits.json'),'',NOW);assert.equal(st.snapshot(NOW).sources.grok.note,undefined);
  const status=U.AI_API.antigravity(api('antigravity-user-status.json'));assert.equal(status.plan,'Google AI Pro');assert.deepEqual(status.windows.map(w=>[w.label,w.used]),[['Gemini 3 Pro (High)',40]]);
  for(const fn of Object.values(U.AI_API))assert.doesNotThrow(()=>{fn(null);fn({});fn([]);},'empty answers are no error');
 });

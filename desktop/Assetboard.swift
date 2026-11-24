@@ -635,10 +635,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
     @objc func openPanorama() { webView.evaluateJavaScript("togglePanorama()") }
     @objc func openTheme() { webView.evaluateJavaScript("themeDialog()") }
     func demoBlocked() { webView.evaluateJavaScript("window.assetboardDemoBlocked?.()") }
-    #if ASSETBOARD_PRO
-    /// The app menu's Assetboard Pro…: 设置 opened at its Assetboard Pro section.
-    @objc func openProDialog() { webView.evaluateJavaScript("prefsDialog('pro')") }
-    #endif
     @objc func openCloudflare() { if demoMode { demoBlocked(); return }; webView.evaluateJavaScript("cloudflareDialog()") }
     @objc func openGitHub() { if demoMode { demoBlocked(); return }; webView.evaluateJavaScript("githubDialog()") }
     @objc func openImport() { webView.evaluateJavaScript("importHub()") }
@@ -1430,11 +1426,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         let settingsItem = NSMenuItem(title: L("设置…"), action: #selector(openSettings), keyEquivalent: ",")
         settingsItem.target = self
         appMenu.addItem(settingsItem)
-        #if ASSETBOARD_PRO
-        let proItem = NSMenuItem(title: "Assetboard Pro…", action: #selector(openProDialog), keyEquivalent: "")
-        proItem.target = self
-        appMenu.addItem(proItem)
-        #endif
         appMenu.addItem(.separator())
         appMenu.addItem(withTitle: L("退出 Assetboard"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         appItem.submenu = appMenu

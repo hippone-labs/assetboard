@@ -52,6 +52,30 @@ async (page) => {
   // Picking another plan replaces a plan name, never one the person typed.
   await p.click('#plan-picks [data-plan="Claude Max"]');
   check(await val(p,'name')==='Claude Max'&&await val(p,'amount')==='100'&&await val(p,'cycle')==='monthly'&&!(await p.locator('#plan-picks [data-plan-cycle]').count()),'Another plan replaces the plan fields');
+  // Another currency: the number follows (the vendor's own price there, else the listed one at the app's rates); back again is the
+  // listed price; a number the person typed stays.
+  const pick=code=>p.evaluate(c=>{const b=document.querySelector(`#asset-form .choice[data-choice][data-value="${c}"]`);b.closest('.chip-group').classList.remove('folded');b.click();},code);
+  const hkd=await p.evaluate(()=>{const plan=findAiPlan('Claude Max');return String(aiPlanPriceIn(plan,'HKD','monthly',fx.rates).value);});
+  await pick('HKD');check(await val(p,'currency')==='HKD'&&await val(p,'amount')===hkd&&hkd!=='100','HKD shows its own number: '+await val(p,'amount'));
+  await pick('JPY');check(/^\d+$/.test(await val(p,'amount'))&&Number(await val(p,'amount'))>1000,'Yen is whole: '+await val(p,'amount'));
+  await pick('USD');check(await val(p,'amount')==='100','Back to the listed price: '+await val(p,'amount'));
+  await p.fill('#asset-form [name="amount"]','85');await pick('HKD');check(await val(p,'amount')==='85','A typed amount stays');
+  await pick('USD');await p.fill('#asset-form [name="amount"]','100');
+  // A vendor with its own price in the currency: that price, not a conversion; and a plan picked while the form is in that currency.
+  await p.evaluate(()=>{const f=document.querySelector('#asset-form');f.elements.name.value='ChatGPT Plus';f.elements.amount.value='20';});
+  await pick('EUR');check(await val(p,'amount')==='23','ChatGPT Plus in euros is OpenAI\'s own price: '+await val(p,'amount'));
+  await pick('GBP');check(await val(p,'amount')==='20','and in pounds: '+await val(p,'amount'));
+  await pick('USD');await p.evaluate(()=>{const f=document.querySelector('#asset-form');f.elements.name.value='Claude Max';f.elements.amount.value='100';});
+  // Where it is bought: the site, the App Store (Claude Max costs more there), and the Turkish and Nigerian stores in US dollars.
+  const stores=await p.locator('#plan-picks [data-plan-channel]').evaluateAll(b=>b.map(x=>[x.dataset.planChannel,x.textContent,x.getAttribute('aria-pressed'),x.title]));
+  check(stores.map(x=>x[0]).join()===',app-store,app-store-tr,app-store-ng'&&stores[0][2]==='true'&&/\$124\.99/.test(stores[1][1])&&/^App Store 土耳其区≈ \$/.test(stores[2][1])&&/6999\.99 TRY.*2026-11-23/.test(stores[2][3]),'Stores for Claude Max: '+JSON.stringify(stores));
+  await p.click('#plan-picks [data-plan-channel="app-store"]');
+  check(await val(p,'amount')==='124.99'&&await val(p,'currency')==='USD'&&await p.locator('#plan-picks [data-plan-channel="app-store"][aria-pressed="true"]').count()===1,'The App Store price is filled and marked: '+await val(p,'amount'));
+  await p.click('#plan-picks [data-plan-channel="app-store-tr"]');check(Number(await val(p,'amount'))>100&&await val(p,'currency')==='USD','The Turkish store in US dollars: '+await val(p,'amount'));
+  await p.click('#plan-picks [data-plan-channel=""]');check(await val(p,'amount')==='100'&&await p.locator('#plan-picks [data-plan-channel=""][aria-pressed="true"]').count()===1,'Back to the site price');
+  await p.click('#plan-picks [data-plan="Claude Pro"]');await p.click('#plan-picks [data-plan-channel="app-store"]');await p.click('#plan-picks [data-plan-cycle="yearly"]');
+  check(await val(p,'amount')==='214.99'&&await val(p,'cycle')==='yearly','A year of Claude Pro in the App Store: '+await val(p,'amount'));
+  await p.click('#plan-picks [data-plan="Claude Max"]');check(await val(p,'amount')==='100','Another plan starts at the site');
   await p.fill('#asset-form [name="name"]','My Claude');
   await p.click('#plan-picks [data-plan="Claude Ultra"]');
   check(await val(p,'name')==='My Claude'&&await val(p,'amount')==='200','A typed name is kept');

@@ -6,16 +6,17 @@ import SQLite3
 /// AI 额度与用量: what the AI tools signed in on this Mac have used, and how much of their plans' limits is left, shown on the
 /// person's AI subscription records. The readers are the page's own ai-usage.js, run here in a JavaScriptCore context of their
 /// own: this file only finds the tools' files, reads what was appended since the last pass, runs fixed read-only SQLite queries and,
-/// for a tool the person turned it on for, makes one fixed GET (or a local POST to Antigravity's own language server) with that
+/// for each tool whose endpoint is on, makes one fixed GET (for Antigravity a local POST to its own language server, or agy's own usage report) with that
 /// tool's own login. The readers keep numbers, model names and times; prompts, replies, paths and tokens never reach the page.
 ///
-/// Local reading is on unless switched off per tool (设置 › 连接 › AI 额度); the endpoints are off until turned on per tool, and
-/// only the page can turn one on, after the person read what it does (an agent cannot). Credentials are read from the tool's own
+/// Local reading and the endpoints are on unless switched off per tool (设置 › 连接 › AI 额度); only the page can turn an endpoint
+/// back on, after the person read what it does (an agent cannot). Credentials are read from the tool's own
 /// store at the moment of the request, kept in memory for that request only, never written anywhere and never logged.
 enum AIUsageSource: String, CaseIterable {
     case claude, codex, cursor, copilot, grok, opencode, antigravity
 
-    /// The fixed request for a tool's usage endpoint. Antigravity is a POST to the local language server, found per read.
+    /// The fixed request for a tool's usage endpoint. Antigravity is a POST to the local language server, found per read, or
+    /// the report of `agy -p /usage` (AntigravityCLI).
     var endpoint: URL? {
         switch self {
         case .claude: return URL(string: "https://api.anthropic.com/api/oauth/usage")
@@ -32,7 +33,7 @@ enum AIUsageSource: String, CaseIterable {
     var hasLocal: Bool { self != .antigravity }
 }
 
-/// Per tool: local reading (default on) and the endpoint (default off). A viewer setting in UserDefaults, never in the board.
+/// Per tool: local reading and the endpoint, both on unless switched off. A viewer setting in UserDefaults, never in the board.
 final class AIUsageSettings {
     static let key = "aiUsageSources"
     private let defaults: UserDefaults
@@ -40,7 +41,7 @@ final class AIUsageSettings {
 
     private var stored: [String: [String: Bool]] { defaults.dictionary(forKey: Self.key) as? [String: [String: Bool]] ?? [:] }
     func local(_ source: AIUsageSource) -> Bool { source.hasLocal && (stored[source.rawValue]?["local"] ?? true) }
-    func api(_ source: AIUsageSource) -> Bool { stored[source.rawValue]?["api"] ?? false }
+    func api(_ source: AIUsageSource) -> Bool { stored[source.rawValue]?["api"] ?? true }
     func set(_ source: AIUsageSource, local: Bool? = nil, api: Bool? = nil) {
         var all = stored, one = all[source.rawValue] ?? [:]
         if let local { one["local"] = local }
@@ -290,6 +291,11 @@ enum AIUsageCredentials {
         guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess else { return nil }
         return result as? Data
     }
+    static func isoDate(_ text: String) -> Date? {
+        let plain = ISO8601DateFormatter(), fractional = ISO8601DateFormatter()
+        fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return plain.date(from: text) ?? fractional.date(from: text)
+    }
     static func clean(_ value: Any?) -> String? {
         guard let text = (value as? String)?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty, text.count < 8192,
               !text.contains(where: { $0.isWhitespace || $0.isNewline }) else { return nil }
@@ -339,10 +345,15 @@ enum AIUsageCredentials {
             request.setValue("token \(token)", forHTTPHeaderField: "Authorization")
             request.setValue("2025-04-01", forHTTPHeaderField: "X-Github-Api-Version")
         case .grok:
+            // auth.json is keyed by scope: the SuperGrok login (https://auth.x.ai::<client>) before the older session one, and
+            // only an entry that holds a token. grok renews the token itself, so an expired one needs grok run once.
             let auth = json(scanner.grokHome.appendingPathComponent("auth.json")) ?? [:]
-            let entry = auth.keys.sorted { a, b in a.hasPrefix("https://auth.x.ai::") && !b.hasPrefix("https://auth.x.ai::") }
-                .filter { $0.hasPrefix("https://auth.x.ai::") || $0.contains("/sign-in") }.compactMap { auth[$0] as? [String: Any] }.first
-            guard let token = clean(entry?["key"]) else { throw Failure(text: L("没找到 Grok CLI 的登录")) }
+            let entries = auth.compactMapValues { value -> [String: Any]? in (value as? [String: Any]).flatMap { clean($0["key"]) == nil ? nil : $0 } }
+            let scope = entries.keys.sorted().first { $0.hasPrefix("https://auth.x.ai::") } ?? entries.keys.sorted().first { $0.contains("/sign-in") }
+            guard let entry = scope.flatMap({ entries[$0] }), let token = clean(entry["key"]) else { throw Failure(text: L("没找到 Grok CLI 的登录")) }
+            if let expires = (entry["expires_at"] as? String).flatMap(isoDate), expires < Date() {
+                throw Failure(text: L("Grok CLI 的登录已过期，打开 grok 一次再读"))
+            }
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
             request.setValue("xai-grok-cli", forHTTPHeaderField: "X-XAI-Token-Auth")
         case .opencode:
@@ -400,6 +411,58 @@ enum AntigravityLocal {
         request.setValue(csrf, forHTTPHeaderField: "X-Codeium-Csrf-Token")
         request.httpBody = Data((method == "GetUserStatus" ? "{\"metadata\":{\"ideName\":\"antigravity\",\"extensionName\":\"antigravity\",\"locale\":\"en\"}}" : "{}").utf8)
         return request
+    }
+}
+
+/// The agy command line has no token to read, so its numbers come from its own report: `agy -p /usage --output-format json`
+/// (agy 1.1.11 and later; an older agy would take /usage as a prompt, so it is never asked). agy asks Google with its own login.
+enum AntigravityCLI {
+    static let minimum = [1, 1, 11]
+    static func candidates(home: URL, env: [String: String]) -> [String] {
+        let named = env["ANTIGRAVITY_CLI_PATH"].flatMap { $0.isEmpty ? nil : [($0 as NSString).expandingTildeInPath] }
+        return named ?? [home.appendingPathComponent(".local/bin/agy").path, "/opt/homebrew/bin/agy", "/usr/local/bin/agy"]
+    }
+    /// `agy --version` prints major.minor.patch; anything else is unknown.
+    static func version(_ output: String) -> [Int]? {
+        let text = output.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard text.range(of: "^[0-9]{1,6}\\.[0-9]{1,6}\\.[0-9]{1,6}$", options: .regularExpression) != nil else { return nil }
+        return text.split(separator: ".").compactMap { Int($0) }
+    }
+    static func supported(_ version: [Int]?) -> Bool {
+        guard let version, version.count == 3 else { return false }
+        return !version.lexicographicallyPrecedes(minimum)
+    }
+    /// The report when it is a finished usage report, as the text ai-usage.js reads.
+    static func report(_ stdout: String) -> String? {
+        guard let start = stdout.firstIndex(of: "{"), let end = stdout.lastIndex(of: "}"), start < end else { return nil }
+        let text = String(stdout[start...end])
+        guard text.utf8.count <= 1024 * 1024, let object = (try? JSONSerialization.jsonObject(with: Data(text.utf8))) as? [String: Any],
+              object["status"] as? String == "SUCCESS", let command = object["command"] as? [String: Any], command["name"] as? String == "usage",
+              (command["data"] as? [String: Any])?["groups"] is [Any] else { return nil }
+        return text
+    }
+    /// What agy runs with: no self-update, and an `open` that fails first on PATH, so a signed-out agy cannot open a browser.
+    static func environment(_ base: [String: String], binary: String, directory: URL) -> [String: String] {
+        var environment = base
+        environment["AGY_CLI_DISABLE_AUTO_UPDATE"] = "true"
+        environment["BROWSER"] = directory.appendingPathComponent("open").path
+        environment["PATH"] = [directory.path, (binary as NSString).deletingLastPathComponent, base["PATH"] ?? "", "/usr/bin:/bin:/usr/sbin:/sbin"].filter { !$0.isEmpty }.joined(separator: ":")
+        return environment
+    }
+    /// The report's text, or why there is none.
+    static func usage(home: URL, env: [String: String]) -> Result<String, AIUsageCredentials.Failure> {
+        guard let binary = LocalCLI.findExecutable(candidates(home: home, env: env)) else { return .failure(.init(text: L("Antigravity 没在运行，也没找到 agy"))) }
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("assetboard-agy-" + UUID().uuidString, isDirectory: true)
+        guard (try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])) != nil,
+              FileManager.default.createFile(atPath: directory.appendingPathComponent("open").path, contents: Data("#!/bin/sh\nexit 1\n".utf8), attributes: [.posixPermissions: 0o700])
+        else { return .failure(.init(text: L("agy 没给出额度，在终端里打开 agy 确认已登录"))) }
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let child = Self.environment(env, binary: binary, directory: directory)
+        let found = (try? LocalCLI.run(executable: binary, arguments: ["--version"], timeout: 10, environment: child, directory: directory)).flatMap { Self.version($0.stdout) }
+        guard supported(found) else { return .failure(.init(text: L("agy 版本太旧或读不出版本，额度要 agy 1.1.11 或更新"))) }
+        guard let result = try? LocalCLI.run(executable: binary, arguments: ["-p", "/usage", "--output-format", "json", "--print-timeout", "60s"], timeout: 70, environment: child, directory: directory),
+              result.status == 0, let text = report(result.stdout) else { return .failure(.init(text: L("agy 没给出额度，在终端里打开 agy 确认已登录"))) }
+        return .success(text)
     }
 }
 
@@ -499,24 +562,28 @@ final class AIUsageMonitor {
         }
     }
 
+    /// The app's local service while Antigravity is open (every language server found), else agy's own usage report.
     private func readAntigravity(_ engine: AIUsageEngine) {
-        guard let ps = try? LocalCLI.run(executable: "/bin/ps", arguments: ["-ax", "-o", "pid=,command="], timeout: 5),
-              let server = AntigravityLocal.servers(ps.stdout).first else { engine.fail(.antigravity, L("Antigravity 没在运行")); return }
-        let listening = (try? LocalCLI.run(executable: "/usr/sbin/lsof", arguments: ["-nP", "-iTCP", "-sTCP:LISTEN", "-a", "-p", server.pid], timeout: 5)).map { AntigravityLocal.ports($0.stdout) } ?? []
-        var tries = listening.map { ($0, true) }
-        if let port = server.extensionPort { tries.append((port, false)) }
-        for (port, https) in tries {
-            guard let request = AntigravityLocal.request(port: port, https: https, csrf: server.csrf, method: "RetrieveUserQuotaSummary") else { continue }
-            let (status, body) = send(request, localSession)
-            guard status == 200, let body else { continue }
-            engine.feed(.antigravity, "api", String(decoding: body, as: UTF8.self))
-            if let plan = AntigravityLocal.request(port: port, https: https, csrf: server.csrf, method: "GetUserStatus") {
-                let (planStatus, planBody) = send(plan, localSession)
-                if planStatus == 200, let planBody { engine.feed(.antigravity, "api", String(decoding: planBody, as: UTF8.self)) }
+        let ps = try? LocalCLI.run(executable: "/bin/ps", arguments: ["-ax", "-o", "pid=,command="], timeout: 5)
+        for server in ps.map({ AntigravityLocal.servers($0.stdout) }) ?? [] {
+            let listening = (try? LocalCLI.run(executable: "/usr/sbin/lsof", arguments: ["-nP", "-iTCP", "-sTCP:LISTEN", "-a", "-p", server.pid], timeout: 5)).map { AntigravityLocal.ports($0.stdout) } ?? []
+            var tries = listening.map { ($0, true) }
+            if let port = server.extensionPort { tries.append((port, false)) }
+            for (port, https) in tries {
+                guard let request = AntigravityLocal.request(port: port, https: https, csrf: server.csrf, method: "RetrieveUserQuotaSummary") else { continue }
+                let (status, body) = send(request, localSession)
+                guard status == 200, let body, engine.feed(.antigravity, "api", String(decoding: body, as: UTF8.self)) > 0 else { continue }
+                if let plan = AntigravityLocal.request(port: port, https: https, csrf: server.csrf, method: "GetUserStatus") {
+                    let (planStatus, planBody) = send(plan, localSession)
+                    if planStatus == 200, let planBody { engine.feed(.antigravity, "api", String(decoding: planBody, as: UTF8.self)) }
+                }
+                return
             }
-            return
         }
-        engine.fail(.antigravity, L("Antigravity 的本机服务没有回答"))
+        switch AntigravityCLI.usage(home: scanner.home, env: scanner.env) {
+        case .success(let report): engine.feed(.antigravity, "api", report)
+        case .failure(let failure): engine.fail(.antigravity, failure.text); apiNext[.antigravity] = Date().addingTimeInterval(Self.backoff)
+        }
     }
 }
 
@@ -543,7 +610,7 @@ extension AppDelegate {
         case "aiUsageSet":
             guard let source = AIUsageSource(rawValue: body["id"] as? String ?? "") else { return }
             let api = body["api"] as? Bool
-            // An endpoint is turned on only with the page's confirmation (the person saw what it reads and with which login).
+            // An endpoint switched off is turned back on only with the page's confirmation (the person saw what it reads and with which login).
             if api == true && body["confirm"] as? Bool != true { aiUsageResult(snapshot: nil); return }
             aiUsageMonitor.settings.set(source, local: body["local"] as? Bool, api: api)
             aiUsageMonitor.changed(source)
@@ -576,7 +643,9 @@ func testAIUsage() {
     let defaults = UserDefaults(suiteName: suite)!
     defer { defaults.removePersistentDomain(forName: suite) }
     let settings = AIUsageSettings(defaults: defaults)
-    precondition(AIUsageSource.allCases.allSatisfy { settings.api($0) == false } && settings.local(.claude) && !settings.local(.antigravity), "local on, endpoints off by default")
+    precondition(AIUsageSource.allCases.allSatisfy { settings.api($0) } && settings.local(.claude) && !settings.local(.antigravity), "local reading and endpoints on by default")
+    for source in AIUsageSource.allCases { settings.set(source, api: false) }
+    precondition(AIUsageSource.allCases.allSatisfy { !settings.api($0) }, "an endpoint switched off stays off")
     let scanner = AIUsageScanner(home: home, env: [:])
     let configuration = URLSessionConfiguration.ephemeral
     configuration.protocolClasses = [MockPlatformProtocol.self]
@@ -586,7 +655,7 @@ func testAIUsage() {
     var json = ""
     monitor.onSnapshot = { json = $0 }
     monitor.pass(force: true)
-    precondition(asked.isEmpty, "no endpoint is called until it is turned on")
+    precondition(asked.isEmpty, "no endpoint is called while it is switched off")
     precondition(json.contains("\"anthropic\"") && json.contains("\"openai\"") && json.contains("\"grok\"") && json.contains("\"plus\"") && json.contains("\"pro\""), "local readings: \(json.prefix(300))")
     for leak in ["PROMPT-TEXT", "SECRET-TOKEN-VALUE", home.path, "%2Fwork"] { precondition(!json.contains(leak), "the snapshot leaks \(leak)") }
     let size = engine.size
@@ -615,5 +684,15 @@ func testAIUsage() {
     precondition(AntigravityLocal.servers(ps) == [AntigravityLocal.Server(pid: "4242", csrf: "0123abcd-ef01-2345-6789-abcdef012345", extensionPort: 61234)])
     precondition(AntigravityLocal.ports("language_ 4242 user 12u IPv4 0x1 0t0 TCP 127.0.0.1:61230 (LISTEN)\nlanguage_ 4242 user 13u IPv4 0x2 0t0 TCP 127.0.0.1:61231 (LISTEN)\n") == [61230, 61231])
     precondition(AntigravityLocal.request(port: 61230, https: true, csrf: "x", method: "RetrieveUserQuotaSummary")?.url?.host == "127.0.0.1" && AntigravityLocal.request(port: 1, https: true, csrf: "x", method: "Delete") == nil)
-    print("PASS: AI usage: readers in JavaScriptCore on made-up Claude Code, Codex, Grok and Cursor files, appended lines read once, nothing but numbers in the snapshot (no prompt, token or path), endpoints off by default and then a fixed GET with the tool's own login, the wait between reads, a 429, Antigravity's local server found from ps and lsof output")
+    precondition(AntigravityCLI.version("1.2.11\n") == [1, 2, 11] && AntigravityCLI.version("agy 1.2.11") == nil, "agy version")
+    precondition(AntigravityCLI.supported([1, 1, 11]) && AntigravityCLI.supported([1, 2, 2]) && !AntigravityCLI.supported([1, 1, 10]) && !AntigravityCLI.supported(nil), "agy before 1.1.11 is never asked")
+    let agyReport = "{\"status\":\"SUCCESS\",\"command\":{\"name\":\"usage\",\"data\":{\"groups\":[{\"name\":\"Gemini Models\",\"buckets\":[{\"id\":\"gemini-weekly\",\"window\":\"weekly\",\"remaining_fraction\":0.75}]}]}}}"
+    precondition(AntigravityCLI.report("note\n" + agyReport + "\n") == agyReport && AntigravityCLI.report(agyReport.replacingOccurrences(of: "SUCCESS", with: "ERROR")) == nil && AntigravityCLI.report("") == nil, "agy report")
+    engine.feed(.antigravity, "api", agyReport)
+    precondition(engine.snapshotJSON().contains("\"week-gemini\""), "agy report read: \(engine.snapshotJSON().suffix(300))")
+    let agyHome = URL(fileURLWithPath: "/nonexistent-home")
+    precondition(AntigravityCLI.candidates(home: agyHome, env: ["ANTIGRAVITY_CLI_PATH": "/opt/x/agy"]) == ["/opt/x/agy"] && AntigravityCLI.candidates(home: agyHome, env: [:]).count == 3, "agy paths")
+    let agyEnv = AntigravityCLI.environment(["PATH": "/usr/bin"], binary: "/opt/homebrew/bin/agy", directory: URL(fileURLWithPath: "/tmp/probe"))
+    precondition(agyEnv["AGY_CLI_DISABLE_AUTO_UPDATE"] == "true" && agyEnv["PATH"]?.hasPrefix("/tmp/probe:/opt/homebrew/bin:/usr/bin") == true && agyEnv["BROWSER"] == "/tmp/probe/open", "agy environment")
+    print("PASS: AI usage: readers in JavaScriptCore on made-up Claude Code, Codex, Grok and Cursor files, appended lines read once, nothing but numbers in the snapshot (no prompt, token or path), endpoints on by default and none called once switched off, a fixed GET with the tool's own login, the wait between reads, a 429, Antigravity's local server found from ps and lsof output, agy's usage report and the version it needs")
 }

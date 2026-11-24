@@ -354,8 +354,10 @@ let englishStrings: [String: [String]] = [
     "无法把令牌存进 macOS 钥匙串，同步未写入资产板。": ["Could not keep the token in the macOS Keychain; nothing was written to the board."],
     // AI 额度 (AIUsage.swift)
     "AI 额度": ["AI limits"],
-    "Antigravity 没在运行": ["Antigravity is not running"],
-    "Antigravity 的本机服务没有回答": ["Antigravity's local service did not answer"],
+    "Antigravity 没在运行，也没找到 agy": ["Antigravity is not running and agy was not found"],
+    "agy 没给出额度，在终端里打开 agy 确认已登录": ["agy gave no usage report; open agy in a terminal and check it is signed in"],
+    "agy 版本太旧或读不出版本，额度要 agy 1.1.11 或更新": ["agy is too old or did not say its version; limits need agy 1.1.11 or later"],
+    "Grok CLI 的登录已过期，打开 grok 一次再读": ["The Grok CLI login has expired; run grok once and read again"],
     "Claude Code 的登录已过期，打开 claude 一次再读": ["Claude Code's login has expired; open claude once, then read again"],
     "Codex 用的是 API key，没有订阅额度": ["Codex uses an API key, which has no plan limits"],
     "Cursor 的登录是加密保存的，读不了": ["Cursor keeps its login encrypted; it cannot be read"],
