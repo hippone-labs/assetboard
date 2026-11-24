@@ -11,7 +11,7 @@
  // Top-level consts of asset-data.js are shared script bindings in the browser, not window properties.
  const KINDS=D.LINK_KINDS||(typeof LINK_KINDS!=='undefined'?LINK_KINDS:[]),MOUNTS=D.MOUNT_TYPES||(typeof MOUNT_TYPES!=='undefined'?MOUNT_TYPES:['domain','repository','database','license']);
  const PAYS=(KINDS.find(k=>k[0]==='pay')||[])[2]||[],LOGINS=(KINDS.find(k=>k[0]==='login')||[])[2]||[];
- const PROJECT_TYPES=['domain','repository','server','deployment','storage','database','subscription','ai','license','bankcard','phone','appleid','google'];
+ const PROJECT_TYPES=['domain','repository','server','deployment','storage','database','subscription','ai','license','bankcard','phone','appleid','google','device'];
  // fits[hubType] = the kid types that hang on that hub in this lens. groups = how kids are grouped on a card, in display order.
  const LENSES=[
   {key:'host',name:'运行在哪',hubName:'服务器',

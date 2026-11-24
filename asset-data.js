@@ -1003,10 +1003,10 @@ function maskEmail(value,{domain=false}={}){const text=String(value||'').trim(),
 // the rule for one field; a masked value always holds MASK_MARK, which is how a write of a masked value is told apart (hasMask).
 const MASK_MARK='•';
 const MASK_SETS={
- screen:{mask:['name','account','host','ips']},
+ screen:{mask:['name','account','host','ips','serial']},
  present:{mask:['ips']},
- handover:{mask:['name','account','host','sshUser','ips','phone','notes','url','mail'],domain:true},
- agent:{mask:['ips','host','sshUser','phone','mail']},
+ handover:{mask:['name','account','host','sshUser','ips','phone','notes','url','mail','serial'],domain:true},
+ agent:{mask:['ips','host','sshUser','phone','mail','serial']},
  calendar:{drop:['name','provider','account','project','cost','notes','url','purpose','reason']}
 };
 const MAIL_PATTERN=/[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}/g;
@@ -1684,6 +1684,7 @@ const IMPORT_HEADER_ALIASES={
  purpose:['purpose','description','用途','描述']
 };
 const IMPORT_TYPE_ALIASES={
+ device:['device','devices','computer','laptop','设备','电脑'],
  domain:['domain','domains','域名'],
  server:['server','vps','droplet','instance','服务器','云主机'],
  subscription:['subscription','subscriptions','tool','tools','订阅','工具'],
@@ -2778,7 +2779,7 @@ function projectNames(assets){
  return [...counts].sort((left,right)=>right[1]-left[1]||left[0].localeCompare(right[0])).map(([name,count])=>({name,count}));
 }
 function projectAssets(assets,name){return (assets||[]).filter(asset=>!asset.hiddenAt&&inProject(asset,name));}
-const KEEP_ON_SHUTDOWN=['bankcard','phone','appleid','google'];
+const KEEP_ON_SHUTDOWN=['bankcard','phone','appleid','google','device'];
 // 关停清单: what to do for each record of a project, the last day it still saves money, and what else still depends on it.
 function shutdownPlan(assets,name,{now=new Date(),currency='CNY',rates}={}){
  const today=localDay(now),own=projectAssets(assets,name),ids=new Set(own.map(asset=>asset.id)),steps=[],kept=[],staying=[];
@@ -2875,7 +2876,7 @@ function projectEconomics(assets,projects,{currency=PROJECT_CURRENCY,rates,now=n
 // 定期清理: records that cost money or keep a date, most expensive and longest untouched first. The clock starts at the last
 // review, or when the record was added (updatedAt for old records without createdAt); nothing joins before REVIEW_QUIET_DAYS
 // have passed on that clock. A record with no time at all joins at once.
-const REVIEW_QUIET_DAYS=80,REVIEW_SKIP=['bankcard','phone','appleid','google'];
+const REVIEW_QUIET_DAYS=80,REVIEW_SKIP=['bankcard','phone','appleid','google','device'];
 function lastTouchedDay(asset){return Math.max(...[asset.reviewedAt,asset.updatedAt,asset.createdAt].map(value=>Date.parse(value||'')).filter(time=>!Number.isNaN(time)).map(time=>localDay(new Date(time))),-Infinity);}
 function reviewQueue(assets,{now=new Date(),currency='CNY',rates}={}){
  const today=localDay(now),out=[];

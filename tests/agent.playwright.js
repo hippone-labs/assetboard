@@ -17,7 +17,7 @@ async (page) => {
 
   // Reads.
   const types=await call('types');
-  check(types.ok&&types.result.length===13&&types.result.some(t=>t.id==='domain'&&t.name==='域名'),'types lists every category');
+  check(types.ok&&types.result.length===14&&types.result.some(t=>t.id==='device')&&types.result.some(t=>t.id==='domain'&&t.name==='域名'),'types lists every category');
   let list=await call('list',{type:'domain'});
   check(list.ok&&list.result.total===1&&list.result.assets[0].id==='d1'&&list.result.assets[0].typeName==='域名','list filters by type and leaves hidden records out');
   list=await call('list',{type:'domain',includeHidden:true});

@@ -3,7 +3,7 @@
 const test=require('node:test'),assert=require('node:assert/strict');
 const D=require('../asset-data.js'),O=require('../panorama-objects.js');
 const day=n=>{const d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()+n);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;};
-const TYPES=['domain','repository','server','deployment','storage','database','subscription','ai','license','bankcard','phone','appleid','google'];
+const TYPES=['domain','repository','server','deployment','storage','database','subscription','ai','license','bankcard','phone','appleid','google','device'];
 function board(){
  const a=[
   {id:'s1',type:'server',name:'tokyo-vps',provider:'Vultr',ips:['203.0.113.10'],date:day(10),dateKind:'renew'},
@@ -39,7 +39,8 @@ test('every category has its own shape; a server is a rack in the cloud and a to
  assert.equal(place({provider:'Homeric Cloud',ips:['203.0.113.10']}),'cloud','a word that only starts like one is not it');
  assert.equal(place({}),'cloud');
  assert.equal(O.objectShape({type:'server',ips:['10.0.0.2']}),'tower');assert.equal(O.objectShape({type:'server',ips:['203.0.113.2']}),'rack');
- assert.equal(O.objectShape({type:'device'}),'','a category this drawing does not know has no shape');
+ assert.equal(O.objectShape({type:'device'}),'mac','a device is a Mac on the desk');
+ assert.equal(O.objectShape({type:'pet'}),'','a category this drawing does not know has no shape');
 });
 
 test('a domain hangs under its registrar, else its DNS host; only Cloudflare is a cloud',()=>{
