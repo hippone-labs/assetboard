@@ -114,7 +114,7 @@ const devInstall = read('desktop/dev-install.sh');
 test('the workflow parser reads the mini install that is already on main', () => {
  assert.equal(mini.name, 'mini-dev');
  assert.deepEqual(Object.keys(mini.on), ['workflow_call', 'workflow_dispatch']);
- assert.equal(mini.on.workflow_call.secrets.PRO_REPO_TOKEN.required, false);
+ assert.equal(mini.on.workflow_call.secrets, undefined, 'pro/ is in this repository: no token to pass');
  assert.equal(mini.on.workflow_call.inputs.ref.required, true);
  assert.deepEqual(mini.permissions, {contents: 'read'});
  assert.equal(mini.concurrency.group, 'mini-dev-install');
@@ -124,11 +124,10 @@ test('the workflow parser reads the mini install that is already on main', () =>
  assert.equal(step(mini.jobs.install, 'actions/checkout@v7').with.ref, '${{ inputs.ref || github.sha }}');
  assert.equal(step(mini.jobs.install, 'actions/checkout@v7').with['persist-credentials'], false);
  assert.match(step(mini.jobs.install, 'Main only').run, /git merge-base --is-ancestor HEAD FETCH_HEAD/);
- assert.equal(step(mini.jobs.install, 'Pro modules (private checkout beside the board)').env.PRO_REPO_TOKEN, '${{ secrets.PRO_REPO_TOKEN }}');
  assert.equal(step(mini.jobs.install, 'Build and install the developer build').run.trim(), 'zsh desktop/dev-install.sh | tee "$RUNNER_TEMP/dev-install.log"');
 });
 
-test('release-app still calls mini-dev with the release commit and the existing token input', () => {
+test('release-app still calls mini-dev with the release commit', () => {
  assert.equal(release.concurrency.group, 'app-production-release');
  assert.equal(release.concurrency['cancel-in-progress'], false);
  assert.deepEqual(release.permissions, {contents: 'write'});
@@ -136,7 +135,7 @@ test('release-app still calls mini-dev with the release commit and the existing 
  const called = release.jobs['mini-dev'];
  assert.equal(called.uses, './.github/workflows/mini-dev.yml');
  assert.equal(called.with.ref, '${{ github.sha }}');
- assert.equal(called.secrets.PRO_REPO_TOKEN, '${{ secrets.PRO_REPO_TOKEN }}');
+ assert.equal(called.secrets, undefined);
  assert.equal(called.needs, 'release');
  for (const job of Object.values(release.jobs)) assert.notEqual(job.uses, './.github/workflows/mbp-dev.yml');
  assert.match(releaseText, /mbp-dev\.yml/);
@@ -152,7 +151,7 @@ test('dev-install keeps the local bundle id and does not touch the board data', 
  assert.match(devInstall, /mini-dev\.yml or mbp-dev\.yml/);
 });
 
-test('mbp-dev installs on assetboard-mbp only, from the same ref, with the token used in that job', () => {
+test('mbp-dev installs on assetboard-mbp only, from the same ref, with no token', () => {
  const text = read('.github/workflows/mbp-dev.yml');
  const doc = parseYaml(text);
  const job = doc.jobs.install;
@@ -181,24 +180,17 @@ test('mbp-dev installs on assetboard-mbp only, from the same ref, with the token
  assert.deepEqual(names, [
   'actions/checkout@v7',
   'Main only',
-  'Pro modules (private checkout beside the board)',
   'Build and install the developer build',
   'Summary'
  ]);
  assert.equal(step(job, 'Main only').run, step(mini.jobs.install, 'Main only').run);
- const pro = step(job, 'Pro modules (private checkout beside the board)');
- const miniPro = step(mini.jobs.install, 'Pro modules (private checkout beside the board)');
- assert.equal(pro.run, miniPro.run);
- assert.deepEqual(pro.env, {PRO_REPO_TOKEN: '${{ secrets.PRO_REPO_TOKEN }}'});
- assert.doesNotMatch(pro.run, /echo[^\n]*(PRO_REPO_TOKEN|GH_TOKEN)/);
- assert.doesNotMatch(pro.run, /GITHUB_ENV/);
  assert.equal(step(job, 'Build and install the developer build').run, step(mini.jobs.install, 'Build and install the developer build').run);
  assert.equal(step(job, 'Summary').if, '${{ always() }}');
- assert.match(step(job, 'Summary').run, /rm -rf pro dist/);
+ assert.match(step(job, 'Summary').run, /rm -rf dist/);
+ assert.doesNotMatch(step(job, 'Summary').run, /rm -rf pro/);
  assert.equal(step(job, 'Summary').run.replaceAll('MBP', 'Mini'), step(mini.jobs.install, 'Summary').run);
 
  for (const item of job.steps) {
-  if (item === pro) continue;
   assert.equal(JSON.stringify(item).includes('PRO_REPO_TOKEN'), false);
   assert.equal(JSON.stringify(item).includes('GH_TOKEN'), false);
  }
@@ -211,7 +203,7 @@ test('mbp-dev installs on assetboard-mbp only, from the same ref, with the token
  assert.match(text, /\/actions\/runners/);
  assert.match(text, /administration/);
  assert.match(text, /actions: read/);
- assert.match(pro.run, /hippone-labs\/assetboard-pro/);
+ assert.equal(text.includes('assetboard-pro'), false);
 });
 
 test('the release commit is the commit both machines check out', () => {

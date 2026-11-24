@@ -32,12 +32,9 @@
 
 ## 官方安装包与源码构建
 
-- 官方安装包： 从 [assetboard.app](https://assetboard.app/) 下载，免费，不用注册，也不用输入许可证。
-- 只在官方安装包里的： 外部 AI 工具通过 MCP 和命令行修改、删除、批量整理已有记录，以及后台自动做的事：每周核对注册局、Cloudflare 每 12 小时自动同步和新资产提醒、实时状态。
-- 源码构建也有的： 手动增改删、导入、连接平台后挑选、手动同步、AI 识别、付款账本、项目、关停清单、定期清理、Inbox 文件夹，以及 MCP 和命令行的查询、添加和引入待引入。
-- 在哪看： “设置 › 关于”的版本类型是“官方版”或“源码构建”。演示模式显示全部功能。
-- 源码构建里： 只在官方安装包里的开关（例如每周核对注册局）不显示，你之前的选择照样保留；外部工具修改或删除已有资产会被拒绝并说明原因；数据一样不少。
-- 源码： 这个仓库是其余部分的全部代码（GPL-3.0）。上面那几项不在仓库里，随官方签名的安装包提供。
+- 安装包： 从 [assetboard.app](https://assetboard.app/) 下载，免费，不用注册，也不用输入许可证。
+- 源码： 这个仓库是全部代码（GPL-3.0），自己编译得到的版本和下载的一样。
+- 不带 `pro/` 的构建： `ASSETBOARD_EDITION=free ./desktop/build.sh` 构建一个不含 `pro/` 模块的版本（放在 `dist/free/`）。它没有外部工具修改、删除和批量整理已有记录，也没有每周核对注册局、Cloudflare 每 12 小时自动同步和实时状态；这些开关不显示，你之前的选择照样保留，数据一样不少。
 
 ## 下载与安装
 
@@ -77,7 +74,7 @@ open /Applications/Assetboard.app --args --demo
 | Hetzner、DigitalOcean、Vercel | 「导入 › 云平台」或菜单「文件 → 从云平台导入…」：粘贴 API 令牌，只调用读取列表的接口。Hetzner 读一个项目的服务器（令牌在 Hetzner Console 的项目 › Security › API tokens 里建，权限选 Read；项目名可选，记在“账号”里）；DigitalOcean 读 Droplet、App Platform 应用和托管数据库（建 Custom Scopes 令牌，只勾 droplet、app、database、account 的 read，没勾的类别跳过并说明）；Vercel 读项目和在 Vercel 注册的域名（到期日和自动续费，自动续费开着的按年重复；只是指向 Vercel 的域名不读，请从注册商导入）。服务器带公网 IP、所在国家和列表月价（Hetzner 按项目币种的含税价，DigitalOcean 按美元；不含流量、备份和另计的附加项），月价只填进空着的费用，之后以你填的为准。Vercel 的令牌没有只读的，能改动所属账号或团队，连接前要勾选确认，列表里标“权限大”。令牌验证通过后存入钥匙串，点“重新同步”再读；同名的先问你，删掉的不会再加回来，平台上没了的标“本次未返回”，令牌读不了的类别不标。尚未用真实账号验证 | App |
 | `~/.ssh/config` | 只读 Host、HostName、User、Port，生成服务器；添加服务器时也能直接从里面选一台。github.com、gitlab.com 这类代码托管（以及 `User git` 的 Host）不当作服务器，仓库从 GitHub 连接来 | App |
 | 服务菜单、Dock | 在任何软件里选中文字，右键 → 服务 →「添加到 Assetboard」，文字会填进添加面板，点「识别」才处理。把邮件、截图、PDF、CSV、JSON 拖到 Dock 图标上，或用“打开方式”选 Assetboard：表格和 JSON 一律先进导入预览，截图和 PDF 在本机识别后进待确认。正在编辑或核对时不会打断，收到的内容在「待确认」里排队，可打开或丢弃。首次安装后若菜单里没有，注销再登录一次 | App |
-| MCP 接入 / 命令行 | 查询、添加和引入待引入免费；修改和删除已有资产只在官方安装包里（免费）。App 内置 `assetboard-cli`：Claude Code、Claude Desktop 等 MCP 客户端或脚本可以查询、添加、修改资产，新增和修改立即生效（`⌘Z` 撤销），删除要你在 App 里确认。通道在本机，但你的 AI 工具会把读到的内容发给它的模型服务商；地址和联系方式默认遮住，银行卡和手机号默认不给。菜单「文件 → MCP 接入…」里有可复制的配置。见下 | App |
+| MCP 接入 / 命令行 | 查询、添加、引入待引入、修改和删除已有资产都可以。App 内置 `assetboard-cli`：Claude Code、Claude Desktop 等 MCP 客户端或脚本可以查询、添加、修改资产，新增和修改立即生效（`⌘Z` 撤销），删除要你在 App 里确认。通道在本机，但你的 AI 工具会把读到的内容发给它的模型服务商；地址和联系方式默认遮住，银行卡和手机号默认不给。菜单「文件 → MCP 接入…」里有可复制的配置。见下 | App |
 | Inbox 文件夹 | 把 JSON 文件放进 `~/Library/Application Support/Assetboard/Inbox/`，App 打开或回到前台时读取，一律先进导入预览，确认才写入，同名的跳过、不覆盖；导入或丢弃后原文件才移到 `Inbox/handled/`（保留 30 天），取消预览或退出 App 时文件留在原处。这个格式拖进窗口或 Dock 也能识别。格式见下 | App |
 | AI 识别（可选） | 接入你自己的模型（Claude、OpenAI 兼容接口或本机 Ollama），配置后，导入的截图、PDF、邮件和粘贴的文字会自动发给它识别（AI 识别设置里可关掉，关掉后只在你点“用 AI 识别”时发送）。本地规则只认中文账单和通知，英文的靠 AI。尚未用真实 API key 验证 | App |
 
@@ -211,7 +208,7 @@ MCP 工具：`list_ai_usage`、`set_ai_usage_source`、`list_asset_types`、`lis
 
 图标与同步的 MCP 工具：`list_icon_platforms`、`set_icon_site`、`fetch_icons`、`get_cloudflare_sync_status`、`sync_cloudflare`、`list_sync_blocklist`、`unblock_sync_item`。
 
-源码构建里，改动已有资产的工具会被拒绝并说明原因：`update_asset`、`update_assets`、`update_project`、`record_payment`、`renew_asset`、`delete_asset`、`request_delete_assets`、`set_icon_site`、`fetch_icons`、`unblock_sync_item`，命令行的 `update`、`delete` 等同样。查询、`add_assets`（同类别已有同名的跳过、不覆盖）、`import_candidates` 和 `sync_cloudflare` 免费。
+不带 `pro/` 的构建（`ASSETBOARD_EDITION=free`）里，改动已有资产的工具会被拒绝并说明原因：`update_asset`、`update_assets`、`update_project`、`record_payment`、`renew_asset`、`delete_asset`、`request_delete_assets`、`set_icon_site`、`fetch_icons`、`unblock_sync_item`，命令行的 `update`、`delete` 等同样。查询、`add_assets`（同类别已有同名的跳过、不覆盖）、`import_candidates` 和 `sync_cloudflare` 照常可用。
 
 操作记录与待引入的 MCP 工具：`list_agent_activity`、`list_agents`、`list_import_candidates`（只读），`import_candidates`（引入待引入的资产）。命令行对应 `activity`、`agents`、`candidates`、`import-candidates`。
 
@@ -268,14 +265,14 @@ App 自己会连的：
 | 新添加的资产认出是已知平台时，取它的图标（同平台已有图标就复用，不再联网） | 内置名单里该平台的官网，如 `github.com`；不带 Cookie | “设置 › 功能”关掉自动获取网站图标 |
 | 费用合计要换算币种时取汇率，每天最多一次 | `api.frankfurter.dev`（欧洲央行参考汇率） | 资产和计价币种都是同一种时不会去取 |
 | 有 GitHub 仓库、本机 `gh` 已登录或保存了 GitHub 令牌时：App 打开时、在前台时每 15 分钟、同步 GitHub 之后，读这些仓库打开的 PR | `api.github.com`（GraphQL，一条固定的只读查询，每次最多 100 个仓库、每个仓库 30 个 PR） | “设置 › 功能”关掉待合并的 PR |
-| 连上 Cloudflare 之后（官方安装包）：App 打开或回到前台时，距上次同步满 12 小时就同步一次 | `api.cloudflare.com` | 断开 Cloudflare |
+| 连上 Cloudflare 之后：App 打开或回到前台时，距上次同步满 12 小时就同步一次 | `api.cloudflare.com` | 断开 Cloudflare |
 | 本机装过、登录过 AI 工具时，读它们的额度：每个工具最多 10 分钟一次，用该工具自己的登录，不保存 | `api.anthropic.com`、`chatgpt.com`、`cursor.com`、`api.github.com`、`cli-chat-proxy.grok.com`、`opencode.ai` 的用量接口，或 Antigravity 在 `127.0.0.1` 的本机服务（没开时是本机 `agy` 自己的用量报告，由 agy 联网） | “设置 › 连接 › AI 额度”里逐个关掉额度接口，或“设置 › 功能”关掉 AI 额度与用量 |
 
 打开以后才会连的（都默认关，或要你先配置）：
 
 | 什么 | 连到哪 |
 |---|---|
-| 每周核对域名到期日（“设置 › 功能”，官方安装包） | `data.iana.org` 的注册局列表和各后缀注册局的 RDAP 服务，只发域名 |
+| 每周核对域名到期日（“设置 › 功能”） | `data.iana.org` 的注册局列表和各后缀注册局的 RDAP 服务，只发域名 |
 | AI 识别（配置模型后） | 你填的模型服务（Claude、OpenAI 兼容接口，或本机 Ollama）；导入的截图、PDF、邮件和粘贴的文字会自动发给它，在 AI 识别设置里可以改成只在你点“用 AI 识别”时发送 |
 | 探针（“设置 › 功能 › 实时状态”） | 你自己添加的监控面板，只读固定的几个接口，按你设的读取间隔 |
 | SSH 直读（同上，每台主机另外打开） | 你的服务器，用系统 `ssh`、你的 `~/.ssh/config` 和密钥，只跑一条固定的只读命令，按你设的读取间隔 |
