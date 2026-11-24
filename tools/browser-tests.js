@@ -6,15 +6,19 @@
 //   node tools/browser-tests.js --root <dir>          another copy of the board (its tests/)
 //   node tools/browser-tests.js tests/keyboard.playwright.js ...   only these files (paths relative to the root)
 //   --port <n>                                         serve on another port
+//   --jobs <n>                                         files run at once (default: half the cores, at most 6; 1 under CI)
 //
 // Needs Playwright with Chromium: once, `npm install --no-save playwright && npx playwright install chromium` in this checkout
 // (node_modules/ is ignored). PLAYWRIGHT_CHROMIUM=<path> uses another Chromium binary.
-const http=require('http'),fs=require('fs'),path=require('path');
+const http=require('http'),fs=require('fs'),path=require('path'),os=require('os');
 const {chromium}=require('playwright');
 
 const args=process.argv.slice(2),option=name=>{const at=args.indexOf(name);return at>=0?args.splice(at,2)[1]:null;};
 const root=path.resolve(option('--root')||path.join(__dirname,'..'));
 const port=Number(option('--port')||4318),base=`http://127.0.0.1:${port}`;
+// Each file has its own context (own storage), so files can run side by side in one browser. CI keeps one at a time: its runners
+// have three cores and draw in software, and the timings some tests check were set there.
+const jobs=Math.max(1,Number(option('--jobs')||(process.env.CI?1:Math.min(6,Math.floor(os.cpus().length/2)))));
 const listed=args.length?args:['tests','pro/tests'].flatMap(dir=>fs.existsSync(path.join(root,dir))?fs.readdirSync(path.join(root,dir)).filter(f=>f.endsWith('.playwright.js')).sort().map(f=>`${dir}/${f}`):[]);
 const types={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png','.gif':'image/gif','.webp':'image/webp','.svg':'image/svg+xml','.json':'application/json'};
 
@@ -43,8 +47,8 @@ server.listen(port,'127.0.0.1',async()=>{
    return {transparency:matchMedia('(prefers-reduced-transparency: reduce)').matches?'reduce':'no-preference',dpr:devicePixelRatio,gl};});
   console.log(`Chromium ${browser.version()}; prefers-reduced-transparency: ${host.transparency}; devicePixelRatio ${host.dpr}; WebGL ${host.gl}`);
   await context.close();}
- let failed=0;
- for(const file of listed){
+ let failed=0,next=0;const started=Date.now();
+ async function runOne(file){
   const context=await browser.newContext({viewport:{width:1400,height:900},locale:'zh-CN'}),page=await context.newPage(),errors=[];
   page.on('pageerror',error=>errors.push(error.message));
   try{
@@ -60,7 +64,8 @@ server.listen(port,'127.0.0.1',async()=>{
   }
   await context.close();
  }
+ await Promise.all(Array.from({length:Math.min(jobs,listed.length)},async()=>{while(next<listed.length)await runOne(listed[next++]);}));
  await browser.close();server.close();
- console.log(`${listed.length-failed} of ${listed.length} passed (${root})`);
+ console.log(`${listed.length-failed} of ${listed.length} passed (${root}) in ${Math.round((Date.now()-started)/1000)}s, ${jobs} at a time`);
  process.exit(failed?1:0);
 });
