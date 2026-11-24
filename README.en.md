@@ -68,7 +68,7 @@ The full host list is in the [user guide](GUIDE.md#隐私与网络) (Chinese).
 
 ## What it records
 
-13 categories: domain, server, repository, deployment, database, object storage, subscription and tool, AI subscription, software licence, bank card, phone number, Apple ID, Google account.
+14 categories: domain, server, repository, deployment, database, object storage, subscription and tool, AI subscription, software licence, bank card, phone number, Apple ID, Google account, device.
 
 - A server can hold up to 4 IPs and an SSH host, user and port.
 - A bank card holds only the last four digits, network and expiry; the form refuses full card numbers.
@@ -132,6 +132,7 @@ Scripts can put JSON in this format into `~/Library/Application Support/Assetboa
 - Network log: lists every request the app makes.
 - An MCP server and the `assetboard-cli` command line for Claude Code, Codex, Cursor and other tools to read and write assets. Every external call goes into a local MCP activity log (which client, when, which tool, what changed), shown in Settings › MCP.
 - AI usage and limits: plan limits and usage of Claude Code, Codex, Cursor, GitHub Copilot, Grok CLI, opencode and Antigravity, read from their local files and quota endpoints and shown on the matching AI subscription: close to the limit, idle, worth its price at API rates or not. Only numbers, model names and times are read.
+- This Mac (Mac): keeps this Mac as a device record with its model, chip, memory, macOS version, disk, battery and serial number, read when the app opens or comes to the front; a nearly full disk is marked. Reads this Mac only, nothing over the network, no permission prompt.
 - In progress (Mac): the AI coding sessions running on this Mac (Claude Code, Codex, Cursor and others): how many, in which repository and branch, and for how long. Reads only process names, working directories, start times and when session files were last written, never conversations.
 - Repositories (Mac, off by default): a GitHub sync also reads branches and the latest Actions run; a failed or running run leads the row, and new branches show for 14 days.
 - Keyboard control; `?` lists the shortcuts.

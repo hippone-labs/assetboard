@@ -345,7 +345,7 @@ enum MCPServer {
     /// The descriptions name parts of the app's interface; in English the Chinese words are left out or given in English.
     static func zh(_ text: String) -> String { AppLanguage.isEnglish ? "" : text }
     static var ssh: String { L("SSH 直读") }
-    static let typeIds = ["bankcard", "phone", "server", "appleid", "google", "ai", "domain", "subscription", "database", "license", "repository", "deployment", "storage"]
+    static let typeIds = ["bankcard", "phone", "server", "appleid", "google", "ai", "domain", "subscription", "database", "license", "repository", "deployment", "storage", "device"]
 
     static var assetFields: [String: Any] {
         func text(_ description: String) -> [String: Any] { ["type": "string", "description": description] }

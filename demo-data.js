@@ -85,6 +85,9 @@ window.assetboardDemoBoard=function(){
   // 平台状态 (实时状态): a free Supabase project that paused, with its sleep rule and a keep-alive in its detail. platform-data.js
   // platformDemo answers for it. A database is no card in 全景, so the demo's panorama stays as it is.
   {...base,id:'demo-db2',updatedAt:ago(20),type:'database',name:'notes-auth',provider:'Supabase',purpose:t('登录与用户'),cost:t('免费'),keepAlive:{url:'https://notes-api.example.com/health',every:1440}},
+  // 本机设备: this Mac as the Mac app records it (device-local.js). Made up: no machine is read in a demo.
+  {...base,id:'demo-m1',createdAt:ago(30),updatedAt:ago(0),type:'device',name:'studio-book',provider:'Apple',source:'local',externalId:'00000000000000d1',
+   model:'Mac15,6',chip:'Apple M3 Pro',memoryBytes:18*2**30,osVersion:'15.2',serial:'DEMO0C02X1Y2',disk:{total:1e12,free:3.8e11},battery:{percent:86,charging:false,cycles:212},seenAt:new Date().toISOString()},
   ...repos.map(repoRecord)
  ];
  // Server relations: two VPS, one account, domains and repositories mounted on them, two orphans (v13).
@@ -110,7 +113,7 @@ window.assetboardDemoBoard=function(){
  for(const a of assets)if(a.type==='repository')icon(a.id,'github.com');
  icon('demo-d1','namecheap.com');icon('demo-s2','hetzner.example.com');icon('demo-db2','supabase.com');
  const block=id=>({id,folded:false});
- return {blocks:['domain','server','repository','subscription','ai','database','license'].map(block),assets,deletedExternalIds:[],cardOrder:{domain:['demo-d1']},featuredRepositoryIds:[],evidenceDecisions:{},iconSites:{'hetzner.com':'hetzner.example.com'}};
+ return {blocks:['domain','server','repository','subscription','ai','database','license','device'].map(block),assets,deletedExternalIds:[],cardOrder:{domain:['demo-d1']},featuredRepositoryIds:[],evidenceDecisions:{},iconSites:{'hetzner.com':'hetzner.example.com'}};
 };
 // The platforms' answers on the demo board (设置 › 连接, the import window): made-up resources in the shape the Mac app passes on, so
 // connecting and picking can be tried. Nothing is sent anywhere. Each read after the first finds one more resource, as a platform does

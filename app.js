@@ -13,9 +13,10 @@ const icons = {
  phone:'<rect x="6.5" y="3" width="11" height="18" rx="2.5"/><path d="M10.5 17.5h3"/>',
  appleid:'<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="10" r="2.8"/><path d="M6.6 18.4c1.2-1.9 3.1-2.9 5.4-2.9s4.2 1 5.4 2.9"/>',
  google:'<path d="M19.5 12.2c0-.6-.05-1.2-.15-1.7H12v3.3h4.2a3.7 3.7 0 0 1-1.6 2.4"/><path d="M19.2 9A8 8 0 1 0 17.6 17.7"/>',
+device:'<rect x="4.5" y="5" width="15" height="10" rx="1.5"/><path d="M2.5 18.5h19M10 15v3.5M14 15v3.5"/>',
  ai:'<path d="M11 4c.6 3.9 2.6 5.9 6.5 6.5-3.9.6-5.9 2.6-6.5 6.5-.6-3.9-2.6-5.9-6.5-6.5C8.4 9.9 10.4 7.9 11 4Z"/><path d="M18 15.5v4M16 17.5h4"/>'
 };
-const cats = {bankcard:{name:tr('银行卡'),one:tr('银行卡',null,'one'),hint:tr('用来付订阅的卡，实体卡、虚拟卡都算；只记尾号、卡组织与有效期')},phone:{name:tr('手机号'),one:tr('手机号',null,'one'),hint:tr('各国号码、运营商与保号日期')},server:{name:tr('服务器'),one:tr('服务器',null,'one')},appleid:{name:'Apple ID',one:'Apple ID',hint:tr('各区 Apple ID 与付款卡、验证号码')},google:{name:tr('Google 账号'),one:tr('Google 账号',null,'one'),hint:tr('各区 Google 账号与验证号码')},ai:{name:tr('AI 订阅'),one:tr('AI 订阅',null,'one')},domain:{name:tr('域名'),one:tr('域名',null,'one')},subscription:{name:tr('订阅与工具'),one:tr('订阅与工具',null,'one')},database:{name:tr('数据库'),one:tr('数据库',null,'one')},license:{name:tr('软件授权'),one:tr('软件授权',null,'one')},repository:{name:tr('代码仓库'),one:tr('代码仓库',null,'one')},deployment:{name:tr('部署服务'),one:tr('部署服务',null,'one')},storage:{name:tr('对象存储'),one:tr('对象存储',null,'one')}};
+const cats = {bankcard:{name:tr('银行卡'),one:tr('银行卡',null,'one'),hint:tr('用来付订阅的卡，实体卡、虚拟卡都算；只记尾号、卡组织与有效期')},phone:{name:tr('手机号'),one:tr('手机号',null,'one'),hint:tr('各国号码、运营商与保号日期')},server:{name:tr('服务器'),one:tr('服务器',null,'one')},appleid:{name:'Apple ID',one:'Apple ID',hint:tr('各区 Apple ID 与付款卡、验证号码')},google:{name:tr('Google 账号'),one:tr('Google 账号',null,'one'),hint:tr('各区 Google 账号与验证号码')},ai:{name:tr('AI 订阅'),one:tr('AI 订阅',null,'one')},domain:{name:tr('域名'),one:tr('域名',null,'one')},subscription:{name:tr('订阅与工具'),one:tr('订阅与工具',null,'one')},database:{name:tr('数据库'),one:tr('数据库',null,'one')},license:{name:tr('软件授权'),one:tr('软件授权',null,'one')},repository:{name:tr('代码仓库'),one:tr('代码仓库',null,'one')},deployment:{name:tr('部署服务'),one:tr('部署服务',null,'one')},storage:{name:tr('对象存储'),one:tr('对象存储',null,'one')},device:{name:tr('设备'),one:tr('设备',null,'one'),hint:tr('这台 Mac 和你的其他电脑、平板、手机')}};
 // Priority asset types: form labels, extra fields and date defaults. Other categories use the generic form.
 const assetProfiles={
  bankcard:{name:tr('例如 汇丰 One 借记卡、Wise 虚拟卡'),provider:[tr('发卡行'),tr('例如 汇丰香港、Wise')],account:[tr('账户备注'),tr('用于区分同一银行的多张卡')],extra:['region','last4','network','cardStatus'],note:tr('只记录后 4 位。不要填写完整卡号、CVV、密码或验证码。'),links:tr('关联用这张卡付款的 Apple ID、Google 账号或 AI 订阅。')},
@@ -37,7 +38,8 @@ const FORM_COPY={
  deployment:{name:tr('例如 notes-web'),provider:[tr('托管平台'),tr('例如 Vercel、Netlify')],account:[tr('团队或账号'),tr('在哪个团队或账号下')],date:tr('下次扣款日期'),dateKind:'renew',cycle:'monthly',kinds:['renew','expire','trial'],url:tr('控制台')},
  storage:{name:tr('例如 backups'),provider:[tr('存储服务'),tr('例如 Cloudflare R2、Backblaze')],account:[tr('账号'),tr('在哪个账号下')],date:tr('下次扣款日期'),dateKind:'renew',cycle:'monthly',kinds:['renew','expire','trial'],url:tr('控制台')},
  phone:{kinds:['keep','renew','expire']},
- appleid:{plain:true},google:{plain:true}
+ appleid:{plain:true},google:{plain:true},
+ device:{name:tr('例如 工作用的 MacBook Pro'),provider:[tr('品牌'),tr('例如 Apple、Lenovo')],account:[tr('使用人或用途'),tr('例如 自己、家里')],plain:true}
 };
 function formCopy(type){return {...FORM_COPY[type],...assetProfiles[type]};}
 // A repository's visibility, stored in `event` the way a GitHub sync stores it.
@@ -179,7 +181,7 @@ function icpNote(a){
  const filed=a.type==='server'?serverChain(state.assets,a).mounts.filter(x=>x.type==='domain'&&x.icp&&!x.hiddenAt):[];
  return filed.length?tr('。上面有 {n} 个已备案域名，取消接入前先在新服务商接入',{n:formatCount(filed.length)}):'';
 }
-const STOPPABLE=['server','domain','repository','database','license','subscription','ai','deployment','storage','phone'];
+const STOPPABLE=['server','domain','repository','database','license','subscription','ai','deployment','storage','phone','device'];
 const stopRing=a=>a.stopped?`<i class="stop-ring" role="img" aria-label="${tr('已停用')}" title="${tr('已停用')}"></i>`:'';
 function toggleStopped(id){
  const a=state.assets.find(x=>x.id===id);if(!a||!STOPPABLE.includes(a.type))return false;
@@ -603,7 +605,7 @@ document.addEventListener('contextmenu',e=>{
 addEventListener('scroll',()=>closeMenu(false),{passive:true});
 // 手动录入 is the default and says nothing, so the detail names a source only for what came from elsewhere.
 function shownSource(a){return !a.source||a.source==='manual'?'':sourceLabel(a);}
-function sourceLabel(a){if(a.syncMissing)return tr('{source} 本次未返回',{source:SYNC_SOURCE_NAMES[a.source]||a.source});if(Object.hasOwn(REGISTRARS,a.source||''))return `${REGISTRARS[a.source].name} · ${a.syncStatus?tr(a.syncStatus):tr('状态未知')}`;if(Object.hasOwn(CLOUD_IMPORTS,a.source||''))return `${CLOUD_IMPORTS[a.source].name} · ${a.syncStatus?tr(a.syncStatus):tr('状态未知')}`;if(a.source==='github')return tr('GitHub 仓库 · {status}',{status:a.syncStatus?tr(a.syncStatus):tr('状态未知')});if(a.source==='cloudflare')return `Cloudflare ${a.resourceKind||'Zone'} · ${a.syncStatus?tr(a.syncStatus):tr('状态未知')}`;return {manual:tr('手动录入'),agent:tr('外部工具添加'),demo:tr('演示资产'),ssh:'~/.ssh/config',csv:a.importedFrom?tr('{file} 导入',{file:tr(a.importedFrom)}):tr('表格导入')}[a.source]||tr('导入');}
+function sourceLabel(a){if(a.source==='local')return tr('本机读取');if(a.syncMissing)return tr('{source} 本次未返回',{source:SYNC_SOURCE_NAMES[a.source]||a.source});if(Object.hasOwn(REGISTRARS,a.source||''))return `${REGISTRARS[a.source].name} · ${a.syncStatus?tr(a.syncStatus):tr('状态未知')}`;if(Object.hasOwn(CLOUD_IMPORTS,a.source||''))return `${CLOUD_IMPORTS[a.source].name} · ${a.syncStatus?tr(a.syncStatus):tr('状态未知')}`;if(a.source==='github')return tr('GitHub 仓库 · {status}',{status:a.syncStatus?tr(a.syncStatus):tr('状态未知')});if(a.source==='cloudflare')return `Cloudflare ${a.resourceKind||'Zone'} · ${a.syncStatus?tr(a.syncStatus):tr('状态未知')}`;return {manual:tr('手动录入'),agent:tr('外部工具添加'),demo:tr('演示资产'),ssh:'~/.ssh/config',csv:a.importedFrom?tr('{file} 导入',{file:tr(a.importedFrom)}):tr('表格导入')}[a.source]||tr('导入');}
 function dateText(a){const status=assetDateStatus(a);if(status.level==='none')return a.date||tr('待补充');return [status.label.startsWith(status.date)?status.label:`${status.date} · ${status.label}`,billingCycles[a.cycle]?billingCycles[a.cycle].label:''].filter(Boolean).join(' · ');}
 // Manual display order from the inspector menu: bring one record to the front of its category, or go back to recency order.
 function manualOrder(type){return !!state.cardOrder?.[type]?.length;}
@@ -649,7 +651,7 @@ function repoFacts(a){
 function detailFacts(a,lastSync){
  // A date row stays on one line; when the inspector is too narrow its end is cut and the whole text is the tip.
  const row=([k,html])=>DATE_FACTS.includes(k)?`<div class="fact fact-date"><span>${k}</span><span title="${esc(html.replace(/<[^>]*>/g,''))}">${html}</span></div>`:`<div class="fact"><span>${k}</span><span>${html}</span></div>`,text=value=>esc(value||'');
- if(!assetProfiles[a.type]){const list=assetIps(a),net=list.length?`<div class="fact"><span>${tr('网络')}</span><span class="ip-pills">${list.map(x=>`<button class="ip-pill" data-action="copy-ip" data-ip="${esc(x.ip)}" title="${tr('复制 IP')}" aria-label="${tr('复制 IP {ip}',{ip:esc(veilIp(x.ip))})}">${x.inner?`<em>${tr('内')}</em>`:''}${esc(veilIp(x.ip))}</button>`).join('')}</span></div>`:'';return [[tr('保留原因'),a.reason],[tr('费用'),costText(a)],[tr('下一日期'),a.date?dateText(a):''],[tr('自动续费'),AUTO_RENEW_WORDS[a.autoRenew]&&a.source!=='manual'?AUTO_RENEW_WORDS[a.autoRenew]:''],['SSH',a.type==='server'&&(a.host||a.sshAlias)?`${a.host?`${a.sshUser?a.sshUser+'@':''}${veilHost(a.host)}${a.sshPort?':'+a.sshPort:''}`:''}${a.sshAlias?`${a.host?' · ':''}ssh ${esc(a.sshAlias)}`:''}`:''],[tr('本机目录'),a.type==='repository'?a.localPath:''],[tr('DNS 托管'),a.type==='domain'?a.dnsHost:''],[tr('备案'),a.type==='domain'&&a.icp?a.icp+(a.stopped||a.hiddenAt||['overdue'].includes(assetDateStatus(a).level)?' · '+tr('不用了先注销备案'):''):''],[tr('来源'),shownSource(a)],...(lastSync?[[syncedLabel(a),lastSync]]:[])].filter(([,v])=>v).map(([k,v])=>row([k,esc(v)])).join('')+net+repoFacts(a)+wakeFact(a);}
+ if(!assetProfiles[a.type]){const list=assetIps(a),net=list.length?`<div class="fact"><span>${tr('网络')}</span><span class="ip-pills">${list.map(x=>`<button class="ip-pill" data-action="copy-ip" data-ip="${esc(x.ip)}" title="${tr('复制 IP')}" aria-label="${tr('复制 IP {ip}',{ip:esc(veilIp(x.ip))})}">${x.inner?`<em>${tr('内')}</em>`:''}${esc(veilIp(x.ip))}</button>`).join('')}</span></div>`:'';return [[tr('保留原因'),a.reason],[tr('费用'),costText(a)],[tr('下一日期'),a.date?dateText(a):''],[tr('自动续费'),AUTO_RENEW_WORDS[a.autoRenew]&&a.source!=='manual'?AUTO_RENEW_WORDS[a.autoRenew]:''],['SSH',a.type==='server'&&(a.host||a.sshAlias)?`${a.host?`${a.sshUser?a.sshUser+'@':''}${veilHost(a.host)}${a.sshPort?':'+a.sshPort:''}`:''}${a.sshAlias?`${a.host?' · ':''}ssh ${esc(a.sshAlias)}`:''}`:''],[tr('本机目录'),a.type==='repository'?a.localPath:''],[tr('DNS 托管'),a.type==='domain'?a.dnsHost:''],[tr('备案'),a.type==='domain'&&a.icp?a.icp+(a.stopped||a.hiddenAt||['overdue'].includes(assetDateStatus(a).level)?' · '+tr('不用了先注销备案'):''):''],[tr('来源'),shownSource(a)],...(lastSync?[[syncedLabel(a),lastSync]]:[])].filter(([,v])=>v).map(([k,v])=>row([k,esc(v)])).join('')+net+repoFacts(a)+(typeof deviceDetailFacts==='function'?deviceDetailFacts(a):'')+wakeFact(a);}
  const region=a.region?`${regionFlag(a.region)} ${regionName(a.region)}`:'',when=a.date?dateText(a):'',count=['appleid','google'].includes(a.type)?verifyNumbers(state.assets,a).length:0,numbers=count===1?tr('1 个（唯一）'):count?tr('{n} 个',{n:count}):'';
  const rows={
   bankcard:[[tr('地区'),text(region)],[tr('状态'),text(CARD_STATUSES[a.cardStatus])],[tr('费用'),text(costText(a))],[tr('有效期'),a.date?esc(`${expiryText(a.date)} · ${assetDateStatus(a).label}`):text('')],[tr('发卡行'),text(a.provider)],[tr('账户备注'),text(veilAccount(a.account))]],
@@ -3034,6 +3036,7 @@ function setFeatureNow(key,on){
  if(key==='aiUsage'&&typeof aiUsageSwitch==='function')aiUsageSwitch(on);
  if(key==='pulls'&&on&&typeof pullsRefresh==='function')pullsRefresh(true);
  if(key==='codingSessions'&&typeof codingSwitch==='function')codingSwitch(on);
+ if(key==='localDevice'&&typeof deviceSwitch==='function')deviceSwitch(on);
  if(key==='probe'&&on){if(typeof probeStart==='function')probeStart();if(typeof sshStart==='function')sshStart();if(typeof platformStart==='function')platformStart();}
  drawTopnavActions();render();prefsChanged();toast(on?tr('{name}：已打开',{name:FEATURES[key].name}):tr('{name}：已关闭',{name:FEATURES[key].name}));
 }

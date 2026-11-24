@@ -90,7 +90,7 @@ async (page) => {
   check(demo.visible===demo.drawn&&!demo.hidden,'Every visible asset is drawn once and the hidden domain is not: '+demo.drawn);
   check(demo.zones==='desk:本机,server:服务器,data:数据,domain:域名,wallet:付款与号码,id:登录账号,pass:订阅,repository:仓库','The zones in order: '+demo.zones);
   const sh=await shapes(p);
-  check(JSON.stringify(sh)===JSON.stringify({rack:2,tower:1,drum:2,plate:3,card:2,key:1,ticket:3,pass:5,folder:14}),'The demo board\'s things: '+JSON.stringify(sh));
+  check(JSON.stringify(sh)===JSON.stringify({mac:1,rack:2,tower:1,drum:2,plate:3,card:2,key:1,ticket:3,pass:5,folder:14}),'The demo board\'s things: '+JSON.stringify(sh));
   const homes=await p.evaluate(()=>[...document.querySelectorAll('.po-home')].map(h=>[h.className.replace('po-home ',''),h.querySelector('.po-roof b').textContent,!!h.querySelector('.po-cloud'),[...h.querySelectorAll('[data-obj]')].map(n=>n.dataset.chip).join(),h.getAttribute('aria-label')].join('|')));
   check(homes.join(' ; ')==='on-cloud|Cloudflare|true|demo-d3|Cloudflare，1 个域名 ; on-rail|Namecheap|false|demo-d1,demo-d2|Namecheap，2 个域名','Cloudflare\'s domain hangs under a cloud, Namecheap\'s under a rail with its name: '+homes.join(' ; '));
   const srv=await p.evaluate(()=>({nas:document.querySelector('[data-chip="demo-s3"]').dataset.obj,tag:document.querySelector('[data-chip="demo-s3"] .po-tag')?.textContent,nasLabel:document.querySelector('[data-chip="demo-s3"]').getAttribute('aria-label'),tokyo:document.querySelector('[data-chip="demo-s1"]').dataset.obj,ip:document.querySelector('[data-chip="demo-s1"] .ip-text').textContent,grill:!!document.querySelector('[data-chip="demo-s1"] .po-grill'),stack:document.querySelectorAll('.po-stack .po-rack').length,tokyoH:document.querySelector('[data-chip="demo-s1"]').offsetHeight,nasH:document.querySelector('[data-chip="demo-s3"]').offsetHeight}));
@@ -147,7 +147,11 @@ async (page) => {
   // ---- 正在做 on the Mac: the demo's reading, then the empty state ------------------------------------------------------------------
   const mac=await p.evaluate(()=>{const m=document.querySelector('[data-mac]');return {form:m.dataset.mac,n:m.dataset.sessions,head:m.querySelector('.po-work').textContent,lines:[...m.querySelectorAll('.po-work-l')].map(l=>l.textContent),label:m.getAttribute('aria-label'),role:m.getAttribute('role'),button:!!m.closest('button')||!!m.querySelector('button'),nav:m.hasAttribute('data-nav')};});
   check(mac.form==='laptop'&&mac.n==='4'&&mac.head==='正在做 · 4 个会话'&&mac.lines.join('|')==='Claude Code · 2 个会话 · atlas-ui · 38 分钟|Codex · 1 个会话 · pixel-kit · 12 分钟|Cursor · 1 个会话 · 260 分钟','The Mac\'s screen lists the demo\'s sessions by tool: '+JSON.stringify(mac));
-  check(mac.role==='group'&&/^本机，正在做 · 4 个会话，Claude Code/.test(mac.label)&&!mac.button&&!mac.nav,'The Mac is a labelled group, not an asset: nothing to open: '+mac.label);
+  check(mac.button&&mac.nav&&/^studio-book，设备，Apple M3 Pro · 18 GB，正在做 · 4 个会话，Claude Code/.test(mac.label)&&await p.evaluate(()=>document.querySelector('[data-mac]').dataset.chip==='demo-m1'),'With this Mac\'s record (本机设备) the Mac is that record, a button that opens it: '+mac.label);
+  // Without the record the Mac is only the carrier of the screen: a labelled group, nothing to open.
+  await p.evaluate(()=>{state.assets=state.assets.filter(a=>a.type!=='device');panoramaRender();});
+  const bare=await p.evaluate(()=>{const m=document.querySelector('[data-mac]');return {label:m.getAttribute('aria-label'),role:m.getAttribute('role'),button:!!m.closest('button'),chip:m.dataset.chip||''};});
+  check(bare.role==='group'&&/^本机，正在做 · 4 个会话，Claude Code/.test(bare.label)&&!bare.button&&!bare.chip,'Without a device record the Mac is a labelled group, not an asset: '+JSON.stringify(bare));
   check(await p.evaluate(()=>!/\/Users\/|\/home\//.test(document.querySelector('[data-mac]').innerText)),'No path is shown on the screen');
   await noWork(p);await p.evaluate(()=>panoramaRender());
   const idle=await p.evaluate(()=>{const m=document.querySelector('[data-mac]');return {n:m.dataset.sessions,cls:m.className,text:m.querySelector('.po-screen').innerText.replace(/\s+/g,' ').trim(),label:m.getAttribute('aria-label'),h:m.offsetHeight,tone:m.querySelectorAll('.red,.amber,.po-stamp').length};});

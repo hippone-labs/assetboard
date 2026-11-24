@@ -240,7 +240,7 @@ final class BoardStore {
         database = try LocalDatabase(file: directory.appendingPathComponent("assetboard.sqlite"))
     }
     func validate(_ value: Any) throws -> [String: Any] {
-        let categories: Set<String> = ["bankcard", "phone", "server", "appleid", "google", "ai", "domain", "subscription", "database", "license", "repository", "deployment", "storage"]
+        let categories: Set<String> = ["bankcard", "phone", "server", "appleid", "google", "ai", "domain", "subscription", "database", "license", "repository", "deployment", "storage", "device"]
         guard let board = value as? [String: Any],
               let blocks = board["blocks"] as? [[String: Any]],
               let assets = board["assets"] as? [[String: Any]],
@@ -938,6 +938,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         }
     }
 
+    /// 本机设备 (device-local.js): this Mac's model, chip, memory, macOS version, disk and battery, one read at a time, off the main
+    /// thread. The answer goes to `assetboardDeviceInfo`; the page keeps it as this Mac's record. Never in a demo.
+    private var deviceInfoReading = false
+    func readDeviceInfo(_ body: [String: Any]) {
+        let requestId = body["requestId"] as? Int ?? 0
+        guard !demoMode, !deviceInfoReading else { return }
+        deviceInfoReading = true
+        DispatchQueue.global(qos: .utility).async {
+            var reply = DeviceInfo.read()
+            reply["requestId"] = requestId
+            DispatchQueue.main.async {
+                self.deviceInfoReading = false
+                guard let data = try? JSONSerialization.data(withJSONObject: reply), let json = String(data: data, encoding: .utf8) else { return }
+                self.webView.evaluateJavaScript("window.assetboardDeviceInfo?.(\(json))")
+            }
+        }
+    }
+
     func syncGitHubWithLocalCLI(users: [String]? = nil, details: Bool = false) {
         DispatchQueue.global(qos: .userInitiated).async {
             guard let path = LocalCLI.ghPath() else {
@@ -1300,6 +1318,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         }
         if body["action"] as? String == "githubPulls" {
             readPulls(body)
+            return
+        }
+        if body["action"] as? String == "deviceInfo" {
+            readDeviceInfo(body)
             return
         }
         if body["action"] as? String == "codingSessions" {
@@ -2583,6 +2605,8 @@ if CommandLine.arguments.contains(Updater.launchCheckFlag) {
     testGitHubPulls()
 } else if CommandLine.arguments.contains("--test-coding-sessions") {
     testCodingSessions()
+} else if CommandLine.arguments.contains("--test-device") {
+    testDeviceInfo()
 } else if CommandLine.arguments.contains("--test-registrar") {
     testRegistrars()
 } else if CommandLine.arguments.contains("--test-cloud-import") {

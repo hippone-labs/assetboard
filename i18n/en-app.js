@@ -1244,4 +1244,12 @@ Object.assign(I18N.en,{
  '修改':'Changed',
  '请求删除':'Asked to delete',
  '读取':'Read',
+ '设备':'Devices',
+ '设备@one':'Device',
+ '这台 Mac 和你的其他电脑、平板、手机':'This Mac and your other computers, tablets and phones',
+ '例如 工作用的 MacBook Pro':'e.g. work MacBook Pro',
+ '品牌':'Brand',
+ '例如 Apple、Lenovo':'e.g. Apple, Lenovo',
+ '使用人或用途':'User or use',
+ '例如 自己、家里':'e.g. me, home',
 });

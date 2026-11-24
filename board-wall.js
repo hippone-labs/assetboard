@@ -48,7 +48,7 @@ function wallFacts(a){
   [2,tr('费用'),[costText(a),costHint(a)].filter(Boolean).join(' · ')],[2,tr('付款方式'),cards.map(c=>c.last4?`•••• ${c.last4}`:displayName(c)).join(tr('、'))],
   [3,tr('关联'),names(rest)],[3,tr('用途'),a.purpose&&a.purpose!==cats[a.type]?.name?a.purpose:''],[3,tr('保留原因'),a.reason],[3,'SSH',ssh],
   [3,tr('本机目录'),a.type==='repository'?a.localPath:''],[3,tr('DNS 托管'),a.type==='domain'?a.dnsHost:''],[3,tr('备案'),a.type==='domain'?a.icp:''],
-  ...wallAiFacts(a),
+  ...wallAiFacts(a),...(typeof wallDeviceFacts==='function'?wallDeviceFacts(a):[]),
   [3,tr('状态'),CARD_STATUSES[a.cardStatus]||PHONE_STATUSES[a.phoneStatus]||''],[3,tr('重要程度'),IMPORTANCE[a.importance]||''],[3,tr('来源'),shownSource(a)],[3,tr('备注'),a.notes]
  ].filter(([,,v])=>v);
 }

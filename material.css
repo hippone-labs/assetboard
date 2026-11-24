@@ -2957,3 +2957,11 @@ button.pj-fig:hover{background:var(--hover)}
 .pz-label{font-size:12px}
 /* The window stays a hint behind whatever zone is in front of it. */
 .panorama .po-window{opacity:.4}
+
+/* Devices in the object panorama: a device record drawn as a Mac is a button with the Mac's own shape, its name under it. */
+.po.po-mac{box-shadow:none;background:none}
+.po-dev-cap{display:flex;flex-direction:column;align-items:center;gap:1px;margin-top:6px;text-align:center}
+.po-mac.other-device{width:220px}
+.po-mac.amber .po-dev-cap .po-when{color:var(--warning)}
+/* The inspector: a disk that is nearly full. */
+.device-amber{color:var(--warning)}

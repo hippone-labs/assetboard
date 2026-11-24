@@ -70,7 +70,7 @@ function poFolder(o){
  const a=o.asset,locked=isPrivateRepo(a);
  return poBtn(o,`<i class="po-tab" aria-hidden="true"></i><span class="po-nm">${locked?ui('lock'):''}<b>${esc(displayName(a))}</b></span>${poLine('po-when',poWords(o),o.dateTone)||poLine('po-cap',a.pushedAt?ageText(a.pushedAt):'')}`,[locked?tr('私有仓库'):'']);
 }
-const PO_DRAW={rack:poServer,tower:poServer,plate:poPlate,ticket:poPaper,pass:poPaper,deed:poPaper,card:poCard,sim:poSim,passport:poAccount,key:poAccount,drum:poVessel,bucket:poVessel,container:poVessel,folder:poFolder};
+const PO_DRAW={mac:poDevice,rack:poServer,tower:poServer,plate:poPlate,ticket:poPaper,pass:poPaper,deed:poPaper,card:poCard,sim:poSim,passport:poAccount,key:poAccount,drum:poVessel,bucket:poVessel,container:poVessel,folder:poFolder};
 
 // 正在做: the readings the Mac's screen shows, in coding-sessions.js's shape ({host, at, sessions}). A page with that module gives
 // its codingData(); without it only the demo board has a made-up reading, and a real board has none (the empty state).
@@ -78,18 +78,38 @@ function objWorkReadings(){
  if(typeof codingData==='function')return codingData();
  return demoMode&&typeof window.assetboardDemoWork==='function'?[window.assetboardDemoWork()]:[];
 }
-// This Mac, the carrier of the 正在做 screen. Not an asset: nothing opens, nothing is stored.
-function poMac(){
- const w=workScreen(objWorkReadings(),{summary:typeof codingSummary==='function'?codingSummary:null}),form=macForm(w.host);
+// This Mac, the carrier of the 正在做 screen. Without a device record it is no asset: nothing opens, nothing is stored. With this
+// Mac's record (本机设备) it is that record: a button that opens it, with its name and its chip and memory under the stand.
+let poLocal=null;
+function poMac(o=null){
+ const w=workScreen(objWorkReadings(),{summary:typeof codingSummary==='function'?codingSummary:null}),form=o?(deviceForm(o.asset)==='desktop'?'mini':'laptop'):macForm(w.host);
  const row=l=>[l.name,tr('{n} 个会话',{n:l.count}),veil(l.repo),l.minutes!=null?tr('{n} 分钟',{n:l.minutes}):''].filter(Boolean).join(' · ');
  const head=w.total?tr('正在做 · {n} 个会话',{n:w.total}):tr('正在做'),lines=w.total?[...w.lines.map(row),w.more?tr('另有 {n} 个工具',{n:w.more}):''].filter(Boolean):[tr('现在没有会话')];
  const screen=`<span class="po-screen"><span class="po-cap">${tr('本机')}</span><b class="po-work">${esc(head)}</b>${lines.map(t=>`<span class="po-work-l">${esc(t)}</span>`).join('')}</span>`;
- return `<div class="po-mac is-${form}${w.total?'':' no-work'}" data-mac="${form}" data-sessions="${w.total}" role="group" aria-label="${esc([tr('本机'),head,...lines].join(tr('，')))}"><span class="po-lid">${screen}</span>${form==='mini'?'<span class="po-stand" aria-hidden="true"></span><span class="po-box" aria-hidden="true"><i></i></span>':'<span class="po-base" aria-hidden="true"><i class="po-deck"></i><i class="po-pad"></i></span>'}</div>`;
+ const body=`<span class="po-lid">${screen}</span>${poMacBody(form)}`;
+ if(!o)return `<div class="po-mac is-${form}${w.total?'':' no-work'}" data-mac="${form}" data-sessions="${w.total}" role="group" aria-label="${esc([tr('本机'),head,...lines].join(tr('，')))}">${body}</div>`;
+ return poMacButton(o,form,body+poDeviceCaption(o),`${w.total?'':' no-work'}" data-mac="${form}" data-sessions="${w.total}`,[head,...lines]);
+}
+const poMacBody=form=>form==='mini'?'<span class="po-stand" aria-hidden="true"></span><span class="po-box" aria-hidden="true"><i></i></span>':'<span class="po-base" aria-hidden="true"><i class="po-deck"></i><i class="po-pad"></i></span>';
+const poDeviceCaption=o=>`<span class="po-dev-cap">${poName(o)}${poLine('po-cap',deviceLine(o.asset))}${poLine('po-when',[deviceTone(o.asset)?deviceDiskText(o.asset):'',o.stopped?tr('已停用'):''].filter(Boolean).join(' · '),deviceTone(o.asset))}</span>`;
+// A device drawn as a Mac is one button like every object (poBtn's label and data), shaped by .po-mac.
+function poMacButton(o,form,inner,more,extra){
+ const a=o.asset,tone=deviceTone(a),label=[displayName(a),cats[a.type].one,deviceLine(a),...extra,tone?deviceDiskText(a):''].filter(Boolean).join(tr('，'));
+ return `<button class="po po-mac is-${form}${tone?' '+tone:''}${o.stopped?' stopped':''}${more}" data-nav data-chip="${esc(a.id)}" data-obj="mac" aria-label="${esc(label)}" title="${esc(label)}">${inner}</button>`;
+}
+// A device: this Mac's record carries the 正在做 screen; any other is a computer whose screen shows its name.
+function poDevice(o){
+ if(o===poLocal)return poMac(o);
+ const form=deviceForm(o.asset)==='desktop'?'mini':'laptop';
+ const screen=`<span class="po-screen"><span class="po-cap">${esc(cats.device.one)}</span><b class="po-work">${esc(veil(displayName(o.asset)))}</b>${poLine('po-work-l',deviceLine(o.asset))}</span>`;
+ return poMacButton(o,form,`<span class="po-lid">${screen}</span>${poMacBody(form)}${poDeviceCaption(o)}`,' other-device',[]);
 }
 const poZone=(key,inner)=>`<section class="pz pz-${key}" data-zone="${key}" aria-label="${PO_ZONE[key]}"><h3 class="pz-label">${PO_ZONE[key]}</h3><div class="pz-items">${inner}</div></section>`;
 function poZoneHtml(z){
  const draw=o=>PO_DRAW[o.shape](o);
  if(z.key==='domain')return poZone(z.key,z.groups.map(poHome).join(''));
+ // The desk: this Mac (its record when there is one, else the plain carrier of the screen), then any other device.
+ if(z.key==='desk'){poLocal=z.items.find(o=>isLocalDevice(o.asset))||null;return poZone(z.key,(poLocal?'':poMac())+z.items.map(draw).join(''));}
  if(z.key==='server'){const racks=z.items.filter(o=>o.shape==='rack'),towers=z.items.filter(o=>o.shape==='tower');return poZone(z.key,`${racks.length?`<div class="po-stack">${racks.map(draw).join('')}</div>`:''}${towers.map(draw).join('')}`);}
  return poZone(z.key,z.items.map(draw).join(''));
 }
@@ -101,7 +121,7 @@ function poTally(t){
 // → null when there is nothing to draw, else {live, tally, body(tier)}: the scene at one of OBJECT_TIERS.
 function objectsScene(){
  const model=buildObjects(state.assets,{cardOrder:state.cardOrder||{},live:probeState});if(!model.total)return null;
- const zones=poZone('desk',poMac())+model.zones.map(poZoneHtml).join('');
+ poLocal=null;const zones=(model.zones.some(z=>z.key==='desk')?'':poZone('desk',poMac()))+model.zones.map(poZoneHtml).join('');
  return {live:model.live,tally:poTally(model.tally),body:tier=>`<div class="pano-body objects" data-layout="objects" data-tier="${tier}">${PO_WINDOW}<div class="po-scene" style="zoom:${+(tier*panoZoom()).toFixed(3)}">${zones}</div></div>`};
 }
 // Draws the scene into the panorama when it fits: the full size first, then the smaller tier. false = it does not (a narrow or
@@ -130,5 +150,5 @@ function objectsMove(from,key){
  best?.focus();
 }
 // A new reading of 正在做 (coding-sessions.js refreshes on its own timer) redraws the screen and nothing else.
-function objectsWorkChanged(){const mac=panoOpen&&document.querySelector('#panorama [data-mac]');if(mac)mac.outerHTML=poMac();}
+function objectsWorkChanged(){const mac=panoOpen&&document.querySelector('#panorama [data-mac]:not(.other-device)');if(mac)mac.outerHTML=poMac(poLocal&&mac.dataset.chip===poLocal.id?poLocal:null);}
 if(typeof window.assetboardCodingSessions==='function'){const take=window.assetboardCodingSessions;window.assetboardCodingSessions=function(){take.apply(this,arguments);objectsWorkChanged();};}

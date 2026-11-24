@@ -5,13 +5,14 @@
 //   domain       plate, hung under its registrar: a cloud for Cloudflare, a named rail for any other, a dashed rail for none
 //   subscription ticket    ai  pass (on a lanyard)    license  deed    bankcard  card    phone  sim
 //   appleid      passport  google  key    database  drum    storage  bucket    deployment  container    repository  folder
+//   device       mac (this Mac's record carries the 正在做 screen; other devices sit beside it)
 // State is the registered one (expiry, a manual stop) plus, where the caller has one, the record's 实时状态 reading: this file is
 // handed readings, it never asks for them.
 (function(){
  const D=typeof module!=='undefined'&&module.exports?require('./asset-data.js'):window;
- const SHAPES={domain:'plate',repository:'folder',server:'rack',deployment:'container',storage:'bucket',database:'drum',subscription:'ticket',ai:'pass',license:'deed',bankcard:'card',phone:'sim',appleid:'passport',google:'key'};
+ const SHAPES={domain:'plate',repository:'folder',server:'rack',deployment:'container',storage:'bucket',database:'drum',subscription:'ticket',ai:'pass',license:'deed',bankcard:'card',phone:'sim',appleid:'passport',google:'key',device:'mac'};
  // The zones of the scene in drawing order, and the categories each holds (in that order inside it).
- const ZONES=[{key:'server',types:['server']},{key:'data',types:['database','storage','deployment']},{key:'domain',types:['domain']},{key:'wallet',types:['bankcard','phone']},{key:'id',types:['appleid','google']},{key:'pass',types:['subscription','ai','license']},{key:'repository',types:['repository']}];
+ const ZONES=[{key:'desk',types:['device']},{key:'server',types:['server']},{key:'data',types:['database','storage','deployment']},{key:'domain',types:['domain']},{key:'wallet',types:['bankcard','phone']},{key:'id',types:['appleid','google']},{key:'pass',types:['subscription','ai','license']},{key:'repository',types:['repository']}];
  // What a thing can sit on, as the 运行在哪 lens has it: a database on a server or a deployment service, a bucket on a deployment service.
  const HOSTS={database:['server','deployment'],storage:['deployment']};
  // The scene needs room: under this width or height the panorama draws cards. It is tried at each scale in turn, largest first, so
@@ -44,6 +45,7 @@
   const zones=ZONES.map(z=>{
    const items=z.types.flatMap(type=>D.arrangeAssets(visible.filter(a=>a.type===type),cardOrder[type])).map(item);
    if(z.key==='server')items.sort((a,b)=>(a.shape==='tower')-(b.shape==='tower'));
+   if(z.key==='desk')items.sort((a,b)=>(b.asset.source==='local')-(a.asset.source==='local'));
    if(z.key!=='domain')return {key:z.key,types:z.types,items};
    const groups=new Map();for(const it of items){if(!groups.has(it.home.key))groups.set(it.home.key,{...it.home,items:[]});groups.get(it.home.key).items.push(it);}
    const rank=g=>g.cloud?0:g.key?1:2,list=[...groups.values()].sort((a,b)=>rank(a)-rank(b)||b.items.length-a.items.length||a.name.localeCompare(b.name));
