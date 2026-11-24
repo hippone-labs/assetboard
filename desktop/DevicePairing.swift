@@ -145,6 +145,13 @@ final class DevicePairing {
     static let defaultPort: UInt16 = 47321
     static let window: TimeInterval = 120
     static let freshness: TimeInterval = 60
+    /// Another Mac is reached directly, on this network or over Tailscale, never through the system proxy: a proxy such as
+    /// Clash takes the connection, cannot reach a LAN or Tailscale address from where it forwards, and the pairing hears nothing.
+    static var direct: NWParameters {
+        let parameters = NWParameters.tcp
+        parameters.preferNoProxies = true
+        return parameters
+    }
 
     let store: PeerStore
     let name: String
@@ -267,7 +274,7 @@ final class DevicePairing {
         queue.async {
             guard self.pending == nil else { self.emit(["pairing": ["state": "busy"]]); return }
             guard let endpoint = self.target(service: service, host: host) else { self.emit(["pairing": ["state": "failed", "error": "address"]]); return }
-            let c = NWConnection(to: endpoint, using: .tcp)
+            let c = NWConnection(to: endpoint, using: DevicePairing.direct)
             let p = Pending(role: "client", connection: c)
             p.host = host; p.service = service
             self.pending = p
@@ -416,7 +423,7 @@ final class DevicePairing {
             _ = SecRandomCopyBytes(kSecRandomDefault, nonceBytes.count, &nonceBytes)
             let nonce = Data(nonceBytes).base64EncodedString()
             guard let box = PeerCrypto.seal(["ask": kind, "at": ISO8601DateFormatter().string(from: Date()), "n": nonce], key) else { finish(["ok": false, "id": id, "error": "seal"]); return }
-            let c = NWConnection(to: endpoint, using: .tcp)
+            let c = NWConnection(to: endpoint, using: DevicePairing.direct)
             var over = false
             let end: ([String: Any]) -> Void = { r in
                 self.queue.async {
@@ -475,6 +482,7 @@ func testDevicePairing() {
     if case let .hostPort(h, p)? = DevicePairing.endpoint("mini.example.ts.net:5000", port: 1) { precondition("\(h)" == "mini.example.ts.net" && p.rawValue == 5000) } else { preconditionFailure("host:port") }
     if case let .hostPort(h, p)? = DevicePairing.endpoint("[fd7a:115c::1]:6000", port: 1) { precondition("\(h)".hasPrefix("fd7a:115c::1") && p.rawValue == 6000) } else { preconditionFailure("[v6]:port") }
     if case let .hostPort(_, p)? = DevicePairing.endpoint("100.64.0.7", port: 47321) { precondition(p.rawValue == 47321) } else { preconditionFailure("plain host") }
+    precondition(DevicePairing.direct.preferNoProxies, "peers are reached directly, not through the system proxy")
     precondition(DevicePairing.endpoint("a b", port: 1) == nil && DevicePairing.endpoint("", port: 1) == nil && DevicePairing.endpoint("x/y", port: 1) == nil)
     let pruned = pruneSessions(["ok": true, "processes": [["pid": 1, "ppid": 0], ["pid": 50, "ppid": 1], ["pid": 51, "ppid": 50, "name": "claude"], ["pid": 77, "ppid": 1]]])
     precondition((pruned["processes"] as? [[String: Any]])?.compactMap { $0["pid"] as? Int }.sorted() == [1, 50, 51], "only the tools and their parents")
@@ -529,7 +537,7 @@ func testDevicePairing() {
     // Raw requests to b: from a key b never paired with, tampered, stale, and replayed — none is answered.
     func raw(_ frame: [String: Any]) -> [String: Any]? {
         var reply: [String: Any]?, done = false
-        let c = NWConnection(to: DevicePairing.endpoint("127.0.0.1:47392", port: 0)!, using: .tcp)
+        let c = NWConnection(to: DevicePairing.endpoint("127.0.0.1:47392", port: 0)!, using: DevicePairing.direct)
         c.stateUpdateHandler = { if case .ready = $0 { PeerWire.send(c, frame); PeerWire.receive(c) { reply = $0; done = true; c.cancel() } } }
         c.start(queue: .global())
         waitFor("raw reply") { done }
