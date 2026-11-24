@@ -29,30 +29,29 @@ async (page) => {
   };
   const {p,errors}=await open({init:`(${host.toString()})();`});
   const sent=op=>p.evaluate(op=>window.__sent.filter(m=>m.action==='peers'&&m.op===op),op);
-  const enable=await until(p,()=>window.__sent.find(m=>m.action==='peers'&&m.op==='enable'));
-  check(enable.on===false,'off until switched: the app is told not to listen: '+JSON.stringify(enable));
-  check((await sent('read')).length===0,'nothing is read while off');
-  await p.evaluate(()=>peersDialog());
-  check(await p.evaluate(()=>/局域网上可被发现/.test(document.querySelector('#modal-content').textContent)&&!!document.querySelector('[data-action="peers-enable"]')),'the dialog explains, and offers 打开');
-  await p.click('[data-action="peers-enable"]');
-  check(await p.evaluate(()=>featureOn('peers')&&window.__sent.some(m=>m.op==='enable'&&m.on===true)),'打开 switches it on and the app listens');
+  // At launch the page asks the app, which keeps on or off (the page's own storage starts empty each launch).
+  await until(p,()=>window.__sent.some(m=>m.action==='peers'&&m.op==='list'));
+  await p.evaluate(()=>window.assetboardPeers({peers:[],found:[],listening:false,enabled:false}));
+  check(await p.evaluate(()=>!featureOn('peers')&&!window.__sent.some(m=>m.op==='enable'))&&(await sent('read')).length===0,'off until switched: nothing listens, nothing is read');
+  // Opening 其他设备 (设置 › 连接) is the intent to pair: it switches the feature on, with no other step.
+  await p.evaluate(()=>{document.body.insertAdjacentHTML('beforeend','<button id="open-peers" data-action="peers-open" hidden>x</button>');document.querySelector('#open-peers').click();});
+  check(await p.evaluate(()=>featureOn('peers')&&window.__sent.some(m=>m.op==='enable'&&m.on===true)&&window.__sent.some(m=>m.op==='list')),'opening it switches it on and the app listens');
+  check(await p.evaluate(()=>/局域网上可被发现/.test(document.querySelector('#modal-content').textContent)),'the dialog says this Mac can be found');
 
   // The app answers with what it found, then a pairing begins.
   await p.evaluate(()=>window.assetboardPeers({peers:[],found:['mac-mini'],listening:true}));
   check(await p.evaluate(()=>!!document.querySelector('[data-action="peers-pair"][data-id="mac-mini"]')),'a Mac found on this network can be paired');
   await p.click('[data-action="peers-pair"][data-id="mac-mini"]');
   check((await sent('pair')).at(-1)?.service==='mac-mini','pairing asks the app for that Mac');
-  await p.evaluate(()=>window.assetboardPeers({pairing:{state:'code',role:'client',code:'042917',name:'mac-mini'}}));
-  const code=await p.evaluate(()=>({text:document.querySelector('.peer-code')?.textContent,yes:!!document.querySelector('[data-action="peers-confirm"][data-id="yes"]'),no:!!document.querySelector('[data-action="peers-confirm"][data-id="no"]')}));
-  check(code.text==='042 917'&&code.yes&&code.no,'the code is shown big with 一致 and 不一致: '+JSON.stringify(code));
-  await p.click('[data-action="peers-confirm"][data-id="yes"]');
-  check((await sent('confirm')).at(-1)?.ok===true,'一致 tells the app');
+  // The Mac that started it only shows the code and waits: nothing to confirm here.
   await p.evaluate(()=>window.assetboardPeers({pairing:{state:'waiting',role:'client',code:'042917',name:'mac-mini'}}));
-  check(await p.evaluate(()=>/等 mac-mini 上的人确认/.test(document.querySelector('#modal-content').textContent)),'then it waits for the other Mac');
-  await p.evaluate(id=>{window.__sent.length=0;window.assetboardPeers({pairing:{state:'paired',name:'mac-mini',id},peers:[{id,name:'mac-mini',host:'192.0.2.40',pairedAt:new Date().toISOString()}]});},PEER);
+  const code=await p.evaluate(()=>({text:document.querySelector('.peer-code')?.textContent,allow:document.querySelectorAll('[data-action="peers-confirm"][data-id="yes"]').length,body:document.querySelector('#modal-content').textContent}));
+  check(code.text==='042 917'&&code.allow===0&&/在 mac-mini 上点「允许」/.test(code.body),'the starting Mac shows the code and asks for 允许 on the other: '+JSON.stringify(code));
+  await p.evaluate(id=>{window.__sent.length=0;window.assetboardPeers({pairing:{state:'paired',role:'client',name:'mac-mini',id},peers:[{id,name:'mac-mini',host:'192.0.2.40',pairedAt:new Date().toISOString(),sync:true,syncFirst:'here',syncSince:Date.now(),syncDone:false}]});},PEER);
   const read=await until(p,()=>window.__sent.find(m=>m.action==='peers'&&m.op==='read'));
   check(read.id===PEER,'a new pairing is read at once: '+JSON.stringify(read));
-  check(await p.evaluate(()=>/已和 mac-mini 配对/.test(document.querySelector('#toast').textContent)),'paired, said in a toast');
+  check(await p.evaluate(id=>window.__sent.some(m=>m.op==='readBoard'&&m.id===id)&&peerSyncOf(id)?.on&&peerSyncOf(id).first==='here',PEER),'and its board too: the starting Mac syncs, keeping its own board');
+  check(await p.evaluate(()=>/已和 mac-mini 配对，资产板开始同步/.test(document.querySelector('#toast').textContent)),'paired, said in a toast');
 
   // Its answer: its device record, and its sessions on its screen.
   await p.evaluate(id=>{const now=Date.now()/1000;window.assetboardPeerFacts({ok:true,id,name:'mac-mini',at:new Date().toISOString(),
@@ -71,6 +70,34 @@ async (page) => {
   check(mine==='0','this Mac’s screen does not show the other Mac’s sessions: '+mine);
   await p.evaluate(()=>panoramaOpen(false));
 
+  // 同步资产板, as the starting Mac: it takes only what changed over there since the pairing.
+  const before=await p.evaluate(()=>state.assets.map(a=>a.id).sort().join());
+  await p.evaluate(id=>{const old=new Date(Date.now()-86400000*30).toISOString(),fresh=new Date(Date.now()+60000).toISOString();
+   window.assetboardPeerBoard({ok:true,id,name:'mac-mini',board:{blocks:[{id:'domain'}],deletedExternalIds:[],assets:[
+    {id:'old1',type:'domain',name:'deleted-long-ago.example.com',updatedAt:old,links:[]},
+    {id:'new1',type:'domain',name:'made-there.example.com',updatedAt:fresh,links:[]},
+    {id:'device-local-bbbbbbbbbbbbbbbb',type:'device',name:'Mac mini',source:'local',externalId:'bbbbbbbbbbbbbbbb',updatedAt:fresh}]}});},PEER);
+  const after=await p.evaluate(()=>state.assets.map(a=>a.id).sort());
+  check(after.includes('new1')&&!after.includes('old1')&&!after.includes('device-local-bbbbbbbbbbbbbbbb'),'only what changed there comes over, and not that Mac’s own record: '+JSON.stringify({before,after}));
+  check(await p.evaluate(()=>/从 mac-mini 同步：新增 1/.test(document.querySelector('#toast').textContent)),'the sync says what it brought');
+  await p.evaluate(()=>peersDialog());
+  check(await p.evaluate(()=>/资产板同步中/.test(document.querySelector('#modal-content').textContent)),'the dialog says the board syncs');
+  await p.evaluate(id=>window.assetboardPeerBoard({ok:false,id,error:'not-synced'}),PEER);
+  check(await p.evaluate(()=>/对方还没打开同步/.test(document.querySelector('#modal-content').textContent)),'until that Mac turns it on too, it says so');
+  await p.click(`[data-action="peers-sync-stop"][data-id="${PEER}"]`);
+  check((await sent('sync')).at(-1)?.on===false&&await p.evaluate(id=>!peerSyncOn(id),PEER),'stopping tells the app and stops reading the board');
+  check(await p.evaluate(id=>!!document.querySelector(`[data-action="peers-sync"][data-id="${id}"]`),PEER),'and it can be turned on again');
+  // As the Mac asked: one confirmation, with whose board to start from.
+  await p.evaluate(()=>{window.__sent.length=0;window.assetboardPeers({pairing:{state:'code',role:'server',code:'318004',name:'mac-air'}});});
+  const ask=await p.evaluate(()=>({title:document.querySelector('#modal-title').textContent,code:document.querySelector('.peer-code')?.textContent,modes:[...document.querySelectorAll('[data-action="peers-confirm"][data-id="yes"]')].map(b=>b.dataset.mode)}));
+  check(/mac-air 想和这台配对/.test(ask.title)&&ask.code==='318 004'&&ask.modes.join()==='there,merge','the Mac asked shows the code and allows once, choosing whose board: '+JSON.stringify(ask));
+  await p.click('[data-action="peers-confirm"][data-mode="there"]');
+  check((await sent('confirm')).at(-1)?.ok===true&&(await sent('confirm')).at(-1)?.mode==='there','允许 tells the app, with whose board to start from');
+  await p.evaluate(()=>window.assetboardPeers({pairing:{state:'paired',role:'server',name:'mac-air',id:'0f0f0f0f0f0f0f0f'},peers:[...peersNow.peers,{id:'0f0f0f0f0f0f0f0f',name:'mac-air',host:'',pairedAt:new Date().toISOString(),sync:true,syncFirst:'there',syncSince:Date.now(),syncDone:false}]}));
+  check(await p.evaluate(()=>peerSyncOf('0f0f0f0f0f0f0f0f')?.first==='there'),'having allowed with “start from mac-air”, this Mac takes its board once');
+  // The app says it is on at the next launch: the page follows.
+  await p.evaluate(()=>{setFeature('peers',false);window.assetboardPeers({enabled:true});});
+  check(await p.evaluate(()=>featureOn('peers')),'on, as the app keeps it, survives the page starting empty');
   // A failed read is worded quietly in the dialog.
   await p.evaluate(id=>{window.assetboardPeerFacts({ok:false,id,name:'mac-mini',error:'unreachable'});peersDialog();},PEER);
   check(await p.evaluate(()=>/连不上/.test(document.querySelector('#modal-content').textContent)&&!document.querySelector('#modal-content .red')),'a failed read says so, with no fault colour');

@@ -38,3 +38,48 @@ test('the object panorama shows that Mac’s sessions on its own screen, and thi
  const there=O.workScreen([mine,f.sessions],{hostId:P.peerHost(PEER)});
  assert.equal(there.total,1);assert.equal(there.lines[0].name,'Claude Code');assert.equal(there.lines[0].repo,'api');
 });
+
+// 同步资产板.
+const at=d=>`2026-11-${String(d).padStart(2,'0')}T10:00:00.000Z`;
+const rec=(id,name,day,extra={})=>({id,type:'domain',name,updatedAt:at(day),links:[],...extra});
+const boardOf=(assets,extra={})=>({blocks:[{id:'domain'},{id:'device'}],assets,deletedExternalIds:[],...extra});
+const me={id:'device-local-aaaaaaaaaaaaaaaa',type:'device',name:'studio-book',source:'local',externalId:'aaaaaaaaaaaaaaaa',updatedAt:at(1)};
+const them={id:'device-local-bbbbbbbbbbbbbbbb',type:'device',name:'mac-mini',source:'local',externalId:'bbbbbbbbbbbbbbbb',updatedAt:at(1)};
+
+test('sync: the newer edit of each record wins, new records come over, nothing changes twice',()=>{
+ const mine=boardOf([me,rec('a','a.example.com',10),rec('b','b.example.com',5)]);
+ const theirs=boardOf([them,rec('a','a-old.example.com',3),rec('b','b-new.example.com',8),rec('c','c.example.com',9)]);
+ const r=P.syncBoards(mine,theirs);
+ assert.ok(r.changed);
+ const names=Object.fromEntries(r.board.assets.map(a=>[a.id,a.name]));
+ assert.deepEqual([names.a,names.b,names.c],['a.example.com','b-new.example.com','c.example.com']);
+ assert.equal(P.syncBoards(r.board,theirs).changed,false,'the same board again changes nothing');
+});
+
+test('sync: a deletion over there removes the record here, unless it was edited here since',()=>{
+ const mine=boardOf([me,rec('a','a.example.com',5),rec('b','b.example.com',20)]);
+ const theirs=boardOf([them],{deletedRecords:[{id:'a',at:at(10)},{id:'b',at:at(10)}]});
+ const r=P.syncBoards(mine,theirs);
+ assert.deepEqual(r.board.assets.map(a=>a.id).sort(),[me.id,'b'].sort(),'a goes; b, edited after the deletion, stays');
+ assert.ok(r.board.deletedRecords.some(t=>t.id==='a'),'the deletion is remembered here too');
+ assert.equal(r.counts.removed,1);
+});
+
+test('sync: each Mac keeps its own device records; another Mac’s never become this Mac',()=>{
+ const r=P.syncBoards(boardOf([me]),boardOf([them,rec('a','a.example.com',3)]));
+ const devices=r.board.assets.filter(a=>a.type==='device');
+ assert.deepEqual(devices.map(a=>a.id),[me.id],'the other Mac’s own record does not come over');
+ const replaced=P.syncBoards(boardOf([me,rec('x','x.example.com',2)]),boardOf([them,rec('a','a.example.com',3)]),{first:'there'});
+ assert.deepEqual(replaced.board.assets.map(a=>a.id).sort(),[me.id,'a'].sort(),'taking that board wholesale still keeps this Mac’s record');
+});
+
+test('sync: the first time, “this Mac” keeps old records over there from coming back; “that Mac” takes its board',()=>{
+ const mine=boardOf([me,rec('a','a.example.com',20)]);
+ const old=boardOf([them,rec('gone','deleted-long-ago.example.com',2),rec('a','a-old.example.com',3),rec('new','made-there.example.com',22)]);
+ const here=P.syncBoards(mine,old,{first:'here',since:Date.parse(at(15))});
+ assert.deepEqual(here.board.assets.map(a=>a.id).sort(),[me.id,'a','new'].sort(),'only what changed there after the first sync comes over');
+ assert.equal(here.board.assets.find(a=>a.id==='a').name,'a.example.com');
+ const there=P.syncBoards(boardOf([me,rec('stale','stale.example.com',1)]),boardOf([them,rec('a','a.example.com',20)]),{first:'there'});
+ assert.deepEqual(there.board.assets.map(a=>a.id).sort(),[me.id,'a'].sort(),'“that Mac”: this board becomes its board');
+ assert.equal(P.syncBoards(mine,{nope:true}).changed,false,'a board that is not one changes nothing');
+});

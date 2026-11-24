@@ -280,6 +280,15 @@ final class BoardStore {
 /// `--demo`: the fictional board from demo-data.js, for screenshots. Uses a throwaway temporary store instead of
 /// Application Support, never reads the Keychain and refuses network/Keychain imports, sync, AI, OCR and export. In-page CSV/JSON demo samples still run in JS without saving.
 let demoMode = CommandLine.arguments.contains("--demo")
+func launchValue(_ name: String) -> String? {
+    let a = CommandLine.arguments
+    guard let i = a.firstIndex(of: name), i + 1 < a.count, !a[i + 1].hasPrefix("--") else { return nil }
+    return a[i + 1]
+}
+/// `--data-dir <folder>` (with `--peer-port <n>` and `--peer-name <name>`): a second copy of the app on one Mac, for trying 其他设备
+/// against the first. Its board, keys and pairings live in that folder. It leaves what the copies share alone: no reminders (the
+/// notification centre is shared, and scheduling clears what is pending) and no update checks.
+let testDataDir = launchValue("--data-dir")
 
 final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WKNavigationDelegate, NSWindowDelegate {
     var window: NSWindow!
@@ -353,7 +362,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
     }
 
     func applicationWillFinishLaunching(_ notification: Notification) {
-        guard !demoMode else { return }
+        guard !demoMode, testDataDir == nil else { return }
         reminders.onOpen = { [weak self] assetId in self?.openReminder(assetId) }
         reminders.onStatus = { [weak self] status in
             guard let self, status != self.notificationStatus else { return }
@@ -474,7 +483,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
     }
     func applicationDidBecomeActive(_ notification: Notification) {
         deliverAgentFiles()
-        if !demoMode { reminders.refreshStatus() }
+        if !demoMode, testDataDir == nil { reminders.refreshStatus() }
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -487,7 +496,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
                 for old in (try? FileManager.default.contentsOfDirectory(at: temporary, includingPropertiesForKeys: nil)) ?? [] where old.lastPathComponent.hasPrefix("assetboard-demo-") { try? FileManager.default.removeItem(at: old) }
             }
             let demoRoot = temporary.appendingPathComponent("assetboard-demo-" + UUID().uuidString, isDirectory: true)
-            store = try demoMode ? BoardStore(root: demoRoot) : BoardStore()
+            store = try demoMode ? BoardStore(root: demoRoot) : BoardStore(root: testDataDir.map { URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath, isDirectory: true) })
             ai = AIRecognizer(directory: store.directory)
             if !demoMode { NSApp.servicesProvider = self; NSUpdateDynamicServices() }
             if !demoMode {
@@ -498,13 +507,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
                 NetworkLog.shared.database = store.database
                 exchangeRates = ExchangeRates(directory: store.directory)
                 if let peers = try? PeerStore(directory: store.directory.appendingPathComponent("devices", isDirectory: true)) {
-                    let pairing = DevicePairing(store: peers, name: Host.current().localizedName ?? "Mac")
+                    let pairing = DevicePairing(store: peers, name: launchValue("--peer-name") ?? Host.current().localizedName ?? "Mac", port: launchValue("--peer-port").flatMap(UInt16.init) ?? DevicePairing.defaultPort)
                     pairing.answer = { ["device": DeviceInfo.read(), "sessions": pruneSessions(CodingSessions.read())] }
+                    // The saved board, read where the store is used: on the main queue.
+                    pairing.board = { [weak self] in DispatchQueue.main.sync { (try? self?.store.load()) ?? nil } }
                     pairing.events = { [weak self] event in self?.sendToPage("assetboardPeers", event) }
                     pairing.log = { direction, name, address, ok, note in
                         NetworkLog.shared.record(direction: direction, service: L("其他设备"), method: note.hasPrefix("pair") ? "PAIR" : "READ", host: name, path: note, ok: ok, address: address)
                     }
                     self.pairing = pairing
+                    if peers.enabled { pairing.start() }
                 }
                 NetworkLog.shared.onEntry = { [weak self] entry in
                     guard let self, self.boardLoaded, let data = try? JSONSerialization.data(withJSONObject: entry),
@@ -591,7 +603,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
                 window.center()
             }
             createMenu()
-            if !demoMode {
+            if !demoMode, testDataDir == nil {
                 updater.window = window
                 // The offer opens in the board's own dialog (window.assetboardUpdateOffer); an alert when the page cannot show it.
                 updater.showInPage = { [weak self] json, shown in
@@ -954,12 +966,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         guard let pairing, !demoMode else { return }
         let text = { (key: String, limit: Int) in String((body[key] as? String ?? "").prefix(limit)) }
         switch body["op"] as? String {
-        case "enable": if body["on"] as? Bool == true { pairing.start() } else { pairing.stop() }; pairing.list()
+        case "enable": let on = body["on"] as? Bool == true; pairing.store.enabled = on; if on { pairing.start() } else { pairing.stop() }; pairing.list()
         case "list": pairing.list()
         case "pair": pairing.pair(service: text("service", 100), host: text("host", 260))
-        case "confirm": pairing.confirm(body["ok"] as? Bool == true)
+        case "confirm": pairing.confirm(body["ok"] as? Bool == true, adopt: text("mode", 10))
         case "unpair": pairing.unpair(text("id", 32))
+        case "sync": pairing.setSync(text("id", 32), body["on"] as? Bool == true, first: body["first"] as? String, since: body["since"] as? Double, done: body["done"] as? Bool)
         case "read": pairing.read(text("id", 32)) { [weak self] reply in self?.sendToPage("assetboardPeerFacts", reply) }
+        case "readBoard": pairing.read(text("id", 32), kind: "board") { [weak self] reply in self?.sendToPage("assetboardPeerBoard", reply) }
         default: break
         }
     }
@@ -1139,7 +1153,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
             if !demoMode, let on = body["on"] as? Bool {
                 switch body["key"] as? String {
                 case "statusItem": setStatusItemShown(on)
-                case "autoUpdate": Updater.automatic = on; if on { updater.checkIfDue() }
+                case "autoUpdate": if testDataDir == nil { Updater.automatic = on; if on { updater.checkIfDue() } }
                 default: break
                 }
             }
@@ -1221,7 +1235,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
             return
         }
         if body["action"] as? String == "reminders" {
-            if let items = ReminderItem.parse(body["items"]) { reminders.apply(items) }
+            if testDataDir == nil, let items = ReminderItem.parse(body["items"]) { reminders.apply(items) }
             return
         }
         if body["action"] as? String == "openNotificationSettings" { NSWorkspace.shared.open(ReminderScheduler.settingsURL); return }
@@ -1572,7 +1586,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         NSApplication.shared.helpMenu = helpMenu
     }
 
-    @objc func checkForUpdates() { if demoMode { demoBlocked(); return }; updater.check(manual: true) }
+    @objc func checkForUpdates() { if demoMode || testDataDir != nil { demoBlocked(); return }; updater.check(manual: true) }
     /// 设置 (⌘,): one panel in the page for viewer settings, optional features and connections.
     @objc func openSettings() { webView.evaluateJavaScript("prefsDialog()") }
     /// The window as a PNG without screen-recording permission: the page (which draws the whole window under the transparent title

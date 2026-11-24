@@ -58,9 +58,9 @@ Notifications go out at 9:00 that morning; a date added after 9:00 will not get 
 
 ## Data and network
 
-- Data is in `~/Library/Application Support/Assetboard/`: `assetboard.sqlite`, with a JSON mirror `board.json`. No cloud sync or telemetry.
+- Data is in `~/Library/Application Support/Assetboard/`: `assetboard.sqlite`, with a JSON mirror `board.json`. No cloud sync or telemetry. With other Macs paired, the board syncs directly between those Macs only.
 - Tokens and API keys are stored in the macOS Keychain.
-- Hosts the app contacts on its own: update checks (assetboard.app), site icons of known providers, exchange rates (api.frankfurter.dev), Cloudflare once connected, and the quota endpoints of the AI tools on this Mac (with each tool's own login; each can be switched off). Other connections (RDAP, AI, live status, GitHub, Namecheap, Porkbun, Hetzner, DigitalOcean, Vercel) happen only after you turn them on or click.
+- Hosts the app contacts on its own: update checks (assetboard.app), site icons of known providers, exchange rates (api.frankfurter.dev), Cloudflare once connected, and the quota endpoints of the AI tools on this Mac (with each tool's own login; each can be switched off). Other connections (RDAP, AI, live status, other devices, GitHub, Namecheap, Porkbun, Hetzner, DigitalOcean, Vercel) happen only after you turn them on or click.
 - The page itself is barred from the network by its Content-Security-Policy; every request goes through the Swift side and is recorded in the network log.
 - Data given to external AI tools has IPs, hosts, phone numbers and emails masked by default and leaves out bank card and phone records.
 
@@ -133,6 +133,7 @@ Scripts can put JSON in this format into `~/Library/Application Support/Assetboa
 - An MCP server and the `assetboard-cli` command line for Claude Code, Codex, Cursor and other tools to read and write assets. Every external call goes into a local MCP activity log (which client, when, which tool, what changed), shown in Settings › MCP.
 - AI usage and limits: plan limits and usage of Claude Code, Codex, Cursor, GitHub Copilot, Grok CLI, opencode and Antigravity, read from their local files and quota endpoints and shown on the matching AI subscription: close to the limit, idle, worth its price at API rates or not. Only numbers, model names and times are read.
 - This Mac (Mac): keeps this Mac as a device record with its model, chip, memory, macOS version, disk, battery and serial number, read when the app opens or comes to the front; a nearly full disk is marked. Reads this Mac only, nothing over the network, no permission prompt.
+- Other devices (Mac, off by default): two Macs with Assetboard pair and read each other's facts and In progress, each keeping the other as a device, and their boards sync (the newer edit of each record wins; deletions carry over). Pairing: the Mac asked checks the same six digits and allows it; after that they connect directly and encrypted, found on the same network or by a Tailscale address, through no server.
 - In progress (Mac): the AI coding sessions running on this Mac (Claude Code, Codex, Cursor and others): how many, in which repository and branch, and for how long. Reads only process names, working directories, start times and when session files were last written, never conversations.
 - Repositories (Mac, off by default): a GitHub sync also reads branches and the latest Actions run; a failed or running run leads the row, and new branches show for 14 days.
 - Keyboard control; `?` lists the shortcuts.
