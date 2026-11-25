@@ -172,7 +172,7 @@ App 会连的主机见[隐私与网络](#隐私与网络)，每个请求都记�
 
 | 工具 | 本机读什么（默认开） | 额度接口（默认开，可逐个关） |
 |---|---|---|
-| Claude Code | `~/.claude/projects`、`~/.config/claude/projects`（或 `CLAUDE_CONFIG_DIR`）里的会话日志：每次回答的 token、模型；用量上限提示里的重置时间；按日志估算的 5 小时块 | `api.anthropic.com` 的用量接口，用 Claude Code 的登录（Mac 上在钥匙串里，macOS 会先问你）：5 小时、本周、按模型的周额度和按量花费 |
+| Claude Code | `~/.claude/projects`、`~/.config/claude/projects`（或 `CLAUDE_CONFIG_DIR`）里的会话日志：每次回答的 token、模型；用量上限提示里的重置时间；按日志估算的 5 小时块 | `api.anthropic.com` 的用量接口，用 Claude Code 的登录（Mac 上在钥匙串里：点「立即读取」时 macOS 会问一次，选「始终允许」后定时自动更新；没允许时定时读取不弹窗，只提示去点「立即读取」）：5 小时、本周、按模型的周额度和按量花费 |
 | Codex | `~/.codex/sessions`（或 `CODEX_HOME`）里的会话日志：token、模型，以及服务器最后一次报的 5 小时和每周额度、套餐 | `chatgpt.com` 的用量接口，用 `~/.codex/auth.json` |
 | Cursor | 本机状态库里的套餐名（不读令牌） | `cursor.com` 的用量汇总，用 Cursor 本机保存的会话令牌：本月已用比例、按量花费 |
 | GitHub Copilot | Copilot CLI 的 `~/.copilot/session-state/*/events.jsonl`：token、高级请求次数 | `api.github.com/copilot_internal/user`，用本机 `gh` 的登录：高级请求额度、每月重置日、套餐 |
