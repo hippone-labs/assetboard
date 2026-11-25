@@ -3483,7 +3483,8 @@ function dayRender(){
  });
 }
 setInterval(dayRollover,60000);document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')dayRollover();});window.addEventListener('focus',dayRollover);
-new ResizeObserver(([entry])=>{const w=entry.contentRect.width,size=w<600?'s':w<860?'m':'l';if($('#board').dataset.size!==size)$('#board').dataset.size=size;}).observe($('#main'));
+// The board's own width, not #main's: the inspector takes its room from the board, and a list sized for #main lost its name column.
+new ResizeObserver(([entry])=>{const w=entry.borderBoxSize?.[0]?.inlineSize??entry.target.offsetWidth,size=w<600?'s':w<860?'m':'l';if($('#board').dataset.size!==size)$('#board').dataset.size=size;}).observe($('#board'));
 // The bar's real height, for what sticks under it (material.css, .action-banner): a narrow window wraps the bar to two or three rows.
 new ResizeObserver(([entry])=>{const h=Math.ceil(entry.borderBoxSize?.[0]?.blockSize??entry.target.offsetHeight);$('#main').style.setProperty('--topbar-h',h+'px');}).observe($('#topbar'));
 render();
