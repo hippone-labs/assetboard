@@ -2389,6 +2389,16 @@ body::before,.native-app body::before{background:radial-gradient(70vw 65vh at 0%
 #board .wall .row:focus-within .r-actions{display:flex}
 @media(hover:hover){#board .wall .row:hover .r-actions{display:flex}}
 body.drag-active #board .wall .row .r-actions{display:none}
+/* The actions sit at the end of the first line, with no backing, and while they show that line keeps their room: the name gives
+   way, never the state (a failed CI, an expiry). Lines below are not covered. */
+#board .wall .row .r-actions,#board .wall .row.selected .r-actions{top:4px;translate:none;gap:0;padding:0;background:none}
+#board .wall[data-density=glance] .row .r-actions{top:50%;translate:0 -50%}
+#board .wall .row .r-actions .quick-action{width:24px;height:24px}
+#board .wall .row .r-actions .quick-action svg{width:14px;height:14px}
+#board .wall .row:has(.r-actions>.quick-action){--wall-acts:28px}#board .wall .row:has(.r-actions>.quick-action+.quick-action){--wall-acts:52px}
+#board .wall .row:focus-within .r-main>.r-line:first-child{padding-right:var(--wall-acts,0)}
+@media(hover:hover){#board .wall .row:hover .r-main>.r-line:first-child{padding-right:var(--wall-acts,0)}}
+body.drag-active #board .wall .row .r-main>.r-line:first-child{padding-right:0}
 /* 全局: one line, name and day count; 标准: + the fields and the price; 详细: every fact under the first line, a line each, the
    labels in one column down the panel */
 #board .wall[data-density=glance] .g-cost{display:none}
