@@ -212,7 +212,17 @@ async (page) => {
   check(await p.locator('#board .wall-pending [data-action="connect-pending"][data-id="cloudflare"]').count()===1,'待引入 is a quiet line under the wall');
   await p.locator('#board .wall-pending [data-action="connect-pending"]').click();await settle();
   check(await p.locator('#modal .connect-pick').count()===1,'待引入 under the wall opens the pick');
-  await p.evaluate(()=>{$('#modal').close();setDensity('standard');});
+  // A tile's actions sit at the end of its first line and never cover its state (a failed Actions run, a PR count) or a lower line.
+  await p.evaluate(()=>{$('#modal').close();state.assets.find(a=>a.id==='demo-r1').url='https://github.com/acme-labs/notes-api';});
+  for(const d of ['glance','standard','detail']){
+   await p.evaluate(d=>setDensity(d),d);await settle();
+   const tile=p.locator('#board .wall [data-asset="demo-r1"]');await tile.scrollIntoViewIfNeeded();await tile.hover();await p.waitForTimeout(120);
+   const r=await tile.evaluate(el=>{const box=s=>el.querySelector(s)?.getBoundingClientRect(),act=box('.r-actions'),date=box('.r-date'),line=box('.r-main>.r-line'),below=[...el.querySelectorAll('.r-main>:not(:first-child)')].map(n=>n.getBoundingClientRect()).filter(b=>b.width&&b.height);
+    const hit=b=>b.right>act.left+.5&&b.left<act.right-.5&&b.bottom>act.top+.5&&b.top<act.bottom-.5,text=[...el.querySelectorAll('.r-main>:not(:first-child) *')].filter(n=>[...n.childNodes].some(c=>c.nodeType===3&&c.textContent.trim())).map(n=>n.getBoundingClientRect());
+    return {buttons:el.querySelectorAll('.r-actions .quick-action').length,shown:act.width>0,overDate:hit(date),overBelow:text.some(hit),centred:Math.abs((act.top+act.bottom)/2-(line.top+line.bottom)/2)<=2,date:el.querySelector('.r-date').textContent};});
+   check(r.buttons===2&&r.shown&&!r.overDate&&!r.overBelow&&r.centred,`${d}: a hovered tile's actions sit on its first line and leave its state and lower lines clear: `+JSON.stringify(r));
+  }
+  await p.evaluate(()=>setDensity('standard'));
   if(errors.length)throw new Error(errors.join(' | '));
   return 'PASS: tile wall default, three columns of tiles of one height at 1280/1440/1728 in every density, long texts cut on their line and whole in the title and the peek, fields in columns, narrow single column, panel moves kept, row moves, densities kept and anchored, peek, privacy, skin, AI readings, 待引入';
  } finally { await p.close(); }
