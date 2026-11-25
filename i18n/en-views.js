@@ -595,6 +595,7 @@ Object.assign(I18N.en,{
  '两边的记录都留下，同一条以较新的为准':'Records from both are kept; for the same record the newer one wins',
  '同步资产板…':'Sync board…',
  '{when} 同步过':'synced {when}',
+ '{when} 同步过；最近一次：{why}':'synced {when}; the latest try: {why}',
  '等待第一次同步':'waiting for the first sync',
  '资产板同步中':'Board syncing',
  '停止同步':'Stop syncing',

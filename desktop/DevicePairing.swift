@@ -22,16 +22,25 @@ enum PeerWire {
         var length = UInt32(body.count).bigEndian
         c.send(content: Data(bytes: &length, count: 4) + body, completion: .contentProcessed { error in done?(error == nil) })
     }
-    static func receive(_ c: NWConnection, done: @escaping ([String: Any]?) -> Void) {
+    /// Reads one frame. The body comes in pieces, and `progress` is called as each arrives, so a reader can tell a slow link that is
+    /// still sending (a board over a Tailscale relay) from one that has gone quiet.
+    static func receive(_ c: NWConnection, progress: (() -> Void)? = nil, done: @escaping ([String: Any]?) -> Void) {
         c.receive(minimumIncompleteLength: 4, maximumLength: 4) { head, _, _, error in
             guard error == nil, let head, head.count == 4 else { done(nil); return }
             let n = head.reduce(0) { $0 << 8 | Int($1) }
             guard n > 0, n <= limit else { done(nil); return }
-            c.receive(minimumIncompleteLength: n, maximumLength: n) { body, _, _, error in
-                guard error == nil, let body, body.count == n,
-                      let object = (try? JSONSerialization.jsonObject(with: body)) as? [String: Any] else { done(nil); return }
-                done(object)
+            progress?()
+            var body = Data(capacity: n)
+            func more() {
+                c.receive(minimumIncompleteLength: 1, maximumLength: min(n - body.count, 1 << 18)) { piece, _, complete, error in
+                    guard error == nil, let piece, !piece.isEmpty else { done(nil); return }
+                    body.append(piece); progress?()
+                    if body.count < n { if complete { done(nil) } else { more() }; return }
+                    guard let object = (try? JSONSerialization.jsonObject(with: body)) as? [String: Any] else { done(nil); return }
+                    done(object)
+                }
             }
+            more()
         }
     }
 }
@@ -147,6 +156,11 @@ final class DevicePairing {
     static let freshness: TimeInterval = 60
     /// Another Mac is reached directly, on this network or over Tailscale, never through the system proxy: a proxy such as
     /// Clash takes the connection, cannot reach a LAN or Tailscale address from where it forwards, and the pairing hears nothing.
+    /// How long an incoming connection may take to ask; how long a reader waits with nothing arriving; the most any one exchange
+    /// may take. A board over a Tailscale relay can take well over 20 seconds while it keeps arriving (seen 2026-11-25, relay hkg).
+    static var askWindow: TimeInterval = 15
+    static var quiet: TimeInterval = 20
+    static var longest: TimeInterval = 180
     static var direct: NWParameters {
         let parameters = NWParameters.tcp
         parameters.preferNoProxies = true
@@ -171,6 +185,8 @@ final class DevicePairing {
     private var browser: NWBrowser?
     private var found: [String: NWEndpoint] = [:]
     private var seen: [String: Date] = [:]
+    /// Incoming connections being answered: past askWindow they are left to finish, up to `longest`.
+    private var serving = Set<ObjectIdentifier>()
 
     /// The one pairing in progress, from either side.
     private final class Pending {
@@ -388,7 +404,7 @@ final class DevicePairing {
                 }
             }
         }
-        queue.asyncAfter(deadline: .now() + 15) { if self.pending?.connection !== c { c.cancel() } }
+        queue.asyncAfter(deadline: .now() + DevicePairing.askWindow) { if self.pending?.connection !== c, !self.serving.contains(ObjectIdentifier(c)) { c.cancel() } }
     }
     private func serve(_ c: NWConnection, _ message: [String: Any]) {
         let host = DevicePairing.address(c)
@@ -401,14 +417,17 @@ final class DevicePairing {
         seen = seen.filter { $0.value.timeIntervalSinceNow > -2 * DevicePairing.freshness }
         guard seen[nonce] == nil else { log("in", peer.name, host, false, "replayed"); c.cancel(); return }
         seen[nonce] = Date()
+        let tag = ObjectIdentifier(c)
+        serving.insert(tag)
+        queue.asyncAfter(deadline: .now() + DevicePairing.longest) { if self.serving.remove(tag) != nil { c.cancel() } }
         // The board only to a Mac this one syncs with.
         guard kind == "facts" || peer.sync == true else { log("in", peer.name, host, false, "board: not synced"); PeerWire.send(c, ["t": "res", "box": PeerCrypto.seal(["n": nonce, "error": "not-synced"], key) ?? ""]) { _ in c.cancel() }; return }
         DispatchQueue.global(qos: .utility).async {
             var facts: [String: Any] = kind == "board" ? (self.board().map { ["board": $0] } ?? ["error": "no-board"]) : self.answer()
             facts["n"] = nonce
             self.queue.async {
-                guard let box = PeerCrypto.seal(facts, key) else { c.cancel(); return }
-                PeerWire.send(c, ["t": "res", "box": box]) { ok in c.cancel(); self.log("in", peer.name, host, ok, kind) }
+                guard let box = PeerCrypto.seal(facts, key) else { self.serving.remove(tag); c.cancel(); return }
+                PeerWire.send(c, ["t": "res", "box": box]) { ok in self.queue.async { self.serving.remove(tag) }; c.cancel(); self.log("in", peer.name, host, ok, kind) }
             }
         }
     }
@@ -424,7 +443,8 @@ final class DevicePairing {
             let nonce = Data(nonceBytes).base64EncodedString()
             guard let box = PeerCrypto.seal(["ask": kind, "at": ISO8601DateFormatter().string(from: Date()), "n": nonce], key) else { finish(["ok": false, "id": id, "error": "seal"]); return }
             let c = NWConnection(to: endpoint, using: DevicePairing.direct)
-            var over = false
+            var over = false, heard = Date()
+            let started = heard
             let end: ([String: Any]) -> Void = { r in
                 self.queue.async {
                     guard !over else { return }
@@ -439,7 +459,7 @@ final class DevicePairing {
                 switch state {
                 case .ready:
                     PeerWire.send(c, ["t": "req", "from": self.store.publicKey.base64EncodedString(), "box": box])
-                    PeerWire.receive(c) { reply in
+                    PeerWire.receive(c, progress: { heard = Date() }) { reply in
                         guard reply?["t"] as? String == "res", var facts = PeerCrypto.open(reply?["box"], key), facts["n"] as? String == nonce else {
                             end(["ok": false, "id": id, "name": peer.name, "error": "refused"]); return
                         }
@@ -452,7 +472,16 @@ final class DevicePairing {
                 }
             }
             c.start(queue: self.queue)
-            self.queue.asyncAfter(deadline: .now() + 20) { end(["ok": false, "id": id, "name": peer.name, "error": "timeout"]) }
+            // Timed out only when nothing has arrived for `quiet` seconds, or the whole exchange passes `longest`.
+            func watch() {
+                self.queue.asyncAfter(deadline: .now() + 1) {
+                    guard !over else { return }
+                    if Date().timeIntervalSince(heard) >= DevicePairing.quiet || Date().timeIntervalSince(started) >= DevicePairing.longest {
+                        end(["ok": false, "id": id, "name": peer.name, "error": "timeout"])
+                    } else { watch() }
+                }
+            }
+            watch()
         }
     }
 }
@@ -533,6 +562,24 @@ func testDevicePairing() {
     waitFor("board read") { answer != nil }
     precondition(((answer?["board"] as? [String: Any])?["assets"] as? [[String: Any]])?.first?["name"] as? String == "one.example.com", "a reads b's board once b syncs: \(answer ?? [:])")
     precondition(answer?["device"] == nil, "a board answer carries only the board")
+    // A slow board (a Tailscale relay): one that takes longer than the ask window to come, and runs to megabytes, still arrives
+    // whole; only a Mac that goes quiet for `quiet` seconds times out.
+    let windows = (DevicePairing.askWindow, DevicePairing.quiet)
+    DevicePairing.askWindow = 1; DevicePairing.quiet = 2.5
+    let filler = String(repeating: "icon", count: 1 << 20)
+    b.board = { Thread.sleep(forTimeInterval: 1.6); return ["assets": [["id": "x1", "type": "domain", "name": "slow.example.com", "notes": filler]], "blocks": [["id": "domain"]]] }
+    answer = nil
+    a.read(b.store.id, kind: "board") { answer = $0 }
+    waitFor("slow board", 15) { answer != nil }
+    precondition(((answer?["board"] as? [String: Any])?["assets"] as? [[String: Any]])?.first?["notes"] as? String == filler, "a board slower than the ask window arrives whole: \(answer?["error"] ?? "")")
+    b.board = { Thread.sleep(forTimeInterval: 5); return ["assets": [], "blocks": []] }
+    answer = nil
+    let asked = Date()
+    a.read(b.store.id, kind: "board") { answer = $0 }
+    waitFor("quiet board", 10) { answer != nil }
+    precondition(answer?["error"] as? String == "timeout" && Date().timeIntervalSince(asked) < 4.5, "a Mac that says nothing for `quiet` seconds times out: \(answer ?? [:])")
+    (DevicePairing.askWindow, DevicePairing.quiet) = windows
+    b.board = { ["assets": [["id": "x1", "type": "domain", "name": "one.example.com"]], "blocks": [["id": "domain"]]] }
 
     // Raw requests to b: from a key b never paired with, tampered, stale, and replayed — none is answered.
     func raw(_ frame: [String: Any]) -> [String: Any]? {

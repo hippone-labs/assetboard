@@ -83,7 +83,9 @@ function peerSyncDialog(id){
 }
 function peerSyncLine(p){
  if(!peerSyncOn(p.id))return `<button class="text-button" data-action="peers-sync" data-id="${esc(p.id)}">${tr('同步资产板…')}</button>`;
- const last=peerLast[p.id],state=last?.syncError?esc(PEER_ERRORS[last.syncError]||last.syncError):last?.syncAt?tr('{when} 同步过',{when:esc(new Date(last.syncAt).toLocaleTimeString(trLocale()))}):tr('等待第一次同步');
+ // A read that fails after one that worked keeps the time of that one: the other Mac may well have synced since (it reads this one
+ // on its own), so 超时 alone would look like nothing ever synced.
+ const last=peerLast[p.id],why=last?.syncError?esc(PEER_ERRORS[last.syncError]||last.syncError):'',when=last?.syncAt?esc(new Date(last.syncAt).toLocaleTimeString(trLocale())):'',state=why&&when?tr('{when} 同步过；最近一次：{why}',{when,why}):why||(when?tr('{when} 同步过',{when}):tr('等待第一次同步'));
  return `<span class="quiet-fact">${tr('资产板同步中')} · ${state}</span> <button class="text-button" data-action="peers-sync-stop" data-id="${esc(p.id)}">${tr('停止同步')}</button>`;
 }
 function peerStatus(p){
