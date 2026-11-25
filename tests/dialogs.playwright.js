@@ -38,7 +38,22 @@ async (page) => {
   await p.evaluate(()=>{$('#modal').close();intake=Array.from({length:30},(_,i)=>({id:'i'+i,source:'window',name:`f${i}.csv`,text:'a',mime:''}));inboxDialog(false);$('#modal-content').scrollTop=300;inboxDialog(false);});
   check(await p.evaluate(()=>$('#modal-content').scrollTop)===300,'A refreshed list keeps its place');
   await p.evaluate(()=>{intake=[];$('#modal').close();});
+  // A toast while a dialog is open (one already showing when it opens, and a new one with 撤销) shows above the dialog and its
+  // blurred backdrop, at its usual place at the foot of the window, and its button can be clicked; it goes back when the dialog closes.
+  await p.evaluate(()=>toast('x'));await p.waitForTimeout(250);
+  const usual=await p.evaluate(()=>Math.round(innerHeight-$('#toast').getBoundingClientRect().bottom));
+  const where=()=>p.evaluate(()=>{const t=$('#toast'),r=t.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return {onTop:!!hit&&t.contains(hit),gap:Math.round(innerHeight-r.bottom)};});
+  await p.evaluate(()=>themeDialog());await p.waitForTimeout(300);
+  const opened=await where();
+  check(opened.onTop&&opened.gap===usual,'A toast showing when a dialog opens stays on top, in its place: '+JSON.stringify({usual,opened}));
+  await p.evaluate(()=>{checkpoint();state.assets[0].name='renamed';toast('已修改',true);});await p.waitForTimeout(250);
+  const fresh=await where();
+  check(fresh.onTop&&fresh.gap===usual,'A toast shown over an open dialog is on top, in its place: '+JSON.stringify({usual,fresh}));
+  await p.locator('#toast [data-action="undo"]').click();
+  check(await p.evaluate(()=>state.assets[0].name==='box'),'撤销 in a toast over a dialog can be clicked');
+  await p.evaluate(()=>$('#modal').close());
+  check(await p.evaluate(()=>$('#toast').parentNode===document.body),'The toast goes back to the page when the dialog closes');
   check(!errors.length,'Page errors: '+errors.join(' | '));
  } finally { await context.close(); }
- return 'PASS: dialog fits the window, body scrolls, head and actions stay, focus starts in the body, widths by content, list keeps its scroll';
+ return 'PASS: dialog fits the window, body scrolls, head and actions stay, focus starts in the body, widths by content, list keeps its scroll, a toast over an open dialog on top and clickable';
 }
