@@ -15,9 +15,9 @@ Reminds you before domains, subscriptions and servers expire. Import with a toke
 
 </div>
 
-![Upcoming: charges to confirm, an overdue domain, and subscriptions due or charging within 7 and 30 days](screenshots/upcoming-en.webp)
+![The Assetboard window in light appearance: Upcoming and the categories on the left; charges to confirm, an overdue domain, and subscriptions charging within 7 and 30 days in the middle; a domain's details on the right, with its grace and redemption periods after expiry](screenshots/upcoming-en.webp)
 
-<sub>Screenshots are from demo mode; the data is fictional.</sub>
+<sub>Screenshots are from demo mode in light appearance; the data is fictional.</sub>
 
 Download the `.dmg` from [assetboard.app](https://assetboard.app/). Requires macOS 15 or later on Apple Silicon. Data stays on the Mac; there is no account. The interface is in English by default and can be switched to Simplified Chinese in Settings.
 

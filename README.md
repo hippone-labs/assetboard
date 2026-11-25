@@ -15,9 +15,9 @@
 
 </div>
 
-![即将到来：待确认的扣款、已过期的域名，以及 7 天内和 30 天内要到期或扣款的订阅](screenshots/upcoming-zh.webp)
+![Assetboard 窗口，浅色外观：左边是即将到来和各类别，中间依次是待确认的扣款、已过期的域名、7 天内和 30 天内要扣款的订阅，右边是一个域名的详情，含过期后的宽限期和赎回期](screenshots/upcoming-zh.webp)
 
-<sub>截图来自演示模式，数据是虚构的。</sub>
+<sub>截图来自演示模式（浅色外观），数据是虚构的。</sub>
 
 从 [assetboard.app](https://assetboard.app/zh/) 下载 `.dmg`，需要 macOS 15 或更高、Apple 芯片。数据只留本机，不需要账号。界面默认英文，可在「设置」里换成简体中文。
 
