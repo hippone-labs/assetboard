@@ -93,6 +93,10 @@ function checkpoint(){checkpointEntry(JSON.stringify(state));}
 function checkpointEntry(entry){history.push(entry);if(history.length>25)history.shift();future=[];}
 // A Latin word set into Chinese text gets a space on the side that meets a Chinese character (添加 AI 订阅资产, 添加 Apple ID 资产).
 function zhGap(text){text=String(text);return appLang==='zh'?(/^[A-Za-z0-9]/.test(text)?' ':'')+text+(/[A-Za-z0-9]$/.test(text)?' ':''):text;}
+// An open #modal sits in the top layer, above anything on the page and behind its own blurred backdrop, and makes the rest of the
+// page inert. So while it is open the toast lives inside it (still fixed to the window), where it shows and its 撤销 can be clicked.
+function toastHome(){const t=$('#toast'),d=$('#modal'),home=d.open?d:document.body;if(t.parentNode!==home)home.append(t);}
+new MutationObserver(toastHome).observe($('#modal'),{attributes:true,attributeFilter:['open']});
 function toast(message,undoable=false,redoable=false,act=null){clearTimeout(toastTimer);$('#toast').classList.remove('notice','ask');$('#toast').setAttribute('role','status');const offer=(undoable&&history.length)||(redoable&&future.length)||!!act;$('#toast').innerHTML=`<span>${esc(message)}</span>${undoable&&history.length?'<button class="toast-undo" data-action="undo">'+tr('撤销')+'</button>':redoable&&future.length?'<button class="toast-undo" data-action="redo">'+tr('重做')+'</button>':act?`<button class="toast-undo" data-action="${esc(act.action)}"${act.id?` data-id="${esc(act.id)}"`:''}>${esc(act.label)}</button>`:''}`;$('#toast').classList.add('show');toastTimer=setTimeout(()=>$('#toast').classList.remove('show'),offer?6000:3000);}
 // A notice is a toast that matters: something the person tried did not happen. It is louder, stays longer, waits while hovered
 // or focused, and has its own close button.

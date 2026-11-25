@@ -812,11 +812,12 @@ body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;ba
 @keyframes v12-fade{from{opacity:0}}
 @keyframes v12-settle{from{opacity:0;transform:scale(.98)}}
 body.first-paint .appbar{animation:v12-fade .15s var(--ease) both}
-dialog[open]{animation:v12-settle .18s var(--ease) both}
+/* backwards, not both: a transform kept after the animation would make the dialog the containing block of the toast it holds while open */
+dialog[open]{animation:v12-settle .18s var(--ease) backwards}
 dialog[open]::backdrop{animation:v12-fade .15s var(--ease) both}
 .toast.show,#toast.show,#toast>*{animation:v12-fade .15s var(--ease) both}
 @media(prefers-reduced-motion:reduce){
- dialog[open]{animation:v12-fade .15s linear both}
+ dialog[open]{animation:v12-fade .15s linear backwards}
  body.first-paint .appbar{animation:v12-fade .15s linear both}
  
 }
