@@ -365,6 +365,7 @@ let englishStrings: [String: [String]] = [
     "Cursor 的登录读不懂": ["Cursor's login could not be understood"],
     "回答 HTTP {status}": ["Answered HTTP {status}"],
     "没找到 Claude Code 的登录": ["Claude Code's login was not found"],
+    "Claude Code 的登录在钥匙串里，点「立即读取」时 macOS 会问一次；选「始终允许」后自动更新": ["Claude Code's login is in the Keychain: macOS asks once when you click Read now; choose Always Allow and it updates on its own"],
     "没找到 Codex 的登录": ["Codex's login was not found"],
     "没找到 Cursor 的登录": ["Cursor's login was not found"],
     "没找到 gh，Copilot 额度要用本机 gh 的登录": ["gh was not found; Copilot limits use the gh login on this Mac"],

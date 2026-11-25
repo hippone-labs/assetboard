@@ -284,12 +284,29 @@ enum AIUsageCredentials {
         guard let data = Data(base64Encoded: text) else { return nil }
         return (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
     }
-    static func keychain(service: String) -> Data? {
-        let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service,
+    enum KeychainRead: Equatable { case found(Data), missing, needsAsk }
+    /// Another tool's Keychain item: macOS asks the person before handing it to this app, and asks again whenever the tool
+    /// rewrites the item (Claude Code does when it refreshes its login) or this app is rebuilt. Only a read the person started
+    /// (立即读取, or switching the source on) may ask; a timed read returns needsAsk instead of a dialog, and still reads silently once
+    /// the person chose 始终允许. Replaced by the self-test.
+    static var keychainReader: (String, Bool) -> KeychainRead = { service, interactive in
+        var query: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service,
                                     kSecReturnData as String: true, kSecMatchLimit as String: kSecMatchLimitOne]
+        if !interactive { query[kSecUseAuthenticationUI as String] = kSecUseAuthenticationUIFail }
         var result: CFTypeRef?
-        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess else { return nil }
-        return result as? Data
+        let status: OSStatus
+        if interactive {
+            status = SecItemCopyMatching(query as CFDictionary, &result)
+        } else {
+            // The file-based login keychain decides on its own access list; this turns its dialog into errSecInteractionNotAllowed.
+            var allowed: DarwinBoolean = true
+            SecKeychainGetUserInteractionAllowed(&allowed)
+            SecKeychainSetUserInteractionAllowed(false)
+            status = SecItemCopyMatching(query as CFDictionary, &result)
+            SecKeychainSetUserInteractionAllowed(allowed.boolValue)
+        }
+        if status == errSecSuccess, let data = result as? Data { return .found(data) }
+        return status == errSecInteractionNotAllowed || status == errSecAuthFailed || status == errSecUserCanceled ? .needsAsk : .missing
     }
     static func isoDate(_ text: String) -> Date? {
         let plain = ISO8601DateFormatter(), fractional = ISO8601DateFormatter()
@@ -303,7 +320,7 @@ enum AIUsageCredentials {
     }
 
     /// The request for a tool's endpoint with its own login, or why there is none.
-    static func request(_ source: AIUsageSource, scanner: AIUsageScanner) throws -> URLRequest {
+    static func request(_ source: AIUsageSource, scanner: AIUsageScanner, interactive: Bool) throws -> URLRequest {
         guard let url = source.endpoint, let host = url.host, AIUsageSource.apiHosts.contains(host), url.scheme == "https" else { throw Failure(text: L("请求无效")) }
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
@@ -314,9 +331,16 @@ enum AIUsageCredentials {
         switch source {
         case .claude:
             // Claude Code keeps its login in ~/.claude/.credentials.json, or on a Mac in the Keychain item "Claude Code-credentials"
-            // (macOS asks the person before letting another app read it).
+            // (macOS asks the person before letting another app read it, so only when the person asked for the reading).
             let file = (scanner.envDir("CLAUDE_CONFIG_DIR") ?? scanner.home.appendingPathComponent(".claude")).appendingPathComponent(".credentials.json")
-            let stored = json(file) ?? keychain(service: "Claude Code-credentials").flatMap { (try? JSONSerialization.jsonObject(with: $0)) as? [String: Any] }
+            var stored = json(file)
+            if stored == nil {
+                switch keychainReader("Claude Code-credentials", interactive) {
+                case .found(let data): stored = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+                case .needsAsk: throw Failure(text: L("Claude Code 的登录在钥匙串里，点「立即读取」时 macOS 会问一次；选「始终允许」后自动更新"))
+                case .missing: break
+                }
+            }
             let oauth = stored?["claudeAiOauth"] as? [String: Any]
             guard let token = clean(oauth?["accessToken"]) else { throw Failure(text: L("没找到 Claude Code 的登录")) }
             if let expires = (oauth?["expiresAt"] as? NSNumber)?.doubleValue, expires / 1000 < Date().timeIntervalSince1970 {
@@ -514,21 +538,23 @@ final class AIUsageMonitor {
         }
     }
     func stop() { queue.async { self.timer?.cancel(); self.timer = nil } }
-    func refresh() { queue.async { self.pass(force: true) } }
+    func refresh() { queue.async { self.pass(force: true, asking: Set(AIUsageSource.allCases)) } }
     func changed(_ source: AIUsageSource) {
         queue.async {
             if !self.settings.local(source) { self.engine?.clear(source); self.scanner.forgetAll() }
             if !self.settings.api(source) { self.apiNext[source] = nil }
-            self.pass(force: true)
+            self.pass(force: true, asking: [source])
         }
     }
 
     /// Synchronous on the monitor's queue (or the self-test's thread).
-    func pass(force: Bool) {
+    /// asking: the sources whose read the person started (立即读取 for all, a switch for its own source); only they may let macOS
+    /// ask for another tool's Keychain item.
+    func pass(force: Bool, asking: Set<AIUsageSource> = []) {
         guard let engine else { return }
         for source in AIUsageSource.allCases {
             if settings.local(source) { scanner.scan(source, into: engine) }
-            if settings.api(source), force || (apiNext[source] ?? .distantPast) <= Date() { readAPI(source, engine) }
+            if settings.api(source), force || (apiNext[source] ?? .distantPast) <= Date() { readAPI(source, engine, interactive: asking.contains(source)) }
         }
         onSnapshot?(engine.snapshotJSON())
     }
@@ -545,11 +571,11 @@ final class AIUsageMonitor {
         return (status, body.flatMap { $0.count <= 2 * 1024 * 1024 ? $0 : nil })
     }
 
-    func readAPI(_ source: AIUsageSource, _ engine: AIUsageEngine) {
+    func readAPI(_ source: AIUsageSource, _ engine: AIUsageEngine, interactive: Bool) {
         apiNext[source] = Date().addingTimeInterval(Self.apiEvery)
         if source == .antigravity { readAntigravity(engine); return }
         let request: URLRequest
-        do { request = try AIUsageCredentials.request(source, scanner: scanner) } catch {
+        do { request = try AIUsageCredentials.request(source, scanner: scanner, interactive: interactive) } catch {
             engine.fail(source, (error as? AIUsageCredentials.Failure)?.text ?? error.localizedDescription); return
         }
         let (status, body) = send(request, session)
@@ -678,6 +704,27 @@ func testAIUsage() {
     monitor.pass(force: true)
     precondition(json.contains("\"error\""), "a refusal is said per source")
 
+    // Claude Code's login in the Keychain (no file): a timed pass never lets macOS ask, and says how to allow it; a read the
+    // person started may ask.
+    try? fm.removeItem(at: home.appendingPathComponent(".claude/.credentials.json"))
+    var keychainAsks: [Bool] = []
+    let realReader = AIUsageCredentials.keychainReader
+    defer { AIUsageCredentials.keychainReader = realReader }
+    AIUsageCredentials.keychainReader = { service, interactive in
+        precondition(service == "Claude Code-credentials")
+        keychainAsks.append(interactive)
+        return interactive ? .found(Data("{\"claudeAiOauth\":{\"accessToken\":\"fake-keychain-token\",\"expiresAt\":4102444800000}}".utf8)) : .needsAsk
+    }
+    MockPlatformProtocol.reply = { request in asked.append(request); return (200, Data("{\"five_hour\":{\"utilization\":40}}".utf8)) }
+    let before = asked.count
+    monitor.readAPI(.claude, engine, interactive: false)
+    precondition(keychainAsks == [false] && asked.count == before, "a timed read neither asks nor calls the endpoint without the login")
+    precondition(engine.snapshotJSON().contains("立即读取") || engine.snapshotJSON().contains("Read now"), "the reason says to click 立即读取: \(engine.snapshotJSON().suffix(300))")
+    monitor.pass(force: true)
+    precondition(keychainAsks.last == false, "a forced pass that the person did not start for Claude does not ask either")
+    monitor.pass(force: true, asking: [.claude])
+    precondition(keychainAsks.last == true && asked.last?.value(forHTTPHeaderField: "Authorization") == "Bearer fake-keychain-token", "立即读取 may ask and then reads")
+
     // Every endpoint is https on its tool's own host; Cursor's cookie carries only the token's user id and the token.
     for source in AIUsageSource.allCases where source != .antigravity { precondition(source.endpoint?.scheme == "https" && AIUsageSource.apiHosts.contains(source.endpoint?.host ?? ""), "\(source)") }
     let ps = "  4242 /Applications/Antigravity.app/Contents/Resources/app/extensions/antigravity/bin/language_server_macos_arm --csrf_token 0123abcd-ef01-2345-6789-abcdef012345 --extension_server_port 61234 --app_data_dir antigravity\n  77 /usr/bin/other --csrf_token zzzzzzzzzz\n"
@@ -694,5 +741,5 @@ func testAIUsage() {
     precondition(AntigravityCLI.candidates(home: agyHome, env: ["ANTIGRAVITY_CLI_PATH": "/opt/x/agy"]) == ["/opt/x/agy"] && AntigravityCLI.candidates(home: agyHome, env: [:]).count == 3, "agy paths")
     let agyEnv = AntigravityCLI.environment(["PATH": "/usr/bin"], binary: "/opt/homebrew/bin/agy", directory: URL(fileURLWithPath: "/tmp/probe"))
     precondition(agyEnv["AGY_CLI_DISABLE_AUTO_UPDATE"] == "true" && agyEnv["PATH"]?.hasPrefix("/tmp/probe:/opt/homebrew/bin:/usr/bin") == true && agyEnv["BROWSER"] == "/tmp/probe/open", "agy environment")
-    print("PASS: AI usage: readers in JavaScriptCore on made-up Claude Code, Codex, Grok and Cursor files, appended lines read once, nothing but numbers in the snapshot (no prompt, token or path), endpoints on by default and none called once switched off, a fixed GET with the tool's own login, the wait between reads, a 429, Antigravity's local server found from ps and lsof output, agy's usage report and the version it needs")
+    print("PASS: AI usage: readers in JavaScriptCore on made-up Claude Code, Codex, Grok and Cursor files, appended lines read once, nothing but numbers in the snapshot (no prompt, token or path), endpoints on by default and none called once switched off, a fixed GET with the tool's own login, the wait between reads, a 429, a timed pass that never asks for Claude Code's Keychain item, Antigravity's local server found from ps and lsof output, agy's usage report and the version it needs")
 }
