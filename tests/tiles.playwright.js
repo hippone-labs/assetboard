@@ -58,13 +58,23 @@ async (page) => {
   // Hovering a row reveals actions without changing its height.
   // A row's box, waiting for it if the board is being drawn again at that moment.
   const row=p.locator('#board [data-asset="t-server"]'),box=async()=>{await row.waitFor({state:'visible'});return (await row.boundingBox())?.height??(await row.boundingBox()).height;};
+  // The board's list size follows its own width, which closeDetail gives back only once the room has slid; measure after that.
+  await p.waitForFunction(()=>!roomMove&&roomTarget===null&&!document.body.classList.contains('detail-room')&&$('#board').dataset.size==='l');
   const rest=await box();await row.hover();await p.waitForTimeout(250);
   check(Math.abs(await box()-rest)<.5,'Hover must not change the row height');
   await p.mouse.move(1,1);
   await p.fill('#search','只在悬停');await p.waitForTimeout(250);
   check(await p.locator('#board .row').count()>0&&await p.locator('#board .card-hit').count()>0,'Search results say when the match is in the purpose');
   await p.fill('#search','');
+  // With the detail open in a 1280px window the board is narrow: its rows take the two-line size and keep their names.
+  await p.setViewportSize({width:1280,height:800});
+  await p.evaluate(()=>showDetail('t-server',{still:true}));
+  await p.waitForFunction(()=>!roomMove&&roomTarget===null&&document.body.classList.contains('detail-room'));
+  await p.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));// the size follows a frame later
+  const narrow=await p.evaluate(()=>({size:$('#board').dataset.size,names:[...document.querySelectorAll('#board .row .r-name')].map(n=>n.getBoundingClientRect().width)}));
+  check(narrow.size!=='l'&&narrow.names.length&&narrow.names.every(w=>w>40),'A list beside the open detail keeps its name column: '+JSON.stringify(narrow));
+  await p.evaluate(()=>closeDetail());await p.setViewportSize({width:1440,height:900});
   check(!errors.length,'Page errors: '+errors.join(' | '));
-  return 'PASS: every category has a distinct 1.5px icon on rows, group titles and the sidebar, real icons win, system sans only, one row height, purpose only on hover, row type, tiles in inspector/即将到来/grid/hidden/search, even grid cards, stable hover height';
+  return 'PASS: every category has a distinct 1.5px icon on rows, group titles and the sidebar, real icons win, system sans only, one row height, purpose only on hover, row type, tiles in inspector/即将到来/grid/hidden/search, even grid cards, stable hover height, names kept beside the open detail';
  } finally { await p.close(); }
 }
