@@ -488,8 +488,9 @@ final class DevicePairing {
 
 /// The Macs in this Mac's tailnet, from the local Tailscale's own `status --json` (asked of the Tailscale app on this Mac, no
 /// network request of ours), so the person picks one instead of copying its address. Only macOS peers, never this Mac; each
-/// with its name, its MagicDNS name (or its first Tailscale IPv4 when MagicDNS is off) and whether it is online. Read when the
-/// person opens 其他设备; nothing is kept.
+/// with its name, its Tailscale IPv4 to connect to, its MagicDNS name to show, and whether it is online. The pairing connects
+/// to the 100.x address, not the name: a proxy such as Clash answers DNS itself with made-up addresses (fake-ip), so a MagicDNS
+/// name reaches nothing on a Mac running one (seen 2026-11-20 with the Mac mini). Read when the person opens 其他设备; nothing is kept.
 enum TailnetMacs {
     static let candidates = ["/Applications/Tailscale.app/Contents/MacOS/Tailscale", "/opt/homebrew/bin/tailscale", "/usr/local/bin/tailscale"]
 
@@ -511,12 +512,13 @@ enum TailnetMacs {
             guard (peer["OS"] as? String)?.lowercased() == "macos" else { continue }
             let ips = (peer["TailscaleIPs"] as? [String]) ?? []
             if !selfIPs.isDisjoint(with: ips) { continue }
-            let dns = (peer["DNSName"] as? String ?? "").trimmingCharacters(in: CharacterSet(charactersIn: ".")).lowercased()
-            let host = dns.range(of: #"^[a-z0-9-]+(\.[a-z0-9-]+)+$"#, options: .regularExpression) != nil ? dns
-                : ips.first { $0.range(of: #"^100\.\d{1,3}\.\d{1,3}\.\d{1,3}$"#, options: .regularExpression) != nil } ?? ""
-            guard !host.isEmpty, host.count <= 260 else { continue }
+            let dnsName = (peer["DNSName"] as? String ?? "").trimmingCharacters(in: CharacterSet(charactersIn: ".")).lowercased()
+            let dns = dnsName.count <= 260 && dnsName.range(of: #"^[a-z0-9-]+(\.[a-z0-9-]+)+$"#, options: .regularExpression) != nil ? dnsName : ""
+            let ip = ips.first { $0.range(of: #"^100\.\d{1,3}\.\d{1,3}\.\d{1,3}$"#, options: .regularExpression) != nil } ?? ""
+            let host = ip.isEmpty ? dns : ip
+            guard !host.isEmpty else { continue }
             let name = String((peer["HostName"] as? String ?? host).trimmingCharacters(in: .whitespacesAndNewlines).prefix(100))
-            macs.append(["name": name.isEmpty ? host : name, "host": host, "online": peer["Online"] as? Bool == true])
+            macs.append(["name": name.isEmpty ? host : name, "host": host, "dns": dns, "online": peer["Online"] as? Bool == true])
         }
         macs.sort { a, b in
             let ao = a["online"] as? Bool == true, bo = b["online"] as? Bool == true
@@ -669,8 +671,9 @@ func testDevicePairing() {
              "k5":{"HostName":"odd","OS":"macOS","DNSName":"bad name;rm","TailscaleIPs":["fd7a::5"],"Online":true}}}
     """
     let macs = TailnetMacs.parse(tailnet) ?? []
-    precondition(macs.map { $0["host"] as? String ?? "" } == ["mac-mini.tail0.ts.net", "100.64.0.4", "studio.tail0.ts.net"], "tailnet Macs: \(macs)")
+    precondition(macs.map { $0["host"] as? String ?? "" } == ["100.64.0.7", "100.64.0.4", "100.64.0.9"], "tailnet Macs are reached by their 100.x address: \(macs)")
+    precondition(macs.map { $0["dns"] as? String ?? "" } == ["mac-mini.tail0.ts.net", "", "studio.tail0.ts.net"], "and shown by their MagicDNS name")
     precondition(macs.first?["name"] as? String == "mac-mini" && macs.first?["online"] as? Bool == true && macs.last?["online"] as? Bool == false)
     precondition(TailnetMacs.parse("{\"BackendState\":\"Stopped\",\"Peer\":{}}")?.isEmpty == true && TailnetMacs.parse("not json") == nil, "stopped or unreadable")
-    print("PASS: device pairing: board only to a Mac that syncs, one code on both screens, one confirmation on the Mac asked, syncing from the start, key 0600 and kept across restarts, sealed read; unpaired, tampered, stale and replayed requests unanswered; declined pairing and unpairing; the tailnet's other Macs from Tailscale's status")
+    print("PASS: device pairing: board only to a Mac that syncs, one code on both screens, one confirmation on the Mac asked, syncing from the start, key 0600 and kept across restarts, sealed read; unpaired, tampered, stale and replayed requests unanswered; declined pairing and unpairing; the tailnet's other Macs from Tailscale's status, reached by their 100.x address")
 }
