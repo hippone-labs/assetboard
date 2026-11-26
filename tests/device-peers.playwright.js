@@ -38,6 +38,18 @@ async (page) => {
   check(await p.evaluate(()=>featureOn('peers')&&window.__sent.some(m=>m.op==='enable'&&m.on===true)&&window.__sent.some(m=>m.op==='list')),'opening it switches it on and the app listens');
   check(await p.evaluate(()=>/局域网上可被发现/.test(document.querySelector('#modal-content').textContent)),'the dialog says this Mac can be found');
 
+  // Opening it also asks the local Tailscale for the tailnet's Macs; one is paired with a click instead of a typed address.
+  check((await sent('tailnet')).length===1,'opening it asks for the tailnet Macs');
+  await p.evaluate(()=>window.assetboardPeers({tailnet:{state:'ok',macs:[{name:'mac-mini',host:'mac-mini.tail0.ts.net',online:true},{name:'Studio',host:'studio.tail0.ts.net',online:false},{name:'bad',host:'x;y',online:true}]}}));
+  const tailnet=await p.evaluate(()=>({hosts:[...document.querySelectorAll('[data-action="peers-pair-host"][data-host]')].map(b=>b.dataset.host),text:document.querySelector('#modal-content').textContent}));
+  check(tailnet.hosts.join()==='mac-mini.tail0.ts.net,studio.tail0.ts.net'&&/Tailscale 里的 Mac/.test(tailnet.text)&&/studio\.tail0\.ts\.net · (离线|Offline)/.test(tailnet.text),'the tailnet Macs are listed, offline marked, a bad address dropped: '+JSON.stringify(tailnet.hosts));
+  await p.click('[data-action="peers-pair-host"][data-host="studio.tail0.ts.net"]');
+  check((await sent('pair')).at(-1)?.host==='studio.tail0.ts.net','pairing a tailnet Mac sends its MagicDNS name');
+  await p.evaluate(()=>window.assetboardPeers({tailnet:{state:'stopped',macs:[]}}));
+  check(await p.evaluate(()=>/Tailscale 没有连接/.test(document.querySelector('#modal-content').textContent)&&!document.querySelector('[data-host]')),'a stopped Tailscale says so');
+  await p.evaluate(()=>window.assetboardPeers({tailnet:{state:'none',macs:[]}}));
+  check(await p.evaluate(()=>!/Tailscale 里的 Mac/.test(document.querySelector('#modal-content').textContent)),'without Tailscale the section is not shown');
+
   // The app answers with what it found, then a pairing begins.
   await p.evaluate(()=>window.assetboardPeers({peers:[],found:['mac-mini'],listening:true}));
   check(await p.evaluate(()=>!!document.querySelector('[data-action="peers-pair"][data-id="mac-mini"]')),'a Mac found on this network can be paired');
