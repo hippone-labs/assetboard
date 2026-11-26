@@ -20,6 +20,7 @@ async (page) => {
   await until(p,()=>typeof render==='function'&&typeof tailnetDialog==='function');
   await p.evaluate(()=>{save=()=>{};});
   const asked=()=>p.evaluate(()=>window.__sent.filter(m=>m.action==='tailnetStatus').length);
+  check(await p.evaluate(()=>!featureOn('tailnet')),'the app said nothing, so it starts off');
   const nodes=lastSeen=>({state:'ok',nodes:[
    {id:'n1',name:'hans的Mac mini',dns:'hansmac-mini.tail0.ts.net',ips:['100.79.13.91'],os:'macos',online:true,lastSeen:''},
    {id:'n2',name:'aether-home',dns:'aether-home.tail0.ts.net',ips:['100.64.0.3'],os:'linux',online:false,lastSeen},
@@ -35,7 +36,7 @@ async (page) => {
 
   // On: asks at once; a matched server and device say online or offline with when last seen; an unmatched server says nothing.
   await p.evaluate(()=>setFeatureNow('tailnet',true));
-  check(await asked()===1,'switching on asks the app once');
+  check(await asked()===2&&await p.evaluate(()=>window.__sent.some(m=>m.action==='tailnetStatus'&&m.remember===true&&m.read===false)),'switching on tells the app to remember it, and asks once');
   await p.evaluate(a=>window.assetboardTailnet(a),nodes(new Date(Date.now()-3*3600e3).toISOString()));
   check(/离线 · 3 小时前 · Tailscale/.test(await rowText('s1')),'a server matched by its MagicDNS name is offline, last seen 3 hours ago: '+await rowText('s1'));
   check(/在线 · Tailscale/.test(await rowText('d1')),'a device matched by its name is online: '+await rowText('d1'));
@@ -44,7 +45,7 @@ async (page) => {
 
   // 导入 › Tailscale: asks again, lists what is not on the board (the phone and the Pi), each with a device or server choice.
   await p.evaluate(()=>{document.body.insertAdjacentHTML('beforeend','<button id="ti" data-action="tailnet-import" hidden>x</button>');document.querySelector('#ti').click();});
-  check(await asked()===2,'opening 从 Tailscale 添加 reads once more');
+  check(await asked()===3,'opening 从 Tailscale 添加 reads once more');
   const list=await p.evaluate(()=>[...document.querySelectorAll('[data-action="tailnet-add"]')].map(b=>[b.dataset.id,document.querySelector(`[data-tailnet-kind="${b.dataset.id}"]`).value]));
   check(JSON.stringify(list)==='[["n3","device"],["n4","server"]]','the phone as a device, the Pi as a server, nothing already on the board: '+JSON.stringify(list));
   await p.selectOption('[data-tailnet-kind="n3"]','device');
@@ -59,6 +60,10 @@ async (page) => {
   check(await p.evaluate(()=>document.querySelectorAll('[data-action="tailnet-add"]').length===1),'the list now has only the Pi');
   await p.click('#toast .toast-undo');
   check(await p.evaluate(()=>!state.assets.some(a=>a.source==='tailscale')),'undo takes the record back');
+
+  // The app's remembered switch wins over the page's empty storage at the next launch.
+  {const q=await context.newPage();await q.addInitScript(`(${host.toString()})();window.__ASSETBOARD_NATIVE__.tailnetOn=true;`);await q.goto('http://127.0.0.1:4317/');
+   await until(q,()=>typeof tailnetOn==='function');check(await q.evaluate(()=>featureOn('tailnet')&&tailnetOn()),'a relaunch with the app\'s switch on starts on');await q.close();}
 
   // A stopped Tailscale says so.
   await p.evaluate(()=>{window.assetboardTailnet({state:'stopped',nodes:[]});});

@@ -78,7 +78,7 @@ The full host list is in the [user guide](GUIDE.md#隐私与网络) (Chinese).
 
 ## Interface
 
-The sidebar holds Upcoming, All assets, Panorama, the categories, projects and Hidden. The middle shows a tile wall (a panel per category, in three densities) and the right the selected asset's details. It can switch to a list, a grid or a 12-month timeline; Upcoming can switch to a month calendar.
+The sidebar holds Upcoming, All assets, Panorama, the categories, projects, views you put together (e.g. Machines = Servers + Devices) and Hidden. The middle shows a tile wall (a panel per category, in three densities) and the right the selected asset's details. It can switch to a list, a grid or a 12-month timeline; Upcoming can switch to a month calendar.
 
 | | |
 | --- | --- |

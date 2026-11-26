@@ -296,7 +296,7 @@ window.assetboardFxRates=r=>{
  fx.ok=!!r?.ok;fx.error=r?.ok?'':String(r?.error||'');
  render();if($('#modal').open&&$('#modal').dataset.view==='cost')costDialog();
 };
-function costScope(v){return query?liveAssets().filter(matches):cats[v]?liveAssets().filter(a=>a.type===v):v==='all'?liveAssets():projectViewName(v)?projectAssets(state.assets,projectViewName(v)):null;}
+function costScope(v){return query?liveAssets().filter(matches):cats[v]?liveAssets().filter(a=>a.type===v):v==='all'?liveAssets():mixOf(v)?mixAssets(mixOf(v)):projectViewName(v)?projectAssets(state.assets,projectViewName(v)):null;}
 function ratesNote(){return fx.fallback?`${tr(fx.source)} ${fx.date}${nativeStore&&!demoMode?tr('（还没取到今天的汇率）'):''}`:`${tr(fx.source)} ${fx.date}${fx.ok?'':tr('（今天没有取到，用的是上次的）')}`;}
 function costDialog(){
  const v=currentView(),scope=costScope(v)||liveAssets(),cur=totalCurrency(),t=costTotals(scope,{currency:cur,rates:fx.rates});
@@ -336,8 +336,12 @@ function costHint(a){
 {const prefs=readViewPrefs();if(['list','grid','timeline','wall'].includes(prefs.board))layoutMode=prefs.board;if(WALL_DENSITIES.includes(prefs.density))wallDensity=prefs.density;if(prefs.upcoming==='calendar')upcomingMode='calendar';if(typeof prefs.view==='string')view=prefs.view;}
 // Sidebar categories follow state.blocks; a category that holds assets is always listed, even without a block entry.
 function categoryIds(){const ids=state.blocks.map(b=>b.id).filter(id=>cats[id]);for(const a of state.assets)if(cats[a.type]&&!ids.includes(a.type))ids.push(a.type);return ids;}
-function currentView(){if(view==='all'||view==='upcoming')return view;if(projectViewName(view))return projectAssets(state.assets,projectViewName(view)).length?view:'all';if(view==='hidden')return state.assets.some(isHidden)?'hidden':'all';return cats[view]&&categoryIds().includes(view)?view:'all';}
-function setView(next){if(!['all','upcoming','hidden'].includes(next)&&!cats[next]&&!projectViewName(next))return;view=next;writeViewPrefs();if(query){query='';$('#search').value='';}render();boardScroller().scrollTo(0,0);}
+// 组合视图: 'mix:<id>' shows the categories a state.views entry names, like 全部资产 limited to them (mix-view.js draws its sidebar and dialog).
+function boardMixes(){return cleanMixes(state.views,Object.keys(cats));}
+function mixOf(v){return typeof v==='string'&&v.startsWith('mix:')?boardMixes().find(x=>'mix:'+x.id===v)||null:null;}
+function mixAssets(mix){return liveAssets().filter(a=>mix.types.includes(a.type));}
+function currentView(){if(view==='all'||view==='upcoming')return view;if(mixOf(view))return view;if(projectViewName(view))return projectAssets(state.assets,projectViewName(view)).length?view:'all';if(view==='hidden')return state.assets.some(isHidden)?'hidden':'all';return cats[view]&&categoryIds().includes(view)?view:'all';}
+function setView(next){if(!['all','upcoming','hidden'].includes(next)&&!cats[next]&&!projectViewName(next)&&!mixOf(next))return;view=next;writeViewPrefs();if(query){query='';$('#search').value='';}render();boardScroller().scrollTo(0,0);}
 // 即将到来 has its own pair (list or month calendar); every other view list, grid or timeline, and 全部资产 the tile wall too (the
 // default; board-wall.js). A search is always a list or a grid; a view without the wall shows the list in its place.
 function setLayout(next){if(currentView()==='upcoming'&&!query){if(!['list','calendar'].includes(next)||next===upcomingMode)return;upcomingMode=next;}else{if(!['list','grid','timeline','wall'].includes(next)||next===shownLayout(currentView()))return;layoutMode=next;}writeViewPrefs();render();}
@@ -373,9 +377,9 @@ function renderSidebar(){
  if(rail){
   // Everything that is not in the column goes to the 更多 menu (railMoreHtml); its dot is the worst of the folded categories.
   const sum=folded.reduce((t,id)=>({overdue:t.overdue+stats[id].overdue,soon:t.soon+stats[id].soon}),{overdue:0,soon:0}),worst=worstLevel(sum),words=dueWords(sum);
-  railMoreParts={cats:folded.map(id=>catItem(id,true)).join(''),projects:projectNavHtml(),hidden:connectNavItem(false)+hiddenItem,tools};
-  const extra=!!(railMoreParts.projects||railMoreParts.hidden||tools),cur=currentView(),inside=!query&&!(typeof panoOpen!=='undefined'&&panoOpen)&&(folded.includes(cur)||cur==='hidden'||!!projectViewName(cur));
-  const curName=inside?(cats[cur]?.name||(cur==='hidden'?tr('已隐藏'):tr('项目 {name}',{name:projectViewName(cur)}))):'';
+  railMoreParts={cats:folded.map(id=>catItem(id,true)).join(''),projects:projectNavHtml()+(typeof mixNavHtml==='function'?mixNavHtml():''),hidden:connectNavItem(false)+hiddenItem,tools};
+  const extra=!!(railMoreParts.projects||railMoreParts.hidden||tools),cur=currentView(),inside=!query&&!(typeof panoOpen!=='undefined'&&panoOpen)&&(folded.includes(cur)||cur==='hidden'||!!projectViewName(cur)||!!mixOf(cur));
+  const curName=inside?(cats[cur]?.name||(cur==='hidden'?tr('已隐藏'):mixOf(cur)?mixOf(cur).name:tr('项目 {name}',{name:projectViewName(cur)}))):'';
   const more=folded.length||extra?`<button class="nav-item nav-more${inside?' active':''}" data-action="nav-more" data-id="more" aria-haspopup="menu" aria-expanded="false"${inside?' aria-current="page"':''}${worst?` data-due="${worst}"`:''} data-tip="${tr('更多')}${folded.length?` · ${folded.length}`:''}" aria-label="${tr('更多')}${folded.length?tr('，')+tr('{n} 个类别',{n:folded.length}):''}${words?tr('，')+words:''}${curName?tr('，')+tr('当前：{name}',{name:esc(curName)}):''}">${ui('more')}<span class="nav-label">${tr('更多')}</span>${railDot(worst)}</button>`:'';
   const catItems=shown.map(id=>catItem(id)).join('')+more;
   $('#sidebar').innerHTML=`${views}${catItems?`<div class="nav-group nav-cats" role="group" aria-labelledby="nav-cats-title"><h2 class="nav-title" id="nav-cats-title">${tr('类别')}</h2>${catItems}</div>`:''}`;
@@ -386,12 +390,12 @@ function renderSidebar(){
  const more=folded.length?`<button class="nav-item nav-more" data-action="nav-more" aria-expanded="${navMoreOpen}"${navMoreOpen?' aria-controls="nav-more-list"':''}${worst&&!navMoreOpen?` data-due="${worst}"`:''} aria-label="${word} ${tr('{n} 个类别',{n:folded.length})}">${ui(navMoreOpen?'chevron':'more')}<span class="nav-label">${word}</span>${navMoreOpen?'':navCount(folded.length,worst)}</button>${navMoreOpen?`<div class="nav-more-list" id="nav-more-list">${folded.map(id=>catItem(id)).join('')}</div>`:''}`:'';
  const catItems=shown.map(id=>catItem(id)).join('')+more;
  const pendingItem=connectNavItem(false);
- $('#sidebar').innerHTML=`${views}${catItems?`<div class="nav-group nav-cats" role="group" aria-labelledby="nav-cats-title"><h2 class="nav-title" id="nav-cats-title">${tr('类别')}</h2>${catItems}</div>`:''}${projectNavHtml()}${hidden||pendingItem?`<div class="nav-group">${pendingItem}${hidden?hiddenItem:''}</div>`:''}${tools?`<div class="nav-group nav-foot">${tools}</div>`:''}`;
+ $('#sidebar').innerHTML=`${views}${catItems?`<div class="nav-group nav-cats" role="group" aria-labelledby="nav-cats-title"><h2 class="nav-title" id="nav-cats-title">${tr('类别')}</h2>${catItems}</div>`:''}${projectNavHtml()}${typeof mixNavHtml==='function'?mixNavHtml():''}${hidden||pendingItem?`<div class="nav-group">${pendingItem}${hidden?hiddenItem:''}</div>`:''}${tools?`<div class="nav-group nav-foot">${tools}</div>`:''}`;
 }
 // 更多 on the rail: a menu beside it with the same entries the expanded sidebar would show (names, counts, dots), in #menu, so the
 // menu keys apply: ↑↓ Home End move, Enter picks, Esc or Tab close and Esc returns to 更多. A pick keeps focus on the column.
 let railMoreParts=null;
-function railMoreHtml(){const p=railMoreParts;if(!p)return '';return [p.cats,p.projects.replace(/<h2[^>]*>.*?<\/h2>/,''),p.hidden,p.tools].filter(Boolean).map(x=>`<div class="rail-menu-group">${x}</div>`).join('<div class="menu-sep" role="separator"></div>');}
+function railMoreHtml(){const p=railMoreParts;if(!p)return '';return [p.cats,p.projects.replace(/<h2[^>]*>.*?<\/h2>/g,''),p.hidden,p.tools].filter(Boolean).map(x=>`<div class="rail-menu-group">${x}</div>`).join('<div class="menu-sep" role="separator"></div>');}
 function openRailMore(anchor){
  const html=railMoreHtml();if(!html)return;hideRailTip();
  const menu=$('#menu');menuReturn=anchor;menu.innerHTML=html;menu.classList.add('rail-menu');menu.setAttribute('aria-label',tr('更多'));
@@ -414,12 +418,12 @@ function staleHtml(scope){
  return `<button class="meta-flag stale" data-action="stale-sync" data-id="${esc(worst.source)}" title="${esc(tip)}">${esc(worst.name)}<span class="mf-word"> ${tr('{n} 天没同步',{n:worst.days})}</span></button>`;
 }
 function renderHeader(v,shown){
- const title=query?tr('搜索'):v==='all'?tr('全部资产'):v==='upcoming'?tr('即将到来'):v==='hidden'?tr('已隐藏'):projectViewName(v)||cats[v].name;
+ const title=query?tr('搜索'):v==='all'?tr('全部资产'):v==='upcoming'?tr('即将到来'):v==='hidden'?tr('已隐藏'):mixOf(v)?.name||projectViewName(v)||cats[v].name;
  $('#view-title').textContent=title;
- const scope=query?[]:cats[v]?liveAssets().filter(a=>a.type===v):v==='all'?liveAssets():projectViewName(v)?projectAssets(state.assets,projectViewName(v)):[],l=dueLevels(scope);
+ const scope=query?[]:cats[v]?liveAssets().filter(a=>a.type===v):v==='all'?liveAssets():mixOf(v)?mixAssets(mixOf(v)):projectViewName(v)?projectAssets(state.assets,projectViewName(v)):[],l=dueLevels(scope);
  $('#view-meta').innerHTML=state.assets.length?`<span${shown>DISPLAY_LIMITS.count?` title="${tr('{n} 项',{n:shown})}"`:''}>${tr('{n} 项',{n:formatCount(shown)})}</span>${costMeta(v)}${v==='all'&&!query?'':`${l.overdue?`<span class="meta-flag overdue" title="${l.overdue} ${tr('已过期')}">${l.overdue}<span class="mf-word"> ${tr('已过期')}</span></span>`:''}${l.soon?`<span class="meta-flag soon" title="${l.soon} ${tr('即将到期')}">${l.soon}<span class="mf-word"> ${tr('即将到期')}</span></span>`:''}`}${staleHtml(scope)}`:'';
- $('#view-menu').hidden=!(cats[v]&&!query);$('#view-menu').dataset.id=cats[v]?v:'';
- if(cats[v])$('#view-menu').setAttribute('aria-label',tr('{name}类别设置',{name:cats[v].name}));
+ $('#view-menu').hidden=!((cats[v]||mixOf(v))&&!query);$('#view-menu').dataset.id=cats[v]||mixOf(v)?v:'';
+ if(cats[v])$('#view-menu').setAttribute('aria-label',tr('{name}类别设置',{name:cats[v].name}));else if(mixOf(v))$('#view-menu').setAttribute('aria-label',tr('编辑视图 {name}',{name:mixOf(v).name}));
  const toggle=$('#layout-toggle'),shown_=shownLayout(v),upcoming=v==='upcoming'&&!query;toggle.hidden=!state.assets.length;
  toggle.querySelectorAll('[data-action="layout"]').forEach(b=>{const id=b.dataset.id;b.hidden=upcoming?!['list','calendar'].includes(id):id==='calendar'||id==='timeline'&&(!!query||v==='hidden')||id==='wall'&&(!!query||v!=='all');});
  const density=$('#density-toggle');density.hidden=shown_!=='wall'||!state.assets.length;if(!density.hidden)density.innerHTML=densityButtons()+(freeOn()?`<button class="seg-button" data-action="wall-tidy" aria-label="${tr('排整齐')}" title="${tr('排整齐：每块面板回到最近一列的位置（⌘Z 撤销）')}">${ui('tidy')}</button>`:'');
@@ -501,7 +505,7 @@ function boardHtml(v){
   return {html,count:events.length+alerts.frozen.length};
  }
  if(layoutMode==='timeline'&&v!=='hidden'){
-  const scope=projectViewName(v)?projectAssets(state.assets,projectViewName(v)).filter(a=>!isHidden(a)):liveAssets().filter(a=>!cats[v]||a.type===v);
+  const scope=projectViewName(v)?projectAssets(state.assets,projectViewName(v)).filter(a=>!isHidden(a)):mixOf(v)?mixAssets(mixOf(v)):liveAssets().filter(a=>!cats[v]||a.type===v);
   return timelineHtml(categoryIds().map(id=>({id,title:cats[id].name,list:arranged(id,scope.filter(a=>a.type===id))})).filter(g=>g.list.length));
  }
  if(projectViewName(v))return projectBoardHtml(projectViewName(v));
@@ -514,6 +518,13 @@ function boardHtml(v){
   const list=arranged(v,live.filter(a=>a.type===v));
   const band=v==='ai'&&typeof aiQuotaBandHtml==='function'?aiQuotaBandHtml(list):groupNote(v,list);
   return {html:list.length?band+groupHtml({id:v,title:cats[v].name,list,reorder:true,head:false}):viewEmpty(`<span class="g-icon">${icon(v)}</span>`,tr('还没有{name}',{name:esc(cats[v].name)}),`<button class="button" data-action="add-asset" data-id="${v}">${ui('plus')}${tr('添加')}</button>`),count:list.length};
+ }
+ const mix=mixOf(v);
+ if(mix){
+  // A 组合视图 is 全部资产 limited to its categories: the same blocks in the same order, folding and moving shared with it.
+  const own=mixAssets(mix),ids=[...categoryIds(),...mix.types].filter((id,i,all)=>mix.types.includes(id)&&all.indexOf(id)===i);
+  const body=ids.map(id=>{const list=arranged(id,own.filter(a=>a.type===id));if(!list.length)return '';const folded=!!state.blocks.find(b=>b.id===id)?.folded;return groupHtml({id,title:cats[id].name,glyph:typeGlyph(id),list,fold:true,folded,reorder:true});}).join('');
+  return {html:body?overviewHtml(own)+body:viewEmpty(ui('stack'),tr('{name}里还没有资产',{name:esc(mix.name)}),`<button class="button" data-action="category-menu" data-id="mix:${esc(mix.id)}">${tr('编辑视图')}</button>`),count:own.length};
  }
  const html=shownLayout(v)==='wall'?live.length?wallBoardHtml(live):'':categoryIds().map(id=>{const list=arranged(id,live.filter(a=>a.type===id));if(!list.length)return '';const folded=!!state.blocks.find(b=>b.id===id)?.folded;return groupHtml({id,title:cats[id].name,glyph:typeGlyph(id),list,fold:true,folded,reorder:true,summary:groupSummary(list)+groupCostHtml(list),actions:categoryActions(id),note:groupNote(id,list)});}).join('');
  return {html:html?overviewHtml(live)+html:viewEmpty(ui('stack'),tr('没有显示中的资产')),count:live.length};
@@ -3065,7 +3076,7 @@ document.addEventListener('click',e=>{const button=e.target.closest('[data-actio
  else if(action==='wall-tidy')freeTidyWall();
  else if(action==='calendar-month')shiftCalendar(Number(id));
  else if(action==='asset-menu'){if(!$('#menu').hidden&&$('#menu').anchor===button){closeMenu();return;}const a=state.assets.find(x=>x.id===id);if(a)openMenu(assetMenuItems(a),{anchor:button});}
- else if(action==='category-menu'){if(cats[button.dataset.id])settings(button.dataset.id);}
+ else if(action==='category-menu'){if(cats[button.dataset.id])settings(button.dataset.id);else if(mixOf(button.dataset.id)&&typeof mixDialog==='function')mixDialog(mixOf(button.dataset.id).id);}
  else if(action==='toast-close')hideToast();
  else if(action==='missed-view'){hideToast();setView('upcoming');}
  else if(action==='nav-more'){if(railOn()){if(!$('#menu').hidden&&$('#menu').anchor===button){closeMenu();return;}openRailMore(button);return;}navMoreOpen=!navMoreOpen;writeViewPrefs();renderSidebar();$('#sidebar .nav-more')?.focus();}

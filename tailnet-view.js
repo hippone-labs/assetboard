@@ -15,7 +15,9 @@ function tailnetRefresh(){
  return true;
 }
 function tailnetDue(){if(document.visibilityState!=='hidden'&&tailnetOn()&&Date.now()-tailnetAsked>=TAILNET_MS)tailnetRefresh();}
-function tailnetSwitch(on){if(on){tailnetAsked=0;tailnetRefresh();}}
+// The app keeps the switch (nativeStore.tailnetOn): the page's own storage starts empty each launch.
+function tailnetSwitch(on){if(tailnetHost())try{window.webkit.messageHandlers.assetboard.postMessage({action:'tailnetStatus',remember:!!on,read:false});}catch{}if(on){tailnetAsked=0;tailnetRefresh();}}
+if(tailnetHost()&&typeof nativeStore.tailnetOn==='boolean'&&nativeStore.tailnetOn!==featureOn('tailnet'))setFeature('tailnet',nativeStore.tailnetOn);
 window.assetboardTailnet=answer=>{
  tailnetBusy=0;
  const read=parseTailnet(answer);if(!read)return;
