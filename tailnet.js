@@ -50,7 +50,9 @@
   const kind=type==='device'?'device':'server',v4=n.ips.filter(ip=>D.normalizeIp(ip)?.version===4);
   const base={type:kind,name:n.name,account:'',purpose:'',reason:'',date:'',dateKind:'expire',cycle:'',cost:'未知',notes:'',url:'',host:n.dns||v4[0]||n.ips[0]||'',
    ...(n.ips.length?{ips:n.ips.slice(0,4)}:{}),source:'tailscale',externalId:n.id||n.dns,art:'generic'};
-  return kind==='device'?{...base,provider:['macos','ios','ipados'].includes(n.os)?'Apple':''}:{...base,provider:''};
+  // iOS reports both iPhone and iPad as ios; the machine's name tells them apart more often than not.
+  const deviceKind={macos:'mac',ipados:'ipad',ios:/ipad/i.test(n.name)?'ipad':'iphone',android:'phone',windows:'computer'}[n.os]||'other';
+  return kind==='device'?{...base,provider:['macos','ios','ipados'].includes(n.os)?'Apple':'',deviceKind}:{...base,provider:''};
  }
  const api={TAILNET_TYPES:TYPES,parseTailnet,tailnetMatch,tailnetUnmatched,tailnetKind:kindOf,tailnetRecord};
  if(node)module.exports=api;else Object.assign(window,api);

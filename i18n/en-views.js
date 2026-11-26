@@ -581,6 +581,13 @@ Object.assign(I18N.en,{
  '离线':'Offline',
  '离线 · {ago}':'Offline · {ago}',
  'Tailscale 在线状态':'Tailscale online status',
+ // 设备种类 (asset-data.js DEVICE_KINDS) and the device form's warranty date.
+ '保修到期':'Warranty until',
+ '种类':'Kind',
+ '设备种类':'Device kind',
+ '手机':'Phone',
+ '电脑':'Computer',
+ '路由器':'Router',
  '在本机运行 tailscale status --json，给 tailnet 里能对上的服务器和设备显示在线或离线、最后在线时间；不探测、不联网，读数只在内存里':'Runs tailscale status --json on this Mac and shows the servers and devices it can match in your tailnet as online or offline, with when they were last seen; no probing, no network request, readings kept in memory only',
  'Tailscale：{status}':'Tailscale: {status}',
  '从 Tailscale 添加':'Add from Tailscale',

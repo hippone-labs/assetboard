@@ -41,5 +41,8 @@ test('the nodes not on the board, and the record each becomes',()=>{
  assert.deepEqual([mac.type,mac.provider,mac.host,mac.ips,mac.source,mac.externalId],['device','Apple','hansmac-mini.tail0.ts.net',['100.79.13.91','fd7a:115c::1'],'tailscale','n1']);
  assert.deepEqual([server.type,server.provider,server.host,server.cost],['server','','aether-home.tail0.ts.net','未知']);
  assert.equal(asServer.type,'server','the person may record a phone as a server, or the other way round');
+ assert.equal(mac.deviceKind,'mac');assert.equal(T.tailnetRecord(nodes[2]).deviceKind,'iphone','iOS is an iPhone');
+ assert.equal(T.tailnetRecord({...nodes[2],name:'Hans iPad'}).deviceKind,'ipad','unless its name says iPad');
+ assert.equal(asServer.deviceKind,undefined,'a server has no device kind');
  assert.equal(T.tailnetMatch(mac,nodes)?.id,'n1','a record made from a node matches it again');
 });

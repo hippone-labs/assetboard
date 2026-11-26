@@ -50,8 +50,12 @@ async (page) => {
   await p.selectOption('[data-tailnet-kind="n3"]','device');
   await p.click('[data-action="tailnet-add"][data-id="n3"]');
   const added=await p.evaluate(()=>state.assets.find(a=>a.source==='tailscale'));
-  check(added?.type==='device'&&added.name==='iPhone 16'&&added.externalId==='n3'&&added.host==='iphone-16.tail0.ts.net'&&added.provider==='Apple','the phone recorded as a device: '+JSON.stringify(added));
+  check(added?.type==='device'&&added.name==='iPhone 16'&&added.externalId==='n3'&&added.host==='iphone-16.tail0.ts.net'&&added.provider==='Apple'&&added.deviceKind==='iphone','the phone recorded as a device, an iPhone: '+JSON.stringify(added));
   check(/在线 · Tailscale/.test(await rowText(added.id)),'and it shows online at once');
+  await p.evaluate(id=>showDetail(id),added.id);
+  check(await p.evaluate(()=>/种类\s*iPhone/.test(document.querySelector('#detail').textContent)&&/Tailscale\s*在线 · iphone-16\.tail0\.ts\.net/.test(document.querySelector('#detail').textContent)),'the inspector says what it is and what it was matched to');
+  check(await p.evaluate(id=>!!document.querySelector(`#board [data-asset="${id}"] .tile path[d="M11 18.5h2"]`),added.id),'its tile is a phone');
+  await p.evaluate(()=>closeDetail());
   check(await p.evaluate(()=>document.querySelectorAll('[data-action="tailnet-add"]').length===1),'the list now has only the Pi');
   await p.click('#toast .toast-undo');
   check(await p.evaluate(()=>!state.assets.some(a=>a.source==='tailscale')),'undo takes the record back');
@@ -61,6 +65,6 @@ async (page) => {
   check(await p.evaluate(()=>/Tailscale 没有连接/.test(document.querySelector('#modal-content').textContent)),'a stopped Tailscale says so');
   check(!/Tailscale/.test(await rowText('s1')),'and no row claims a status');
   check(!errors.length,errors.join(' | '));
-  return 'PASS: off until switched, a matched server offline with its last-seen time and a device online, nothing for others, 从 Tailscale 添加 lists what is not on the board as device or server, adds with undo, a stopped Tailscale';
+  return 'PASS: off until switched, a matched server offline with its last-seen time and a device online, nothing for others, 从 Tailscale 添加 lists what is not on the board as device or server, adds with undo (an iPhone with its kind, the inspector row, a phone tile), a stopped Tailscale';
  } finally { await context.close(); }
 }

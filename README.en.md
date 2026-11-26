@@ -72,6 +72,7 @@ The full host list is in the [user guide](GUIDE.md#隐私与网络) (Chinese).
 
 - A server can hold up to 4 IPs and an SSH host, user and port.
 - A bank card holds only the last four digits, network and expiry; the form refuses full card numbers.
+- A device records its kind (Mac, iPhone, iPad, Apple Watch, phone, computer, router, other) and its warranty date, which is reminded like any date; devices hold no amount and stay out of the monthly costs.
 - A link's meaning follows from the two categories: a domain points to a server or deployment, a repository deploys to a deployment, a bank card pays for a subscription, an Apple ID or Google account is used to sign in, a phone number receives verification codes.
 - An asset can belong to one or more projects, and a project's assets add up to what the whole project costs: per month, by category, over the next 12 months; with a monthly revenue it shows the net, and an asset shared by several projects is split between them.
 

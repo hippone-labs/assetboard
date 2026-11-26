@@ -37,6 +37,12 @@ function tailnetRowHtml(a){
  return `<span class="r-probe live-line ${s.online?'on':'off'}${s.tone?' '+s.tone:''}" role="group" aria-label="${esc(words)}" title="${esc(words)}"><i class="probe-dot" role="img" aria-label="${esc(s.text)}"></i><span class="live-text">${esc(s.text)} · Tailscale</span></span>`;
 }
 
+// The inspector's row (app.js detailFacts): the status and the node's MagicDNS name, so the person sees what it was matched to.
+function tailnetFactHtml(a){
+ const s=tailnetStatusOf(a);if(!s)return '';
+ return `<div class="fact"><span>Tailscale</span><span class="live-line ${s.online?'on':'off'}${s.tone?' '+s.tone:''}"><i class="probe-dot" role="img" aria-label="${esc(s.text)}"></i> ${esc(s.text)}${s.node.dns?` · ${esc(veilHost(s.node.dns))}`:''}</span></div>`;
+}
+
 // 导入 › Tailscale: the nodes not on the board yet, each recorded as a device or a server with one click (one undo step each).
 function tailnetDialog(){
  if(!tailnetHost()){modal(tr('从 Tailscale 添加'),`<p>${tr('只在 Mac App 里可用，演示模式不读取。')}</p>`,'tailnet');return;}
