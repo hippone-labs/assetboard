@@ -973,7 +973,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         case "unpair": pairing.unpair(text("id", 32))
         case "sync": pairing.setSync(text("id", 32), body["on"] as? Bool == true, first: body["first"] as? String, since: body["since"] as? Double, done: body["done"] as? Bool)
         case "read": pairing.read(text("id", 32)) { [weak self] reply in self?.sendToPage("assetboardPeerFacts", reply) }
-        case "readBoard": pairing.read(text("id", 32), kind: "board") { [weak self] reply in self?.sendToPage("assetboardPeerBoard", reply) }
+        case "readBoard":
+            // The answer goes to the page with the base it merges against (syncBase below keeps the next one).
+            pairing.read(text("id", 32), kind: "board") { [weak self] reply in
+                var reply = reply
+                if let id = reply["id"] as? String, let base = pairing.store.syncBase(id) { reply["base"] = base }
+                self?.sendToPage("assetboardPeerBoard", reply)
+            }
+        case "syncBase": if let base = body["base"] as? [String: Any] { pairing.store.setSyncBase(text("id", 32), base) }
+        case "conflicts": pairing.store.conflicts = (body["list"] as? [[String: Any]]) ?? []
         case "tailnet":
             DispatchQueue.global(qos: .userInitiated).async {
                 let tailnet = TailnetMacs.read()
@@ -1445,6 +1453,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         // Two switches in 设置 that the app keeps (UserDefaults); the page shows them and answers through `preference`.
         initial["statusItem"] = !UserDefaults.standard.bool(forKey: AppDelegate.statusItemHiddenKey)
         initial["autoUpdate"] = Updater.automatic
+        initial["syncConflicts"] = demoMode ? [] : pairing?.store.conflicts ?? []
         // Tailscale 在线状态 (tailnet-view.js): kept here, since the page's own storage does not outlive the app.
         initial["tailnetOn"] = !demoMode && UserDefaults.standard.bool(forKey: "tailnetStatusOn")
         initial["lang"] = AppLanguage.current

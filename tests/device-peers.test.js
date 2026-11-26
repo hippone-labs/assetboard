@@ -91,3 +91,47 @@ test('sync: 组合视图 stay on each Mac (a backup carries them, a sync does no
  assert.deepEqual((r.board.views||[]).map(v=>v.id),['mine'],'no view comes over, the own one stays');
  assert.equal(P.syncBoards(boardOf([me]),theirs).board.views,undefined,'a deleted view does not come back');
 });
+
+test('三方合并: each Mac’s change to a different field survives, even when the other’s record is newer',()=>{
+ const base={a:rec('a','a.example.com',1,{notes:'old',provider:'Namecheap'})};
+ const mine=boardOf([me,rec('a','a.example.com',10,{notes:'mine',provider:'Namecheap'})]);
+ const theirs=boardOf([them,rec('a','a.example.com',20,{notes:'old',provider:'Porkbun'})]);
+ const r=P.syncBoards(mine,theirs,{base});
+ const a=r.board.assets.find(x=>x.id==='a');
+ assert.deepEqual([a.notes,a.provider,a.updatedAt],['mine','Porkbun',at(20)],'my notes and their provider, the newer time');
+ assert.deepEqual(r.conflicts,[]);
+ assert.equal(r.counts.updated,1);
+ assert.equal(r.base.a.provider,'Porkbun','the next base is their copy as received');
+ const whole=P.syncBoards(mine,theirs);
+ assert.equal(whole.board.assets.find(x=>x.id==='a').notes,'old','without a base the newer record wins whole, as before');
+});
+
+test('三方合并: a field both changed is a conflict; the newer value is kept and reported',()=>{
+ const base={a:rec('a','a.example.com',1,{notes:'old'})};
+ const mine=boardOf([me,rec('a','a.example.com',10,{notes:'mine'})]),theirs=boardOf([them,rec('a','a.example.com',20,{notes:'theirs'})]);
+ const r=P.syncBoards(mine,theirs,{base});
+ assert.equal(r.board.assets.find(x=>x.id==='a').notes,'theirs');
+ assert.deepEqual(r.conflicts,[{id:'a',name:'a.example.com',field:'notes',mine:'mine',theirs:'theirs',kept:'theirs'}]);
+ const back=P.syncBoards(boardOf([me,rec('a','a.example.com',30,{notes:'mine again'})]),theirs,{base});
+ assert.equal(back.board.assets.find(x=>x.id==='a').notes,'mine again','my newer edit is kept');
+ assert.equal(back.conflicts[0].kept,'mine');
+});
+
+test('三方合并: links merge as sets, and the two Macs end the same',()=>{
+ const old=rec('a','a.example.com',1,{links:['x'],notes:'n'});
+ const onA=rec('a','a.example.com',10,{links:['x','fromA'],notes:'n'}),onB=rec('a','a.example.com',20,{links:['fromB'],notes:'n',provider:'Porkbun'});
+ const A=P.syncBoards(boardOf([me,onA]),boardOf([them,onB]),{base:{a:old}}),B=P.syncBoards(boardOf([them,onB]),boardOf([me,onA]),{base:{a:old}});
+ const ra=A.board.assets.find(x=>x.id==='a'),rb=B.board.assets.find(x=>x.id==='a');
+ assert.deepEqual([...ra.links].sort(),['fromA','fromB'],'A adds its link and theirs, and drops the one B removed');
+ assert.deepEqual({...ra,links:[...ra.links].sort()},{...rb,links:[...rb.links].sort()},'both Macs end with the same record');
+ assert.equal(P.syncBoards(A.board,boardOf([them,rb]),{base:A.base}).counts.updated,0,'and the next sync changes nothing');
+});
+
+test('sync: another Mac’s clock running fast is corrected before times are compared',()=>{
+ const hour=3600e3,mine=boardOf([me,rec('a','mine.example.com',10)]);
+ // Edited there an hour before the edit here, on a clock two hours fast.
+ const theirs=boardOf([them,{...rec('a','theirs.example.com',10),updatedAt:new Date(Date.parse(at(10))-hour+2*hour).toISOString()}]);
+ assert.equal(P.syncBoards(mine,theirs).board.assets.find(x=>x.id==='a').name,'theirs.example.com','uncorrected, the fast clock wins');
+ assert.equal(P.syncBoards(mine,theirs,{skew:2*hour}).board.assets.find(x=>x.id==='a').name,'mine.example.com','corrected, the later edit here wins');
+ assert.equal(P.syncBoards(mine,theirs,{skew:P.SKEW_MIN-1}).board.assets.find(x=>x.id==='a').name,'theirs.example.com','a small offset is left alone');
+});

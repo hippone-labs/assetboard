@@ -3,6 +3,13 @@
 // that Mac's device record (device-peers.js) and its 正在做 reading (shown on its screen in the object panorama). Only in the
 // Mac app with the feature on; the demo and the browser have no other Macs. Loaded after device-view.js.
 let peersNow={peers:[],found:[],listening:false,tailnet:null},peerPairing=null,peerLast={},peerAsked=0;
+// Per paired Mac: its clock minus this one (ms), from its last answer (device-peers.js syncBoards corrects with it); the base last
+// handed to the app, so an unchanged one is not written again.
+const peerSkew={},peerBaseSent={};
+// 同步冲突: a field both Macs changed since the last sync, the newer value kept (device-peers.js mergeRecord). Kept by the app
+// (devices/conflicts.json) until the person takes the other value or dismisses it.
+let syncConflicts=Array.isArray(nativeStore?.syncConflicts)?nativeStore.syncConflicts.filter(c=>c&&typeof c.id==='string'&&typeof c.field==='string'):[];
+function keepConflicts(){syncConflicts=syncConflicts.slice(-100);peersSend({op:'conflicts',list:syncConflicts});}
 function peersOn(){return featureOn('peers')&&!!nativeStore&&!demoMode;}
 function peersSend(message){try{window.webkit.messageHandlers.assetboard.postMessage({action:'peers',...message});}catch{}}
 // 同步资产板, per paired Mac: {on, first:'here'|'there'|'merge', since (ms), done}. 'here' takes from that Mac only what changed there
@@ -50,6 +57,7 @@ window.assetboardPeerFacts=answer=>{
  const id=answer?.id;if(typeof id!=='string'||!peersOn())return;
  if(answer.ok!==true){peerLast[id]={...peerLast[id],error:String(answer.error||'unreachable')};if(peersOpenView())peersDialog();return;}
  const facts=parsePeerFacts(answer);if(!facts)return;
+ if(typeof answer.at==='string'&&!isNaN(Date.parse(answer.at)))peerSkew[id]=Date.parse(answer.at)-Date.now();
  peerLast[id]={at:facts.at,error:''};
  if(facts.sessions&&typeof codingReadings!=='undefined'&&featureOn('codingSessions'))codingReadings={...codingReadings,[facts.sessions.host.id]:facts.sessions};
  const merged=mergePeer(state,facts);
@@ -61,22 +69,45 @@ window.assetboardPeerBoard=answer=>{
  const id=answer?.id;if(typeof id!=='string'||!peersOn()||!peerSyncOn(id))return;
  const pref=peerSyncOf(id);
  if(answer.ok!==true){peerLast[id]={...peerLast[id],syncError:String(answer.error||'unreachable')};if(peersOpenView())peersDialog();return;}
- const r=syncBoards(state,answer.board,{first:pref.done?(pref.first==='here'?'here':''):pref.first,since:pref.first==='here'?pref.since:0});
+ const r=syncBoards(state,answer.board,{first:pref.done?(pref.first==='here'?'here':''):pref.first,since:pref.first==='here'?pref.since:0,base:answer.base&&typeof answer.base==='object'?answer.base:null,skew:peerSkew[id]||0});
  if(r.error){peerLast[id]={...peerLast[id],syncError:r.error};return;}
+ const baseText=JSON.stringify(r.base);if(peerBaseSent[id]!==baseText){peerBaseSent[id]=baseText;peersSend({op:'syncBase',id,base:r.base});}
+ const name_=peersNow.peers.find(p=>p.id===id)?.name||'Mac',fresh=r.conflicts.filter(c=>!syncConflicts.some(x=>x.id===c.id&&x.field===c.field&&JSON.stringify(x.theirs)===JSON.stringify(c.theirs)&&JSON.stringify(x.mine)===JSON.stringify(c.mine)));
+ if(fresh.length){syncConflicts=[...syncConflicts.filter(x=>!fresh.some(c=>c.id===x.id&&c.field===x.field)),...fresh.map(c=>({...c,peer:id,peerName:name_,at:new Date().toISOString()}))];keepConflicts();}
  peerLast[id]={...peerLast[id],syncError:'',syncAt:new Date().toISOString()};
  if(!pref.done)setPeerSync(id,{...pref,done:true});
  if(r.changed){
   for(const key of Object.keys(state))delete state[key];Object.assign(state,r.board);
   save();render();
   const c=r.counts,name=peersNow.peers.find(p=>p.id===id)?.name||'Mac',parts=[c.added?tr('新增 {n}',{n:c.added}):'',c.updated?tr('更新 {n}',{n:c.updated}):'',c.removed?tr('删除 {n}',{n:c.removed}):''].filter(Boolean);
+  if(fresh.length)parts.push(tr('{n} 处两边都改了，用了较新的',{n:fresh.length}));
+  else if(!parts.length)parts.push(tr('已合并'));
   if(parts.length)toast(tr('从 {name} 同步：{what}',{name,what:parts.join(tr('，'))}));
  }
+ else if(fresh.length)toast(tr('{n} 处两边都改了，用了这台较新的修改',{n:fresh.length}));
  if(peersOpenView())peersDialog();
 };
+// 同步冲突 in 其他设备: what both Macs changed, which value was kept, and one click to take the other one (an edit like any other:
+// one undo step, and it reaches the other Mac at the next sync, being the only change since).
+const CONFLICT_FIELDS={name:tr('名称'),provider:tr('平台'),account:tr('账号'),purpose:tr('用途'),reason:tr('保留原因'),date:tr('日期'),dateKind:tr('日期类型'),cycle:tr('重复'),cost:tr('费用'),notes:tr('备注'),url:tr('管理链接'),hiddenAt:tr('隐藏'),project:tr('项目')};
+const conflictValue=v=>v===null||v===undefined||v===''?tr('（空）'):typeof v==='string'?v.slice(0,80):JSON.stringify(v).slice(0,80);
+function syncConflictsHtml(){
+ const live=syncConflicts.filter(c=>state.assets.some(a=>a.id===c.id));if(!live.length)return '';
+ return `<h3>${tr('同步冲突')} <span class="quiet-fact">${live.length}</span></h3><ul class="peer-list sync-conflicts">${live.map(c=>{const i=syncConflicts.indexOf(c),kept=c.kept==='theirs'?c.theirs:c.mine,other=c.kept==='theirs'?c.mine:c.theirs,from=c.kept==='theirs'?c.peerName||'Mac':tr('这台');
+  return `<li><span><b>${esc(c.name||c.id)}</b> · ${esc(CONFLICT_FIELDS[c.field]||c.field)}<br><span class="quiet-fact">${tr('用了{from}的「{value}」，另一边是「{other}」',{from:esc(from),value:esc(conflictValue(kept)),other:esc(conflictValue(other))})}</span></span>
+   <span class="conflict-actions"><button class="button" data-action="sync-conflict-swap" data-id="${i}">${tr('换成另一边')}</button><button class="text-button" data-action="sync-conflict-ok" data-id="${i}">${tr('知道了')}</button></span></li>`;}).join('')}</ul>`;
+}
+function syncConflictSwap(i){
+ const c=syncConflicts[i],a=c&&state.assets.find(x=>x.id===c.id);if(!a)return;
+ const other=c.kept==='theirs'?c.mine:c.theirs;
+ checkpoint();if(other===null||other===undefined)delete a[c.field];else a[c.field]=structuredClone(other);touchAsset(a);
+ syncConflicts.splice(i,1);keepConflicts();save();render();if(activeAsset===a.id)showDetail(a.id,{focus:false});peersDialog();
+ toast(tr('{name} 的{field}换成了另一边',{name:a.name,field:CONFLICT_FIELDS[c.field]||c.field}),true);
+}
 function peerSyncDialog(id){
  const x=peersNow.peers.find(p=>p.id===id);if(!x)return;
  const there=esc(x.name);
- modal(tr('和 {name} 同步资产板',{name:there}),`<p>${tr('两台 Mac 的资产板会合并：每条记录以较新的修改为准，一边删掉的另一边也删掉。设备记录不同步，每台只记自己。两台都要打开同步才会开始。')}</p>
+ modal(tr('和 {name} 同步资产板',{name:there}),`<p>${tr('两台 Mac 的资产板会合并：一条记录两边改了不同的地方，两处修改都留下；两边改了同一处，用较新的，并在这里列出，可以换成另一边。一边删掉的另一边也删掉。设备记录和组合视图不同步，每台只记自己。两台都要打开同步才会开始。')}</p>
   <p>${tr('第一次同步以哪台为准？')}</p>
   <div class="peer-sync-choices">
    <button class="button primary" data-action="peers-sync-start" data-id="${esc(id)}" data-first="here">${tr('以这台为准')}<small>${tr('只接收 {name} 之后的修改；它上面的旧记录不会拿过来',{name:there})}</small></button>
@@ -121,6 +152,7 @@ function peersDialog(){
  const tailnet=macs.length?`<ul class="peer-list">${macs.map(m=>`<li><span>${esc(m.name)} <span class="quiet-fact">${esc(m.dns||m.host)}${m.online?'':' · '+tr('离线')}</span></span><button class="button" data-action="peers-pair-host" data-host="${esc(m.host)}">${tr('配对')}</button></li>`).join('')}</ul>`:tn?.state==='stopped'?`<p class="quiet-fact">${tr('Tailscale 没有连接，连上后再打开这里')}</p>`:'';
  const nearby=found.length?`<ul class="peer-list">${found.map(n=>`<li><span>${esc(n)}</span><button class="button" data-action="peers-pair" data-id="${esc(n)}">${tr('配对')}</button></li>`).join('')}</ul>`:`<p class="quiet-fact">${peersNow.listening?tr('这个网络里没找到开着 Assetboard 的 Mac'):tr('正在启动……')}</p>`;
  modal(tr('其他设备'),`<h3>${tr('已配对')}</h3>${paired}
+  ${syncConflictsHtml()}
   <h3>${tr('同一网络里的 Mac')}</h3>${nearby}
   ${tn?.state==='ok'||tn?.state==='stopped'?`<h3>${tr('Tailscale 里的 Mac')}</h3>${tailnet||`<p class="quiet-fact">${tr('Tailscale 里没有可以配对的 Mac')}</p>`}`:''}
   <h3>${tr('按地址添加')}</h3><p class="form-note">${tr('不在同一网络时，填对方的 Tailscale 地址或 MagicDNS 名，例如 mac-mini.tailnet-name.ts.net 或 100.64.0.7。对方要开着 Assetboard，并打开「其他设备」。')}</p>
@@ -138,6 +170,8 @@ document.addEventListener('click',async e=>{
  else if(action==='peers-confirm'){const mode=el.dataset.mode==='merge'?'merge':'there';peersSend({op:'confirm',ok:id==='yes',mode});}
  else if(action==='peers-read'){peerAsked=0;peersDue();toast(tr('正在读取'));}
  else if(action==='peers-sync')peerSyncDialog(id);
+ else if(action==='sync-conflict-swap')syncConflictSwap(Number(id));
+ else if(action==='sync-conflict-ok'){syncConflicts.splice(Number(id),1);keepConflicts();peersDialog();}
  else if(action==='peers-sync-start'){const first=['here','there','merge'].includes(el.dataset.first)?el.dataset.first:'merge';setPeerSync(id,{on:true,first,since:Date.now(),done:false});peersSend({op:'sync',id,on:true});peersSend({op:'readBoard',id});peersDialog();toast(tr('已打开同步'));}
  else if(action==='peers-sync-stop'){setPeerSync(id,null);peersSend({op:'sync',id,on:false});peersDialog();}
  else if(action==='peers-unpair'){
