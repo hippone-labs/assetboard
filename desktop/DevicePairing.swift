@@ -128,11 +128,27 @@ final class PeerStore {
     }
     func peer(publicKey: Data) -> Peer? { peers.first { $0.publicKey == publicKey.base64EncodedString() } }
     func add(_ peer: Peer) { peers.removeAll { $0.id == peer.id }; peers.append(peer); save() }
-    func remove(id: String) { peers.removeAll { $0.id == id }; save() }
+    func remove(id: String) { peers.removeAll { $0.id == id }; save(); setSyncBase(id, nil) }
+    /// 三方合并 (device-peers.js syncBoards): per paired Mac, its own copy of each record as this Mac last received it. The page
+    /// merges against it and hands back the next one; dropped when the pairing or its sync ends.
+    private func baseFile(_ id: String) -> URL? { id.range(of: #"^[0-9a-f]{16}$"#, options: .regularExpression) == nil ? nil : directory.appendingPathComponent("sync-base-\(id).json") }
+    func syncBase(_ id: String) -> [String: Any]? {
+        guard let url = baseFile(id), let data = try? Data(contentsOf: url) else { return nil }
+        return (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+    }
+    func setSyncBase(_ id: String, _ base: [String: Any]?) {
+        guard let url = baseFile(id) else { return }
+        if let base { try? PeerStore.write(base, to: url) } else { try? FileManager.default.removeItem(at: url) }
+    }
+    /// The sync conflicts the person has not looked at yet (the page's list, at most 100), kept across launches.
+    var conflicts: [[String: Any]] {
+        get { (try? Data(contentsOf: directory.appendingPathComponent("conflicts.json"))).flatMap { try? JSONSerialization.jsonObject(with: $0) as? [[String: Any]] } ?? [] }
+        set { try? PeerStore.write(Array(newValue.prefix(100)), to: directory.appendingPathComponent("conflicts.json")) }
+    }
     func setSync(id: String, on: Bool, first: String? = nil, since: Double? = nil, done: Bool? = nil) {
         guard let at = peers.firstIndex(where: { $0.id == id }) else { return }
         peers[at].sync = on
-        if !on { peers[at].syncFirst = nil; peers[at].syncSince = nil; peers[at].syncDone = nil }
+        if !on { peers[at].syncFirst = nil; peers[at].syncSince = nil; peers[at].syncDone = nil; setSyncBase(id, nil) }
         if let first, ["here", "there", "merge"].contains(first) { peers[at].syncFirst = first }
         if let since, since > 0 { peers[at].syncSince = since }
         if let done { peers[at].syncDone = done }
@@ -693,6 +709,15 @@ func testDevicePairing() {
     precondition(answer?["ok"] as? Bool == false, "after unpairing nothing is answered")
     a.stop(); b.stop(); c.stop()
 
+    // 三方合并's base: kept per paired Mac, 0600, gone when the pairing goes; a bad id writes nothing.
+    let someone = "0123456789abcdef"
+    a.store.setSyncBase(someone, ["r1": ["id": "r1", "name": "x"]])
+    precondition((a.store.syncBase(someone)?["r1"] as? [String: Any])?["name"] as? String == "x", "the base is kept")
+    precondition((try? FileManager.default.attributesOfItem(atPath: a.store.directory.appendingPathComponent("sync-base-\(someone).json").path))?[.posixPermissions] as? Int == 0o600, "the base is 0600")
+    a.store.setSyncBase("../escape", ["r": [:]]); precondition(a.store.syncBase("../escape") == nil, "a bad id writes nothing")
+    a.store.remove(id: someone); precondition(a.store.syncBase(someone) == nil, "unpairing drops the base")
+    a.store.conflicts = [["id": "r1", "field": "notes"]]; precondition(a.store.conflicts.count == 1, "conflicts are kept")
+
     // Tailscale's status: the other Macs only (not this one, not Linux), online first, by MagicDNS name or else the 100.x address.
     let tailnet = """
     {"BackendState":"Running","Self":{"HostName":"This Mac","OS":"macOS","DNSName":"this-mac.tail0.ts.net.","TailscaleIPs":["100.64.0.1","fd7a::1"]},
@@ -714,5 +739,5 @@ func testDevicePairing() {
     let nas = nodes.first { $0["name"] as? String == "nas" }, studio = nodes.first { $0["name"] as? String == "Studio" }
     precondition(nas?["os"] as? String == "linux" && nas?["dns"] as? String == "nas.tail0.ts.net" && nas?["lastSeen"] as? String == "", "a node seen now has no last-seen time")
     precondition(studio?["online"] as? Bool == false && studio?["lastSeen"] as? String == "2026-11-26T08:00:00Z" && studio?["id"] as? String == "n9", "an offline node keeps when it was last seen")
-    print("PASS: device pairing: board only to a Mac that syncs, one code on both screens, one confirmation on the Mac asked, syncing from the start, key 0600 and kept across restarts, sealed read; unpaired, tampered, stale and replayed requests unanswered; declined pairing and unpairing; the tailnet's other Macs from Tailscale's status, reached by their 100.x address; every other node with its system and last-seen time")
+    print("PASS: device pairing: board only to a Mac that syncs, one code on both screens, one confirmation on the Mac asked, syncing from the start, key 0600 and kept across restarts, sealed read; unpaired, tampered, stale and replayed requests unanswered; declined pairing and unpairing; the tailnet's other Macs from Tailscale's status, reached by their 100.x address; every other node with its system and last-seen time; the sync base per paired Mac and the conflicts kept")
 }
