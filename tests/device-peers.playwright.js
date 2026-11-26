@@ -40,11 +40,11 @@ async (page) => {
 
   // Opening it also asks the local Tailscale for the tailnet's Macs; one is paired with a click instead of a typed address.
   check((await sent('tailnet')).length===1,'opening it asks for the tailnet Macs');
-  await p.evaluate(()=>window.assetboardPeers({tailnet:{state:'ok',macs:[{name:'mac-mini',host:'mac-mini.tail0.ts.net',online:true},{name:'Studio',host:'studio.tail0.ts.net',online:false},{name:'bad',host:'x;y',online:true}]}}));
+  await p.evaluate(()=>window.assetboardPeers({tailnet:{state:'ok',macs:[{name:'mac-mini',host:'100.64.0.7',dns:'mac-mini.tail0.ts.net',online:true},{name:'Studio',host:'100.64.0.9',dns:'studio.tail0.ts.net',online:false},{name:'bad',host:'x;y',online:true}]}}));
   const tailnet=await p.evaluate(()=>({hosts:[...document.querySelectorAll('[data-action="peers-pair-host"][data-host]')].map(b=>b.dataset.host),text:document.querySelector('#modal-content').textContent}));
-  check(tailnet.hosts.join()==='mac-mini.tail0.ts.net,studio.tail0.ts.net'&&/Tailscale 里的 Mac/.test(tailnet.text)&&/studio\.tail0\.ts\.net · (离线|Offline)/.test(tailnet.text),'the tailnet Macs are listed, offline marked, a bad address dropped: '+JSON.stringify(tailnet.hosts));
-  await p.click('[data-action="peers-pair-host"][data-host="studio.tail0.ts.net"]');
-  check((await sent('pair')).at(-1)?.host==='studio.tail0.ts.net','pairing a tailnet Mac sends its MagicDNS name');
+  check(tailnet.hosts.join()==='100.64.0.7,100.64.0.9'&&/mac-mini\.tail0\.ts\.net/.test(tailnet.text)&&/Tailscale 里的 Mac/.test(tailnet.text)&&/studio\.tail0\.ts\.net · (离线|Offline)/.test(tailnet.text),'the tailnet Macs are listed, offline marked, a bad address dropped: '+JSON.stringify(tailnet.hosts));
+  await p.click('[data-action="peers-pair-host"][data-host="100.64.0.9"]');
+  check((await sent('pair')).at(-1)?.host==='100.64.0.9','pairing a tailnet Mac sends its 100.x address, not the name a proxy\'s DNS would fake');
   await p.evaluate(()=>window.assetboardPeers({tailnet:{state:'stopped',macs:[]}}));
   check(await p.evaluate(()=>/Tailscale 没有连接/.test(document.querySelector('#modal-content').textContent)&&!document.querySelector('[data-host]')),'a stopped Tailscale says so');
   await p.evaluate(()=>window.assetboardPeers({tailnet:{state:'none',macs:[]}}));
