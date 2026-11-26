@@ -1377,6 +1377,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
             readDeviceInfo(body)
             return
         }
+        // Tailscale 在线状态 and 从 Tailscale 添加 (tailnet.js): the local Tailscale's node list, off the main thread. Never in a demo.
+        if body["action"] as? String == "tailnetStatus" {
+            guard !demoMode else { return }
+            let requestId = body["requestId"] as? Int ?? 0
+            DispatchQueue.global(qos: .utility).async {
+                var reply = TailnetNodes.read()
+                reply["requestId"] = requestId
+                DispatchQueue.main.async { self.sendToPage("assetboardTailnet", reply) }
+            }
+            return
+        }
         if body["action"] as? String == "codingSessions" {
             readCodingSessions(body)
             return
