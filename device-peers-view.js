@@ -2,7 +2,7 @@
 // when the page opens, when it comes back to the front, and at most every PEER_READ_MS while it is in front. An answer becomes
 // that Mac's device record (device-peers.js) and its 正在做 reading (shown on its screen in the object panorama). Only in the
 // Mac app with the feature on; the demo and the browser have no other Macs. Loaded after device-view.js.
-let peersNow={peers:[],found:[],listening:false},peerPairing=null,peerLast={},peerAsked=0;
+let peersNow={peers:[],found:[],listening:false,tailnet:null},peerPairing=null,peerLast={},peerAsked=0;
 function peersOn(){return featureOn('peers')&&!!nativeStore&&!demoMode;}
 function peersSend(message){try{window.webkit.messageHandlers.assetboard.postMessage({action:'peers',...message});}catch{}}
 // 同步资产板, per paired Mac: {on, first:'here'|'there'|'merge', since (ms), done}. 'here' takes from that Mac only what changed there
@@ -25,6 +25,8 @@ window.assetboardPeers=event=>{
  if(Array.isArray(event.peers))peersNow.peers=event.peers.filter(p=>p&&typeof p.id==='string');
  if(Array.isArray(event.found))peersNow.found=event.found.filter(n=>typeof n==='string').slice(0,50);
  if('listening' in event)peersNow.listening=!!event.listening;
+ // The Macs in this Mac's tailnet, from the local Tailscale (TailnetMacs in DevicePairing.swift): picked instead of typed.
+ if(event.tailnet&&typeof event.tailnet==='object')peersNow.tailnet={state:String(event.tailnet.state||''),macs:(Array.isArray(event.tailnet.macs)?event.tailnet.macs:[]).filter(m=>m&&typeof m.host==='string'&&/^[a-z0-9.-]{1,260}$/i.test(m.host)).slice(0,50).map(m=>({name:String(m.name||m.host).slice(0,100),host:m.host.toLowerCase(),online:m.online===true}))};
  // The app keeps on or off; the page follows it (its own storage starts empty each launch).
  if(typeof event.enabled==='boolean'&&event.enabled!==featureOn('peers')){setFeature('peers',event.enabled);if(event.enabled){peerAsked=0;setTimeout(peersDue,500);}}
  const p=event.pairing;
@@ -114,9 +116,12 @@ function peersDialog(){
  if(demoMode||!nativeStore){modal(tr('其他设备'),`<p>${tr('和你的其他 Mac 配对，互相读本机信息和「正在做」。只在 Mac App 里可用，演示模式不连接。')}</p>`,'peers');return;}
  const paired=peersNow.peers.length?`<ul class="peer-list">${peersNow.peers.map(x=>`<li><span><b>${esc(x.name)}</b>${x.host?` <span class="quiet-fact">${esc(x.host)}</span>`:''}<br>${peerStatus(x)}<br>${peerSyncLine(x)}</span><button class="text-button" data-action="peers-unpair" data-id="${esc(x.id)}">${tr('解除配对')}</button></li>`).join('')}</ul>`:`<p class="quiet-fact">${tr('还没有配对的设备')}</p>`;
  const pairedNames=new Set(peersNow.peers.map(x=>x.name)),found=peersNow.found.filter(n=>!pairedNames.has(n));
+ const pairedHosts=new Set(peersNow.peers.map(x=>String(x.host||'').toLowerCase())),tn=peersNow.tailnet,macs=(tn?.macs||[]).filter(m=>!pairedHosts.has(m.host)&&!pairedNames.has(m.name));
+ const tailnet=macs.length?`<ul class="peer-list">${macs.map(m=>`<li><span>${esc(m.name)} <span class="quiet-fact">${esc(m.host)}${m.online?'':' · '+tr('离线')}</span></span><button class="button" data-action="peers-pair-host" data-host="${esc(m.host)}">${tr('配对')}</button></li>`).join('')}</ul>`:tn?.state==='stopped'?`<p class="quiet-fact">${tr('Tailscale 没有连接，连上后再打开这里')}</p>`:'';
  const nearby=found.length?`<ul class="peer-list">${found.map(n=>`<li><span>${esc(n)}</span><button class="button" data-action="peers-pair" data-id="${esc(n)}">${tr('配对')}</button></li>`).join('')}</ul>`:`<p class="quiet-fact">${peersNow.listening?tr('这个网络里没找到开着 Assetboard 的 Mac'):tr('正在启动……')}</p>`;
  modal(tr('其他设备'),`<h3>${tr('已配对')}</h3>${paired}
   <h3>${tr('同一网络里的 Mac')}</h3>${nearby}
+  ${tn?.state==='ok'||tn?.state==='stopped'?`<h3>${tr('Tailscale 里的 Mac')}</h3>${tailnet||`<p class="quiet-fact">${tr('Tailscale 里没有可以配对的 Mac')}</p>`}`:''}
   <h3>${tr('按地址添加')}</h3><p class="form-note">${tr('不在同一网络时，填对方的 Tailscale 地址或 MagicDNS 名，例如 mac-mini.tailnet-name.ts.net 或 100.64.0.7。对方要开着 Assetboard，并打开「其他设备」。')}</p>
   <div class="peer-add"><input id="peer-host" type="text" maxlength="260" autocomplete="off" spellcheck="false" placeholder="${tr('地址或名称')}" aria-label="${tr('对方的地址')}"><button class="button" data-action="peers-pair-host">${tr('配对')}</button></div>
   <p class="form-note">${tr('两台 Mac 直接连接，不经过任何服务器：互相读本机信息和「正在做」，资产板自动同步。打开过这里之后，这台 Mac 在局域网上可被发现（「设置 › 功能 › 其他设备」可关）；第一次会弹「本地网络」授权。')}</p>
@@ -125,10 +130,10 @@ function peersDialog(){
 document.addEventListener('click',async e=>{
  const el=e.target.closest('[data-action]');if(!el)return;const {action,id}=el.dataset;
  // Opening 其他设备 is the intent to pair: it turns the feature on (listening, found on this network) without another switch.
- if(action==='peers-open'){if(!featureOn('peers')&&nativeStore&&!demoMode){setFeature('peers',true);peersSwitch(true);}peersSend({op:'list'});peersDialog();}
+ if(action==='peers-open'){if(!featureOn('peers')&&nativeStore&&!demoMode){setFeature('peers',true);peersSwitch(true);}peersSend({op:'list'});peersSend({op:'tailnet'});peersDialog();}
  else if(action==='peers-enable'){setFeature('peers',true);peersSwitch(true);peersDialog();}
  else if(action==='peers-pair')peersSend({op:'pair',service:id});
- else if(action==='peers-pair-host'){const host=$('#peer-host')?.value.trim();if(!host){$('#peer-host')?.focus();return;}peersSend({op:'pair',host});}
+ else if(action==='peers-pair-host'){const host=el.dataset.host||$('#peer-host')?.value.trim();if(!host){$('#peer-host')?.focus();return;}peersSend({op:'pair',host});}
  else if(action==='peers-confirm'){const mode=el.dataset.mode==='merge'?'merge':'there';peersSend({op:'confirm',ok:id==='yes',mode});}
  else if(action==='peers-read'){peerAsked=0;peersDue();toast(tr('正在读取'));}
  else if(action==='peers-sync')peerSyncDialog(id);

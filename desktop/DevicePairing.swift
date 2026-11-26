@@ -486,6 +486,46 @@ final class DevicePairing {
     }
 }
 
+/// The Macs in this Mac's tailnet, from the local Tailscale's own `status --json` (asked of the Tailscale app on this Mac, no
+/// network request of ours), so the person picks one instead of copying its address. Only macOS peers, never this Mac; each
+/// with its name, its MagicDNS name (or its first Tailscale IPv4 when MagicDNS is off) and whether it is online. Read when the
+/// person opens 其他设备; nothing is kept.
+enum TailnetMacs {
+    static let candidates = ["/Applications/Tailscale.app/Contents/MacOS/Tailscale", "/opt/homebrew/bin/tailscale", "/usr/local/bin/tailscale"]
+
+    /// state: ok, none (no Tailscale on this Mac), stopped (installed but not connected), failed.
+    static func read() -> [String: Any] {
+        guard let path = LocalCLI.findExecutable(candidates) else { return ["state": "none", "macs": []] }
+        guard let result = try? LocalCLI.run(executable: path, arguments: ["status", "--json"], timeout: 8), result.status == 0 else {
+            return ["state": "stopped", "macs": []]
+        }
+        return parse(result.stdout).map { ["state": "ok", "macs": $0] } ?? ["state": "failed", "macs": []]
+    }
+
+    static func parse(_ text: String) -> [[String: Any]]? {
+        guard let data = text.data(using: .utf8), let status = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { return nil }
+        guard status["BackendState"] as? String == "Running" else { return [] }
+        let selfIPs = Set(((status["Self"] as? [String: Any])?["TailscaleIPs"] as? [String]) ?? [])
+        var macs: [[String: Any]] = []
+        for case let peer as [String: Any] in (status["Peer"] as? [String: Any] ?? [:]).values {
+            guard (peer["OS"] as? String)?.lowercased() == "macos" else { continue }
+            let ips = (peer["TailscaleIPs"] as? [String]) ?? []
+            if !selfIPs.isDisjoint(with: ips) { continue }
+            let dns = (peer["DNSName"] as? String ?? "").trimmingCharacters(in: CharacterSet(charactersIn: ".")).lowercased()
+            let host = dns.range(of: #"^[a-z0-9-]+(\.[a-z0-9-]+)+$"#, options: .regularExpression) != nil ? dns
+                : ips.first { $0.range(of: #"^100\.\d{1,3}\.\d{1,3}\.\d{1,3}$"#, options: .regularExpression) != nil } ?? ""
+            guard !host.isEmpty, host.count <= 260 else { continue }
+            let name = String((peer["HostName"] as? String ?? host).trimmingCharacters(in: .whitespacesAndNewlines).prefix(100))
+            macs.append(["name": name.isEmpty ? host : name, "host": host, "online": peer["Online"] as? Bool == true])
+        }
+        macs.sort { a, b in
+            let ao = a["online"] as? Bool == true, bo = b["online"] as? Bool == true
+            return ao != bo ? ao : (a["name"] as? String ?? "").localizedStandardCompare(b["name"] as? String ?? "") == .orderedAscending
+        }
+        return Array(macs.prefix(50))
+    }
+}
+
 /// 正在做 for another Mac: the tools' processes and the chain of parents above each, not every process on the machine.
 func pruneSessions(_ reading: [String: Any]) -> [String: Any] {
     guard var processes = reading["processes"] as? [[String: Any]] else { return reading }
@@ -618,5 +658,19 @@ func testDevicePairing() {
     waitFor("read after unpairing") { answer != nil }
     precondition(answer?["ok"] as? Bool == false, "after unpairing nothing is answered")
     a.stop(); b.stop(); c.stop()
-    print("PASS: device pairing: board only to a Mac that syncs, one code on both screens, one confirmation on the Mac asked, syncing from the start, key 0600 and kept across restarts, sealed read; unpaired, tampered, stale and replayed requests unanswered; declined pairing and unpairing")
+
+    // Tailscale's status: the other Macs only (not this one, not Linux), online first, by MagicDNS name or else the 100.x address.
+    let tailnet = """
+    {"BackendState":"Running","Self":{"HostName":"This Mac","OS":"macOS","DNSName":"this-mac.tail0.ts.net.","TailscaleIPs":["100.64.0.1","fd7a::1"]},
+     "Peer":{"k1":{"HostName":"Studio","OS":"macOS","DNSName":"studio.tail0.ts.net.","TailscaleIPs":["100.64.0.9"],"Online":false},
+             "k2":{"HostName":"mac-mini","OS":"macOS","DNSName":"mac-mini.tail0.ts.net.","TailscaleIPs":["100.64.0.7"],"Online":true},
+             "k3":{"HostName":"nas","OS":"linux","DNSName":"nas.tail0.ts.net.","TailscaleIPs":["100.64.0.3"],"Online":true},
+             "k4":{"HostName":"no-dns","OS":"macOS","DNSName":"","TailscaleIPs":["fd7a::4","100.64.0.4"],"Online":true},
+             "k5":{"HostName":"odd","OS":"macOS","DNSName":"bad name;rm","TailscaleIPs":["fd7a::5"],"Online":true}}}
+    """
+    let macs = TailnetMacs.parse(tailnet) ?? []
+    precondition(macs.map { $0["host"] as? String ?? "" } == ["mac-mini.tail0.ts.net", "100.64.0.4", "studio.tail0.ts.net"], "tailnet Macs: \(macs)")
+    precondition(macs.first?["name"] as? String == "mac-mini" && macs.first?["online"] as? Bool == true && macs.last?["online"] as? Bool == false)
+    precondition(TailnetMacs.parse("{\"BackendState\":\"Stopped\",\"Peer\":{}}")?.isEmpty == true && TailnetMacs.parse("not json") == nil, "stopped or unreadable")
+    print("PASS: device pairing: board only to a Mac that syncs, one code on both screens, one confirmation on the Mac asked, syncing from the start, key 0600 and kept across restarts, sealed read; unpaired, tampered, stale and replayed requests unanswered; declined pairing and unpairing; the tailnet's other Macs from Tailscale's status")
 }

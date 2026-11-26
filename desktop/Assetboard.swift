@@ -974,6 +974,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         case "sync": pairing.setSync(text("id", 32), body["on"] as? Bool == true, first: body["first"] as? String, since: body["since"] as? Double, done: body["done"] as? Bool)
         case "read": pairing.read(text("id", 32)) { [weak self] reply in self?.sendToPage("assetboardPeerFacts", reply) }
         case "readBoard": pairing.read(text("id", 32), kind: "board") { [weak self] reply in self?.sendToPage("assetboardPeerBoard", reply) }
+        case "tailnet":
+            DispatchQueue.global(qos: .userInitiated).async {
+                let tailnet = TailnetMacs.read()
+                DispatchQueue.main.async { self.sendToPage("assetboardPeers", ["tailnet": tailnet]) }
+            }
         default: break
         }
     }
