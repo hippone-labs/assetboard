@@ -29,7 +29,8 @@
  const ownDevice=a=>a?.type==='device'&&(a.source==='local'||a.source==='peer');
  function syncBoards(current,remote,{first='',since=0}={}){
   const parsed=D.parseBoardBackup(remote);if(!parsed.ok)return {board:current,changed:false,error:parsed.error};
-  const theirs={...parsed.board,assets:parsed.board.assets.filter(a=>!ownDevice(a))};
+  // 组合视图 are each Mac's own way of looking: a backup carries them, a sync does not (one deleted here would come back from there).
+  const {views:_views,...board}=parsed.board,theirs={...board,assets:board.assets.filter(a=>!ownDevice(a))};
   const mine=current.assets.filter(ownDevice),base={...current,assets:current.assets.filter(a=>!ownDevice(a))};
   const plan=D.planBoardBackup(base,{ok:true,board:theirs,exportedAt:''},{mode:first==='there'?'replace':'merge'});
   if(since&&first!=='there'){plan.added=plan.added.filter(e=>D.editedTime(e.item)>=since);plan.updated=plan.updated.filter(r=>r.backupAt>=since);plan.settings={};}
