@@ -19,7 +19,7 @@ for(const file of dictFiles){
 }
 const sources=['app.js','asset-data.js','money-view.js','money-ledger.js','project-money.js','board-views.js','board-wall.js','board-free.js','ai-usage-view.js','pulls-view.js','github-pulls.js','sessions-view.js','coding-sessions.js','panorama-view.js','panorama.js','demo-data.js','features.js','theme.js','pro-slots.js','pro-load.js',
  ...(fs.existsSync(path.join(root,'pro/web'))?fs.readdirSync(path.join(root,'pro/web')).filter(f=>f.endsWith('.js')&&f!=='en.js').map(f=>'pro/web/'+f):[])].filter(f=>fs.existsSync(path.join(root,f)));
-sources.push('panorama-objects-view.js','panorama-objects.js','device-view.js','device-local.js','device-peers.js','device-peers-view.js');
+sources.push('panorama-objects-view.js','panorama-objects.js','device-view.js','device-local.js','device-peers.js','device-peers-view.js','tailnet.js','tailnet-view.js','mix-view.js');
 const cjk=/[㐀-鿿＀-￯　-〿]/;
 // The first argument of every tr( call that is a plain literal.
 function calls(src){

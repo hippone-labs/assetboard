@@ -44,8 +44,9 @@ function proOn(){return !proOff;}
 function proBuilt(){return !proFree&&typeof proEditionText==='function';}
 function slotHtml(name,...args){return proSlots[name].map(fn=>fn(...args)||'').join('');}
 // 实时状态 for one record: a server's probe or SSH reading, or a database's or deployment's platform state (null when there is none).
-function probeState(a){if(!a)return null;if(a.type==='server')return proSlots.serverProbe?proSlots.serverProbe.status(a):null;return proSlots.platformProbe?proSlots.platformProbe.status(a):null;}
-function liveRowHtml(a){return a?.type==='server'?proSlots.serverProbe?.rowHtml(a)||'':proSlots.platformProbe?.rowHtml(a)||'';}
+// A server or device with no probe reading falls back to Tailscale 在线状态 (tailnet-view.js), when that is on and the record is a node.
+function probeState(a){if(!a)return null;const tail=()=>typeof tailnetStatusOf==='function'?tailnetStatusOf(a):null;if(a.type==='server')return (proSlots.serverProbe?proSlots.serverProbe.status(a):null)||tail();if(a.type==='device')return tail();return proSlots.platformProbe?proSlots.platformProbe.status(a):null;}
+function liveRowHtml(a){if(a?.type==='server'){const probe=proSlots.serverProbe?.status(a)?proSlots.serverProbe.rowHtml(a):'';return probe||(typeof tailnetRowHtml==='function'?tailnetRowHtml(a):'');}if(a?.type==='device')return typeof tailnetRowHtml==='function'?tailnetRowHtml(a):'';return proSlots.platformProbe?.rowHtml(a)||'';}
 // Whether the Pro modules are loaded (?free and a build made with ASSETBOARD_EDITION=free have none).
 function proLoaded(){return proBuilt();}
 function proAction(name){return Object.hasOwn(proSlots.actions,name)?proSlots.actions[name]:null;}

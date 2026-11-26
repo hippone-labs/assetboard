@@ -496,35 +496,67 @@ enum TailnetMacs {
 
     /// state: ok, none (no Tailscale on this Mac), stopped (installed but not connected), failed.
     static func read() -> [String: Any] {
-        guard let path = LocalCLI.findExecutable(candidates) else { return ["state": "none", "macs": []] }
-        guard let result = try? LocalCLI.run(executable: path, arguments: ["status", "--json"], timeout: 8), result.status == 0 else {
-            return ["state": "stopped", "macs": []]
-        }
-        return parse(result.stdout).map { ["state": "ok", "macs": $0] } ?? ["state": "failed", "macs": []]
+        let status = TailnetNodes.status()
+        return ["state": status.state, "macs": status.text.flatMap(parse) ?? []]
     }
 
+    static func parse(_ text: String) -> [[String: Any]]? {
+        guard let nodes = TailnetNodes.parse(text) else { return nil }
+        var macs: [[String: Any]] = []
+        for node in nodes where node["os"] as? String == "macos" {
+            let dns = node["dns"] as? String ?? "", ip = (node["ips"] as? [String] ?? []).first { $0.hasPrefix("100.") } ?? ""
+            let host = ip.isEmpty ? dns : ip
+            guard !host.isEmpty else { continue }
+            macs.append(["name": node["name"] as? String ?? host, "host": host, "dns": dns, "online": node["online"] as? Bool == true])
+        }
+        return Array(macs.prefix(50))
+    }
+}
+
+/// Every other node of this Mac's tailnet, as the local Tailscale's `status --json` lists it: name, MagicDNS name, Tailscale
+/// addresses, operating system, online and when last seen. For 其他设备 (the Macs) and for Tailscale 在线状态 and 从 Tailscale
+/// 添加 (tailnet.js): a read of the Tailscale app on this Mac, no network request of ours, nothing kept here.
+enum TailnetNodes {
+    static func status() -> (state: String, text: String?) {
+        guard let path = LocalCLI.findExecutable(TailnetMacs.candidates) else { return ("none", nil) }
+        guard let result = try? LocalCLI.run(executable: path, arguments: ["status", "--json"], timeout: 8), result.status == 0 else { return ("stopped", nil) }
+        return ("ok", result.stdout)
+    }
+
+    static func read() -> [String: Any] {
+        let status = TailnetNodes.status()
+        guard let text = status.text else { return ["state": status.state, "nodes": []] }
+        guard let nodes = parse(text) else { return ["state": "failed", "nodes": []] }
+        return ["state": "ok", "nodes": nodes]
+    }
+
+    /// Online first, then by name; at most 200. Nil when the text is not Tailscale's status; empty when Tailscale is not running.
     static func parse(_ text: String) -> [[String: Any]]? {
         guard let data = text.data(using: .utf8), let status = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { return nil }
         guard status["BackendState"] as? String == "Running" else { return [] }
         let selfIPs = Set(((status["Self"] as? [String: Any])?["TailscaleIPs"] as? [String]) ?? [])
-        var macs: [[String: Any]] = []
+        let match = { (text: String, pattern: String) in text.range(of: pattern, options: .regularExpression) != nil }
+        var nodes: [[String: Any]] = []
         for case let peer as [String: Any] in (status["Peer"] as? [String: Any] ?? [:]).values {
-            guard (peer["OS"] as? String)?.lowercased() == "macos" else { continue }
-            let ips = (peer["TailscaleIPs"] as? [String]) ?? []
-            if !selfIPs.isDisjoint(with: ips) { continue }
+            let all = (peer["TailscaleIPs"] as? [String]) ?? []
+            if !selfIPs.isDisjoint(with: all) { continue }
+            let ips = all.filter { match($0, #"^100\.\d{1,3}\.\d{1,3}\.\d{1,3}$"#) || match($0.lowercased(), #"^fd7a:[0-9a-f:]{1,40}$"#) }.prefix(4)
             let dnsName = (peer["DNSName"] as? String ?? "").trimmingCharacters(in: CharacterSet(charactersIn: ".")).lowercased()
-            let dns = dnsName.count <= 260 && dnsName.range(of: #"^[a-z0-9-]+(\.[a-z0-9-]+)+$"#, options: .regularExpression) != nil ? dnsName : ""
-            let ip = ips.first { $0.range(of: #"^100\.\d{1,3}\.\d{1,3}\.\d{1,3}$"#, options: .regularExpression) != nil } ?? ""
-            let host = ip.isEmpty ? dns : ip
-            guard !host.isEmpty else { continue }
-            let name = String((peer["HostName"] as? String ?? host).trimmingCharacters(in: .whitespacesAndNewlines).prefix(100))
-            macs.append(["name": name.isEmpty ? host : name, "host": host, "dns": dns, "online": peer["Online"] as? Bool == true])
+            let dns = dnsName.count <= 260 && match(dnsName, #"^[a-z0-9-]+(\.[a-z0-9-]+)+$"#) ? dnsName : ""
+            guard !ips.isEmpty || !dns.isEmpty else { continue }
+            let id = peer["ID"] as? String ?? "", os = (peer["OS"] as? String ?? "").lowercased()
+            let name = String((peer["HostName"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines).prefix(100))
+            // Tailscale writes 0001-01-01 for a node it sees now; only a real time is passed on.
+            let seen = peer["LastSeen"] as? String ?? "", seenDate = ISO8601DateFormatter().date(from: seen)
+            nodes.append(["id": match(id, #"^[A-Za-z0-9]{1,40}$"#) ? id : "", "name": name.isEmpty ? (dns.split(separator: ".").first.map(String.init) ?? ips.first ?? "") : name,
+                          "dns": dns, "ips": Array(ips), "os": match(os, #"^[a-z]{1,20}$"#) ? os : "",
+                          "online": peer["Online"] as? Bool == true, "lastSeen": (seenDate?.timeIntervalSince1970 ?? 0) > 946684800 ? seen : ""])
         }
-        macs.sort { a, b in
+        nodes.sort { a, b in
             let ao = a["online"] as? Bool == true, bo = b["online"] as? Bool == true
             return ao != bo ? ao : (a["name"] as? String ?? "").localizedStandardCompare(b["name"] as? String ?? "") == .orderedAscending
         }
-        return Array(macs.prefix(50))
+        return Array(nodes.prefix(200))
     }
 }
 
@@ -675,5 +707,12 @@ func testDevicePairing() {
     precondition(macs.map { $0["dns"] as? String ?? "" } == ["mac-mini.tail0.ts.net", "", "studio.tail0.ts.net"], "and shown by their MagicDNS name")
     precondition(macs.first?["name"] as? String == "mac-mini" && macs.first?["online"] as? Bool == true && macs.last?["online"] as? Bool == false)
     precondition(TailnetMacs.parse("{\"BackendState\":\"Stopped\",\"Peer\":{}}")?.isEmpty == true && TailnetMacs.parse("not json") == nil, "stopped or unreadable")
-    print("PASS: device pairing: board only to a Mac that syncs, one code on both screens, one confirmation on the Mac asked, syncing from the start, key 0600 and kept across restarts, sealed read; unpaired, tampered, stale and replayed requests unanswered; declined pairing and unpairing; the tailnet's other Macs from Tailscale's status, reached by their 100.x address")
+    // Every other node, for Tailscale 在线状态 and 从 Tailscale 添加: the Linux one too, with its system and when it was last seen.
+    let nodes = TailnetNodes.parse(tailnet.replacingOccurrences(of: "\"Online\":false}", with: "\"Online\":false,\"LastSeen\":\"2026-11-26T08:00:00Z\",\"ID\":\"n9\"}")
+                                           .replacingOccurrences(of: "\"OS\":\"linux\",", with: "\"OS\":\"linux\",\"LastSeen\":\"0001-01-01T00:00:00Z\","))  ?? []
+    precondition(nodes.count == 5 && !nodes.contains { ($0["ips"] as? [String] ?? []).contains("100.64.0.1") }, "every node but this Mac: \(nodes.count)")
+    let nas = nodes.first { $0["name"] as? String == "nas" }, studio = nodes.first { $0["name"] as? String == "Studio" }
+    precondition(nas?["os"] as? String == "linux" && nas?["dns"] as? String == "nas.tail0.ts.net" && nas?["lastSeen"] as? String == "", "a node seen now has no last-seen time")
+    precondition(studio?["online"] as? Bool == false && studio?["lastSeen"] as? String == "2026-11-26T08:00:00Z" && studio?["id"] as? String == "n9", "an offline node keeps when it was last seen")
+    print("PASS: device pairing: board only to a Mac that syncs, one code on both screens, one confirmation on the Mac asked, syncing from the start, key 0600 and kept across restarts, sealed read; unpaired, tampered, stale and replayed requests unanswered; declined pairing and unpairing; the tailnet's other Macs from Tailscale's status, reached by their 100.x address; every other node with its system and last-seen time")
 }

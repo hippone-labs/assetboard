@@ -23,7 +23,7 @@ async (page) => {
   const nav=await p.evaluate(()=>[...document.querySelectorAll('#sidebar .nav-item')].map(n=>`${n.dataset.id}:${n.querySelector('.nav-count')?.textContent||''}`).join());
   // 定期清理 is a Pro tool: it is listed only when the Pro scripts are loaded.
   const review=await p.evaluate(()=>proSlots.toolsNav.length>0)?'review:3,':'';
-  check(nav===`upcoming:3,all:99+,panorama:,domain:99+,server:1,repository:40,license:,hidden:1,${review}export:,prefs:`,'Sidebar lists views, categories and counts (99+ cap): '+nav);
+  check(nav===`upcoming:3,all:99+,panorama:,domain:99+,server:1,repository:40,license:,mix-new:,hidden:1,${review}export:,prefs:`,'Sidebar lists views, categories, 新建视图 and counts (99+ cap): '+nav);
   check(await p.evaluate(()=>document.querySelector('#sidebar .nav-item[data-id="license"]').hasAttribute('data-empty')&&!document.querySelector('#sidebar .nav-item[data-id="server"]').hasAttribute('data-empty')),'An empty category steps back without a 0');
   check(await p.evaluate(()=>document.querySelector('#sidebar .nav-item[data-id="all"] .nav-count').title==='161'),'A capped count shows the real number on hover');
   check(await p.evaluate(()=>document.querySelector('#sidebar .nav-item[data-id="all"]').getAttribute('aria-current')==='page'&&document.querySelector('#sidebar .nav-item[data-id="domain"]').getAttribute('aria-label').includes('120 项')),'The current view is marked and labels carry real counts');

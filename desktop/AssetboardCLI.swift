@@ -376,6 +376,7 @@ enum MCPServer {
             "network": text("Bank card network: Visa, Mastercard, 银联, American Express, JCB, Discover, 其他"),
             "cardStatus": ["type": "string", "enum": ["", "frozen", "declined", "closed"], "description": "Bank card state besides its expiry: frozen (stopped or reported lost), declined (charges refused), closed (the issuer shut down, e.g. a virtual card service); empty = normal. Anything but empty marks what the card pays for as at risk"],
             "phoneStatus": ["type": "string", "enum": ["", "suspended", "ported"], "description": "Phone number state besides its keep date: suspended (cut off by the carrier), ported (moved to another carrier); empty = normal. Anything but empty marks what the number verifies as at risk"],
+            "deviceKind": ["type": "string", "enum": ["", "mac", "iphone", "ipad", "watch", "phone", "computer", "router", "other"], "description": "Device category: what the device is (empty = not recorded; this Mac and paired Macs count as mac)."],
             "phone": text("Phone number (phone category)"),
             "host": text("Server: SSH host"),
             "ips": ips,

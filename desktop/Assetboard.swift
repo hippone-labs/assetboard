@@ -1377,6 +1377,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
             readDeviceInfo(body)
             return
         }
+        // Tailscale 在线状态 and 从 Tailscale 添加 (tailnet.js): the local Tailscale's node list, off the main thread. Never in a demo.
+        if body["action"] as? String == "tailnetStatus" {
+            guard !demoMode else { return }
+            if let on = body["remember"] as? Bool { UserDefaults.standard.set(on, forKey: "tailnetStatusOn"); if body["read"] as? Bool == false { return } }
+            let requestId = body["requestId"] as? Int ?? 0
+            DispatchQueue.global(qos: .utility).async {
+                var reply = TailnetNodes.read()
+                reply["requestId"] = requestId
+                DispatchQueue.main.async { self.sendToPage("assetboardTailnet", reply) }
+            }
+            return
+        }
         if body["action"] as? String == "codingSessions" {
             readCodingSessions(body)
             return
@@ -1433,6 +1445,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         // Two switches in 设置 that the app keeps (UserDefaults); the page shows them and answers through `preference`.
         initial["statusItem"] = !UserDefaults.standard.bool(forKey: AppDelegate.statusItemHiddenKey)
         initial["autoUpdate"] = Updater.automatic
+        // Tailscale 在线状态 (tailnet-view.js): kept here, since the page's own storage does not outlive the app.
+        initial["tailnetOn"] = !demoMode && UserDefaults.standard.bool(forKey: "tailnetStatusOn")
         initial["lang"] = AppLanguage.current
         initial["version"] = Updater.currentVersion
         #if ASSETBOARD_PRO

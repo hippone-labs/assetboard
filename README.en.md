@@ -72,12 +72,13 @@ The full host list is in the [user guide](GUIDE.md#隐私与网络) (Chinese).
 
 - A server can hold up to 4 IPs and an SSH host, user and port.
 - A bank card holds only the last four digits, network and expiry; the form refuses full card numbers.
+- A device records its kind (Mac, iPhone, iPad, Apple Watch, phone, computer, router, other) and its warranty date, which is reminded like any date; devices hold no amount and stay out of the monthly costs.
 - A link's meaning follows from the two categories: a domain points to a server or deployment, a repository deploys to a deployment, a bank card pays for a subscription, an Apple ID or Google account is used to sign in, a phone number receives verification codes.
 - An asset can belong to one or more projects, and a project's assets add up to what the whole project costs: per month, by category, over the next 12 months; with a monthly revenue it shows the net, and an asset shared by several projects is split between them.
 
 ## Interface
 
-The sidebar holds Upcoming, All assets, Panorama, the categories, projects and Hidden. The middle shows a tile wall (a panel per category, in three densities) and the right the selected asset's details. It can switch to a list, a grid or a 12-month timeline; Upcoming can switch to a month calendar.
+The sidebar holds Upcoming, All assets, Panorama, the categories, projects, views you put together (e.g. Machines = Servers + Devices) and Hidden. The middle shows a tile wall (a panel per category, in three densities) and the right the selected asset's details. It can switch to a list, a grid or a 12-month timeline; Upcoming can switch to a month calendar.
 
 | | |
 | --- | --- |
@@ -134,6 +135,7 @@ Scripts can put JSON in this format into `~/Library/Application Support/Assetboa
 - AI usage and limits: plan limits and usage of Claude Code, Codex, Cursor, GitHub Copilot, Grok CLI, opencode and Antigravity, read from their local files and quota endpoints and shown on the matching AI subscription: close to the limit, idle, worth its price at API rates or not. Only numbers, model names and times are read.
 - This Mac (Mac): keeps this Mac as a device record with its model, chip, memory, macOS version, disk, battery and serial number, read when the app opens or comes to the front; a nearly full disk is marked. Reads this Mac only, nothing over the network, no permission prompt.
 - Other devices (Mac, off by default): two Macs with Assetboard pair and read each other's facts and In progress, each keeping the other as a device, and their boards sync (the newer edit of each record wins; deletions carry over). Pairing: the Mac asked checks the same six digits and allows it; after that they connect directly and encrypted, found on the same network, picked from the Macs your local Tailscale lists, or by address, through no server.
+- Tailscale (Mac): Import › Tailscale lists the machines in your tailnet that are not on the board yet, phones and computers as devices and Linux and the like as servers, added with a click; Settings › Features › Tailscale online status (off by default) shows the servers and devices it can match as online or offline, with when they were last seen. It only runs `tailscale status --json` on this Mac: no probing, no network request.
 - In progress (Mac): the AI coding sessions running on this Mac (Claude Code, Codex, Cursor and others): how many, in which repository and branch, and for how long. Reads only process names, working directories, start times and when session files were last written, never conversations.
 - Repositories (Mac, off by default): a GitHub sync also reads branches and the latest Actions run; a failed or running run leads the row, and new branches show for 14 days.
 - Keyboard control; `?` lists the shortcuts.

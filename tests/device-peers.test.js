@@ -83,3 +83,11 @@ test('sync: the first time, “this Mac” keeps old records over there from com
  assert.deepEqual(there.board.assets.map(a=>a.id).sort(),[me.id,'a'].sort(),'“that Mac”: this board becomes its board');
  assert.equal(P.syncBoards(mine,{nope:true}).changed,false,'a board that is not one changes nothing');
 });
+
+test('sync: 组合视图 stay on each Mac (a backup carries them, a sync does not)',()=>{
+ const mine=boardOf([me],{views:[{id:'mine',name:'机器',types:['server','device']}]});
+ const theirs=boardOf([them],{views:[{id:'other',name:'账号',types:['appleid']}]});
+ const r=P.syncBoards(mine,theirs);
+ assert.deepEqual((r.board.views||[]).map(v=>v.id),['mine'],'no view comes over, the own one stays');
+ assert.equal(P.syncBoards(boardOf([me]),theirs).board.views,undefined,'a deleted view does not come back');
+});

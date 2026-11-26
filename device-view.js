@@ -51,7 +51,7 @@ function deviceDetailFacts(a){
  if(a.type!=='device')return '';
  const seen=isLocalDevice(a)&&a.seenAt?tr('{when} 读取',{when:new Date(a.seenAt).toLocaleString(trLocale())}):'';
  const disk=deviceDiskText(a),tone=deviceTone(a);
- return [[tr('型号'),esc(a.model||'')],[tr('芯片'),esc(a.chip||'')],[tr('内存'),esc(deviceMemory(a.memoryBytes))],[tr('系统'),esc(deviceSystem(a))],
+ return [[tr('种类'),esc(DEVICE_KINDS[deviceKindOf(a)]||'')],[tr('型号'),esc(a.model||'')],[tr('芯片'),esc(a.chip||'')],[tr('内存'),esc(deviceMemory(a.memoryBytes))],[tr('系统'),esc(deviceSystem(a))],
   [tr('磁盘'),disk?`<span class="${tone?'device-'+tone:''}">${esc(disk)}</span>`:''],[tr('电池'),esc(deviceBatteryText(a))],[tr('序列号'),esc(deviceSerial(a))],[tr('本机'),esc(seen)]]
   .filter(([,html])=>html).map(([k,html])=>`<div class="fact"><span>${k}</span><span>${html}</span></div>`).join('');
 }
