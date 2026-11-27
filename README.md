@@ -57,9 +57,15 @@ Then ask your AI:
 
 ## Install & Try Demo in 10 Seconds
 
-1. Download the signed & notarized `.dmg` from **[assetboard.app](https://assetboard.app/)** (requires **macOS 15+**, **Apple Silicon**).
-2. Drag **Assetboard** into `Applications`. The app updates itself.
-3. Want to explore with fictional data first (touches nothing, no network)?
+Install via **Homebrew** (installs `Assetboard.app` and links `assetboard-cli` to your `PATH`; requires **macOS 15+**, **Apple Silicon**):
+
+```sh
+brew install --cask hippone-labs/tap/assetboard
+```
+
+Or download the signed & notarized `.dmg` directly from **[assetboard.app](https://assetboard.app/)** and drag **Assetboard** into `Applications`. The app updates itself.
+
+Want to explore with fictional data first (touches nothing, no network)?
 
 ```sh
 open /Applications/Assetboard.app --args --demo
