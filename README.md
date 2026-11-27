@@ -42,6 +42,8 @@ If you ship side projects, run VPSes/homelabs, and juggle multiple AI subscripti
 
 ## Connect to Your AI via MCP
 
+[![hippone-labs/assetboard MCP server](https://glama.ai/mcp/servers/hippone-labs/assetboard/badges/score.svg)](https://glama.ai/mcp/servers/hippone-labs/assetboard)
+
 Add Assetboard to Claude Code in one line (other MCP clients: copy config from **File › MCP Setup…**):
 
 ```sh
@@ -196,6 +198,11 @@ node --test               # Runs pure-JS unit tests (Node 22+, zero packages)
 Bug reports, **provider expiry/grace-period rules**, and PRs are very welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) or open an [issue](https://github.com/hippone-labs/assetboard/issues/new/choose). Contact: `lihaosong1109@gmail.com`.
 
 Licensed under **[GPL-3.0](LICENSE)**.
+
+### Links
+
+- [Glama MCP Directory](https://glama.ai/mcp/servers/hippone-labs/assetboard)
+- [LINUX DO](https://linux.do) — Where we share updates and collect community feedback
 
 <div align="center">
 
