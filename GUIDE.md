@@ -1,6 +1,6 @@
 # Assetboard 使用手册
 
-这是 [README](README.md) 之外的完整说明：每个功能怎么用、App 会连哪些主机、命令行和 MCP 工具的参数。快速了解先看 README。
+这是 [中文 README](README.zh-CN.md) 之外的完整说明：每个功能怎么用、App 会连哪些主机、命令行和 MCP 工具的参数。快速了解先看 README。
 
 ## 目录
 
@@ -47,7 +47,7 @@
 
 - 系统：macOS 15 或更高，仅提供 Apple Silicon（arm64）版本。
 - 磁盘映像和里面的 App 都已签名并公证，双击即可打开。
-- 也可以不装，直接在浏览器里试：见 README 的[从源码构建](README.md#从源码构建)。
+- 也可以不装，直接在浏览器里试：见 README 的[从源码构建](README.zh-CN.md#从源码构建)。
 
 想先看看效果，用演示数据启动（不读也不写你的数据）：
 
@@ -311,4 +311,4 @@ App 的数据在本机的 SQLite 文件里，菜单“文件 → 打开本地数
 菜单“帮助 → 反馈与建议…”会打开一封写给 lihaosong1109@gmail.com 的邮件；官网的联系页也是这个地址。
 
 有 Windows / Linux / Intel Mac 版吗？
-没有，目前只发 Apple Silicon 的 macOS 版。浏览器版可以在任何系统用，功能少一些，见 README 的[从源码构建](README.md#从源码构建)。
+没有，目前只发 Apple Silicon 的 macOS 版。浏览器版可以在任何系统用，功能少一些，见 README 的[从源码构建](README.zh-CN.md#从源码构建)。

@@ -1,201 +1,198 @@
 <div align="center">
 
-<img src="desktop/icon-1024.png" width="96" alt="Assetboard 图标">
+<img src="desktop/icon-1024.png" width="88" alt="Assetboard icon">
 
 # Assetboard
 
-到期前提醒你：域名、订阅、服务器。装上用令牌导入，平时不用打开。
+**A local-first macOS command board for domains, servers, AI plan quotas, and subscriptions.**
 
-[![build](https://github.com/hippone-labs/assetboard/actions/workflows/build.yml/badge.svg)](https://github.com/hippone-labs/assetboard/actions/workflows/build.yml)
-[![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
-[![macOS 15+](https://img.shields.io/badge/macOS-15%2B%20arm64-lightgrey)](https://assetboard.app/zh/)
+Track Claude Code / Codex / Cursor usage limits, VPS live load, domain renewals & price hikes, GitHub PRs, and side-project burn rate — on a quiet tile wall or a pixel fridge door. Built-in MCP, direct Mac-to-Mac sync, zero cloud, zero telemetry.
+
+[![GitHub Stars](https://img.shields.io/github/stars/hippone-labs/assetboard?style=flat&logo=github)](https://github.com/hippone-labs/assetboard/stargazers)
 [![Version](https://img.shields.io/github/v/release/hippone-labs/assetboard?label=version&color=lightgrey)](https://github.com/hippone-labs/assetboard/releases/latest)
+[![macOS 15+](https://img.shields.io/badge/macOS-15%2B%20Apple%20Silicon-lightgrey)](https://assetboard.app/)
+[![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
+[![Build](https://github.com/hippone-labs/assetboard/actions/workflows/build.yml/badge.svg)](https://github.com/hippone-labs/assetboard/actions/workflows/build.yml)
 
-[官网](https://assetboard.app/zh/) · [使用手册](GUIDE.md) · [English](README.en.md) · [问题反馈](https://github.com/hippone-labs/assetboard/issues/new/choose)
+**[Download for macOS](https://assetboard.app/)** · **[简体中文](README.zh-CN.md)** · **[User Guide (中文)](GUIDE.md)** · **[Report an Issue](https://github.com/hippone-labs/assetboard/issues/new/choose)**
 
 </div>
 
-![Assetboard 窗口，浅色外观：左边是即将到来和各类别，中间依次是待确认的扣款、已过期的域名、7 天内和 30 天内要扣款的订阅，右边是一个域名的详情，含过期后的宽限期和赎回期](screenshots/upcoming-zh.webp)
+![Assetboard in Pixel Server Room theme: domains with +36% price hike and redemption period, servers, GitHub repos with ready-to-merge PRs and failing CI, AI plans with live quota bars for Claude Max, ChatGPT Plus, Grok and Copilot, databases, and masked bank cards](screenshots/theme-fridge-server-en.webp)
 
-<sub>截图来自演示模式（浅色外观），数据是虚构的。</sub>
+<sub>Fridge magnets skin (Pixel Server Room) in demo mode — fictional data. Switch between 4 fridge doors or minimalist Quiet light/dark anytime.</sub>
 
-从 [assetboard.app](https://assetboard.app/zh/) 下载 `.dmg`，需要 macOS 15 或更高、Apple 芯片。数据只留本机，不需要账号。界面默认英文，可在「设置」里换成简体中文。
-
-## 目录
-
-- [三步上手](#三步上手)
-- [会提醒什么](#会提醒什么)
-- [数据与网络](#数据与网络)
-- [记录什么](#记录什么)
-- [界面](#界面)
-- [主题](#主题)
-- [数据来源](#数据来源)
-- [其他功能](#其他功能)
-- [官方安装包与源码构建](#官方安装包与源码构建)
-- [安装](#安装)
-- [从源码构建](#从源码构建)
-- [参与](#参与)
-- [许可证](#许可证)
-
-## 三步上手
-
-1. 从官网下载，把 Assetboard 拖进「应用程序」。
-2. 导入带到期日的记录。在 Mac App 里粘贴域名或网址，会向注册局查询，把到期日和注册商填进空着的栏。一部分后缀没有开放查询（比如 cn、io、de），这时要自己填。也可以用只读令牌从 Cloudflare 导入：只有在 Cloudflare 注册的域名、并且令牌带 Registrar 读权限，才会带上到期日；只做 DNS 托管的 Zone 不会。新找到的会先列出来，勾选后再写入。
-3. 有到期日之后，App 才会申请系统通知。允许即可。之后窗口不必一直开着，到期前会在早上 9 点弹出通知。
-
-GitHub 和 `~/.ssh/config` 也能导入仓库或服务器，但带不来到期日，不会进入提醒。订阅目前要手填，或从表格、邮件、截图里导入。浏览器版没有系统通知，也不会向注册局查询。
-
-## 会提醒什么
-
-提醒只针对已经记在资产上的日期：
-
-- 到期和扣款：提前 30、7、1 天
-- 按月扣款、试用结束、取消截止：提前 3、1 天
-- 一次性到期和保号：当天、过期第 3 天和第 14 天再提醒一次
-- 开了自动续费且到期日已经过了：第二天提醒，并留在「待确认续费」里，直到你点「已续上」或「没续上」
-
-通知在当天早上 9 点发出；9 点以后才加上的日期，当天那一条不会补发。点通知会打开「即将到来」。菜单栏（可关）显示 7 天内的数量。没有日期的记录不会排提醒。证书到期、流量超标、额度用尽目前也不会发通知。
-
-## 数据与网络
-
-- 数据在 `~/Library/Application Support/Assetboard/`：`assetboard.sqlite`，另有 JSON 镜像 `board.json`。没有云同步和遥测；配对了其他 Mac 时，资产板只在这些 Mac 之间直接同步。
-- 令牌和 API key 存在 macOS 钥匙串。
-- App 自己会连的主机：检查更新（assetboard.app）、已知平台的网站图标、汇率（api.frankfurter.dev）、连上之后的 Cloudflare、本机 AI 工具的额度接口（用各工具自己的登录，可逐个关）。其余连接（RDAP、AI、实时状态、其他设备、GitHub、Namecheap、Porkbun、Hetzner、DigitalOcean、Vercel）在你打开或点击之后才发生。
-- 网页本身由 Content-Security-Policy 禁止联网，所有请求经过 Swift 一侧，记在网络记录里。
-- 交给外部 AI 工具的数据默认遮住 IP、主机、手机号和邮箱，不含银行卡和手机号两类记录。
-
-完整的主机列表见[使用手册 · 隐私与网络](GUIDE.md#隐私与网络)。
-
-## 记录什么
-
-14 个类别：域名、服务器、代码仓库、部署服务、数据库、对象存储、订阅与工具、AI 订阅、软件授权、银行卡、手机号、Apple ID、Google 账号、设备。
-
-- 服务器可以记最多 4 个 IP、SSH 主机、用户和端口。
-- 银行卡只记尾号、卡组织和有效期，表单不接受完整卡号。
-- 设备记种类（Mac、iPhone、iPad、Apple Watch、手机、电脑、路由器、其他）和保修到期日，到期会提醒；设备不记金额，不计入每月费用。
-- 关联的含义由两边的类别决定：域名指向服务器或部署，仓库部署到部署服务，银行卡支付订阅，Apple ID / Google 账号用于登录，手机号接收验证码。
-- 资产可以归到一个或几个项目，项目里的资产合起来算整个项目的花费：每月合计、按类别拆分、未来 12 个月；填上每月收入就能看净额，几个项目共用的按比例分摊。
-
-## 界面
-
-左边是侧边栏：即将到来、全部资产、全景、各类别、项目、自己组合的视图（例如「机器」= 服务器 + 设备）、已隐藏。中间是磁贴墙（每个类别一块面板，密度分三档），右边是选中资产的详情。可以切成列表、网格或 12 个月的时间线，即将到来可以切成月历。
-
-| | |
+| Quiet mode: tile wall + detail inspector | Panorama: what runs on which server (press `P`) |
 | --- | --- |
-| 全部资产：按类别分块的磁贴墙，右边是一条记录的详情 ![全部资产](screenshots/board-zh.webp) | 费用：每月和每年合计，按类别拆分，可换计价币种 ![费用面板](screenshots/cost-zh.webp) |
-| 时间线：从本月起 12 个月的到期和扣款 ![时间线](screenshots/timeline-zh.webp) | 全景：每台服务器一张卡，列出挂在上面的资产 ![全景](screenshots/panorama-zh.webp) |
-| 实时状态（默认关闭）：服务器的内存、流量和负载 ![实时状态](screenshots/live-zh.webp) | 免费套餐的休眠规则和保活配置 ![休眠规则](screenshots/sleep-zh.webp) |
+| ![Quiet light tile wall showing domains, servers, AI plans, repos and inspector](screenshots/board-en.webp) | ![Panorama showing VPS cards with live memory/traffic, mounted domains, repos, databases, and offline home-nas alert](screenshots/panorama-en.webp) |
 
-全景有四个视角：运行在哪、谁在付钱、用什么登录、按项目。拖动卡片里的资产或按 `L` 修改关联。顶栏的「画法」可以换成实物：服务器是机箱，域名是挂在注册商下面的门牌，订阅是月票，银行卡只露尾号；窗口放不下时自动用回卡片（[画法说明](OBJECT-PANORAMA.md)）。
+---
 
-## 主题
+## Why Assetboard?
 
-两种风格：安静，和冰箱贴。冰箱贴有四扇门，整个窗口换成门的配色。在「设置 › 外观」里选。
+If you ship side projects, run VPSes/homelabs, and juggle multiple AI subscriptions, your infrastructure is scattered across registrars, billing emails, `~/.ssh/config`, and browser tabs. Assetboard pulls it all into one fast, native macOS app that never phones home.
 
-| | |
-| --- | --- |
-| 安静 · 浅色 ![安静，浅色](screenshots/theme-quiet-light-zh.webp) | 安静 · 深色 ![安静，深色](screenshots/theme-quiet-dark-zh.webp) |
-| 冰箱贴 · 像素厨房 ![冰箱贴：像素厨房](screenshots/theme-fridge-kitchen-zh.webp) | 冰箱贴 · 像素夜景 ![冰箱贴：像素夜景](screenshots/theme-fridge-city-zh.webp) |
-| 冰箱贴 · 手绘冰箱门 ![冰箱贴：手绘冰箱门](screenshots/theme-fridge-handdrawn-zh.webp) | 冰箱贴 · 像素机房 ![冰箱贴：像素机房](screenshots/theme-fridge-server-zh.webp) |
+- **AI Plan Quotas & Active Coding Sessions** — Reads local usage files and quota endpoints for **Claude Code, Codex, Cursor, GitHub Copilot, Grok CLI, opencode, and Antigravity** (only numbers, model names, and timestamps — never prompts or chats). Shows 5-hour/weekly/monthly bars, reset countdowns, whether your usage is worth the subscription at API rates, and which AI coding sessions are currently running on which repo & branch.
+- **Built-in MCP Server & CLI** — Connect Claude Code, Codex, Cursor, or Claude Desktop in one command. Let your AI populate the board from your repos/configs, or ask it what renews next month and which side projects are bleeding money. IPs, SSH hosts, emails, and phones are masked by default; deletions always require your confirmation in the app; every call is logged locally.
+- **14 Asset Categories + Panorama + Project Burn Rate** — Track domains (RDAP checks, price-hike badges, grace/redemption windows), servers (SSH/probe live load & Tailscale online status), repos (open PRs, mergeable status & CI runs), databases & free-tier sleep rules, subscriptions, bank cards (last 4 digits only), phone numbers, Apple IDs, Google accounts, and devices. Press `P` for 4 panorama lenses (*where it runs · who pays · sign-in · by project*) or switch to the physical **Object Shelf** drawing.
+- **True Local-First & Direct Mac-to-Mac Sync** — Plain SQLite (`assetboard.sqlite`) + JSON mirror (`board.json`) on your Mac; tokens stay in macOS Keychain; the WebView is blocked from the network via CSP; every Swift network request is visible in the built-in **Network Log**. Pair two Macs over LAN or Tailscale for direct encrypted sync with field-level 3-way merge — no cloud server in the middle.
+- **Zero-Dependency Native Craft** — Native Swift + vanilla JS/CSS. No `package.json`, no bundler, no third-party runtime dependencies. Free and open source (GPL-3.0) with no accounts, limits, or paywalls.
 
-## 数据来源
+---
 
-| 来源 | 平台 |
-| --- | --- |
-| 手动添加：选类别后填表 | App、浏览器 |
-| 粘贴域名或网址：Mac App 向注册局（RDAP）填写空着的到期日和注册商；部分后缀没有 RDAP（如 cn、io、de） | App、浏览器（浏览器不查询） |
-| CSV / TSV / JSON 文件或粘贴的表格，先预览再写入 | App、浏览器 |
-| `.eml` 邮件和粘贴的续费通知，按规则识别后逐条确认 | App、浏览器 |
-| 截图和 PDF，用 macOS 的文字识别在本机识别 | App |
-| Cloudflare（只读 API 令牌）：Zone、Pages、Workers、R2；在 Cloudflare 注册的域名且令牌含 Registrar 读权限时带到期日 | App |
-| GitHub（本机 `gh` 或只读令牌）：仓库，无到期日 | App |
-| Namecheap、Porkbun：域名、到期日和自动续费。尚未用真实账号验证 | App |
-| Hetzner、DigitalOcean、Vercel：服务器或项目；Vercel 上注册的域名可带到期日。尚未用真实账号验证 | App |
-| `~/.ssh/config`：Host、HostName、User、Port；github.com 这类代码托管（或 `User git`）不当作服务器。无到期日 | App |
-| 自己配置的 AI 模型（Claude、OpenAI 兼容接口或 Ollama）识别截图、邮件和文字 | App |
+## Connect to Your AI via MCP
 
-每种导入方式的细节见[使用手册 · 导入方式](GUIDE.md#导入方式)。
+Add Assetboard to Claude Code in one line (other MCP clients: copy config from **File › MCP Setup…**):
 
-脚本可以把下面格式的 JSON 放进 `~/Library/Application Support/Assetboard/Inbox/`，或拖进窗口，每次都在导入预览里确认。先写成临时名，写完再改名为 `.json`；一份最多 100 项、1 MB，其余字段忽略：
-
-```json
-{"assetboard": 1, "items": [
-  {"name": "example.com", "type": "domain", "provider": "Namecheap", "account": "me@example.com",
-   "date": "2027-03-01", "dateKind": "expire", "cycle": "yearly", "cost": "$10.98 / 年",
-   "url": "https://ap.www.namecheap.com", "notes": "", "purpose": ""}
-]}
+```sh
+claude mcp add assetboard -- /Applications/Assetboard.app/Contents/MacOS/assetboard-cli mcp
 ```
 
-## 其他功能
+Then ask your AI:
+- *"Scan this project and my configs, and add every domain, server, database, repo, and paid subscription you find to Assetboard. Never record passwords or tokens."*
+- *"Read my Assetboard. What renews in the next 60 days, what looks forgotten, and what should I cancel?"*
+- *"List each project's monthly cost, revenue, and net. If I shut down the worst one, what do I cancel first?"*
 
-- 续费记录、付款记录和价格变动。
-- 通过 RDAP 核对域名在注册局的到期日和状态。
-- 导出：JSON 备份（可以导回）、日历 .ics、付款账本 .csv、交接清单 .html。
-- 隐私模式：遮住名称、账号和 IP。
-- 网络记录：列出 App 发出的每个请求。
-- MCP 服务和命令行 `assetboard-cli`，供 Claude Code、Codex、Cursor 等工具读写资产，见[使用手册 · MCP 接入](GUIDE.md#mcp-接入外部-ai-工具与命令行)。每次外部调用都记在本机的 MCP 操作记录里（哪个客户端、什么时间、调了哪个工具、改了什么），在「设置 › MCP」查看。
-- AI 额度与用量：从本机的 Claude Code、Codex、Cursor、GitHub Copilot、Grok CLI、opencode、Antigravity 的文件和额度接口读出额度和用量，显示在对应的 AI 订阅上：快用完、闲置、按 API 价折算值不值。只读数字、模型名和时间。
-- 本机设备（Mac）：把这台 Mac 记成一条设备，写明型号、芯片、内存、系统版本、磁盘、电池和序列号；App 打开或回到前台时读，磁盘快满时标黄。只读本机，不联网，不弹权限。
-- 其他设备（Mac，默认关）：两台装了 Assetboard 的 Mac 配对后，互相读对方的本机信息和“正在做”，各自记成一条设备，资产板自动同步（一条记录两边改了不同的地方都留下，改了同一处用较新的并列出冲突，删除也同步）。配对时被点的那台核对 6 位数字后点允许；之后直接加密连接，同一网络自动发现，不在同一网络时从本机 Tailscale 列出的 Mac 里点选，或填地址。不经过任何服务器。
-- Tailscale（Mac）：「导入 › Tailscale」列出 tailnet 里还没记到资产板上的机器，手机、电脑记成设备，Linux 等记成服务器，点一下添加；「设置 › 功能 › Tailscale 在线状态」（默认关）打开后，能对上的服务器和设备显示在线或离线和最后在线时间。只在本机运行 `tailscale status --json`，不探测、不联网。
-- 正在做（Mac）：本机正在运行的 AI 编码会话（Claude Code、Codex、Cursor 等）有几个、各在哪个仓库和分支、运行了多久；只读进程名、工作目录、启动时间和会话文件的修改时间，不读对话内容。
-- 代码仓库（Mac，默认关闭）：GitHub 同步时一并读取分支和最近一次 Actions，失败或运行中的排在行首，新分支显示 14 天。
-- 键盘操作，按 `?` 查看快捷键，见[使用手册 · 快捷键](GUIDE.md#快捷键)。
-- 主题色、两种磁贴墙皮肤（安静；冰箱贴：四扇冰箱门可选，整个窗口跟着门的配色，面板可以随手摆放）、三档密度，浅色和深色跟随系统；界面有英文（默认）和简体中文。
+---
 
-## 官方安装包与源码构建
+## Install & Try Demo in 10 Seconds
 
-Assetboard 免费、开源（GPL-3.0），不限时间和条数。从 [assetboard.app](https://assetboard.app/) 下载的安装包不用注册，也不用输入许可证。这个仓库就是它的全部代码，自己编译得到的版本和下载的一样。见[使用手册 · 官方安装包与源码构建](GUIDE.md#官方安装包与源码构建)。
-
-## 安装
-
-从 [assetboard.app](https://assetboard.app/zh/) 下载 `.dmg`，把 Assetboard 拖进「应用程序」。需要 macOS 15 或更高、Apple Silicon。安装包已签名并公证，App 内置更新。
-
-发布页附带 [SHA256SUMS.txt](https://github.com/hippone-labs/assetboard/releases/latest/download/SHA256SUMS.txt)。把它和安装包放在同一目录后，运行 `shasum -a 256 -c SHA256SUMS.txt --ignore-missing` 即可核对。
-
-用演示数据启动（不读写你的数据，不联网）：
+1. Download the signed & notarized `.dmg` from **[assetboard.app](https://assetboard.app/)** (requires **macOS 15+**, **Apple Silicon**).
+2. Drag **Assetboard** into `Applications`. The app updates itself.
+3. Want to explore with fictional data first (touches nothing, no network)?
 
 ```sh
 open /Applications/Assetboard.app --args --demo
 ```
 
-## 从源码构建
-
-前置环境（版本以 `desktop/Info.plist` 和 `.github/workflows/build.yml` 为准）：
-
-| 需要 | 版本 | 用途 |
-|---|---|---|
-| macOS 与芯片 | 只支持 Apple 芯片（arm64）；最低 macOS 15.0（`LSMinimumSystemVersion`）。CI 在 macOS 26 上构建；发版前会手动在 macOS 15 上再跑一次 Swift 任务 | 构建和运行 App |
-| Xcode / Swift | 最低：带 `swiftc` 的 Xcode 命令行工具（`./desktop/build.sh` 调 `xcrun swiftc`）。已验证：CI 用 Xcode 26.6；只有要编译 macOS 26 应用图标（`Assets.car`）才需要完整 Xcode，否则用仓库里已提交的 | `./desktop/build.sh` |
-| Node | 已验证：CI 用 22（`node --test` 不需要装任何包） | 单元测试 |
-| Python 3 | 近期的 3 即可（CI 用 runner 自带版本），不需要装包 | 浏览器版本地服务、`tools/` 里的测试 |
-| Playwright | 已验证：1.64.1 加 Chromium；首次安装 `npm install --no-save playwright && npx playwright install chromium`，然后 `node tools/browser-tests.js`（默认同时跑一半核心数、最多 6 个文件，`--jobs 1` 逐个跑；CI 上逐个跑） | 界面测试（`tests/*.playwright.js`） |
-
-没有 package.json、打包工具或第三方依赖。
+Or preview the browser UI locally without building anything:
 
 ```sh
-./desktop/build.sh        # 输出 dist/Assetboard.app（本机临时签名）并跑原生自检；需要 macOS 和 Xcode 命令行工具
-node --test               # 单元测试
+python3 -m http.server 4317 --bind 127.0.0.1
+# Open http://127.0.0.1:4317/?demo  (add &lang=zh for Chinese)
 ```
 
-浏览器版不需要构建，数据存在浏览器的 localStorage，没有系统通知、文字识别、AI 识别和钥匙串：
+> Release checksums are published in [SHA256SUMS.txt](https://github.com/hippone-labs/assetboard/releases/latest/download/SHA256SUMS.txt). Verify with `shasum -a 256 -c SHA256SUMS.txt --ignore-missing`.
 
-```sh
-python3 -m http.server 4317 --bind 127.0.0.1    # 打开 http://127.0.0.1:4317，加 ?demo 看演示数据
-```
+---
 
-| 路径 | 内容 |
+## Themes & Views
+
+Choose between **Quiet** (light/dark, hairlines, structured columns) and **Fridge magnets** (4 doors with tilted draggable panels, tape, magnets, and a tiny pixel mascot). Turn on **Privacy mode** (eye icon in the top bar) anytime to mask names, accounts, and IPs for safe screenshots.
+
+| | |
 | --- | --- |
-| `index.html`、`*.js`、`*.css` | 两种宿主共用的界面；纯函数在 `asset-data.js`，有单元测试 |
-| `desktop/` | macOS App（Swift）和构建、打包脚本 |
-| `i18n/` | 英文文案 |
-| `tests/` | Node 单元测试和 Playwright 界面测试 |
-| `GUIDE.md` | 使用手册 |
+| **Quiet · Light** ![Quiet light](screenshots/theme-quiet-light-en.webp) | **Quiet · Dark** ![Quiet dark](screenshots/theme-quiet-dark-en.webp) |
+| **Fridge · Pixel Kitchen** ![Pixel Kitchen](screenshots/theme-fridge-kitchen-en.webp) | **Fridge · Pixel Night City** ![Pixel Night City](screenshots/theme-fridge-city-en.webp) |
+| **Fridge · Sketchbook Fridge** ![Sketchbook Fridge](screenshots/theme-fridge-handdrawn-en.webp) | **Fridge · Pixel Server Room** ![Pixel Server Room](screenshots/theme-fridge-server-en.webp) |
 
-## 参与
+### More views
 
-问题、服务商规则（比如某家云服务器过期几天后释放）和建议可以用 [issue 表单](https://github.com/hippone-labs/assetboard/issues/new/choose)提交，也欢迎 Pull Request，见 [CONTRIBUTING.md](CONTRIBUTING.md)。邮件：lihaosong1109@gmail.com。
+| | |
+| --- | --- |
+| **Upcoming**: overdue, 7d/30d charges, renewals to confirm ![Upcoming](screenshots/upcoming-en.webp) | **Cost**: monthly/yearly totals in 6 currencies + 12-month forecast ![Cost](screenshots/cost-en.webp) |
+| **Timeline**: 12 months of renewals and recurring charges ![Timeline](screenshots/timeline-en.webp) | **Live status** (off by default): SSH/probe memory, traffic & load ![Live status](screenshots/live-en.webp) |
 
-## 许可证
+---
 
-[GPL-3.0](LICENSE)。
+## Reminders, Imports & Integrations
+
+### Native macOS notifications (even when closed)
+- **Expiries & renewals**: 30, 7, and 1 days ahead at 09:00.
+- **Monthly charges, trial ends, cancel-by dates**: 3 and 1 days ahead.
+- **One-off expiries & SIM/number keep-alives**: on the day, plus day +3 and day +14.
+- **Auto-renewals**: never silently roll forward — asks you to confirm *"Renewed"* or *"Not renewed"* in Upcoming.
+
+### Data sources (12+ ways to populate)
+
+| Source | Details | Platform |
+| --- | --- | --- |
+| **Paste a domain / URL** | Queries RDAP for expiry date and registrar (TLDs without RDAP like `.cn`/`.io`/`.de` filled manually) | Mac App |
+| **Cloudflare** | Read-only token: Zones, Pages, Workers, R2 (+ expiry dates for Cloudflare Registrar domains) | Mac App |
+| **GitHub** | Local `gh` or read-only token: repos, open PRs, mergeable status, branches & latest Actions | Mac App |
+| **`~/.ssh/config`** | Host, HostName, User, Port (ignores `github.com` / `User git`) | Mac App |
+| **Tailscale** | Local `tailscale status --json`: import tailnet machines as servers/devices + optional online status | Mac App |
+| **Registrars & Cloud** | Namecheap, Porkbun, Hetzner, DigitalOcean, Vercel *(not yet verified against live accounts)* | Mac App |
+| **Screenshots & PDFs** | On-device macOS Vision OCR | Mac App |
+| **Mail & renewal notices** | `.eml` files or pasted text, rule-parsed with preview | App & Browser |
+| **CSV / TSV / JSON** | File drop or pasted tables, previewed before writing | App & Browser |
+| **Your own AI model** | Claude, OpenAI-compatible API, or local Ollama to parse screenshots/mail/text | Mac App |
+| **Inbox folder** | Drop script-generated JSON into `~/Library/Application Support/Assetboard/Inbox/` | Mac App |
+
+<details>
+<summary>Scriptable Inbox JSON format (max 100 items, 1 MB)</summary>
+
+Write to a temporary filename first, then rename to `.json` inside `~/Library/Application Support/Assetboard/Inbox/` (or drag onto the window). Every file is previewed before writing:
+
+```json
+{"assetboard": 1, "items": [
+  {"name": "example.com", "type": "domain", "provider": "Namecheap", "account": "me@example.com",
+   "date": "2027-03-01", "dateKind": "expire", "cycle": "yearly", "cost": "$10.98 / year",
+   "url": "https://ap.www.namecheap.com", "notes": "", "purpose": ""}
+]}
+```
+
+</details>
+
+### Also included
+- **Exports**: JSON backup, calendar `.ics`, payment ledger `.csv`, and a standalone **Handover List `.html`**.
+- **Free-tier sleep rules**: Built-in vendor rules (Supabase, Render, Upstash, etc.) + optional GitHub Actions keep-alive config.
+- **This Mac & paired Macs**: Automatic hardware/disk/battery/serial record for this Mac; pair additional Macs over LAN or Tailscale (6-digit confirmation) for encrypted board sync and remote coding session status.
+- **Custom combined views**: Group categories into custom views (e.g. *Machines* = Servers + Devices).
+- **Keyboard-first**: Single-key shortcuts everywhere (`?` lists all). English (default) & Simplified Chinese.
+
+---
+
+## Privacy & Network Transparency
+
+- **Storage**: `~/Library/Application Support/Assetboard/assetboard.sqlite` + `board.json`. No account, no cloud sync, no telemetry.
+- **Secrets**: Tokens and API keys live in the **macOS Keychain**. Bank card forms refuse full card numbers (last 4 digits only).
+- **CSP isolation**: The WebView cannot make network requests directly; every request goes through Swift and is recorded in the **Network Log**.
+- **Default connections**: Update checks (`assetboard.app`), known provider favicons, ECB exchange rates (`api.frankfurter.dev`), connected Cloudflare accounts, and local AI tool quota endpoints (using each tool's own login; each toggleable off). Everything else only connects when you enable or trigger it. See [GUIDE.md](GUIDE.md#隐私与网络) for the full host list.
+
+---
+
+## Build from Source
+
+No `package.json`, bundler, or third-party dependencies. This repository is the complete source of the official release.
+
+```sh
+./desktop/build.sh        # Builds dist/Assetboard.app (ad-hoc signed) & runs native self-tests (macOS + Xcode CLT)
+node --test               # Runs pure-JS unit tests (Node 22+, zero packages)
+```
+
+<details>
+<summary>Prerequisites & repository layout</summary>
+
+| Need | Version | For |
+| --- | --- | --- |
+| macOS & chip | Apple Silicon (`arm64`), macOS 15.0+ (`LSMinimumSystemVersion`) | Building and running the app |
+| Xcode / Swift | Xcode Command Line Tools (`swiftc`); full Xcode only needed to recompile `Assets.car` | `./desktop/build.sh` |
+| Node | Verified on Node 22 (`node --test`, no packages needed) | Unit tests |
+| Python 3 | Any recent Python 3 (no packages needed) | Local browser server & `tools/` tests |
+| Playwright | Optional: `npm install --no-save playwright && npx playwright install chromium`, then `node tools/browser-tests.js` | UI tests (`tests/*.playwright.js`) |
+
+| Path | Contents |
+| --- | --- |
+| `index.html`, `*.js`, `*.css` | Shared UI; pure logic in `asset-data.js` |
+| `desktop/` | Native macOS app (Swift), CLI/MCP, packaging scripts |
+| `pro/` | Open-source GPL-3.0 modules (bulk MCP edits, weekly RDAP, 12h Cloudflare sync, live status) bundled in all standard builds |
+| `i18n/` | English localization |
+| `tests/` | Node unit tests and Playwright UI tests |
+| `GUIDE.md`, `OBJECT-PANORAMA.md`, `DEVICE-PAIRING.md` | Detailed documentation (Chinese) |
+
+</details>
+
+---
+
+## Contributing & License
+
+Bug reports, **provider expiry/grace-period rules**, and PRs are very welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) or open an [issue](https://github.com/hippone-labs/assetboard/issues/new/choose). Contact: `lihaosong1109@gmail.com`.
+
+Licensed under **[GPL-3.0](LICENSE)**.
+
+<div align="center">
+
+If Assetboard keeps your domains, servers, and AI subscriptions under control, consider giving it a **Star** — it helps other developers discover the project.
+
+</div>
