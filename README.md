@@ -14,7 +14,7 @@ Track Claude Code / Codex / Cursor usage limits, VPS live load, domain renewals 
 [![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
 [![Build](https://github.com/hippone-labs/assetboard/actions/workflows/build.yml/badge.svg)](https://github.com/hippone-labs/assetboard/actions/workflows/build.yml)
 
-**[Download for macOS](https://assetboard.app/)** · **[简体中文](README.zh-CN.md)** · **[User Guide (中文)](GUIDE.md)** · **[Report an Issue](https://github.com/hippone-labs/assetboard/issues/new/choose)**
+**[Download for macOS](https://assetboard.app/)** · **[Try Live Demo](https://assetboard.app/demo/)** · **[简体中文](README.zh-CN.md)** · **[User Guide (中文)](GUIDE.md)** · **[Discussions](https://github.com/hippone-labs/assetboard/discussions)** · **[Issues](https://github.com/hippone-labs/assetboard/issues/new/choose)**
 
 </div>
 
