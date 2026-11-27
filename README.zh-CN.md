@@ -57,9 +57,15 @@ claude mcp add assetboard -- /Applications/Assetboard.app/Contents/MacOS/assetbo
 
 ## 10 秒上手 & 演示模式
 
-1. 从 **[assetboard.app](https://assetboard.app/zh/)** 下载已签名并公证的 `.dmg`（需要 **macOS 15+**，**Apple 芯片**）。
-2. 把 **Assetboard** 拖进「应用程序」，App 内置自动更新（界面默认英文，可在「设置」切简体中文）。
-3. 想先用虚构数据体验（不读写你的数据，不联网）：
+通过 **Homebrew** 一行安装（自动装好 `Assetboard.app` 并把 `assetboard-cli` 链接到 `PATH`；需要 **macOS 15+**，**Apple 芯片**）：
+
+```sh
+brew install --cask hippone-labs/tap/assetboard
+```
+
+也可以直接从 **[assetboard.app](https://assetboard.app/zh/)** 下载已签名并公证的 `.dmg`，拖进「应用程序」即可（内置自动更新；界面默认英文，可在「设置」切简体中文）。
+
+想先用虚构数据体验（不读写你的数据，不联网）：
 
 ```sh
 open /Applications/Assetboard.app --args --demo
