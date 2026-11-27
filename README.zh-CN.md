@@ -14,7 +14,7 @@
 [![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
 [![Build](https://github.com/hippone-labs/assetboard/actions/workflows/build.yml/badge.svg)](https://github.com/hippone-labs/assetboard/actions/workflows/build.yml)
 
-**[官网下载](https://assetboard.app/zh/)** · **[English](README.md)** · **[完整使用手册](GUIDE.md)** · **[问题反馈](https://github.com/hippone-labs/assetboard/issues/new/choose)**
+**[官网下载](https://assetboard.app/zh/)** · **[在线体验 Demo](https://assetboard.app/demo/?lang=zh)** · **[English](README.md)** · **[完整使用手册](GUIDE.md)** · **[社区讨论](https://github.com/hippone-labs/assetboard/discussions)** · **[问题反馈](https://github.com/hippone-labs/assetboard/issues/new/choose)**
 
 </div>
 
