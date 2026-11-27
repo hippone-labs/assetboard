@@ -42,6 +42,8 @@
 
 ## 一行命令接入 AI（MCP）
 
+[![hippone-labs/assetboard MCP server](https://glama.ai/mcp/servers/hippone-labs/assetboard/badges/score.svg)](https://glama.ai/mcp/servers/hippone-labs/assetboard)
+
 把 Assetboard 接入 Claude Code（其他客户端在 App 菜单「文件 › MCP 接入…」一键复制配置）：
 
 ```sh
@@ -196,6 +198,11 @@ node --test               # 单元测试（Node 22+，无需装包）
 欢迎提交 Bug、**服务商过期与宽限期规则**与 Pull Request，见 [CONTRIBUTING.md](CONTRIBUTING.md) 或 [issue 表单](https://github.com/hippone-labs/assetboard/issues/new/choose)。邮件：`lihaosong1109@gmail.com`。
 
 基于 **[GPL-3.0](LICENSE)** 开源。
+
+### 友情链接
+
+- [LINUX DO](https://linux.do) — 真诚、友善、团结、专业的开发者社区
+- [Glama MCP 目录](https://glama.ai/mcp/servers/hippone-labs/assetboard)
 
 <div align="center">
 
